@@ -70,7 +70,7 @@ export default function FeaturesDark() {
           <motion.p initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
             className="text-base md:text-lg mb-8 max-w-2xl mx-auto text-gray-300">AI 상담, 실시간 단가, 3D 뷰어, 전문업체 매칭까지 하나의 플랫폼에서</motion.p>
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}>
-            <a href="/address" className="inline-flex items-center justify-center px-5 py-3 rounded-lg text-sm font-medium bg-white text-gray-900 hover:opacity-90 hover:scale-105 transition-all">
+            <a href="/project/new" className="inline-flex items-center justify-center px-5 py-3 rounded-lg text-sm font-medium bg-white text-gray-900 hover:opacity-90 hover:scale-105 transition-all">
               무료 견적 시작하기
             </a>
           </motion.div>

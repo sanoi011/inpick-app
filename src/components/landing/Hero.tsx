@@ -64,7 +64,7 @@ export default function Hero() {
 
           <div className="flex flex-col items-center gap-4">
             <motion.a initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ duration: 0.5, delay: 0.3 }}
-              href="/address" className="rounded-lg px-6 py-4 text-base font-medium transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              href="/project/new" className="rounded-lg px-6 py-4 text-base font-medium transition-transform hover:scale-[1.02] active:scale-[0.98]"
               style={{ backgroundColor: COLORS.buttonBg, color: COLORS.buttonText }}>
               무료 견적 시작하기
             </motion.a>

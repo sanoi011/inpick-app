@@ -65,7 +65,7 @@ export default function Pricing() {
                     <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
                     {plan.period && <span className="text-base text-gray-600">{plan.period}</span>}
                   </div>
-                  <a href={plan.id === "pro" ? "/contractor/register" : "/address"}
+                  <a href={plan.id === "pro" ? "/contractor/register" : "/project/new"}
                     className="block w-full py-4 px-6 rounded-lg text-base font-medium transition-colors duration-200 bg-gray-900 text-white hover:bg-gray-800 text-center">
                     {plan.buttonText}
                   </a>
