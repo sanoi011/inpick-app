@@ -38,7 +38,7 @@ export default function Header({
   brandName = "INPICK",
   navLinks = NAV_LINKS,
   startButtonText = "무료 견적 받기",
-  startButtonHref = "/address",
+  startButtonHref = "/project/new",
   contactButtonText = "사업자 등록",
   contactButtonHref = "/contractor/register",
 }: HeaderProps) {
