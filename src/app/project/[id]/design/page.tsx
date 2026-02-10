@@ -1,13 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Map } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import AnnotationCanvas from "@/components/project/AnnotationCanvas";
 import DesignChat from "@/components/project/DesignChat";
 import ImageUploader, { ImageThumbnailList } from "@/components/project/ImageUploader";
 import type { CanvasAnnotation, DesignChatMessage, ProjectImage } from "@/types/consumer-project";
+import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
+import { loadFloorPlan } from "@/lib/services/drawing-service";
+import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 
 // 이미지 리사이즈 유틸
 function resizeImage(file: File, maxSize: number): Promise<string> {
@@ -65,6 +68,15 @@ export default function DesignPage() {
   const [annotations, setAnnotations] = useState<CanvasAnnotation[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingText, setStreamingText] = useState("");
+  const [drawingPlan, setDrawingPlan] = useState<ParsedFloorPlan | null>(null);
+  const [showMinimap, setShowMinimap] = useState(true);
+
+  // 도면 로드
+  useEffect(() => {
+    if (project?.drawingId) {
+      loadFloorPlan(project.drawingId).then(setDrawingPlan);
+    }
+  }, [project?.drawingId]);
 
   const activeImage = images.find((img) => img.id === activeImageId);
 
@@ -113,6 +125,11 @@ export default function DesignPage() {
         )
       );
     }
+  };
+
+  // 도면 공간 클릭 → 해당 공간 컨텍스트로 메시지
+  const handleRoomClick = (room: RoomData) => {
+    handleSendMessage(`${room.name} (${room.area}m²) 공간에 대해 인테리어 추천을 해주세요.`);
   };
 
   // 메시지 전송 (Mock AI)
@@ -248,6 +265,35 @@ export default function DesignPage() {
 
         {/* 우측: 캔버스 */}
         <div className="flex-1 flex flex-col min-w-0">
+          {/* 도면 미니맵 */}
+          {drawingPlan && showMinimap && (
+            <div className="relative border-b border-gray-200 bg-white">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
+                <span className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                  <Map className="w-3 h-3" /> 평면도 (공간 클릭 시 AI 상담)
+                </span>
+                <button
+                  onClick={() => setShowMinimap(false)}
+                  className="text-xs text-gray-400 hover:text-gray-600"
+                >
+                  접기
+                </button>
+              </div>
+              <FloorPlan2D
+                floorPlan={drawingPlan}
+                onRoomClick={handleRoomClick}
+                className="max-h-[200px] border-0 rounded-none"
+              />
+            </div>
+          )}
+          {drawingPlan && !showMinimap && (
+            <button
+              onClick={() => setShowMinimap(true)}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-50 border-b border-gray-200"
+            >
+              <Map className="w-3 h-3" /> 평면도 보기
+            </button>
+          )}
           <AnnotationCanvas
             backgroundImage={activeImage?.url}
             annotations={annotations}

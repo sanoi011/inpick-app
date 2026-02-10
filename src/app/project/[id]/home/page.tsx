@@ -8,6 +8,10 @@ import {
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import type { AddressSearchResult, BuildingInfo } from "@/types/address";
+import type { ParsedFloorPlan } from "@/types/floorplan";
+import { findMatchingDrawing, loadFloorPlan } from "@/lib/services/drawing-service";
+import type { DrawingCatalogEntry } from "@/lib/services/drawing-service";
+import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 
 type Step = "search" | "building" | "confirm";
 
@@ -15,7 +19,7 @@ export default function ProjectHomePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateAddress } = useProjectState(projectId);
+  const { project, updateAddress, setDrawingId } = useProjectState(projectId);
 
   const [step, setStep] = useState<Step>("search");
   const [keyword, setKeyword] = useState("");
@@ -26,6 +30,9 @@ export default function ProjectHomePage() {
   const [loading, setLoading] = useState(false);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [matchedDrawing, setMatchedDrawing] = useState<DrawingCatalogEntry | null>(null);
+  const [matchedFloorPlan, setMatchedFloorPlan] = useState<ParsedFloorPlan | null>(null);
+  const [drawingLoading, setDrawingLoading] = useState(false);
 
   // 이미 주소가 설정된 프로젝트면 confirm 단계로
   useEffect(() => {
@@ -95,9 +102,28 @@ export default function ProjectHomePage() {
     }
   };
 
-  const handleSelectBuilding = (building: BuildingInfo) => {
+  const handleSelectBuilding = async (building: BuildingInfo) => {
     setSelectedBuilding(building);
     setStep("confirm");
+
+    // 건축도면 매칭 시도
+    setDrawingLoading(true);
+    try {
+      const match = await findMatchingDrawing(
+        building.exclusiveArea,
+        building.roomCount || 3,
+        building.buildingType
+      );
+      if (match) {
+        setMatchedDrawing(match);
+        const plan = await loadFloorPlan(match.id);
+        setMatchedFloorPlan(plan);
+      }
+    } catch {
+      // 매칭 실패 시 무시
+    } finally {
+      setDrawingLoading(false);
+    }
   };
 
   // 확인 → 프로젝트에 주소 저장 → 디자인 탭 이동
@@ -117,6 +143,9 @@ export default function ProjectHomePage() {
         floor: selectedBuilding.floor,
         totalFloor: selectedBuilding.totalFloor,
       });
+      if (matchedDrawing) {
+        setDrawingId(matchedDrawing.id);
+      }
       router.push(`/project/${projectId}/design`);
     }
   };
@@ -403,11 +432,32 @@ export default function ProjectHomePage() {
                   </div>
                   <div>
                     <p className="text-xs text-gray-400">도면</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedBuilding.floorPlanAvailable ? "있음" : "없음"}</p>
+                    <p className="text-sm font-medium text-gray-900">{matchedDrawing ? "AI 매칭" : selectedBuilding.floorPlanAvailable ? "있음" : "없음"}</p>
                   </div>
                 </div>
               </div>
             </div>
+
+            {/* 매칭된 도면 미리보기 */}
+            {drawingLoading && (
+              <div className="flex items-center justify-center py-8 bg-white rounded-2xl border border-gray-200 mb-6">
+                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+                <span className="text-sm text-gray-500">건축도면 매칭 중...</span>
+              </div>
+            )}
+            {!drawingLoading && matchedFloorPlan && matchedDrawing && (
+              <div className="mb-6">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
+                    AI 건축도면 데이터 기반
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {matchedDrawing.totalArea}m² / {matchedDrawing.roomCount}방 / {matchedDrawing.bathroomCount}욕실
+                  </span>
+                </div>
+                <FloorPlan2D floorPlan={matchedFloorPlan} className="max-h-[300px]" />
+              </div>
+            )}
 
             <div className="flex gap-3">
               <button

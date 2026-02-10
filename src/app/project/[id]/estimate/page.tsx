@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -16,16 +16,97 @@ import {
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import CostTable, { type RoomCostSection, type CostItem } from "@/components/project/CostTable";
+import type { ParsedFloorPlan } from "@/types/floorplan";
+import { loadFloorPlan } from "@/lib/services/drawing-service";
 
-// Mock 견적 데이터 생성
-function generateMockEstimate(): {
+// 공간 유형별 기본 견적 아이템 생성
+function generateRoomItems(roomName: string, roomType: string, area: number): Omit<CostItem, "id">[] {
+  const q = Math.round(area);
+  const wallQ = Math.round(area * 0.6); // 대략적인 벽지 롤 수
+
+  if (roomType === "BATHROOM") {
+    return [
+      { category: "철거", part: "전체", productName: "기존 욕실 철거", method: "철거", spec: "-", unit: "식", quantity: 1, materialCost: 0, laborCost: 350000, overhead: 35000, total: 385000, note: "" },
+      { category: "방수", part: "바닥", productName: "우레탄 방수", method: "시공", spec: "2회 도포", unit: "㎡", quantity: q, materialCost: q * 15000, laborCost: q * 20000, overhead: q * 3500, total: q * 38500, note: "" },
+      { category: "마감", part: "벽", productName: "욕실 타일 (200×200)", method: "타일", spec: "200×200mm", unit: "㎡", quantity: q * 3, materialCost: q * 60000, laborCost: q * 90000, overhead: q * 15000, total: q * 165000, note: "" },
+      { category: "마감", part: "바닥", productName: "욕실 바닥 타일", method: "타일", spec: "200×200mm", unit: "㎡", quantity: q, materialCost: q * 20000, laborCost: q * 30000, overhead: q * 5000, total: q * 55000, note: "논슬립" },
+      { category: "설비", part: "전체", productName: "욕실 세트 (양변기+세면대+샤워기)", method: "설치", spec: "대림바스", unit: "식", quantity: 1, materialCost: 650000, laborCost: 250000, overhead: 90000, total: 990000, note: "" },
+      { category: "전기", part: "천장", productName: "방습 LED 등", method: "설치", spec: "IP44", unit: "개", quantity: 2, materialCost: 40000, laborCost: 60000, overhead: 10000, total: 110000, note: "" },
+    ];
+  }
+
+  if (roomType === "KITCHEN") {
+    return [
+      { category: "철거", part: "벽", productName: "기존 타일 철거", method: "철거", spec: "-", unit: "㎡", quantity: q, materialCost: 0, laborCost: q * 10000, overhead: q * 1000, total: q * 11000, note: "" },
+      { category: "마감", part: "벽", productName: "포세린 타일 (300×600)", method: "타일", spec: "300×600mm", unit: "㎡", quantity: q, materialCost: q * 30000, laborCost: q * 40000, overhead: q * 7000, total: q * 77000, note: "백색무광" },
+      { category: "마감", part: "바닥", productName: "포세린 타일 (600×600)", method: "타일", spec: "600×600mm", unit: "㎡", quantity: q, materialCost: q * 35000, laborCost: q * 40000, overhead: q * 7500, total: q * 82500, note: "" },
+      { category: "목공", part: "천장", productName: "싱크대 상부장 교체", method: "설치", spec: "2.4m", unit: "식", quantity: 1, materialCost: 450000, laborCost: 300000, overhead: 75000, total: 825000, note: "" },
+      { category: "전기", part: "천장", productName: "펜던트 조명", method: "설치", spec: "E26 소켓", unit: "개", quantity: 2, materialCost: 120000, laborCost: 60000, overhead: 18000, total: 198000, note: "" },
+    ];
+  }
+
+  if (roomType === "ENTRANCE") {
+    return [
+      { category: "마감", part: "바닥", productName: "포세린 타일 (300×300)", method: "타일", spec: "300×300mm", unit: "㎡", quantity: q, materialCost: q * 25000, laborCost: q * 30000, overhead: q * 5500, total: q * 60500, note: "" },
+      { category: "마감", part: "벽", productName: "실크벽지", method: "도배", spec: "106cm×15.6m", unit: "롤", quantity: Math.max(2, wallQ), materialCost: Math.max(2, wallQ) * 15000, laborCost: Math.max(2, wallQ) * 20000, overhead: Math.max(2, wallQ) * 3500, total: Math.max(2, wallQ) * 38500, note: "" },
+      { category: "목공", part: "벽", productName: "신발장 (빌트인)", method: "설치", spec: "1.2m×H2.1m", unit: "식", quantity: 1, materialCost: 350000, laborCost: 200000, overhead: 55000, total: 605000, note: "" },
+    ];
+  }
+
+  // 거실, 안방, 침실, 기타 일반 공간
+  const isMaster = roomType === "MASTER_BED";
+  return [
+    { category: "철거", part: "바닥", productName: "기존 장판 철거", method: "철거", spec: "-", unit: "㎡", quantity: q, materialCost: 0, laborCost: q * 5000, overhead: q * 500, total: q * 5500, note: "" },
+    { category: "마감", part: "바닥", productName: isMaster ? "한화 아쿠아텍 자작나무" : "LX하우시스 디아망 오크", method: "시공", spec: isMaster ? "1200×190×8mm" : "1210×192×8mm", unit: "㎡", quantity: q, materialCost: q * 15000, laborCost: q * 10000, overhead: q * 2500, total: q * 27500, note: isMaster ? "방수" : "E0등급" },
+    { category: "마감", part: "벽", productName: isMaster ? "합지벽지 (수입)" : "실크벽지 (LG하우시스)", method: "도배", spec: isMaster ? "53cm×10m" : "106cm×15.6m", unit: "롤", quantity: Math.max(4, wallQ), materialCost: Math.max(4, wallQ) * (isMaster ? 20000 : 15000), laborCost: Math.max(4, wallQ) * 20000, overhead: Math.max(4, wallQ) * (isMaster ? 4000 : 3500), total: Math.max(4, wallQ) * (isMaster ? 44000 : 38500), note: isMaster ? "포인트" : "" },
+    { category: "마감", part: "천장", productName: "실크벽지", method: "도배", spec: "106cm×15.6m", unit: "롤", quantity: Math.max(2, Math.round(wallQ * 0.5)), materialCost: Math.max(2, Math.round(wallQ * 0.5)) * 15000, laborCost: Math.max(2, Math.round(wallQ * 0.5)) * 20000, overhead: Math.max(2, Math.round(wallQ * 0.5)) * 3500, total: Math.max(2, Math.round(wallQ * 0.5)) * 38500, note: "" },
+    { category: "전기", part: "천장", productName: "LED 매입 다운라이트", method: "설치", spec: "Φ125 12W", unit: "개", quantity: Math.max(2, Math.round(q * 0.3)), materialCost: Math.max(2, Math.round(q * 0.3)) * 16000, laborCost: Math.max(2, Math.round(q * 0.3)) * 30000, overhead: Math.max(2, Math.round(q * 0.3)) * 4600, total: Math.max(2, Math.round(q * 0.3)) * 50600, note: "" },
+    ...(isMaster ? [{ category: "목공", part: "벽", productName: "붙박이장 (슬라이딩)", method: "설치", spec: "2.4m×H2.4m", unit: "식", quantity: 1, materialCost: 800000, laborCost: 400000, overhead: 120000, total: 1320000, note: "" }] : []),
+  ];
+}
+
+// Mock 견적 데이터 생성 (도면 데이터가 있으면 실제 공간 정보 사용)
+function generateMockEstimate(floorPlan?: ParsedFloorPlan | null): {
   sections: RoomCostSection[];
   summary: { label: string; amount: number; color: string }[];
 } {
-  const rooms: {
-    name: string;
-    items: Omit<CostItem, "id">[];
-  }[] = [
+  const ROOM_COLORS: Record<string, string> = {
+    거실: "bg-blue-500", 주방: "bg-amber-500", 안방: "bg-purple-500",
+    욕실: "bg-teal-500", 현관: "bg-orange-500", 침실: "bg-indigo-500",
+    발코니: "bg-green-500", 드레스룸: "bg-pink-500", 다용도실: "bg-gray-500",
+  };
+
+  // 도면 데이터가 있으면 실제 공간 기반 견적 생성
+  if (floorPlan && floorPlan.rooms.length > 0) {
+    // 주요 공간만 필터 (CORRIDOR, UTILITY 중 너무 작은 것 제외)
+    const mainRooms = floorPlan.rooms.filter((r) =>
+      r.area >= 2 && !["CORRIDOR"].includes(r.type)
+    );
+
+    const sections: RoomCostSection[] = mainRooms.map((room) => {
+      const rawItems = generateRoomItems(room.name, room.type, room.area);
+      const items: CostItem[] = rawItems.map((item, idx) => ({
+        ...item,
+        id: `${room.id}-${idx}`,
+      }));
+      return {
+        roomName: room.name,
+        items,
+        subtotal: items.reduce((sum, i) => sum + i.total, 0),
+      };
+    });
+
+    const summary = sections.map((s) => ({
+      label: s.roomName,
+      amount: s.subtotal,
+      color: ROOM_COLORS[s.roomName] || Object.values(ROOM_COLORS)[Math.floor(Math.random() * Object.values(ROOM_COLORS).length)],
+    }));
+
+    return { sections, summary };
+  }
+
+  // 폴백: 기본 하드코딩 Mock
+  const rooms: { name: string; items: Omit<CostItem, "id">[]; }[] = [
     {
       name: "거실",
       items: [
@@ -124,7 +205,16 @@ export default function EstimatePage() {
   const { project } = useProjectState(projectId);
 
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
-  const { sections, summary } = generateMockEstimate();
+  const [drawingPlan, setDrawingPlan] = useState<ParsedFloorPlan | null>(null);
+
+  // 도면 로드
+  useEffect(() => {
+    if (project?.drawingId) {
+      loadFloorPlan(project.drawingId).then(setDrawingPlan);
+    }
+  }, [project?.drawingId]);
+
+  const { sections, summary } = generateMockEstimate(drawingPlan);
 
   const grandTotal = sections.reduce((sum, s) => sum + s.subtotal, 0);
   const totalMaterial = sections.reduce(
