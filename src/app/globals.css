@@ -17,11 +17,29 @@
 body {
   color: var(--foreground);
   background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
 }
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
+@layer components {
+  .btn-primary {
+    @apply bg-primary-600 text-white px-6 py-3 rounded-lg font-medium
+           hover:bg-primary-700 transition-colors duration-200;
+  }
+
+  .btn-outline {
+    @apply border border-neutral-300 text-neutral-700 px-6 py-3 rounded-lg font-medium
+           hover:bg-neutral-50 transition-colors duration-200;
+  }
+
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-neutral-200
+           hover:shadow-md transition-shadow duration-200;
+  }
+
+  .section-title {
+    @apply text-2xl font-bold text-neutral-900;
+  }
+
+  .section-subtitle {
+    @apply text-neutral-500 mt-2;
   }
 }
