@@ -47,6 +47,8 @@ export default function LandingFooter() {
                 <div className="flex flex-col gap-3">
                   <a href="/address" className="text-sm text-gray-400 hover:text-white transition-colors">무료 견적 받기</a>
                   <a href="/contractor/register" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 등록</a>
+                  <a href="/contractor/login" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 로그인</a>
+                  <a href="/admin" className="text-sm text-gray-400 hover:text-white transition-colors">관리자</a>
                   <a href="#contact" className="text-sm text-gray-400 hover:text-white transition-colors">문의하기</a>
                 </div>
               </div>
