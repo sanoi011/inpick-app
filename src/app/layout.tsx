@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -16,10 +14,17 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "INPICK - 나에게 딱 맞는 인테리어",
+  title: "INPICK - AI 인테리어 견적 플랫폼",
   description:
-    "인테리어 전문가를 찾고, 포트폴리오를 탐색하고, 커뮤니티에서 영감을 얻으세요. INPICK에서 나만의 공간을 완성하세요.",
-  keywords: ["인테리어", "인테리어 플랫폼", "인테리어 전문가", "포트폴리오", "INPICK"],
+    "AI가 설계하는 나만의 인테리어 견적. 주소만 입력하면 실시간 공식 단가 기반으로 정확한 견적을 만들어 드립니다.",
+  keywords: [
+    "인테리어 견적",
+    "AI 인테리어",
+    "인테리어 플랫폼",
+    "견적 자동화",
+    "INPICK",
+    "인픽",
+  ],
 };
 
 export default function RootLayout({
@@ -32,9 +37,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
       >
-        <Header />
-        <main className="min-h-screen">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
