@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
-  ArrowLeft, Loader2, FileText, Download, Printer,
+  ArrowLeft, Loader2, FileText, Download, Printer, Users,
   ChevronDown, ChevronRight, Package, Wrench, Layers,
   AlertCircle, CheckCircle2, Gavel,
 } from "lucide-react";
@@ -357,17 +357,23 @@ export default function EstimateDetailPage() {
           </div>
         </div>
 
-        {/* Total footer */}
-        <div className="bg-blue-600 text-white rounded-xl p-6 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-blue-200">최종 견적금액 (VAT 포함)</p>
-            <p className="text-3xl font-bold mt-1">{fmt(estimate.finalPrice)}원</p>
+        {/* Total footer + Bid link */}
+        <div className="bg-blue-600 text-white rounded-xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm text-blue-200">최종 견적금액 (VAT 포함)</p>
+              <p className="text-3xl font-bold mt-1">{fmt(estimate.finalPrice)}원</p>
+            </div>
+            <div className="text-right space-y-1">
+              <p className="text-sm text-blue-200">자재 {fmt(estimate.materialCost)}원</p>
+              <p className="text-sm text-blue-200">노무 {fmt(estimate.laborCost)}원</p>
+              <p className="text-sm text-blue-200">경비 {fmt(estimate.overheadCost)}원</p>
+            </div>
           </div>
-          <div className="text-right space-y-1">
-            <p className="text-sm text-blue-200">자재 {fmt(estimate.materialCost)}원</p>
-            <p className="text-sm text-blue-200">노무 {fmt(estimate.laborCost)}원</p>
-            <p className="text-sm text-blue-200">경비 {fmt(estimate.overheadCost)}원</p>
-          </div>
+          <Link href={`/estimate/${estimate.id}/bids`}
+            className="block w-full text-center bg-white/20 hover:bg-white/30 text-white py-3 rounded-lg text-sm font-medium transition-colors">
+            <span className="inline-flex items-center gap-1.5"><Users className="w-4 h-4" /> 입찰 비교 및 업체 선정</span>
+          </Link>
         </div>
       </main>
     </div>
