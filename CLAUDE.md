@@ -113,6 +113,49 @@
 | 견적받기 | `/project/[id]/bids` | 완료 |
 | 프로젝트 생성 | `/project/new` | 완료 |
 
+## 건축도면 데이터 연동 (2026-02-11)
+
+### 데이터셋
+- AI Hub 239번 건축도면 데이터 (COCO 포맷)
+- SPA(공간 폴리곤) 데이터만 사용, STR/OBJ는 ID 불일치로 제외
+- 10개 샘플 아파트 단위 평면도 (49~109m²)
+
+### 전처리 스크립트
+- `scripts/coco-types.ts` - COCO 타입 정의 + 카테고리 매핑
+- `scripts/process-drawings.ts` - COCO → ParsedFloorPlan 변환
+- 실행: `npx tsx scripts/process-drawings.ts`
+- 출력: `public/floorplans/index.json` + `public/floorplans/{id}.json`
+
+### 도면 서비스
+- `src/lib/services/drawing-service.ts` - 카탈로그 캐싱, 면적+방수 매칭, 개별 도면 로딩
+
+### 타입 확장
+- `src/types/floorplan.ts` - DRESSROOM, FixtureData, wall.polygon, DRAWING source
+- `src/types/consumer-project.ts` - drawingId 필드
+- `src/hooks/useProjectState.ts` - setDrawingId 메서드
+
+### 렌더링
+- `src/components/viewer/FloorPlan2D.tsx` - SVG 폴리곤 렌더링 (기존 rect 폴백 유지)
+  - room.polygon → `<polygon>`, 중심점 라벨, "AI 건축도면 데이터" 뱃지
+  - wall.polygon, fixtures 렌더링 지원
+
+### 워크플로우 연동
+- `home/page.tsx` - 건물 선택 시 자동 도면 매칭 + 폴리곤 미리보기
+- `design/page.tsx` - 도면 미니맵 (공간 클릭 → AI 상담)
+- `estimate/page.tsx` - 실제 공간 데이터 기반 견적 생성
+
+### 카테고리 매핑
+| COCO ID | 이름 | RoomType |
+|---------|------|----------|
+| 13 | 거실 | LIVING |
+| 14 | 침실 | BED/MASTER_BED |
+| 15 | 주방 | KITCHEN |
+| 16 | 현관 | ENTRANCE |
+| 17 | 발코니 | BALCONY |
+| 18 | 화장실 | BATHROOM |
+| 20 | 드레스룸 | DRESSROOM |
+| 19,1,22 | 기타 | UTILITY |
+
 ## 소비자(고객) 측 기존 기능
 - `/` - 랜딩 페이지
 - `/address` - 주소 검색 (레거시, /project/new로 전환)
@@ -124,10 +167,11 @@
 - `/auth` - 소비자 인증
 
 ## 다음 작업 후보
-- 소비자 워크플로우 UI/UX 디테일 보완
-- 실제 건축도면 연동 (도면 확보 시)
+- 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
+- 더 많은 도면 샘플 추가 (Training 데이터에서)
 - Gemini AI 실제 API 키 연동 테스트
 - 견적산출 데이터 ↔ 디자인 결정 자동 연결
+- 소비자 워크플로우 UI/UX 디테일 보완
 - 사업자 페이지 UI/UX 디테일 보완
 - 실제 데이터 연동 테스트
 - RLS(Row Level Security) 정책 설정
