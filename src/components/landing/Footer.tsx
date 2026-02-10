@@ -10,12 +10,12 @@ const HOME_LINKS = [
 ];
 
 const COMPANY_INFO = {
-  copyright: "Copyright © 2026 INPICK. All rights reserved.",
-  businessNumber: "사업자등록번호: 000-00-00000",
-  ceo: "대표자: 홍길동",
-  email: "이메일: support@inpick.co.kr",
-  phone: "연락처: 02-0000-0000",
-  address: "사업자주소: 서울특별시 서초구 매헌로 16, 서울AI허브 1205호",
+  copyright: "Copyright © 2026 AIOD. All rights reserved.",
+  businessNumber: "사업자등록번호: 예비창업 준비중",
+  ceo: "회사명: AIOD | 플랫폼: INPICK",
+  email: "이메일: tjsqhs011@naver.com",
+  phone: "연락처: 준비중",
+  address: "사업자주소: 예비창업 예정",
 };
 
 const LEGAL_LINKS = [
