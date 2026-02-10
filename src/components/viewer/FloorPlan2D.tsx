@@ -11,15 +11,38 @@ interface FloorPlan2DProps {
   className?: string;
 }
 
+/** Compute centroid of a polygon */
+function polygonCentroid(points: { x: number; y: number }[]): { x: number; y: number } {
+  let cx = 0, cy = 0;
+  for (const p of points) {
+    cx += p.x;
+    cy += p.y;
+  }
+  return { x: cx / points.length, y: cy / points.length };
+}
+
 export default function FloorPlan2D({ floorPlan, selectedRoomId, onRoomClick, className = "" }: FloorPlan2DProps) {
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
 
-  // 전체 바운딩박스 계산
-  const allPositions = floorPlan.rooms.map((r) => r.position);
-  const minX = Math.min(...allPositions.map((p) => p.x));
-  const minY = Math.min(...allPositions.map((p) => p.y));
-  const maxX = Math.max(...allPositions.map((p) => p.x + p.width));
-  const maxY = Math.max(...allPositions.map((p) => p.y + p.height));
+  // 폴리곤 포인트 포함한 전체 바운딩박스 계산
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+  for (const room of floorPlan.rooms) {
+    if (room.polygon && room.polygon.length > 0) {
+      for (const p of room.polygon) {
+        if (p.x < minX) minX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y > maxY) maxY = p.y;
+      }
+    } else {
+      const pos = room.position;
+      if (pos.x < minX) minX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.x + pos.width > maxX) maxX = pos.x + pos.width;
+      if (pos.y + pos.height > maxY) maxY = pos.y + pos.height;
+    }
+  }
 
   const padding = 0.5;
   const viewMinX = minX - padding;
@@ -28,6 +51,7 @@ export default function FloorPlan2D({ floorPlan, selectedRoomId, onRoomClick, cl
   const viewHeight = maxY - minY + padding * 2;
 
   const scale = 50; // 1m = 50px
+  const hasPolygons = floorPlan.rooms.some((r) => r.polygon && r.polygon.length > 0);
 
   return (
     <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${className}`}>
@@ -49,44 +73,78 @@ export default function FloorPlan2D({ floorPlan, selectedRoomId, onRoomClick, cl
           const isSelected = room.id === selectedRoomId;
           const isHovered = room.id === hoveredRoom;
           const fillColor = ROOM_TYPE_COLORS[room.type] || "#F5F5F5";
+          const strokeColor = isSelected ? "#2563EB" : isHovered ? "#60A5FA" : "#9CA3AF";
+          const strokeW = isSelected ? 3 : isHovered ? 2 : 1;
+
+          // 폴리곤이 있으면 폴리곤 렌더링
+          const usePolygon = room.polygon && room.polygon.length >= 3;
+
+          // 라벨 위치 계산
+          let labelX: number, labelY: number, roomWidth: number;
+          if (usePolygon) {
+            const c = polygonCentroid(room.polygon!);
+            labelX = c.x * scale;
+            labelY = c.y * scale;
+            roomWidth = room.position.width;
+          } else {
+            labelX = (room.position.x + room.position.width / 2) * scale;
+            labelY = (room.position.y + room.position.height / 2) * scale;
+            roomWidth = room.position.width;
+          }
+
+          // 폰트 크기: 공간 크기에 비례
+          const fontSize = roomWidth * scale > 100 ? 12 : roomWidth * scale > 60 ? 10 : 8;
+          const areaFontSize = fontSize - 2;
 
           return (
-            <g key={room.id}
+            <g
+              key={room.id}
               onClick={() => onRoomClick?.(room)}
               onMouseEnter={() => setHoveredRoom(room.id)}
               onMouseLeave={() => setHoveredRoom(null)}
               className="cursor-pointer"
             >
-              <rect
-                x={room.position.x * scale}
-                y={room.position.y * scale}
-                width={room.position.width * scale}
-                height={room.position.height * scale}
-                fill={fillColor}
-                stroke={isSelected ? "#2563EB" : isHovered ? "#60A5FA" : "#D1D5DB"}
-                strokeWidth={isSelected ? 3 : isHovered ? 2 : 1}
-                rx={2}
-              />
-              {/* Room label */}
+              {usePolygon ? (
+                <polygon
+                  points={room.polygon!.map((p) => `${p.x * scale},${p.y * scale}`).join(" ")}
+                  fill={fillColor}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
+                  strokeLinejoin="round"
+                />
+              ) : (
+                <rect
+                  x={room.position.x * scale}
+                  y={room.position.y * scale}
+                  width={room.position.width * scale}
+                  height={room.position.height * scale}
+                  fill={fillColor}
+                  stroke={strokeColor}
+                  strokeWidth={strokeW}
+                  rx={2}
+                />
+              )}
+
+              {/* Room name */}
               <text
-                x={(room.position.x + room.position.width / 2) * scale}
-                y={(room.position.y + room.position.height / 2 - 0.2) * scale}
+                x={labelX}
+                y={labelY - (areaFontSize * 0.4)}
                 textAnchor="middle"
                 dominantBaseline="middle"
-                className="text-xs font-semibold"
                 fill="#374151"
-                fontSize={room.position.width * scale > 100 ? 12 : 10}
+                fontSize={fontSize}
+                fontWeight="600"
               >
                 {room.name}
               </text>
-              {/* Area label */}
+              {/* Area */}
               <text
-                x={(room.position.x + room.position.width / 2) * scale}
-                y={(room.position.y + room.position.height / 2 + 0.4) * scale}
+                x={labelX}
+                y={labelY + (fontSize * 0.7)}
                 textAnchor="middle"
                 dominantBaseline="middle"
                 fill="#9CA3AF"
-                fontSize={room.position.width * scale > 100 ? 10 : 8}
+                fontSize={areaFontSize}
               >
                 {room.area}m²
               </text>
@@ -95,18 +153,33 @@ export default function FloorPlan2D({ floorPlan, selectedRoomId, onRoomClick, cl
         })}
 
         {/* Walls */}
-        {floorPlan.walls.filter((w) => w.isExterior).map((wall) => (
-          <line
-            key={wall.id}
-            x1={wall.start.x * scale}
-            y1={wall.start.y * scale}
-            x2={wall.end.x * scale}
-            y2={wall.end.y * scale}
-            stroke="#1F2937"
-            strokeWidth={wall.thickness * scale}
-            strokeLinecap="round"
-          />
-        ))}
+        {floorPlan.walls.map((wall) => {
+          // 벽체 폴리곤이 있으면 폴리곤 렌더링
+          if (wall.polygon && wall.polygon.length >= 3) {
+            return (
+              <polygon
+                key={wall.id}
+                points={wall.polygon.map((p) => `${p.x * scale},${p.y * scale}`).join(" ")}
+                fill={wall.isExterior ? "#374151" : "#9CA3AF"}
+                stroke={wall.isExterior ? "#1F2937" : "#6B7280"}
+                strokeWidth={0.5}
+              />
+            );
+          }
+          // 폴백: 선 렌더링
+          return (
+            <line
+              key={wall.id}
+              x1={wall.start.x * scale}
+              y1={wall.start.y * scale}
+              x2={wall.end.x * scale}
+              y2={wall.end.y * scale}
+              stroke={wall.isExterior ? "#1F2937" : "#9CA3AF"}
+              strokeWidth={wall.thickness * scale}
+              strokeLinecap="round"
+            />
+          );
+        })}
 
         {/* Doors */}
         {floorPlan.doors.map((door) => (
@@ -135,6 +208,65 @@ export default function FloorPlan2D({ floorPlan, selectedRoomId, onRoomClick, cl
             />
           </g>
         ))}
+
+        {/* Fixtures */}
+        {floorPlan.fixtures?.map((fixture) => {
+          const fx = fixture.position.x * scale;
+          const fy = fixture.position.y * scale;
+          const fw = fixture.position.width * scale;
+          const fh = fixture.position.height * scale;
+
+          const fixtureColors: Record<string, string> = {
+            toilet: "#A3E635",
+            sink: "#67E8F9",
+            kitchen_sink: "#FDE047",
+            bathtub: "#93C5FD",
+            stove: "#FCA5A5",
+          };
+          const color = fixtureColors[fixture.type] || "#D1D5DB";
+
+          return (
+            <g key={fixture.id}>
+              <rect
+                x={fx}
+                y={fy}
+                width={fw}
+                height={fh}
+                fill={color}
+                fillOpacity={0.6}
+                stroke="#6B7280"
+                strokeWidth={0.5}
+                rx={fixture.type === "toilet" || fixture.type === "bathtub" ? fw / 4 : 1}
+              />
+            </g>
+          );
+        })}
+
+        {/* "AI 건축도면" badge for polygon-based plans */}
+        {hasPolygons && (
+          <g>
+            <rect
+              x={(viewMinX + 0.1) * scale}
+              y={(viewMinY + 0.1) * scale}
+              width={105}
+              height={20}
+              rx={4}
+              fill="#2563EB"
+              fillOpacity={0.9}
+            />
+            <text
+              x={(viewMinX + 0.1) * scale + 52}
+              y={(viewMinY + 0.1) * scale + 11}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fill="white"
+              fontSize={10}
+              fontWeight="600"
+            >
+              AI 건축도면 데이터
+            </text>
+          </g>
+        )}
       </svg>
 
       {/* Legend */}
