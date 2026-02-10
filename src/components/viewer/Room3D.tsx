@@ -117,26 +117,67 @@ function RoomMesh({ config }: { config: RoomConfig }) {
   );
 }
 
+// FloorPlan 기반 3D 렌더링
+function FloorPlanRoom({ room, wallColor, floorColor, height = 2.7 }: {
+  room: { type: string; name: string; position: { x: number; y: number; width: number; height: number } };
+  wallColor: string; floorColor: string; height?: number;
+}) {
+  const { x, y, width: w, height: d } = room.position;
+  const centerX = x + w / 2;
+  const centerZ = y + d / 2;
+
+  const config: RoomConfig = {
+    width: w,
+    depth: d,
+    height,
+    wallColor,
+    floorColor,
+    ceilingColor: "#FFFFFF",
+    label: room.name,
+  };
+
+  return (
+    <group position={[centerX, 0, centerZ]}>
+      <RoomMesh config={config} />
+    </group>
+  );
+}
+
 interface Room3DProps {
   rooms?: RoomConfig[];
+  floorPlanRooms?: { type: string; name: string; position: { x: number; y: number; width: number; height: number } }[];
+  wallColor?: string;
+  floorColor?: string;
   className?: string;
 }
 
-export default function Room3D({ rooms, className = "" }: Room3DProps) {
+export default function Room3D({ rooms, floorPlanRooms, wallColor = "#F5F0EB", floorColor = "#C4A882", className = "" }: Room3DProps) {
   const roomConfigs = rooms && rooms.length > 0 ? rooms : [DEFAULT_ROOM];
+  const useFloorPlan = floorPlanRooms && floorPlanRooms.length > 0;
+
+  // 도면 기반일 때 카메라 위치 계산
+  let camPos: [number, number, number] = [6, 5, 6];
+  let camTarget: [number, number, number] = [0, 1, 0];
+
+  if (useFloorPlan) {
+    const maxX = Math.max(...floorPlanRooms.map((r) => r.position.x + r.position.width));
+    const maxZ = Math.max(...floorPlanRooms.map((r) => r.position.y + r.position.height));
+    camPos = [maxX * 0.8, Math.max(maxX, maxZ) * 0.7, maxZ * 0.8];
+    camTarget = [maxX / 2, 0, maxZ / 2];
+  }
 
   return (
     <div className={`w-full h-full bg-gray-100 rounded-xl overflow-hidden ${className}`}>
       <Canvas shadows>
-        <PerspectiveCamera makeDefault position={[6, 5, 6]} fov={50} />
+        <PerspectiveCamera makeDefault position={camPos} fov={50} />
         <OrbitControls
           enablePan
           enableZoom
           enableRotate
           minDistance={3}
-          maxDistance={15}
+          maxDistance={25}
           maxPolarAngle={Math.PI / 2.1}
-          target={[0, 1, 0]}
+          target={camTarget}
         />
 
         <ambientLight intensity={0.4} />
@@ -151,14 +192,18 @@ export default function Room3D({ rooms, className = "" }: Room3DProps) {
 
         <Environment preset="apartment" background={false} />
 
-        {roomConfigs.map((room, i) => (
-          <group key={i} position={[i * (room.width + 1), 0, 0]}>
-            <RoomMesh config={room} />
-          </group>
-        ))}
+        {useFloorPlan
+          ? floorPlanRooms.map((room, i) => (
+              <FloorPlanRoom key={i} room={room} wallColor={wallColor} floorColor={floorColor} />
+            ))
+          : roomConfigs.map((room, i) => (
+              <group key={i} position={[i * (room.width + 1), 0, 0]}>
+                <RoomMesh config={room} />
+              </group>
+            ))
+        }
 
-        {/* Grid helper */}
-        <gridHelper args={[20, 20, "#CCCCCC", "#EEEEEE"]} position={[0, -0.01, 0]} />
+        <gridHelper args={[30, 30, "#CCCCCC", "#EEEEEE"]} position={[0, -0.01, 0]} />
       </Canvas>
     </div>
   );
