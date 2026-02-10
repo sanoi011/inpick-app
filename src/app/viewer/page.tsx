@@ -1,33 +1,39 @@
 "use client";
 
-import { useState, useMemo, Suspense } from "react";
+import { useState, useMemo, useCallback, Suspense } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { ArrowLeft, Palette, Maximize2, Box, Layout, Loader2, ArrowRight } from "lucide-react";
+import { ArrowLeft, Palette, Maximize2, Box, Layout, Loader2, ArrowRight, RotateCcw } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { generateFloorPlan } from "@/lib/floorplan-generator";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
-import type { RoomData } from "@/types/floorplan";
+import type { RoomData, MaterialSelection } from "@/types/floorplan";
 import { ROOM_TYPE_LABELS, ROOM_TYPE_COLORS } from "@/types/floorplan";
 
-const Room3D = dynamic(() => import("@/components/viewer/Room3D"), { ssr: false });
+const Model3DViewer = dynamic(() => import("@/components/viewer/Model3DViewer"), { ssr: false });
 
-const WALL_COLORS = [
-  { label: "화이트", value: "#FFFFFF" },
-  { label: "아이보리", value: "#F5F0EB" },
-  { label: "베이지", value: "#E8DCC8" },
-  { label: "그레이", value: "#D4D4D4" },
-  { label: "민트", value: "#D1E8E0" },
-  { label: "블루그레이", value: "#C8D1DC" },
+const WALL_MATERIALS = [
+  { id: "wall-white", label: "화이트", color: "#FFFFFF" },
+  { id: "wall-ivory", label: "아이보리", color: "#F5F0EB" },
+  { id: "wall-beige", label: "베이지", color: "#E8DCC8" },
+  { id: "wall-gray", label: "그레이", color: "#D4D4D4" },
+  { id: "wall-mint", label: "민트", color: "#D1E8E0" },
+  { id: "wall-bluegray", label: "블루그레이", color: "#C8D1DC" },
 ];
 
-const FLOOR_COLORS = [
-  { label: "오크", value: "#C4A882" },
-  { label: "월넛", value: "#8B6F4E" },
-  { label: "메이플", value: "#DEC89C" },
-  { label: "그레이타일", value: "#B0B0B0" },
-  { label: "화이트타일", value: "#E8E8E8" },
-  { label: "마블", value: "#D4CFC8" },
+const FLOOR_MATERIALS = [
+  { id: "floor-oak", label: "오크", color: "#C4A882" },
+  { id: "floor-walnut", label: "월넛", color: "#8B6F4E" },
+  { id: "floor-maple", label: "메이플", color: "#DEC89C" },
+  { id: "floor-graytile", label: "그레이타일", color: "#B0B0B0" },
+  { id: "floor-whitetile", label: "화이트타일", color: "#E8E8E8" },
+  { id: "floor-marble", label: "마블", color: "#D4CFC8" },
+];
+
+const CEILING_MATERIALS = [
+  { id: "ceil-white", label: "화이트", color: "#FFFFFF" },
+  { id: "ceil-ivory", label: "아이보리", color: "#FAFAF5" },
+  { id: "ceil-warm", label: "웜화이트", color: "#FFF8F0" },
 ];
 
 function ViewerContent() {
@@ -41,10 +47,10 @@ function ViewerContent() {
   const ho = searchParams.get("ho") || "";
 
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
-  const [wallColor, setWallColor] = useState("#F5F0EB");
-  const [floorColor, setFloorColor] = useState("#C4A882");
   const [selectedRoomId, setSelectedRoomId] = useState<string | undefined>();
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [materials, setMaterials] = useState<Record<string, MaterialSelection>>({});
+  const [materialTarget, setMaterialTarget] = useState<"all" | "selected">("all");
 
   const floorPlan = useMemo(() => generateFloorPlan({
     exclusiveArea: area,
@@ -55,9 +61,52 @@ function ViewerContent() {
 
   const selectedRoom = floorPlan.rooms.find((r) => r.id === selectedRoomId);
 
-  const handleRoomClick = (room: RoomData) => {
-    setSelectedRoomId(room.id === selectedRoomId ? undefined : room.id);
-  };
+  const handleRoomClick = useCallback((room: RoomData) => {
+    setSelectedRoomId((prev) => room.id === prev ? undefined : room.id);
+  }, []);
+
+  const handle3DAreaClick = useCallback((areaId: string) => {
+    setSelectedRoomId((prev) => areaId === prev ? undefined : areaId);
+  }, []);
+
+  const applyMaterial = useCallback((areaType: 'wall' | 'floor' | 'ceiling', materialId: string, materialName: string, color: string) => {
+    setMaterials((prev) => {
+      const next = { ...prev };
+      if (materialTarget === "all" || !selectedRoomId) {
+        // Apply to all rooms
+        floorPlan.rooms.forEach((room) => {
+          const key = `${room.id}-${areaType}`;
+          next[key] = { roomId: room.id, areaType, materialId, materialName, color };
+        });
+        // Also set global default
+        next[`__global-${areaType}`] = { roomId: "__global", areaType, materialId, materialName, color };
+      } else {
+        // Apply to selected room only
+        const key = `${selectedRoomId}-${areaType}`;
+        next[key] = { roomId: selectedRoomId, areaType, materialId, materialName, color };
+      }
+      return next;
+    });
+  }, [materialTarget, selectedRoomId, floorPlan.rooms]);
+
+  const resetMaterials = useCallback(() => {
+    setMaterials({});
+  }, []);
+
+  // Get current material for display
+  const getCurrentMaterial = useCallback((areaType: 'wall' | 'floor' | 'ceiling') => {
+    if (selectedRoomId && materialTarget === "selected") {
+      const key = `${selectedRoomId}-${areaType}`;
+      return materials[key]?.materialId;
+    }
+    return materials[`__global-${areaType}`]?.materialId;
+  }, [materials, selectedRoomId, materialTarget]);
+
+  // Count rooms with custom materials
+  const customMaterialCount = useMemo(() => {
+    const roomIds = new Set(Object.values(materials).filter((m) => m.roomId !== "__global").map((m) => m.roomId));
+    return roomIds.size;
+  }, [materials]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -112,23 +161,24 @@ function ViewerContent() {
               />
             </div>
           ) : (
-            <Room3D
-              floorPlanRooms={floorPlan.rooms}
-              wallColor={wallColor}
-              floorColor={floorColor}
+            <Model3DViewer
+              floorPlan={floorPlan}
+              selectedArea={selectedRoomId}
+              onAreaClick={handle3DAreaClick}
+              materials={materials}
               className="w-full h-full"
             />
           )}
 
           <div className="absolute bottom-4 left-4 text-xs text-gray-500 bg-white/80 px-3 py-1.5 rounded-lg backdrop-blur-sm">
-            {viewMode === "2d" ? "클릭: 공간 선택" : "마우스 드래그: 회전 | 스크롤: 줌"}
+            {viewMode === "2d" ? "클릭: 공간 선택" : "클릭: 공간 선택 | 드래그: 회전 | 스크롤: 줌"}
           </div>
         </div>
 
         {/* Controls Panel */}
         {!isFullscreen && (
           <div className="w-72 bg-white border-l border-gray-200 overflow-y-auto flex-shrink-0">
-            <div className="p-4 space-y-6">
+            <div className="p-4 space-y-5">
 
               {/* Selected Room Info */}
               {selectedRoom && (
@@ -148,51 +198,105 @@ function ViewerContent() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900 mb-3">공간 목록</h3>
                 <div className="space-y-1.5">
-                  {floorPlan.rooms.map((room) => (
-                    <button key={room.id} onClick={() => handleRoomClick(room)}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        room.id === selectedRoomId ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "hover:bg-gray-50 text-gray-700"
-                      }`}>
-                      <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: ROOM_TYPE_COLORS[room.type] }} />
-                      <span className="flex-1 text-left font-medium">{room.name}</span>
-                      <span className="text-xs text-gray-400">{room.area}m²</span>
-                    </button>
-                  ))}
+                  {floorPlan.rooms.map((room) => {
+                    const hasCustom = Object.values(materials).some((m) => m.roomId === room.id);
+                    return (
+                      <button key={room.id} onClick={() => handleRoomClick(room)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
+                          room.id === selectedRoomId ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200" : "hover:bg-gray-50 text-gray-700"
+                        }`}>
+                        <div className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: ROOM_TYPE_COLORS[room.type] }} />
+                        <span className="flex-1 text-left font-medium">{room.name}</span>
+                        {hasCustom && <div className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
+                        <span className="text-xs text-gray-400">{room.area}m²</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Wall Color (3D only) */}
+              {/* Material Controls (3D mode) */}
               {viewMode === "3d" && (
                 <>
+                  {/* Apply Target Toggle */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Palette className="w-4 h-4" /> 벽면 마감재
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <Palette className="w-4 h-4" /> 마감재 설정
+                      </h3>
+                      <button onClick={resetMaterials} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+                        <RotateCcw className="w-3 h-3" /> 초기화
+                      </button>
+                    </div>
+                    <div className="flex bg-gray-100 rounded-lg p-0.5 mb-3">
+                      <button onClick={() => setMaterialTarget("all")}
+                        className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          materialTarget === "all" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                        }`}>
+                        전체 적용
+                      </button>
+                      <button onClick={() => setMaterialTarget("selected")}
+                        className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                          materialTarget === "selected" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                        }`}>
+                        {selectedRoom ? selectedRoom.name : "공간 선택"}
+                      </button>
+                    </div>
+                    {materialTarget === "selected" && !selectedRoomId && (
+                      <p className="text-xs text-amber-600 bg-amber-50 px-2 py-1.5 rounded-md mb-3">
+                        3D 뷰에서 공간을 클릭해 선택하세요
+                      </p>
+                    )}
+                    {customMaterialCount > 0 && (
+                      <p className="text-xs text-gray-400 mb-3">
+                        {customMaterialCount}개 공간에 마감재 적용됨
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Wall Materials */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wider">벽면</h4>
                     <div className="grid grid-cols-3 gap-2">
-                      {WALL_COLORS.map((c) => (
-                        <button key={c.value} onClick={() => setWallColor(c.value)}
+                      {WALL_MATERIALS.map((m) => (
+                        <button key={m.id} onClick={() => applyMaterial("wall", m.id, m.label, m.color)}
                           className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all ${
-                            wallColor === c.value ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                            getCurrentMaterial("wall") === m.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
                           }`}>
-                          <div className="w-8 h-8 rounded-full border border-gray-200" style={{ backgroundColor: c.value }} />
-                          <span className="text-xs text-gray-600">{c.label}</span>
+                          <div className="w-8 h-8 rounded-full border border-gray-200" style={{ backgroundColor: m.color }} />
+                          <span className="text-xs text-gray-600">{m.label}</span>
                         </button>
                       ))}
                     </div>
                   </div>
 
+                  {/* Floor Materials */}
                   <div>
-                    <h3 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                      <Palette className="w-4 h-4" /> 바닥 마감재
-                    </h3>
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wider">바닥</h4>
                     <div className="grid grid-cols-3 gap-2">
-                      {FLOOR_COLORS.map((c) => (
-                        <button key={c.value} onClick={() => setFloorColor(c.value)}
+                      {FLOOR_MATERIALS.map((m) => (
+                        <button key={m.id} onClick={() => applyMaterial("floor", m.id, m.label, m.color)}
                           className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all ${
-                            floorColor === c.value ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                            getCurrentMaterial("floor") === m.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
                           }`}>
-                          <div className="w-8 h-8 rounded-full border border-gray-200" style={{ backgroundColor: c.value }} />
-                          <span className="text-xs text-gray-600">{c.label}</span>
+                          <div className="w-8 h-8 rounded-full border border-gray-200" style={{ backgroundColor: m.color }} />
+                          <span className="text-xs text-gray-600">{m.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Ceiling Materials */}
+                  <div>
+                    <h4 className="text-xs font-semibold text-gray-700 mb-2 uppercase tracking-wider">천장</h4>
+                    <div className="grid grid-cols-3 gap-2">
+                      {CEILING_MATERIALS.map((m) => (
+                        <button key={m.id} onClick={() => applyMaterial("ceiling", m.id, m.label, m.color)}
+                          className={`flex flex-col items-center gap-1.5 p-2 rounded-lg transition-all ${
+                            getCurrentMaterial("ceiling") === m.id ? "ring-2 ring-blue-500 bg-blue-50" : "hover:bg-gray-50"
+                          }`}>
+                          <div className="w-8 h-8 rounded-full border border-gray-200" style={{ backgroundColor: m.color }} />
+                          <span className="text-xs text-gray-600">{m.label}</span>
                         </button>
                       ))}
                     </div>

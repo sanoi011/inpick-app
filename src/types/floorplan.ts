@@ -62,6 +62,15 @@ export interface FloorPlan {
   createdAt: string;
 }
 
+export interface MaterialSelection {
+  roomId: string;
+  areaType: 'wall' | 'floor' | 'ceiling';
+  materialId: string;
+  materialName: string;
+  color?: string;
+  textureUrl?: string;
+}
+
 export const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   LIVING: '거실',
   KITCHEN: '주방',
