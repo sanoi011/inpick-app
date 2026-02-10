@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
 
   const { data: estimates, error } = await supabase
     .from("estimates")
-    .select("id, title, status, project_type, total_area_m2, grand_total, created_at, updated_at")
+    .select("id, title, status, project_type, total_area_m2, total_material, total_labor, total_overhead, grand_total, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(20);
 
