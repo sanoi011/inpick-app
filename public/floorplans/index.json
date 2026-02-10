@@ -1,0 +1,612 @@
+{
+  "version": "1.0",
+  "generatedAt": "2026-02-10T23:47:41.789Z",
+  "count": 10,
+  "entries": [
+    {
+      "id": "apt-fp-371618742",
+      "fileName": "APT_FP_SPA_371618742",
+      "buildingType": "APT",
+      "totalArea": 49,
+      "roomCount": 1,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "실외기실",
+          "area": 1
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 10.2
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 6.7
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 2.1
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 1.2
+        },
+        {
+          "type": "UTILITY",
+          "name": "다목적공간",
+          "area": 2.5
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 1.5
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 21.2
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.6
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 2
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-041684981",
+      "fileName": "APT_FP_SPA_041684981",
+      "buildingType": "APT",
+      "totalArea": 68.8,
+      "roomCount": 1,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 22.5
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 5.5
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 1.7
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.6
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 23.2
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 3.3
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 4
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 8
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-863136882",
+      "fileName": "APT_FP_SPA_863136882",
+      "buildingType": "APT",
+      "totalArea": 69.1,
+      "roomCount": 2,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 26.6
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.6
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 4.6
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 12.9
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 10.4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.5
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 5.4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.7
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 5.1
+        },
+        {
+          "type": "UTILITY",
+          "name": "실외기실",
+          "area": 2.3
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-719765723",
+      "fileName": "APT_FP_SPA_719765723",
+      "buildingType": "APT",
+      "totalArea": 93.9,
+      "roomCount": 3,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.8
+        },
+        {
+          "type": "BED",
+          "name": "침실",
+          "area": 15.6
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 4.4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 2.5
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 5.5
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 17.8
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 18
+        },
+        {
+          "type": "UTILITY",
+          "name": "실외기실",
+          "area": 2.4
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 9.2
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 17.7
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-138268866",
+      "fileName": "APT_FP_SPA_138268866",
+      "buildingType": "APT",
+      "totalArea": 94,
+      "roomCount": 3,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.5
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 4.8
+        },
+        {
+          "type": "BED",
+          "name": "침실",
+          "area": 13.2
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 2.7
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 14.5
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 1.4
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 19.5
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 24
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.4
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 2.9
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 10.1
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-655639299",
+      "fileName": "APT_FP_SPA_655639299",
+      "buildingType": "APT",
+      "totalArea": 94,
+      "roomCount": 2,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 1
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 8.2
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 19.2
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 13.2
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 36.3
+        },
+        {
+          "type": "BED",
+          "name": "침실",
+          "area": 12.1
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 2.3
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 1.4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.3
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-672590224",
+      "fileName": "APT_FP_SPA_672590224",
+      "buildingType": "APT",
+      "totalArea": 94.1,
+      "roomCount": 3,
+      "bathroomCount": 1,
+      "rooms": [
+        {
+          "type": "UTILITY",
+          "name": "실외기실",
+          "area": 2.2
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 17.4
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 4
+        },
+        {
+          "type": "BED",
+          "name": "침실",
+          "area": 16.6
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 2.7
+        },
+        {
+          "type": "BATHROOM",
+          "name": "화장실",
+          "area": 5.3
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 17.5
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 18.6
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 9.8
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-301349783",
+      "fileName": "APT_FP_SPA_301349783",
+      "buildingType": "APT",
+      "totalArea": 108.8,
+      "roomCount": 4,
+      "bathroomCount": 2,
+      "rooms": [
+        {
+          "type": "BATHROOM",
+          "name": "욕실1",
+          "area": 2.4
+        },
+        {
+          "type": "BED",
+          "name": "침실1",
+          "area": 9.3
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 10.6
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 25.1
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 5.8
+        },
+        {
+          "type": "BED",
+          "name": "침실2",
+          "area": 9.2
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 3.5
+        },
+        {
+          "type": "BATHROOM",
+          "name": "욕실2",
+          "area": 3.3
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 15.4
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 3.3
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 14.8
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 6.1
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-097133521",
+      "fileName": "APT_FP_SPA_097133521",
+      "buildingType": "APT",
+      "totalArea": 109,
+      "roomCount": 4,
+      "bathroomCount": 2,
+      "rooms": [
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 11.4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 0.9
+        },
+        {
+          "type": "BED",
+          "name": "침실2",
+          "area": 8.9
+        },
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 11.6
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 22.2
+        },
+        {
+          "type": "BATHROOM",
+          "name": "욕실1",
+          "area": 3
+        },
+        {
+          "type": "BATHROOM",
+          "name": "욕실2",
+          "area": 3.2
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 3.5
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 25.5
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 3
+        },
+        {
+          "type": "BED",
+          "name": "침실1",
+          "area": 9
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 6.8
+        }
+      ]
+    },
+    {
+      "id": "apt-fp-530278719",
+      "fileName": "APT_FP_SPA_530278719",
+      "buildingType": "APT",
+      "totalArea": 109,
+      "roomCount": 4,
+      "bathroomCount": 0,
+      "rooms": [
+        {
+          "type": "MASTER_BED",
+          "name": "안방",
+          "area": 17.4
+        },
+        {
+          "type": "ENTRANCE",
+          "name": "현관",
+          "area": 2
+        },
+        {
+          "type": "LIVING",
+          "name": "거실",
+          "area": 27.4
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 17.4
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 11
+        },
+        {
+          "type": "BED",
+          "name": "침실2",
+          "area": 8.6
+        },
+        {
+          "type": "BED",
+          "name": "침실1",
+          "area": 9.5
+        },
+        {
+          "type": "BALCONY",
+          "name": "발코니",
+          "area": 4
+        },
+        {
+          "type": "UTILITY",
+          "name": "기타",
+          "area": 1.6
+        },
+        {
+          "type": "KITCHEN",
+          "name": "주방",
+          "area": 10.1
+        }
+      ]
+    }
+  ]
+}
