@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, ArrowLeft } from "lucide-react";
-import Link from "next/link";
+import { Send, Bot, User, Loader2 } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -99,13 +98,7 @@ export default function ContractorAIPage() {
   };
 
   return (
-    <div className="h-screen flex flex-col bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-4 py-3 flex items-center gap-3">
-        <Link href="/contractor" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-5 h-5" /></Link>
-        <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
-        <span className="text-sm text-gray-500">사업자 AI 비서</span>
-      </header>
-
+    <div className="h-[calc(100vh-3.5rem)] lg:h-screen flex flex-col">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((msg, i) => (
           <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : ""}`}>

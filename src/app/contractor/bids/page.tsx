@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { ArrowLeft, Loader2, FileText, CheckCircle2, Clock, Gavel, Plus } from "lucide-react";
+import { Loader2, FileText, CheckCircle2, Clock, Gavel, Plus } from "lucide-react";
 import type { EstimateStatus } from "@/types/estimate";
 import { STATUS_LABELS, STATUS_COLORS } from "@/types/estimate";
 
@@ -60,17 +60,7 @@ export default function BidsPage() {
     : estimates.filter((e) => mapStatus(e.status) === filter);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center gap-3">
-          <Link href="/contractor" className="text-gray-400 hover:text-gray-600"><ArrowLeft className="w-5 h-5" /></Link>
-          <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
-          <span className="text-sm text-gray-400">|</span>
-          <span className="text-sm font-medium text-gray-700">견적 관리</span>
-        </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-6 py-8">
+    <div className="px-6 py-8 max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold text-gray-900">견적 목록</h1>
           <div className="flex items-center gap-3">
@@ -147,7 +137,6 @@ export default function BidsPage() {
             })}
           </div>
         )}
-      </main>
     </div>
   );
 }
