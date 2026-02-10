@@ -40,7 +40,7 @@ export default function Header({
   startButtonText = "무료 견적 받기",
   startButtonHref = "/address",
   contactButtonText = "사업자 등록",
-  contactButtonHref = "/contractor",
+  contactButtonHref = "/contractor/register",
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);

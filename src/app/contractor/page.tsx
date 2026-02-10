@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { BarChart3, FileText, Users, Bot, Calendar, Loader2, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { BarChart3, FileText, Users, Bot, Calendar, Loader2, Plus, LogOut } from "lucide-react";
 
 const MENU_ITEMS = [
   { label: "입찰 관리", href: "/contractor/bids", icon: FileText, description: "새 입찰 참여 및 관리" },
@@ -19,16 +20,29 @@ interface DashboardStats {
 }
 
 export default function ContractorDashboard() {
+  const router = useRouter();
+  const [contractorName, setContractorName] = useState<string | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
   const [stats, setStats] = useState<DashboardStats>({
-    activeProjects: 0,
-    pendingBids: 0,
-    completedProjects: 0,
-    avgRating: "-",
+    activeProjects: 0, pendingBids: 0, completedProjects: 0, avgRating: "-",
   });
   const [recentEstimates, setRecentEstimates] = useState<{ id: string; title: string; status: string; grand_total: number; created_at: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // 로그인 체크
   useEffect(() => {
+    const token = localStorage.getItem("contractor_token");
+    const name = localStorage.getItem("contractor_name");
+    if (!token) {
+      router.replace("/contractor/login");
+      return;
+    }
+    setContractorName(name);
+    setAuthChecked(true);
+  }, [router]);
+
+  useEffect(() => {
+    if (!authChecked) return;
     async function loadDashboard() {
       try {
         const res = await fetch("/api/estimates");
@@ -49,7 +63,22 @@ export default function ContractorDashboard() {
       }
     }
     loadDashboard();
-  }, []);
+  }, [authChecked]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("contractor_token");
+    localStorage.removeItem("contractor_id");
+    localStorage.removeItem("contractor_name");
+    router.replace("/contractor/login");
+  };
+
+  if (!authChecked) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -60,7 +89,15 @@ export default function ContractorDashboard() {
             <span className="text-sm text-gray-400">|</span>
             <span className="text-sm font-medium text-gray-700">사업자 대시보드</span>
           </div>
-          <Link href="/auth" className="text-sm text-gray-500 hover:text-gray-700">로그인</Link>
+          <div className="flex items-center gap-3">
+            {contractorName && (
+              <span className="text-sm text-gray-600 bg-gray-100 px-3 py-1 rounded-full">{contractorName}</span>
+            )}
+            <button onClick={handleLogout}
+              className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              <LogOut className="w-4 h-4" /> 로그아웃
+            </button>
+          </div>
         </div>
       </header>
 
@@ -70,12 +107,9 @@ export default function ContractorDashboard() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">대시보드</h1>
             <p className="text-gray-500">프로젝트와 입찰을 한눈에 관리하세요</p>
           </div>
-          <Link
-            href="/address"
-            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            새 견적
+          <Link href="/address"
+            className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+            <Plus className="w-4 h-4" /> 새 견적
           </Link>
         </div>
 
@@ -112,7 +146,7 @@ export default function ContractorDashboard() {
               </div>
               <div className="bg-white rounded-xl p-6 border border-gray-200">
                 <div className="flex items-center justify-between mb-4">
-                  <span className="text-2xl">⭐</span>
+                  <span className="text-2xl">&#11088;</span>
                   <span className="text-xs text-gray-400">평균</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-900">{stats.avgRating}</p>
@@ -127,7 +161,8 @@ export default function ContractorDashboard() {
                 </div>
                 <div className="divide-y divide-gray-50">
                   {recentEstimates.map((est) => (
-                    <div key={est.id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                    <Link key={est.id} href={`/estimate/${est.id}`}
+                      className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 block">
                       <div>
                         <p className="text-sm font-medium text-gray-900">{est.title}</p>
                         <p className="text-xs text-gray-400">{new Date(est.created_at).toLocaleDateString("ko-KR")}</p>
@@ -144,7 +179,7 @@ export default function ContractorDashboard() {
                           {est.status === "completed" ? "완료" : est.status === "in_progress" ? "진행중" : "초안"}
                         </span>
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               </div>
