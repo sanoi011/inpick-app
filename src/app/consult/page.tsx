@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, Suspense } from "react";
-import { Send, Bot, User, Loader2, ArrowLeft, FileText } from "lucide-react";
+import { Send, Bot, User, Loader2, ArrowLeft, FileText, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -136,6 +136,9 @@ function ConsultContent() {
           )}
           <Link href="#" className="text-gray-400 hover:text-gray-600" title="견적서 보기">
             <FileText className="w-5 h-5" />
+          </Link>
+          <Link href="/viewer" className="inline-flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-full hover:bg-blue-700 transition-colors">
+            다음 단계 <ArrowRight className="w-3 h-3" />
           </Link>
         </div>
       </header>
