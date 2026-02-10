@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-// GET: 견적별 입찰 목록 또는 단일 입찰 조회
+// GET: 견적별 입찰 목록, 단일 입찰 조회, 또는 사업자별 입찰 목록
 export async function GET(request: NextRequest) {
   const supabase = createClient();
   const estimateId = request.nextUrl.searchParams.get("estimateId");
   const bidId = request.nextUrl.searchParams.get("id");
+  const contractorId = request.nextUrl.searchParams.get("contractorId");
+  const statusFilter = request.nextUrl.searchParams.get("status");
 
   if (bidId) {
     const { data, error } = await supabase
@@ -28,8 +30,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ bid: data });
   }
 
+  // 사업자별 입찰 목록
+  if (contractorId) {
+    let query = supabase
+      .from("bids")
+      .select(`
+        *,
+        estimates (id, title, status, project_type, space_type, total_area_m2, grand_total, address)
+      `)
+      .eq("contractor_id", contractorId)
+      .order("created_at", { ascending: false });
+
+    if (statusFilter) {
+      query = query.eq("status", statusFilter);
+    }
+
+    const { data, error } = await query.limit(100);
+    if (error) {
+      return NextResponse.json({ error: "입찰 목록 조회 실패" }, { status: 500 });
+    }
+    return NextResponse.json({ bids: data || [] });
+  }
+
   if (!estimateId) {
-    return NextResponse.json({ error: "estimateId가 필요합니다." }, { status: 400 });
+    return NextResponse.json({ error: "estimateId 또는 contractorId가 필요합니다." }, { status: 400 });
   }
 
   const { data, error } = await supabase
@@ -59,7 +83,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { estimateId, contractorId, bidAmount, discountRate, estimatedDays, startAvailableDate, message } = body;
+    const { estimateId, contractorId, bidAmount, discountRate, estimatedDays, startAvailableDate, message, metadata } = body;
 
     if (!estimateId || !contractorId || !bidAmount) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
@@ -75,6 +99,7 @@ export async function POST(request: NextRequest) {
         estimated_days: estimatedDays || 30,
         start_available_date: startAvailableDate || null,
         message: message || null,
+        metadata: metadata || {},
         status: "pending",
       })
       .select(`
