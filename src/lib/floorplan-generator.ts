@@ -173,6 +173,7 @@ export function roomTypeToSpaceCode(type: RoomType): string {
     BALCONY: "RES-BAL",
     UTILITY: "RES-LIV",
     CORRIDOR: "RES-ENT",
+    DRESSROOM: "RES-MBR",
   };
   return map[type];
 }

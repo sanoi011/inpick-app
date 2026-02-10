@@ -143,6 +143,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 도면 ID 설정
+  const setDrawingId = useCallback(
+    (drawingId: string) => {
+      if (!project) return;
+      saveProject({ ...project, drawingId });
+    },
+    [project, saveProject]
+  );
+
   // 견적 ID 설정
   const setEstimateId = useCallback(
     (estimateId: string) => {
@@ -162,6 +171,7 @@ export function useProjectState(projectId: string) {
     addImage,
     setActiveImage,
     addDecision,
+    setDrawingId,
     setEstimateId,
     saveProject: () => project && saveProject(project),
   };

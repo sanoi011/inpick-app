@@ -7,7 +7,8 @@ export type RoomType =
   | 'ENTRANCE'
   | 'BALCONY'
   | 'UTILITY'
-  | 'CORRIDOR';
+  | 'CORRIDOR'
+  | 'DRESSROOM';
 
 export interface RoomData {
   id: string;
@@ -24,6 +25,7 @@ export interface WallData {
   end: { x: number; y: number };
   thickness: number;
   isExterior: boolean;
+  polygon?: { x: number; y: number }[];
 }
 
 export interface DoorData {
@@ -44,18 +46,26 @@ export interface WindowData {
   wallId: string;
 }
 
+export interface FixtureData {
+  id: string;
+  type: 'toilet' | 'sink' | 'kitchen_sink' | 'bathtub' | 'stove';
+  position: { x: number; y: number; width: number; height: number };
+  roomId?: string;
+}
+
 export interface ParsedFloorPlan {
   totalArea: number;
   rooms: RoomData[];
   walls: WallData[];
   doors: DoorData[];
   windows: WindowData[];
+  fixtures?: FixtureData[];
 }
 
 export interface FloorPlan {
   id: string;
   buildingInfoId: string;
-  source: 'API' | 'UPLOAD' | 'GENERATED';
+  source: 'API' | 'UPLOAD' | 'GENERATED' | 'DRAWING';
   imageUrl?: string;
   svgData?: string;
   parsedData: ParsedFloorPlan;
@@ -81,6 +91,7 @@ export const ROOM_TYPE_LABELS: Record<RoomType, string> = {
   BALCONY: '발코니',
   UTILITY: '다용도실',
   CORRIDOR: '복도',
+  DRESSROOM: '드레스룸',
 };
 
 export const ROOM_TYPE_COLORS: Record<RoomType, string> = {
@@ -93,4 +104,5 @@ export const ROOM_TYPE_COLORS: Record<RoomType, string> = {
   BALCONY: '#E8F5E9',
   UTILITY: '#F5F5F5',
   CORRIDOR: '#ECEFF1',
+  DRESSROOM: '#FCE4EC',
 };

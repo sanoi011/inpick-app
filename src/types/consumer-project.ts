@@ -99,6 +99,7 @@ export interface ConsumerProject {
   status: ConsumerProjectStatus;
   address?: ProjectAddress;
   design?: ProjectDesign;
+  drawingId?: string;
   estimateId?: string;
   bidIds?: string[];
   selectedBidId?: string;
