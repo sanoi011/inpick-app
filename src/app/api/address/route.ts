@@ -46,14 +46,18 @@ export async function GET(request: NextRequest) {
     }
 
     const results = jusoList.map((j: Record<string, string>) => ({
-      roadAddr: j.roadAddr,
-      jibunAddr: j.jibunAddr,
-      zipNo: j.zipNo,
-      bdNm: j.bdNm,
+      roadAddress: j.roadAddr,
+      jibunAddress: j.jibunAddr,
+      zipCode: j.zipNo,
+      buildingName: j.bdNm || undefined,
+      sigunguCode: j.sggCd || "",
+      bcode: j.admCd || "",
+      bdMgtSn: j.bdMgtSn || undefined,
+      // 하위 호환
+      bdKdcd: j.bdKdcd,
       siNm: j.siNm,
       sggNm: j.sggNm,
       emdNm: j.emdNm,
-      bdKdcd: j.bdKdcd,
     }));
 
     return NextResponse.json({
