@@ -23,7 +23,8 @@ const NAV_LINKS = [
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut, User } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface HeaderProps {
   brandName?: string;
@@ -44,6 +45,8 @@ export default function Header({
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, loading: authLoading, signOut } = useAuth();
   const colors = COLORS.light;
 
   useEffect(() => {
@@ -83,11 +86,37 @@ export default function Header({
         </div>
 
         <div className="hidden md:flex items-center gap-2">
-          <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
-            style={{ color: colors.textMuted }}
-            whileHover={{ scale: 1.02, color: colors.text }} whileTap={{ scale: 0.98 }}>
-            로그인
-          </motion.a>
+          {!authLoading && !user && (
+            <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+              style={{ color: colors.textMuted }}
+              whileHover={{ scale: 1.02, color: colors.text }} whileTap={{ scale: 0.98 }}>
+              로그인
+            </motion.a>
+          )}
+          {!authLoading && user && (
+            <div className="relative">
+              <motion.button
+                onClick={() => setShowUserMenu((v) => !v)}
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                style={{ color: colors.text }}
+                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              >
+                <User className="w-4 h-4" />
+                {user.user_metadata?.full_name || user.email?.split("@")[0]}
+              </motion.button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
+                  <a href="/project/new" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 프로젝트</a>
+                  <button
+                    onClick={() => { setShowUserMenu(false); signOut(); }}
+                    className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-3.5 h-3.5" /> 로그아웃
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
             style={{ backgroundColor: colors.buttonSecondaryBg, border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -130,10 +159,26 @@ export default function Header({
                   </div>
                 </div>
                 <div className="mt-6 flex flex-col gap-3">
-                  <a href="/auth" className="rounded-full px-4 py-3 text-center text-sm font-medium"
-                    style={{ color: colors.textMuted }} onClick={() => setMobileMenuOpen(false)}>
-                    로그인 / 회원가입
-                  </a>
+                  {!authLoading && !user && (
+                    <a href="/auth" className="rounded-full px-4 py-3 text-center text-sm font-medium"
+                      style={{ color: colors.textMuted }} onClick={() => setMobileMenuOpen(false)}>
+                      로그인 / 회원가입
+                    </a>
+                  )}
+                  {!authLoading && user && (
+                    <>
+                      <div className="px-4 py-2 text-sm text-gray-700 text-center">
+                        <User className="w-4 h-4 inline mr-1" />
+                        {user.user_metadata?.full_name || user.email?.split("@")[0]}
+                      </div>
+                      <button
+                        onClick={() => { setMobileMenuOpen(false); signOut(); }}
+                        className="rounded-full px-4 py-3 text-center text-sm font-medium text-red-600 border border-red-200"
+                      >
+                        로그아웃
+                      </button>
+                    </>
+                  )}
                   <a href={contactButtonHref} className="rounded-full px-4 py-3 text-center text-sm font-medium"
                     style={{ border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }} onClick={() => setMobileMenuOpen(false)}>
                     {contactButtonText}
