@@ -91,7 +91,7 @@ export function useCredits() {
   }, [credits]);
 
   // 크레딧 사용 (이미지 생성 시)
-  const useCreditsForGeneration = useCallback(async (): Promise<boolean> => {
+  const spendCredits = useCallback(async (): Promise<boolean> => {
     if (!credits || !user) return false;
 
     const isFree = credits.freeGenerationsUsed < FREE_GENERATION_LIMIT;
@@ -191,7 +191,7 @@ export function useCredits() {
     credits,
     loading,
     canGenerate,
-    useCreditsForGeneration,
+    spendCredits,
     chargeCredits,
     reload: loadCredits,
   };
