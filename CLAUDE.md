@@ -201,8 +201,14 @@
 
 ### 인증
 - Google OAuth 연동 완료 (Supabase Auth)
-- 카카오 로그인 비활성화 (비즈니스 심사 대기)
+- 카카오 로그인 버튼 활성화 완료 (Supabase 카카오 provider 설정 필요)
 - `src/hooks/useAuth.ts` - user, loading, signOut
+
+### 크레딧 시스템
+- `supabase/migrations/20260211000000_credit_tables.sql` - 마이그레이션 SQL 작성 완료
+- `src/hooks/useCredits.ts` - Supabase 연동 + localStorage 폴백
+- `src/types/credits.ts` - UserCredits, CreditTransaction, CREDIT_PACKAGES 타입
+- `.env.local`에 `GOOGLE_GEMINI_API_KEY` 항목 추가 (키 값 입력 필요)
 
 ## 소비자(고객) 측 기존 기능
 - `/` - 랜딩 페이지
@@ -214,14 +220,30 @@
 - `/contract/[id]` - 계약 상세
 - `/auth` - 소비자 인증 (Google OAuth)
 
-## 다음 작업 후보
-- Supabase에 user_credits, credit_transactions 테이블 생성
+## 다음 작업 (우선순위 순)
+
+### 즉시 필요 (수동 작업)
+1. **Supabase SQL 실행** - `supabase/migrations/20260211000000_credit_tables.sql`을 Supabase 대시보드 SQL Editor에서 실행
+   - URL: `https://supabase.com/dashboard/project/pyhsjjtxcfmkcqmaxozd/sql/new`
+2. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
+3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화 (REST API 키 + Client Secret 입력, Redirect URI 등록)
+
+### 개발 작업
 - 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
-- Gemini AI 실제 API 키 연동 테스트
+- Gemini AI 이미지 생성 실제 테스트
 - 3D 렌더링 엔진 API 연동 (현재 Mock 이미지)
-- 결제 시스템 연동 (크레딧 충전)
+- 결제 시스템 연동 (크레딧 충전 - 토스페이먼츠 등)
 - 사업자 대시보드에 견적요청 수신 연동
-- 카카오 로그인 활성화 (비즈니스 심사 완료 후)
-- RLS(Row Level Security) 정책 설정
 - 모바일 반응형 세부 조정
 - 실제 데이터 연동 테스트
+
+## DB 마이그레이션 현황
+| 파일 | 상태 |
+|------|------|
+| `20250210000000_initial_schema.sql` | Supabase 적용 완료 |
+| `20250210100000_admin_profiles.sql` | Supabase 적용 완료 |
+| `20250210200000_bids_contracts.sql` | Supabase 적용 완료 |
+| `20260210000000_projects_and_bids.sql` | Supabase 적용 완료 |
+| `20260210100000_schedule_enhance.sql` | Supabase 적용 완료 |
+| `20260210200000_finance_tables.sql` | Supabase 적용 완료 |
+| `20260211000000_credit_tables.sql` | **미적용 - SQL Editor에서 실행 필요** |
