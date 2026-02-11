@@ -150,8 +150,7 @@ function AuthForm() {
               )}
               <span className="font-medium text-neutral-700">Google로 계속하기</span>
             </button>
-            {/* 카카오 로그인 - 비즈니스 심사 완료 후 활성화 예정 */}
-            {/* <button
+            <button
               onClick={() => handleOAuth("kakao")}
               disabled={!!oauthLoading}
               className="w-full flex items-center justify-center gap-3 py-3 bg-[#FEE500] rounded-lg hover:bg-[#FDD835] transition-colors disabled:opacity-50"
@@ -164,7 +163,7 @@ function AuthForm() {
                 </svg>
               )}
               <span className="font-medium text-neutral-900">카카오로 계속하기</span>
-            </button> */}
+            </button>
           </div>
 
           {/* 구분선 */}
