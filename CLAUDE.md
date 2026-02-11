@@ -156,6 +156,54 @@
 | 20 | 드레스룸 | DRESSROOM |
 | 19,1,22 | 기타 | UTILITY |
 
+## 6탭 소비자 워크플로우 리디자인 (2026-02-11)
+
+### 구조 변경: 4탭 → 6탭
+| 탭 | 경로 | 상태 |
+|----|------|------|
+| 1. 우리집 찾기 | `/project/[id]/home` | 기존 유지 |
+| 2. 도면/3D 매스 | `/project/[id]/design` | 재설계 완료 |
+| 3. AI 디자인 | `/project/[id]/ai-design` | 신규 완료 |
+| 4. 3D 렌더링 | `/project/[id]/rendering` | 신규 완료 |
+| 5. 물량산출 | `/project/[id]/estimate` | 재설계 완료 |
+| 6. 견적요청 | `/project/[id]/rfq` | 신규 완료 |
+
+### Phase 1: 6탭 구조 + 타입 확장
+- `layout.tsx` - 6탭 네비게이션 (Home/Box/Palette/Image/Calculator/FileText 아이콘)
+- `src/types/credits.ts` - 크레딧 시스템 타입 (UserCredits, CreditTransaction, CREDIT_PACKAGES)
+- `src/types/consumer-project.ts` - 새 상태 (FLOOR_PLAN/AI_DESIGN/RENDERING/RFQ), GeneratedImage, SelectedMaterial, SubMaterial, RenderView, ProjectRendering, EstimateItem, ProjectEstimate, ProjectRfq
+- `src/hooks/useCredits.ts` - Supabase 크레딧 관리 + localStorage 폴백
+- `src/hooks/useProjectState.ts` - addGeneratedImage, removeGeneratedImage, updateRendering, addRenderView, updateMaterial, setEstimate, updateRfq
+
+### Phase 2: 탭2 - 도면/3D 매스 생성
+- `src/components/project/FloorPlan3D.tsx` - Three.js 3D 매스 모델 (RoomFloor/RoomWalls/RoomLabel)
+- `src/app/project/[id]/design/page.tsx` - 도면 자동 로드 or 업로드/스캐닝, 2D/3D 토글
+
+### Phase 3: 탭3 - AI 디자인 상담
+- `src/app/api/project/generate-image/route.ts` - Gemini 이미지 생성 API + Mock 폴백
+- `src/app/project/[id]/ai-design/page.tsx` - 좌: AI 채팅 + 퀵 프롬프트, 우: 평면도 + 이미지 갤러리
+- 크레딧 시스템 연동 (무료 1회 + 유료 크레딧)
+
+### Phase 4: 탭4 - 3D 렌더링 + 자재수정
+- `src/app/project/[id]/rendering/page.tsx` - 방별 렌더링 갤러리, 확인 체크
+- 우측 패널: 자재 선택 UI (바닥/벽/천장 카테고리별 옵션, 부자재 자동 연동)
+- MATERIAL_CATALOG: LIVING/BED/KITCHEN/BATHROOM 자재 데이터
+
+### Phase 5: 탭5 - 물량산출/견적
+- `src/app/project/[id]/estimate/page.tsx` - 확정 자재 기반 물량 자동 산출
+- 카테고리별 노무비 비율, 공간 유형별 철거비, 부자재 산출
+- 견적서 저장 → ProjectEstimate
+
+### Phase 6: 탭6 - 견적요청
+- `src/app/project/[id]/rfq/page.tsx` - 특기사항 폼 + 견적요청 발송 + 입찰 확인
+- 4개 Mock 입찰 카드 (AI 추천/최저가/프리미엄/빠른 시공)
+- 업체 선택 → 계약 확정 플로우
+
+### 인증
+- Google OAuth 연동 완료 (Supabase Auth)
+- 카카오 로그인 비활성화 (비즈니스 심사 대기)
+- `src/hooks/useAuth.ts` - user, loading, signOut
+
 ## 소비자(고객) 측 기존 기능
 - `/` - 랜딩 페이지
 - `/address` - 주소 검색 (레거시, /project/new로 전환)
@@ -164,16 +212,16 @@
 - `/estimate/[id]` - 견적 상세
 - `/estimate/[id]/bids` - 입찰 목록
 - `/contract/[id]` - 계약 상세
-- `/auth` - 소비자 인증
+- `/auth` - 소비자 인증 (Google OAuth)
 
 ## 다음 작업 후보
+- Supabase에 user_credits, credit_transactions 테이블 생성
 - 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
-- 더 많은 도면 샘플 추가 (Training 데이터에서)
 - Gemini AI 실제 API 키 연동 테스트
-- 견적산출 데이터 ↔ 디자인 결정 자동 연결
-- 소비자 워크플로우 UI/UX 디테일 보완
-- 사업자 페이지 UI/UX 디테일 보완
-- 실제 데이터 연동 테스트
+- 3D 렌더링 엔진 API 연동 (현재 Mock 이미지)
+- 결제 시스템 연동 (크레딧 충전)
+- 사업자 대시보드에 견적요청 수신 연동
+- 카카오 로그인 활성화 (비즈니스 심사 완료 후)
 - RLS(Row Level Security) 정책 설정
 - 모바일 반응형 세부 조정
-- 알림 시스템 실시간화 (현재 mock)
+- 실제 데이터 연동 테스트
