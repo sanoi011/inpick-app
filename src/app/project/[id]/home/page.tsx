@@ -15,6 +15,30 @@ import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 
 type Step = "search" | "building" | "confirm";
 
+const RECENT_ADDRESSES_KEY = "inpick_recent_addresses";
+const MAX_RECENT = 5;
+
+function loadRecentAddresses(): AddressSearchResult[] {
+  try {
+    const stored = localStorage.getItem(RECENT_ADDRESSES_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecentAddress(addr: AddressSearchResult) {
+  try {
+    const recent = loadRecentAddresses();
+    // 중복 제거 후 맨 앞에 추가
+    const filtered = recent.filter((r) => r.roadAddress !== addr.roadAddress);
+    const updated = [addr, ...filtered].slice(0, MAX_RECENT);
+    localStorage.setItem(RECENT_ADDRESSES_KEY, JSON.stringify(updated));
+  } catch {
+    // 저장 실패 무시
+  }
+}
+
 export default function ProjectHomePage() {
   const params = useParams();
   const router = useRouter();
@@ -33,6 +57,8 @@ export default function ProjectHomePage() {
   const [matchedDrawing, setMatchedDrawing] = useState<DrawingCatalogEntry | null>(null);
   const [matchedFloorPlan, setMatchedFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [drawingLoading, setDrawingLoading] = useState(false);
+  const [showRecent, setShowRecent] = useState(false);
+  const [recentAddresses, setRecentAddresses] = useState<AddressSearchResult[]>([]);
 
   // 이미 주소가 설정된 프로젝트면 confirm 단계로
   useEffect(() => {
@@ -83,6 +109,8 @@ export default function ProjectHomePage() {
     setSelectedAddress(addr);
     setKeyword(addr.roadAddress);
     setResults([]);
+    setShowRecent(false);
+    saveRecentAddress(addr);
     setStep("building");
     setBuildingLoading(true);
     try {
@@ -255,11 +283,43 @@ export default function ProjectHomePage() {
               <input
                 type="text"
                 value={keyword}
-                onChange={(e) => { setKeyword(e.target.value); setSelectedAddress(null); }}
+                onChange={(e) => { setKeyword(e.target.value); setSelectedAddress(null); setShowRecent(false); }}
+                onDoubleClick={() => {
+                  if (keyword.trim().length === 0) {
+                    const recent = loadRecentAddresses();
+                    setRecentAddresses(recent);
+                    if (recent.length > 0) setShowRecent(true);
+                  }
+                }}
+                onBlur={() => { setTimeout(() => setShowRecent(false), 200); }}
                 placeholder="도로명 주소 또는 건물명을 입력하세요"
                 className="w-full pl-12 pr-12 py-4 rounded-xl border border-gray-300 text-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 autoFocus
               />
+
+              {/* 최근 검색 주소 (더블클릭 시) */}
+              {showRecent && recentAddresses.length > 0 && results.length === 0 && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-80 overflow-y-auto z-10">
+                  <div className="px-4 py-2 text-xs text-gray-400 border-b border-gray-100">
+                    최근 검색한 주소
+                  </div>
+                  {recentAddresses.map((addr, i) => (
+                    <button
+                      key={i}
+                      onClick={() => handleSelectAddress(addr)}
+                      className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors flex items-start gap-3 border-b border-gray-50 last:border-0"
+                    >
+                      <MapPin className="w-4 h-4 text-gray-400 mt-1 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{addr.roadAddress}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {addr.buildingName && `${addr.buildingName} | `}{addr.zipCode}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
 
               {results.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-80 overflow-y-auto z-10">
