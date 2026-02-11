@@ -2,306 +2,280 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Map } from "lucide-react";
+import { ArrowRight, Upload, Camera, FileImage, Eye, Box, CheckCircle2, Loader2 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
-import AnnotationCanvas from "@/components/project/AnnotationCanvas";
-import DesignChat from "@/components/project/DesignChat";
-import ImageUploader, { ImageThumbnailList } from "@/components/project/ImageUploader";
-import type { CanvasAnnotation, DesignChatMessage, ProjectImage } from "@/types/consumer-project";
-import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
-import { loadFloorPlan } from "@/lib/services/drawing-service";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
+import type { ParsedFloorPlan } from "@/types/floorplan";
+import { loadFloorPlan } from "@/lib/services/drawing-service";
+import dynamic from "next/dynamic";
 
-// 이미지 리사이즈 유틸
-function resizeImage(file: File, maxSize: number): Promise<string> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new window.Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        let { width, height } = img;
-        if (width > maxSize || height > maxSize) {
-          if (width > height) {
-            height = (height / width) * maxSize;
-            width = maxSize;
-          } else {
-            width = (width / height) * maxSize;
-            height = maxSize;
-          }
-        }
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext("2d");
-        ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL("image/jpeg", 0.85));
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  });
+// Three.js는 SSR 불가 → dynamic import
+const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex items-center justify-center h-full bg-gray-100">
+      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+    </div>
+  ),
+});
+
+// 이미지→도면 분석 Mock (향후 Gemini Vision 연동)
+function analyzeMockFloorPlan(): ParsedFloorPlan {
+  return {
+    totalArea: 84,
+    rooms: [
+      { id: "r1", type: "LIVING", name: "거실", area: 28, position: { x: 0, y: 0, width: 7, height: 4 } },
+      { id: "r2", type: "KITCHEN", name: "주방", area: 10, position: { x: 7, y: 0, width: 4, height: 2.5 } },
+      { id: "r3", type: "MASTER_BED", name: "안방", area: 16, position: { x: 0, y: 4, width: 4, height: 4 } },
+      { id: "r4", type: "BED", name: "침실", area: 12, position: { x: 4, y: 4, width: 3, height: 4 } },
+      { id: "r5", type: "BATHROOM", name: "욕실", area: 6, position: { x: 7, y: 2.5, width: 3, height: 2 } },
+      { id: "r6", type: "ENTRANCE", name: "현관", area: 4, position: { x: 7, y: 4.5, width: 2, height: 2 } },
+      { id: "r7", type: "BALCONY", name: "발코니", area: 8, position: { x: 0, y: -1.5, width: 7, height: 1.5 } },
+    ],
+    walls: [],
+    doors: [],
+    windows: [],
+  };
 }
 
-// Mock AI 응답
-const MOCK_RESPONSES = [
-  "해당 부분에 대해 분석해 보겠습니다.\n\n**바닥재 추천:**\n- 거실: LX 하우시스 디아망 오크 (내구성 우수, 평당 약 45,000원)\n- 침실: 한화 아쿠아텍 자작나무 (방수 기능, 평당 약 38,000원)\n\n선택하신 공간의 면적과 용도를 고려했을 때, 복합 마루가 가장 적합합니다. 추가 문의사항이 있으시면 말씀해 주세요.",
-  "좋은 선택이시네요! 해당 공간을 분석했습니다.\n\n**벽 색상 제안:**\n1. 베이지 톤 (NCS S 1005-Y20R) - 따뜻하고 넓어 보이는 효과\n2. 라이트 그레이 (NCS S 1502-B) - 모던하고 깔끔한 느낌\n3. 소프트 민트 (NCS S 1010-G10Y) - 밝고 산뜻한 분위기\n\n현재 공간의 채광과 크기를 고려하면 1번 베이지 톤을 추천드립니다.",
-  "공간 활용도를 높이는 수납 솔루션을 제안드립니다.\n\n**수납 확장 방안:**\n- 붙박이장 설치 (벽면 활용, 약 120만원~)\n- 시스템 행거 (드레스룸 구성, 약 80만원~)\n- 키큰수납장 (주방/거실 벽면, 약 60만원~)\n\n표시하신 영역이 약 2m 폭으로 보이는데, 이 공간에 맞춤형 붙박이장을 설치하면 수납량을 약 3배 늘릴 수 있습니다.",
-  "조명 배치를 분석해 보겠습니다.\n\n**추천 조명 계획:**\n- 거실: 매입 다운라이트 6개 + 간접 LED 라인 (약 45만원)\n- 주방: 펜던트 2개 + 하부장 LED (약 30만원)\n- 침실: 매입등 4개 + 간접등 (약 25만원)\n\n현재 도면 기준으로 최적의 조명 배치를 계산했습니다. 밝기는 거실 300lx, 주방 500lx, 침실 150lx를 기준으로 합니다.",
-];
-
-export default function DesignPage() {
+export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, addChatMessage, addImage, setActiveImage } = useProjectState(projectId);
+  const { project, updateStatus } = useProjectState(projectId);
 
-  const [messages, setMessages] = useState<DesignChatMessage[]>(
-    project?.design?.chatMessages || []
-  );
-  const [images, setImages] = useState<ProjectImage[]>(
-    project?.design?.images || []
-  );
-  const [activeImageId, setActiveImageId] = useState<string | undefined>(
-    project?.design?.activeImageId
-  );
-  const [annotations, setAnnotations] = useState<CanvasAnnotation[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [streamingText, setStreamingText] = useState("");
-  const [drawingPlan, setDrawingPlan] = useState<ParsedFloorPlan | null>(null);
-  const [showMinimap, setShowMinimap] = useState(true);
+  const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
+  const [uploadedFile, setUploadedFile] = useState<string | null>(null);
+  const [analyzing, setAnalyzing] = useState(false);
 
-  // 도면 로드
+  // 탭1에서 매칭된 도면 자동 로드
   useEffect(() => {
     if (project?.drawingId) {
-      loadFloorPlan(project.drawingId).then(setDrawingPlan);
+      loadFloorPlan(project.drawingId).then((plan) => {
+        if (plan) setFloorPlan(plan);
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
     }
   }, [project?.drawingId]);
 
-  const activeImage = images.find((img) => img.id === activeImageId);
+  // 도면 파일 업로드
+  const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  // 이미지 업로드 처리
-  const handleImageSelect = useCallback(async (file: File, type: "photo" | "camera") => {
-    const dataUrl = await resizeImage(file, 2000);
-    const newImage: ProjectImage = {
-      id: crypto.randomUUID(),
-      url: dataUrl,
-      type,
-      name: file.name || (type === "camera" ? "카메라 촬영" : "업로드 사진"),
-      annotations: [],
-      createdAt: new Date().toISOString(),
+    // 파일 미리보기
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target?.result as string;
+      setUploadedFile(dataUrl);
+      setAnalyzing(true);
+
+      // AI 도면 분석 (Mock → 향후 Gemini Vision 연동)
+      await new Promise((r) => setTimeout(r, 2000));
+      const analyzed = analyzeMockFloorPlan();
+      setFloorPlan(analyzed);
+      setAnalyzing(false);
     };
-    setImages((prev) => [...prev, newImage]);
-    setActiveImageId(newImage.id);
-    setAnnotations([]);
-    addImage(newImage);
-  }, [addImage]);
+    reader.readAsDataURL(file);
+  }, []);
 
-  // 이미지 선택
-  const handleSelectImage = (id: string) => {
-    setActiveImageId(id);
-    const img = images.find((i) => i.id === id);
-    setAnnotations(img?.annotations || []);
-    setActiveImage(id);
-  };
+  // 카메라 3D 스캐닝 (Mock)
+  const handleCameraScan = useCallback(async () => {
+    setAnalyzing(true);
+    // 향후: WebXR/ARKit 연동
+    await new Promise((r) => setTimeout(r, 2500));
+    const mockPlan = analyzeMockFloorPlan();
+    setFloorPlan(mockPlan);
+    setAnalyzing(false);
+  }, []);
 
-  // 이미지 삭제
-  const handleRemoveImage = (id: string) => {
-    setImages((prev) => prev.filter((img) => img.id !== id));
-    if (activeImageId === id) {
-      setActiveImageId(undefined);
-      setAnnotations([]);
+  // 다음 단계 (AI 디자인으로 이동)
+  const handleNext = () => {
+    if (floorPlan) {
+      updateStatus("AI_DESIGN");
+      router.push(`/project/${projectId}/ai-design`);
     }
   };
 
-  // 주석 변경
-  const handleAnnotationsChange = (newAnnotations: CanvasAnnotation[]) => {
-    setAnnotations(newAnnotations);
-    // 활성 이미지의 주석 업데이트
-    if (activeImageId) {
-      setImages((prev) =>
-        prev.map((img) =>
-          img.id === activeImageId ? { ...img, annotations: newAnnotations } : img
-        )
-      );
-    }
-  };
-
-  // 도면 공간 클릭 → 해당 공간 컨텍스트로 메시지
-  const handleRoomClick = (room: RoomData) => {
-    handleSendMessage(`${room.name} (${room.area}m²) 공간에 대해 인테리어 추천을 해주세요.`);
-  };
-
-  // 메시지 전송 (Mock AI)
-  const handleSendMessage = async (content: string, imageData?: string) => {
-    const userMsg: DesignChatMessage = {
-      id: crypto.randomUUID(),
-      role: "user",
-      content,
-      imageId: imageData ? "attached" : undefined,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    addChatMessage(userMsg);
-
-    setIsStreaming(true);
-    setStreamingText("");
-
-    // API 호출 시도, 실패 시 Mock
-    try {
-      const body: Record<string, unknown> = {
-        messages: [...messages, userMsg].map((m) => ({ role: m.role, content: m.content })),
-        projectId,
-      };
-      if (imageData) {
-        body.image = imageData;
-      }
-      if (annotations.length > 0) {
-        body.annotations = annotations;
-      }
-
-      const res = await fetch("/api/project/design-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok && res.body) {
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-        let fullText = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value, { stream: true });
-          const lines = chunk.split("\n");
-
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                if (data.text) {
-                  fullText += data.text;
-                  setStreamingText(fullText);
-                }
-              } catch {
-                // JSON 파싱 실패 무시
-              }
-            }
-          }
-        }
-
-        const assistantMsg: DesignChatMessage = {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: fullText,
-          createdAt: new Date().toISOString(),
-        };
-        setMessages((prev) => [...prev, assistantMsg]);
-        addChatMessage(assistantMsg);
-      } else {
-        throw new Error("API not available");
-      }
-    } catch {
-      // Mock 폴백
-      const mockResponse = MOCK_RESPONSES[messages.length % MOCK_RESPONSES.length];
-      let fullText = "";
-      for (let i = 0; i < mockResponse.length; i += 3) {
-        fullText = mockResponse.slice(0, i + 3);
-        setStreamingText(fullText);
-        await new Promise((r) => setTimeout(r, 15));
-      }
-      const assistantMsg: DesignChatMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: mockResponse,
-        createdAt: new Date().toISOString(),
-      };
-      setMessages((prev) => [...prev, assistantMsg]);
-      addChatMessage(assistantMsg);
-    }
-
-    setIsStreaming(false);
-    setStreamingText("");
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
-      {/* 이미지 썸네일 + 업로더 */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-white border-b border-gray-200">
-        <ImageUploader onImageSelect={handleImageSelect} />
-        <div className="w-px h-6 bg-gray-300" />
-        <ImageThumbnailList
-          images={images}
-          activeImageId={activeImageId}
-          onSelect={handleSelectImage}
-          onRemove={handleRemoveImage}
-        />
-        {images.length === 0 && (
-          <p className="text-xs text-gray-400">도면 또는 사진을 업로드하세요</p>
-        )}
-
-        <button
-          onClick={() => router.push(`/project/${projectId}/estimate`)}
-          className="ml-auto flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-        >
-          견적산출 <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* 메인: 좌 채팅 | 우 캔버스 */}
-      <div className="flex-1 flex min-h-0">
-        {/* 좌측: AI 채팅 */}
-        <DesignChat
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          isStreaming={isStreaming}
-          streamingText={streamingText}
-          onRequestSnapshot={() => window.dispatchEvent(new Event("request-canvas-snapshot"))}
-          className="w-[380px] min-w-[320px] flex-shrink-0 border-r border-gray-200"
-        />
-
-        {/* 우측: 캔버스 */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* 도면 미니맵 */}
-          {drawingPlan && showMinimap && (
-            <div className="relative border-b border-gray-200 bg-white">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-gray-50 border-b border-gray-100">
-                <span className="text-xs font-medium text-gray-600 flex items-center gap-1">
-                  <Map className="w-3 h-3" /> 평면도 (공간 클릭 시 AI 상담)
-                </span>
+      {/* 상단 바 */}
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-bold text-gray-900">도면 / 3D 매스</h2>
+          {floorPlan && (
+            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> 도면 로드 완료
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {floorPlan && (
+            <>
+              {/* 2D/3D 토글 */}
+              <div className="flex bg-gray-100 rounded-lg p-0.5">
                 <button
-                  onClick={() => setShowMinimap(false)}
-                  className="text-xs text-gray-400 hover:text-gray-600"
+                  onClick={() => setViewMode("2d")}
+                  className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    viewMode === "2d" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
+                  }`}
                 >
-                  접기
+                  <Eye className="w-3.5 h-3.5" /> 2D
+                </button>
+                <button
+                  onClick={() => setViewMode("3d")}
+                  className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
+                    viewMode === "3d" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
+                  }`}
+                >
+                  <Box className="w-3.5 h-3.5" /> 3D
                 </button>
               </div>
-              <FloorPlan2D
-                floorPlan={drawingPlan}
-                onRoomClick={handleRoomClick}
-                className="max-h-[200px] border-0 rounded-none"
-              />
-            </div>
+              <button
+                onClick={handleNext}
+                className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                AI 디자인 <ArrowRight className="w-4 h-4" />
+              </button>
+            </>
           )}
-          {drawingPlan && !showMinimap && (
-            <button
-              onClick={() => setShowMinimap(true)}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 bg-gray-50 border-b border-gray-200"
-            >
-              <Map className="w-3 h-3" /> 평면도 보기
-            </button>
-          )}
-          <AnnotationCanvas
-            backgroundImage={activeImage?.url}
-            annotations={annotations}
-            onAnnotationsChange={handleAnnotationsChange}
-            className="flex-1"
-          />
         </div>
       </div>
+
+      {/* 메인 영역 */}
+      <div className="flex-1 min-h-0">
+        {!floorPlan && !analyzing ? (
+          /* 도면 없음 → 업로드 UI */
+          <div className="h-full flex items-center justify-center bg-gray-50 p-8">
+            <div className="max-w-lg w-full">
+              {project?.drawingId ? (
+                <div className="text-center mb-8">
+                  <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+                  <p className="text-gray-600">도면을 불러오는 중...</p>
+                </div>
+              ) : (
+                <>
+                  <div className="text-center mb-8">
+                    <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <FileImage className="w-10 h-10 text-blue-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">도면을 등록해주세요</h2>
+                    <p className="text-sm text-gray-500">
+                      우리집 찾기에서 매칭된 도면이 없습니다.<br />
+                      아래 방법으로 도면을 등록할 수 있습니다.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* 도면 파일 업로드 */}
+                    <label className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-colors">
+                      <Upload className="w-8 h-8 text-gray-400" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-700">도면 파일 업로드</p>
+                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG</p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/*,.pdf"
+                        onChange={handleFileUpload}
+                        className="hidden"
+                      />
+                    </label>
+
+                    {/* 카메라 3D 스캐닝 */}
+                    <button
+                      onClick={handleCameraScan}
+                      className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-colors"
+                    >
+                      <Camera className="w-8 h-8 text-gray-400" />
+                      <div className="text-center">
+                        <p className="text-sm font-medium text-gray-700">카메라 3D 스캐닝</p>
+                        <p className="text-xs text-gray-400 mt-1">사진으로 공간 인식</p>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* 업로드된 파일 미리보기 */}
+                  {uploadedFile && (
+                    <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+                      <img
+                        src={uploadedFile}
+                        alt="업로드된 도면"
+                        className="w-full max-h-48 object-contain rounded-lg"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ) : analyzing ? (
+          /* AI 분석 중 */
+          <div className="h-full flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
+              <h3 className="text-lg font-bold text-gray-900 mb-2">AI가 도면을 분석하고 있습니다</h3>
+              <p className="text-sm text-gray-500">공간 구조를 인식하고 3D 매스 모델을 생성합니다...</p>
+              {uploadedFile && (
+                <div className="mt-6 max-w-xs mx-auto">
+                  <img
+                    src={uploadedFile}
+                    alt="분석 중인 도면"
+                    className="w-full rounded-lg opacity-50"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          /* 도면/3D 뷰어 */
+          <div className="h-full">
+            {viewMode === "2d" ? (
+              <div className="h-full p-4 bg-gray-50">
+                <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
+                  <FloorPlan2D
+                    floorPlan={floorPlan!}
+                    className="h-full"
+                  />
+                </div>
+              </div>
+            ) : (
+              <FloorPlan3D
+                floorPlan={floorPlan!}
+                className="h-full"
+              />
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* 하단 정보 바 */}
+      {floorPlan && (
+        <div className="px-4 py-2 bg-white border-t border-gray-200 flex items-center justify-between">
+          <div className="flex items-center gap-4 text-xs text-gray-500">
+            <span>전용면적: <strong className="text-gray-900">{floorPlan.totalArea}m²</strong></span>
+            <span>방: <strong className="text-gray-900">{floorPlan.rooms.length}개</strong></span>
+            <span>
+              {floorPlan.rooms.map((r) => r.name).join(", ")}
+            </span>
+          </div>
+          <div className="text-xs text-gray-400">
+            {project?.address?.roadAddress || "주소 미설정"}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
