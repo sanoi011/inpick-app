@@ -2,13 +2,15 @@
 
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Home, Palette, Calculator, FileText, Save, ArrowLeft } from "lucide-react";
+import { Home, Box, Palette, Image, Calculator, FileText, Save, ArrowLeft } from "lucide-react";
 
 const TABS = [
   { label: "우리집 찾기", segment: "home", icon: Home },
-  { label: "디자인하기", segment: "design", icon: Palette },
-  { label: "견적산출", segment: "estimate", icon: Calculator },
-  { label: "견적받기", segment: "bids", icon: FileText },
+  { label: "도면/3D 매스", segment: "design", icon: Box },
+  { label: "AI 디자인", segment: "ai-design", icon: Palette },
+  { label: "3D 렌더링", segment: "rendering", icon: Image },
+  { label: "물량산출", segment: "estimate", icon: Calculator },
+  { label: "견적요청", segment: "rfq", icon: FileText },
 ];
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {

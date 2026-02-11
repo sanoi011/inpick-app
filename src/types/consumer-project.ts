@@ -2,24 +2,30 @@
 
 export type ConsumerProjectStatus =
   | "ADDRESS_SELECTION"
-  | "DESIGNING"
+  | "FLOOR_PLAN"
+  | "AI_DESIGN"
+  | "RENDERING"
   | "ESTIMATING"
-  | "BIDDING"
+  | "RFQ"
   | "CONTRACTED";
 
 export const CONSUMER_PROJECT_STATUS_LABELS: Record<ConsumerProjectStatus, string> = {
   ADDRESS_SELECTION: "주소 선택",
-  DESIGNING: "디자인 중",
-  ESTIMATING: "견적 산출",
-  BIDDING: "견적 받기",
+  FLOOR_PLAN: "도면/3D 매스",
+  AI_DESIGN: "AI 디자인",
+  RENDERING: "3D 렌더링",
+  ESTIMATING: "물량 산출",
+  RFQ: "견적 요청",
   CONTRACTED: "계약 완료",
 };
 
 export const CONSUMER_PROJECT_STATUS_COLORS: Record<ConsumerProjectStatus, string> = {
   ADDRESS_SELECTION: "bg-gray-100 text-gray-700",
-  DESIGNING: "bg-blue-100 text-blue-700",
+  FLOOR_PLAN: "bg-cyan-100 text-cyan-700",
+  AI_DESIGN: "bg-blue-100 text-blue-700",
+  RENDERING: "bg-indigo-100 text-indigo-700",
   ESTIMATING: "bg-amber-100 text-amber-700",
-  BIDDING: "bg-purple-100 text-purple-700",
+  RFQ: "bg-purple-100 text-purple-700",
   CONTRACTED: "bg-green-100 text-green-700",
 };
 
@@ -85,12 +91,106 @@ export interface ProjectAddress {
   totalFloor?: number;
 }
 
+// AI 생성 이미지
+export interface GeneratedImage {
+  id: string;
+  prompt: string;
+  imageData: string;
+  roomId?: string;
+  roomName?: string;
+  description?: string;
+  createdAt: string;
+}
+
+// 자재 선정
+export interface SelectedMaterial {
+  id: string;
+  roomId: string;
+  roomName: string;
+  category: string; // 바닥, 벽, 천장, 가구 등
+  part: string; // 부위명
+  materialName: string;
+  specification: string;
+  unitPrice: number;
+  unit: string; // m², EA, SET 등
+  quantity?: number;
+  subMaterials?: SubMaterial[];
+  confirmed: boolean;
+}
+
+export interface SubMaterial {
+  name: string;
+  specification: string;
+  unitPrice: number;
+  unit: string;
+  quantity?: number;
+}
+
+// 3D 렌더링 뷰
+export interface RenderView {
+  id: string;
+  roomId: string;
+  roomName: string;
+  imageData: string;
+  prompt: string;
+  confirmed: boolean;
+  createdAt: string;
+}
+
 // 디자인 상태
 export interface ProjectDesign {
   images: ProjectImage[];
   decisions: DesignDecision[];
   chatMessages: DesignChatMessage[];
+  generatedImages: GeneratedImage[];
   activeImageId?: string;
+}
+
+// 렌더링 상태
+export interface ProjectRendering {
+  views: RenderView[];
+  materials: SelectedMaterial[];
+  allConfirmed: boolean;
+}
+
+// 견적 항목
+export interface EstimateItem {
+  id: string;
+  roomId: string;
+  roomName: string;
+  category: string;
+  part: string;
+  materialName: string;
+  specification: string;
+  unit: string;
+  quantity: number;
+  materialCost: number;
+  laborCost: number;
+  expense: number;
+  total: number;
+}
+
+// 견적서
+export interface ProjectEstimate {
+  items: EstimateItem[];
+  totalMaterialCost: number;
+  totalLaborCost: number;
+  totalExpense: number;
+  grandTotal: number;
+  createdAt: string;
+}
+
+// RFQ (견적요청)
+export interface ProjectRfq {
+  specialNotes: string;
+  preferredStartDate?: string;
+  preferredDuration?: string;
+  budgetRange?: string;
+  livingDuringWork: boolean;
+  noiseRestriction?: string;
+  sentAt?: string;
+  bidIds: string[];
+  selectedBidId?: string;
 }
 
 // 통합 프로젝트 상태
@@ -99,10 +199,10 @@ export interface ConsumerProject {
   status: ConsumerProjectStatus;
   address?: ProjectAddress;
   design?: ProjectDesign;
+  rendering?: ProjectRendering;
+  estimate?: ProjectEstimate;
+  rfq?: ProjectRfq;
   drawingId?: string;
-  estimateId?: string;
-  bidIds?: string[];
-  selectedBidId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -117,6 +217,7 @@ export function createNewProject(id: string): ConsumerProject {
       images: [],
       decisions: [],
       chatMessages: [],
+      generatedImages: [],
     },
     createdAt: now,
     updatedAt: now,
