@@ -83,6 +83,11 @@ export default function Header({
         </div>
 
         <div className="hidden md:flex items-center gap-2">
+          <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            style={{ color: colors.textMuted }}
+            whileHover={{ scale: 1.02, color: colors.text }} whileTap={{ scale: 0.98 }}>
+            로그인
+          </motion.a>
           <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
             style={{ backgroundColor: colors.buttonSecondaryBg, border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
@@ -125,6 +130,10 @@ export default function Header({
                   </div>
                 </div>
                 <div className="mt-6 flex flex-col gap-3">
+                  <a href="/auth" className="rounded-full px-4 py-3 text-center text-sm font-medium"
+                    style={{ color: colors.textMuted }} onClick={() => setMobileMenuOpen(false)}>
+                    로그인 / 회원가입
+                  </a>
                   <a href={contactButtonHref} className="rounded-full px-4 py-3 text-center text-sm font-medium"
                     style={{ border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }} onClick={() => setMobileMenuOpen(false)}>
                     {contactButtonText}
