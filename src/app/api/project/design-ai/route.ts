@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -16,6 +17,39 @@ const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전�
 - 답변은 전문적이면서도 이해하기 쉽게, 구조화하여 작성하세요.
 - 마감재 추천 시 제품명, 규격, 평당 단가를 함께 안내하세요.
 - 공간의 넓이, 채광, 동선을 고려하여 실용적인 제안을 하세요.`;
+
+// construction_knowledge에서 관련 지식 검색
+async function searchKnowledge(query: string): Promise<string> {
+  try {
+    const supabase = createClient();
+    // 간단한 키워드 기반 검색 (한글 2글자 이상 단어 추출)
+    const keywords = query.match(/[가-힣]{2,}/g) || [];
+    if (keywords.length === 0) return "";
+
+    // 상위 3개 키워드로 검색
+    const searchTerms = keywords.slice(0, 3);
+    const results: { title: string; content: string; category: string }[] = [];
+
+    for (const term of searchTerms) {
+      const { data } = await supabase
+        .from("construction_knowledge")
+        .select("title, content, category")
+        .ilike("content", `%${term}%`)
+        .limit(2);
+      if (data) results.push(...data);
+    }
+
+    // 중복 제거 + 최대 3개
+    const unique = Array.from(new Map(results.map(r => [r.content, r])).values()).slice(0, 3);
+    if (unique.length === 0) return "";
+
+    return "\n\n[참고 건설 지식베이스]\n" + unique.map(r =>
+      `[${r.category}] ${r.title}\n${r.content.slice(0, 500)}`
+    ).join("\n---\n");
+  } catch {
+    return "";
+  }
+}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
@@ -35,6 +69,10 @@ export async function POST(request: NextRequest) {
       return createMockResponse(messages);
     }
 
+    // 지식베이스 검색 (마지막 메시지 기반)
+    const lastUserMsg = messages[messages.length - 1]?.content || "";
+    const knowledgeContext = await searchKnowledge(lastUserMsg);
+
     // Gemini API 요청 구성
     const contents = buildGeminiContents(messages, image, annotations);
 
@@ -46,7 +84,7 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           contents,
           systemInstruction: {
-            parts: [{ text: DESIGN_SYSTEM_PROMPT }],
+            parts: [{ text: DESIGN_SYSTEM_PROMPT + knowledgeContext }],
           },
           generationConfig: {
             maxOutputTokens: 2048,
