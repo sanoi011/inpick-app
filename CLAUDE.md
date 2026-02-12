@@ -361,7 +361,7 @@
 
 ### 즉시 필요 (수동 작업)
 1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260213 까지)
-2. **Supabase 마이그레이션 적용** - `20260214000000_material_catalog_seed.sql`, `20260214100000_consumer_projects.sql` 실행 필요
+2. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260214 2개)
 3. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
 4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
 5. **Toss Payments 키 발급** - https://developers.tosspayments.com → `.env.local`과 Vercel 환경변수에 `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY` 설정
@@ -385,5 +385,5 @@
 | `20260211000000_credit_tables.sql` | Supabase 적용 완료 |
 | `20260212000000_consumer_rfq_integration.sql` | Supabase 적용 완료 |
 | `20260213000000_ai_data_pipeline.sql` | Supabase 적용 완료 |
-| `20260214000000_material_catalog_seed.sql` | **실행 필요** |
-| `20260214100000_consumer_projects.sql` | **실행 필요** |
+| `20260214000000_material_catalog_seed.sql` | Supabase 적용 완료 |
+| `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
