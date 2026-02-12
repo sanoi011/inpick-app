@@ -591,13 +591,12 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
                   2D/3D 뷰어 + 물량산출 엔진
 ```
 
-### 도면 인식 테스트 결과 (59.pdf, 2026-02-16)
-- **모델**: gemini-2.5-flash (thinkingBudget: 0, maxOutputTokens: 16384)
-- **응답시간**: 22초
-- **신뢰도**: 1.0
-- **결과**: 12개 공간, 34벽, 9문, 5창, 8설비
-- **면적**: 59.001m² (정규화 후, 실제 전용면적 59m²)
-- **공간**: 안방(5.6m²), 침실2(5.6m²), 욕실1(3.9m²), 현관(3.1m²), 침실1(4.5m²), 드레스룸(3.6m²), 거실(10.4m²), 주방(5.6m²), 욕실2(4.5m²), 침실1(3.9m²), 발코니1(4.2m²), 발코니2(4.2m²)
+### 도면 인식 테스트 결과 (2026-02-16)
+| 도면 | 시간 | 면적 | 공간 | 벽 | 문 | 창 | 설비 | 신뢰도 |
+|------|------|------|------|-----|-----|-----|------|--------|
+| 59㎡ | 22s | 59.0m² | 12 | 34 | 9 | 5 | 8 | 1.0 |
+| 84A㎡ | 26s | 84.0m² | 11 | 13 | 11 | 5 | 8 | 1.0 |
+| 84B㎡ | 20s | 84.0m² | 12 | 30 | 10 | 8 | 8 | 1.0 |
 
 ### Gemini 도면 인식 핵심 설정
 - **thinkingConfig: { thinkingBudget: 0 }** 필수 (없으면 249초 → 있으면 22초)
@@ -609,14 +608,22 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 
 ### 보유 도면 데이터
 - `drawings/_arch/59.pdf` + `59.png` (59㎡형 단위세대 평면도) ✅ 인식 테스트 완료
-- `drawings/_arch/84A.pdf` (84㎡A형 단위세대 평면도)
-- `drawings/_arch/84d.pdf` (84㎡B형 단위세대 평면도)
+- `drawings/_arch/84A.pdf` + `84A.png` (84㎡A형 단위세대 평면도) ✅ 인식 테스트 완료
+- `drawings/_arch/84d.pdf` + `84d.png` (84㎡B형 단위세대 평면도) ✅ 인식 테스트 완료
 - `drawings/_arch/*.dwg` (3개 DWG 원본)
 - `drawings/_arch/사용승인_대전용산4블럭_건축_0413_날인.pdf` (265페이지 사용승인도서)
 
 ### 테스트 스크립트
 - `scripts/test-gemini-parse.mjs` - REST API 직접 호출 테스트 (SDK 우회)
 - `scripts/test-api-parse.mjs` - `/api/project/parse-drawing` 엔드포인트 테스트
+- `scripts/test-all-drawings.mjs` - 3개 도면 일괄 테스트 (59/84A/84B)
+
+### 파이프라인 품질 개선 (2026-02-16)
+- **프롬프트 강화**: 단위세대만 분석 명시, 공간별 크기 차이 반영, 설비 크기 힌트
+- **유효성 검증**: 0.5m² 미만 방 필터, 0.3m 미만 벽 필터, fixture roomId 검증
+- **3D 뷰어**: 문/창 실제 Gemini 데이터 사용, 적응형 wall-door tolerance
+- **견적 엔진**: QTY 엔진 try-catch 오류 처리 (크래시 방지)
+- **2D 뷰어**: hasPolygons useMemo, 좌표 유효성 가드
 
 ## 다음 작업 (우선순위 순)
 
@@ -631,10 +638,10 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 8. **ODA File Converter 설치** (DWG→DXF 변환용) - https://www.opendesign.com/guestfiles/oda_file_converter
 
 ### 개발 작업 (도면 인식 고도화)
-- 84A.pdf, 84d.pdf 인식 테스트 및 검증
+- ~~84A.pdf, 84d.pdf 인식 테스트 및 검증~~ ✅ 완료
+- ~~파이프라인 품질 개선 (프롬프트/유효성/뷰어/견적)~~ ✅ 완료
 - Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)
 - DXF 파서 실행 및 Ground Truth 비교 검증
-- Gemini 인식 정확도 개선 (프롬프트 튜닝, 치수선 보정 강화)
 - 도면 인식 로그 분석 대시보드 (admin/ai-logs 확장)
 
 ### 기타 개발 작업
