@@ -45,7 +45,7 @@ export default function ContractorDashboard() {
         setNotifications((notiData.notifications || []).slice(0, 5));
         setStats({
           activeProjects: estimates.filter((e: { status: string }) => e.status === "in_progress").length,
-          pendingBids: estimates.filter((e: { status: string }) => e.status === "draft").length,
+          pendingBids: estimates.filter((e: { status: string }) => e.status === "confirmed" || e.status === "draft").length,
           completedProjects: estimates.filter((e: { status: string }) => e.status === "completed").length,
           avgRating: "-",
           monthlyRevenue: 0,
@@ -141,6 +141,11 @@ export default function ContractorDashboard() {
                 <div className="flex items-center gap-2">
                   <Bell className="w-5 h-5 text-gray-400" />
                   <h2 className="font-semibold text-gray-900">알림</h2>
+                  {notifications.filter((n) => !n.isRead).length > 0 && (
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                      {notifications.filter((n) => !n.isRead).length}
+                    </span>
+                  )}
                 </div>
               </div>
               {notifications.length === 0 ? (
@@ -184,9 +189,10 @@ export default function ContractorDashboard() {
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           est.status === "completed" ? "bg-green-100 text-green-700" :
                           est.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                          est.status === "confirmed" ? "bg-purple-100 text-purple-700" :
                           "bg-gray-100 text-gray-600"
                         }`}>
-                          {est.status === "completed" ? "완료" : est.status === "in_progress" ? "진행중" : "초안"}
+                          {est.status === "completed" ? "완료" : est.status === "in_progress" ? "진행중" : est.status === "confirmed" ? "입찰중" : "초안"}
                         </span>
                       </div>
                     </Link>

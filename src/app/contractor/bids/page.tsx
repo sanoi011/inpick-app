@@ -9,6 +9,18 @@ import {
 } from "lucide-react";
 import { BID_STATUS_LABELS, BID_STATUS_COLORS, type BidStatus } from "@/types/bid";
 
+interface RfqData {
+  specialNotes?: string;
+  preferredStartDate?: string;
+  preferredDuration?: string;
+  budgetRange?: string;
+  livingDuringWork?: boolean;
+  noiseRestriction?: string;
+  roomCount?: number;
+  bathroomCount?: number;
+  sentAt?: string;
+}
+
 interface EstimateForBid {
   id: string;
   title: string;
@@ -18,6 +30,9 @@ interface EstimateForBid {
   total_area_m2: number;
   grand_total: number;
   address: string;
+  region?: string;
+  rfq_data?: RfqData;
+  consumer_project_id?: string;
   created_at: string;
   updated_at: string;
   bid_count?: number;
@@ -249,6 +264,9 @@ export default function BidsPage() {
                           {BID_STATUS_LABELS[mapBidStatus(est.my_bid.status)]}
                         </span>
                       )}
+                      {est.rfq_data?.sentAt && (
+                        <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700">소비자 직접요청</span>
+                      )}
                       {!est.my_bid && tab === "available" && (
                         <span className="inline-flex px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">입찰 가능</span>
                       )}
@@ -282,6 +300,38 @@ export default function BidsPage() {
                     <InfoBox icon={<DollarSign className="w-4 h-4 text-gray-400" />} label="견적 금액" value={est.grand_total ? `${fmt(est.grand_total)}원` : "-"} />
                     <InfoBox icon={<MapPin className="w-4 h-4 text-gray-400" />} label="위치" value={est.address || "-"} />
                   </div>
+
+                  {/* 소비자 요청사항 (RFQ) */}
+                  {est.rfq_data && est.rfq_data.sentAt && (
+                    <div className="bg-purple-50 rounded-lg p-4 mb-4">
+                      <h4 className="text-sm font-semibold text-purple-900 mb-2 flex items-center gap-1.5">
+                        <FileText className="w-4 h-4" /> 소비자 요청사항
+                      </h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm">
+                        {est.rfq_data.preferredStartDate && (
+                          <div><span className="text-purple-600 text-xs">희망 시작일</span><p className="font-medium text-purple-900">{est.rfq_data.preferredStartDate}</p></div>
+                        )}
+                        {est.rfq_data.preferredDuration && (
+                          <div><span className="text-purple-600 text-xs">희망 공기</span><p className="font-medium text-purple-900">{est.rfq_data.preferredDuration}</p></div>
+                        )}
+                        {est.rfq_data.budgetRange && (
+                          <div><span className="text-purple-600 text-xs">예산</span><p className="font-medium text-purple-900">{est.rfq_data.budgetRange}</p></div>
+                        )}
+                        {est.rfq_data.roomCount != null && (
+                          <div><span className="text-purple-600 text-xs">방/화장실</span><p className="font-medium text-purple-900">{est.rfq_data.roomCount}방 {est.rfq_data.bathroomCount}화장실</p></div>
+                        )}
+                        {est.rfq_data.livingDuringWork && (
+                          <div><span className="text-purple-600 text-xs">거주 여부</span><p className="font-medium text-purple-900">거주 중 시공</p></div>
+                        )}
+                        {est.rfq_data.noiseRestriction && (
+                          <div><span className="text-purple-600 text-xs">소음 제한</span><p className="font-medium text-purple-900">{est.rfq_data.noiseRestriction}</p></div>
+                        )}
+                      </div>
+                      {est.rfq_data.specialNotes && (
+                        <p className="text-xs text-purple-700 mt-2 bg-purple-100 rounded-lg p-2">{est.rfq_data.specialNotes}</p>
+                      )}
+                    </div>
+                  )}
 
                   {/* 내 입찰 정보 */}
                   {est.my_bid && (
