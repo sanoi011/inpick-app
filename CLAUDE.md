@@ -530,17 +530,93 @@ design/page.tsx (상태 소유)
 - `src/components/ui/LoadingState.tsx` (신규) - LoadingState + EmptyState 공통 컴포넌트
 - `src/app/api/admin/env-check/route.ts` (신규) - 환경변수 상태 확인 API
 
+## 완료된 작업 (2026-02-16) - 딥러닝 도면 인식 시스템
+
+### Phase A: Gemini Vision 도면 인식 엔진 (MVP)
+- `src/lib/services/gemini-floorplan-parser.ts` (신규, ~350줄) - 핵심 AI 엔진
+  - Gemini 2.0 Flash + `responseMimeType: "application/json"` 구조화 출력
+  - 시스템 프롬프트: 한국 아파트 도면 전문 분석가 (공간/벽/문/창/설비/치수 인식)
+  - 좌표 보정 3단계: 치수선 앵커 → 면적 역산 → 문 폭 기준
+  - 후처리: ID 부여, MASTER_BED 식별, 중복 실명 번호, 합성 벽, fixtures roomId 연결
+  - Mock 폴백 (API 키 없을 때)
+- `src/lib/services/pdf-extractor.ts` (신규, ~100줄) - PDF → PNG 변환
+  - pdfjs-dist + node-canvas 서버사이드 렌더링 (200 DPI)
+  - 멀티페이지 PDF에서 도면 페이지 자동 식별 (데이터 밀도 기반)
+- `src/lib/services/image-preprocessor.ts` (신규, ~80줄) - 이미지 전처리
+  - 2048x2048 리사이즈 (Gemini 최적)
+  - 사진/스캔: 그레이스케일 + 대비 강화
+- `src/app/api/project/parse-drawing/route.ts` (신규, ~120줄) - 업로드 API
+  - POST multipart/form-data, 파일 타입별 분기 (PDF/이미지/DWG 거부)
+  - knownArea 파라미터로 면적 보정
+  - Vercel 60초 타임아웃 설정
+- `src/app/project/[id]/design/page.tsx` (수정) - Mock 제거 → 실제 API 연동
+  - `analyzeMockFloorPlan()` 제거 → `parseDrawingFile()` API 호출
+  - 인식 결과 확인 단계 추가 (DrawingParseResult 컴포넌트)
+  - 신뢰도 배지 (높음/보통/낮음), 경고 표시
+- `src/components/project/DrawingParseResult.tsx` (신규, ~200줄) - 결과 검증 UI
+  - 신뢰도 배지 (높음≥0.8/보통≥0.5/낮음<0.5)
+  - 공간 목록 + 실 타입 드롭다운 수정
+  - 경고 메시지, "결과 수용"/"다시 분석" 버튼
+
+### Phase B: DWG/DXF 직접 파서 (Python)
+- `scripts/convert-dwg.py` (신규, ~90줄) - ODA File Converter CLI 래퍼 (DWG→DXF)
+- `scripts/parse-dxf.py` (신규, ~350줄) - ezdxf 기반 DXF→ParsedFloorPlan
+  - 레이어 패턴 매핑 (벽/문/창/텍스트/설비)
+  - 엔티티별 추출: LINE/LWPOLYLINE(벽), ARC/INSERT(문), TEXT/MTEXT(실명/치수)
+  - 좌표 정규화 (CAD mm → 미터), 실명 기반 공간 생성
+  - 출력: `public/floorplans/dwg-{name}.json`
+
+### Phase D: DB 로깅
+- `supabase/migrations/20260216000000_drawing_parse_logs.sql` (신규) - 도면 파싱 로그 테이블
+  - project_id, file_name, parse_method, result_json(JSONB), confidence_score, warnings, processing_time_ms
+  - RLS 정책 (본인 로그만)
+
+### 도면 인식 플로우
+```
+PDF/이미지 업로드 → POST /api/project/parse-drawing
+  ├── PDF → pdf-extractor → 페이지 선택 → preprocessor → Gemini Vision
+  ├── 이미지 → preprocessor → Gemini Vision
+  └── DWG/DXF → 에러 (PDF 내보내기 안내)
+                            ↓
+                  GeminiRawResult (픽셀 좌표)
+                            ↓
+                  calibrateCoordinates (좌표 보정)
+                            ↓
+                  postProcess (미터 좌표 + ID + 합성 벽)
+                            ↓
+                  ParsedFloorPlan JSON
+                            ↓
+                  DrawingParseResult (사용자 확인)
+                            ↓
+                  2D/3D 뷰어 + 물량산출 엔진
+```
+
+### 보유 도면 데이터
+- `drawings/_arch/59.pdf` (59㎡형 단위세대 평면도)
+- `drawings/_arch/84A.pdf` (84㎡A형 단위세대 평면도)
+- `drawings/_arch/84d.pdf` (84㎡B형 단위세대 평면도)
+- `drawings/_arch/*.dwg` (3개 DWG 원본)
+- `drawings/_arch/사용승인_대전용산4블럭_건축_0413_날인.pdf` (265페이지 사용승인도서)
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
 1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260214 까지)
-2. **Supabase 마이그레이션 적용** - `20260215000000_vector_embeddings.sql` (pgvector 확장 활성화 필요)
-3. **임베딩 스크립트 실행** - 마이그레이션 적용 후 `npx tsx scripts/embed-knowledge.ts`
-4. **Gemini API 키 발급** - https://aistudio.google.com/apikey → `.env.local` + Vercel `GOOGLE_GEMINI_API_KEY`
-5. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-6. **Toss Payments 키 발급** - https://developers.tosspayments.com → `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
+2. **Supabase 마이그레이션 적용** - `20260215000000_vector_embeddings.sql` (pgvector 확장 필요)
+3. **Supabase 마이그레이션 적용** - `20260216000000_drawing_parse_logs.sql`
+4. **임베딩 스크립트 실행** - 마이그레이션 적용 후 `npx tsx scripts/embed-knowledge.ts`
+5. **Gemini API 키 발급** - https://aistudio.google.com/apikey → `.env.local` + Vercel `GOOGLE_GEMINI_API_KEY`
+6. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+7. **Toss Payments 키 발급** - https://developers.tosspayments.com → `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
+8. **ODA File Converter 설치** (DWG→DXF 변환용) - https://www.opendesign.com/guestfiles/oda_file_converter
 
-### 개발 작업
+### 개발 작업 (도면 인식 고도화)
+- Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)
+- DXF 파서 실행 및 Ground Truth 비교 검증
+- Gemini 인식 정확도 개선 (프롬프트 튜닝, 치수선 보정 강화)
+- 도면 인식 로그 분석 대시보드 (admin/ai-logs 확장)
+
+### 기타 개발 작업
 - Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
 - E2E 테스트 작성 (Playwright/Cypress)
 - 성능 최적화 (번들 분석, 코드 스플리팅)
@@ -562,3 +638,4 @@ design/page.tsx (상태 소유)
 | `20260214000000_material_catalog_seed.sql` | Supabase 적용 완료 |
 | `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
 | `20260215000000_vector_embeddings.sql` | **미적용** (pgvector 확장 필요) |
+| `20260216000000_drawing_parse_logs.sql` | **미적용** |

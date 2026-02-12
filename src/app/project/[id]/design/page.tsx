@@ -2,7 +2,8 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
@@ -10,6 +11,8 @@ import ViewerToolbar from "@/components/viewer/ViewerToolbar";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import type { CameraMode } from "@/components/project/FloorPlan3D";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
+import DrawingParseResult from "@/components/project/DrawingParseResult";
+import type { RoomType } from "@/types/floorplan";
 import dynamic from "next/dynamic";
 
 // Three.js는 SSR 불가 → dynamic import
@@ -22,23 +25,32 @@ const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
   ),
 });
 
-// 이미지→도면 분석 Mock (향후 Gemini Vision 연동)
-function analyzeMockFloorPlan(): ParsedFloorPlan {
-  return {
-    totalArea: 84,
-    rooms: [
-      { id: "r1", type: "LIVING", name: "거실", area: 28, position: { x: 0, y: 0, width: 7, height: 4 } },
-      { id: "r2", type: "KITCHEN", name: "주방", area: 10, position: { x: 7, y: 0, width: 4, height: 2.5 } },
-      { id: "r3", type: "MASTER_BED", name: "안방", area: 16, position: { x: 0, y: 4, width: 4, height: 4 } },
-      { id: "r4", type: "BED", name: "침실", area: 12, position: { x: 4, y: 4, width: 3, height: 4 } },
-      { id: "r5", type: "BATHROOM", name: "욕실", area: 6, position: { x: 7, y: 2.5, width: 3, height: 2 } },
-      { id: "r6", type: "ENTRANCE", name: "현관", area: 4, position: { x: 7, y: 4.5, width: 2, height: 2 } },
-      { id: "r7", type: "BALCONY", name: "발코니", area: 8, position: { x: 0, y: -1.5, width: 7, height: 1.5 } },
-    ],
-    walls: [],
-    doors: [],
-    windows: [],
-  };
+// 도면 파일 → API → ParsedFloorPlan
+async function parseDrawingFile(
+  file: File,
+  knownArea?: number
+): Promise<{
+  floorPlan: ParsedFloorPlan;
+  confidence: number;
+  warnings: string[];
+  method: string;
+  processingTimeMs: number;
+}> {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (knownArea) formData.append("knownArea", String(knownArea));
+
+  const res = await fetch("/api/project/parse-drawing", {
+    method: "POST",
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: "알 수 없는 오류" }));
+    throw new Error(err.error || `서버 오류 (${res.status})`);
+  }
+
+  return res.json();
 }
 
 export default function FloorPlanPage() {
@@ -52,6 +64,13 @@ export default function FloorPlanPage() {
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [parseWarnings, setParseWarnings] = useState<string[]>([]);
+  const [parseConfidence, setParseConfidence] = useState<number>(0);
+  const [parseMethod, setParseMethod] = useState<string>("");
+  const [parseTimeMs, setParseTimeMs] = useState<number>(0);
+  const [pendingFloorPlan, setPendingFloorPlan] = useState<ParsedFloorPlan | null>(null);
+  const [showParseResult, setShowParseResult] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 뷰어 제어 상태
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
@@ -77,31 +96,78 @@ export default function FloorPlanPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 파일 미리보기
-    const reader = new FileReader();
-    reader.onload = async (ev) => {
-      const dataUrl = ev.target?.result as string;
-      setUploadedFile(dataUrl);
-      setAnalyzing(true);
+    // 이미지 파일이면 미리보기
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setUploadedFile(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    } else {
+      setUploadedFile(null);
+    }
 
-      // AI 도면 분석 (Mock → 향후 Gemini Vision 연동)
-      await new Promise((r) => setTimeout(r, 2000));
-      const analyzed = analyzeMockFloorPlan();
-      setFloorPlan(analyzed);
-      setAnalyzing(false);
-    };
-    reader.readAsDataURL(file);
-  }, []);
-
-  // 카메라 3D 스캐닝 (Mock)
-  const handleCameraScan = useCallback(async () => {
     setAnalyzing(true);
-    // 향후: WebXR/ARKit 연동
-    await new Promise((r) => setTimeout(r, 2500));
-    const mockPlan = analyzeMockFloorPlan();
-    setFloorPlan(mockPlan);
-    setAnalyzing(false);
+    setParseWarnings([]);
+    setParseConfidence(0);
+
+    try {
+      const knownArea = project?.address?.exclusiveArea;
+      const result = await parseDrawingFile(file, knownArea);
+
+      setPendingFloorPlan(result.floorPlan);
+      setParseConfidence(result.confidence);
+      setParseWarnings(result.warnings);
+      setParseMethod(result.method);
+      setParseTimeMs(result.processingTimeMs || 0);
+      setShowParseResult(true);
+
+      if (result.method === "mock") {
+        toast({ type: "info", title: "AI 엔진 미연결", message: "Mock 데이터로 표시됩니다" });
+      } else {
+        toast({ type: "success", title: "도면 인식 완료", message: `${result.floorPlan.rooms.length}개 공간 감지` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+      toast({ type: "error", title: "도면 분석 실패", message: msg });
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [project?.address?.exclusiveArea]);
+
+  // 카메라 3D 스캐닝 (향후 WebXR 연동)
+  const handleCameraScan = useCallback(async () => {
+    toast({ type: "info", title: "카메라 스캐닝", message: "향후 업데이트 예정입니다. 도면 파일을 업로드해주세요." });
   }, []);
+
+  // 인식 결과 수용
+  const handleAcceptResult = useCallback(() => {
+    if (pendingFloorPlan) {
+      setFloorPlan(pendingFloorPlan);
+      setShowParseResult(false);
+      setPendingFloorPlan(null);
+    }
+  }, [pendingFloorPlan]);
+
+  // 다시 분석
+  const handleRetry = useCallback(() => {
+    setShowParseResult(false);
+    setPendingFloorPlan(null);
+    setUploadedFile(null);
+    setParseWarnings([]);
+    setParseConfidence(0);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  }, []);
+
+  // 실 타입 수정
+  const handleRoomTypeChange = useCallback((roomId: string, newType: RoomType) => {
+    if (!pendingFloorPlan) return;
+    const updated = {
+      ...pendingFloorPlan,
+      rooms: pendingFloorPlan.rooms.map((r) =>
+        r.id === roomId ? { ...r, type: newType } : r
+      ),
+    };
+    setPendingFloorPlan(updated);
+  }, [pendingFloorPlan]);
 
   // 다음 단계 (AI 디자인으로 이동)
   const handleNext = () => {
@@ -145,7 +211,23 @@ export default function FloorPlanPage() {
 
       {/* 메인 영역 */}
       <div className="flex-1 min-h-0">
-        {!floorPlan && !analyzing ? (
+        {showParseResult && pendingFloorPlan ? (
+          /* 인식 결과 확인 */
+          <div className="h-full flex items-center justify-center bg-gray-50 p-8 overflow-y-auto">
+            <div className="max-w-lg w-full">
+              <DrawingParseResult
+                floorPlan={pendingFloorPlan}
+                confidence={parseConfidence}
+                warnings={parseWarnings}
+                method={parseMethod}
+                processingTimeMs={parseTimeMs}
+                onAccept={handleAcceptResult}
+                onRetry={handleRetry}
+                onRoomTypeChange={handleRoomTypeChange}
+              />
+            </div>
+          </div>
+        ) : !floorPlan && !analyzing ? (
           /* 도면 없음 → 업로드 UI */
           <div className="h-full flex items-center justify-center bg-gray-50 p-8">
             <div className="max-w-lg w-full">
@@ -176,6 +258,7 @@ export default function FloorPlanPage() {
                         <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG</p>
                       </div>
                       <input
+                        ref={fileInputRef}
                         type="file"
                         accept="image/*,.pdf"
                         onChange={handleFileUpload}
@@ -271,6 +354,17 @@ export default function FloorPlanPage() {
         )}
       </div>
 
+      {/* 인식 경고 */}
+      {parseWarnings.length > 0 && floorPlan && (
+        <div className="px-4 py-1.5 bg-amber-50 border-t border-amber-200 flex items-center gap-2 text-xs text-amber-700 overflow-x-auto">
+          <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+          <span className="whitespace-nowrap">{parseWarnings[0]}</span>
+          {parseWarnings.length > 1 && (
+            <span className="text-amber-500">외 {parseWarnings.length - 1}건</span>
+          )}
+        </div>
+      )}
+
       {/* 하단 정보 바 */}
       {floorPlan && (
         <div className="px-4 py-2 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
@@ -280,6 +374,17 @@ export default function FloorPlanPage() {
             <span className="hidden sm:inline">
               {floorPlan.rooms.map((r) => r.name).join(", ")}
             </span>
+            {parseConfidence > 0 && (
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                parseConfidence >= 0.8
+                  ? "bg-green-100 text-green-700"
+                  : parseConfidence >= 0.5
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-700"
+              }`}>
+                신뢰도 {Math.round(parseConfidence * 100)}%
+              </span>
+            )}
           </div>
           <div className="text-xs text-gray-400 truncate max-w-full">
             {project?.address?.roadAddress || "주소 미설정"}
