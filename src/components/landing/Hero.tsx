@@ -14,6 +14,7 @@ const GRADIENT = {
   badge: "linear-gradient(90deg, #2563EB 0%, #7C3AED 50%, #EC4899 100%)",
 } as const;
 
+import Image from "next/image";
 import { motion } from "motion/react";
 import { Star } from "lucide-react";
 
@@ -85,11 +86,14 @@ export default function Hero() {
             className="relative mt-8 w-full max-w-5xl">
             <div className="relative rounded-2xl p-[3px]" style={{ background: "linear-gradient(179deg, #2563EB 0%, #3B82F6 36%, #7C3AED 70%, #EC4899 100%)" }}>
               <div className="relative overflow-hidden rounded-[13px] bg-white">
-                <div className="aspect-[16/9] overflow-hidden">
-                  <img
+                <div className="relative aspect-[16/9] overflow-hidden">
+                  <Image
                     src="/images/hero-kitchen.jpg"
                     alt="AI 인테리어 견적 데모 - 럭셔리 주방 인테리어"
-                    className="h-full w-full object-cover"
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 1280px) 100vw, 1280px"
+                    priority
                   />
                 </div>
               </div>

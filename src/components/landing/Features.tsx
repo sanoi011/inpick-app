@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "motion/react";
 import { Check, GitBranch, Star, Brain, Calculator, Users, Eye } from "lucide-react";
 
@@ -104,11 +105,13 @@ function FeatureSection({ feature, index }: { feature: typeof FEATURES[0]; index
   const visual = (
     <div className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
       {feature.image ? (
-        <div className="aspect-[4/3] overflow-hidden rounded-xl">
-          <img
+        <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
+          <Image
             src={feature.image}
             alt={feature.label}
-            className="h-full w-full object-cover"
+            fill
+            className="object-cover"
+            sizes="(max-width: 1024px) 100vw, 50vw"
           />
         </div>
       ) : (
