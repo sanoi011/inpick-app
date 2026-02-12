@@ -731,44 +731,80 @@ export async function extractFloorPlanFromImage(
     };
   }
 
+  // 모델 폴백 순서: 2.5-flash → 2.0-flash → 2.0-flash-lite → 2.5-flash-lite
+  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash-lite"];
+
   try {
-    const response = await client.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: SYSTEM_PROMPT },
+    let text = "";
+    let lastError: unknown = null;
+
+    for (const modelName of MODELS) {
+      try {
+        console.log(`[floorplan-parser] Trying model: ${modelName}`);
+        const response = await client.models.generateContent({
+          model: modelName,
+          contents: [
             {
-              inlineData: {
-                mimeType: mimeType as "image/png" | "image/jpeg",
-                data: imageBase64,
-              },
-            },
-            {
-              text: `이 건축 도면을 분석하여 JSON으로 출력하세요.${
-                options.knownAreaM2
-                  ? ` 참고: 이 세대의 전용면적은 ${options.knownAreaM2}m²입니다.`
-                  : ""
-              }`,
+              role: "user",
+              parts: [
+                { text: SYSTEM_PROMPT },
+                {
+                  inlineData: {
+                    mimeType: mimeType as "image/png" | "image/jpeg",
+                    data: imageBase64,
+                  },
+                },
+                {
+                  text: `이 건축 도면을 분석하여 JSON으로 출력하세요.${
+                    options.knownAreaM2
+                      ? ` 참고: 이 세대의 전용면적은 ${options.knownAreaM2}m²입니다.`
+                      : ""
+                  }`,
+                },
+              ],
             },
           ],
-        },
-      ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: JSON_SCHEMA,
-        temperature: 0.1,
-        maxOutputTokens: 8192,
-      },
-    });
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: JSON_SCHEMA,
+            temperature: 0.1,
+            maxOutputTokens: 16384,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        });
+        text = response.text || "";
+        console.log(`[floorplan-parser] Success with model: ${modelName}`);
+        break; // 성공
+      } catch (modelError) {
+        lastError = modelError;
+        const errMsg = modelError instanceof Error ? modelError.message : String(modelError);
+        const isRateLimit = errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota");
+        if (isRateLimit && modelName !== MODELS[MODELS.length - 1]) {
+          console.warn(`[floorplan-parser] Rate limited on ${modelName}, trying next model...`);
+          warnings.push(`${modelName} 할당량 초과, 다른 모델로 재시도`);
+          continue;
+        }
+        throw modelError; // 마지막 모델이거나 rate limit이 아닌 에러
+      }
+    }
 
-    const text = response.text || "";
+    if (!text && lastError) {
+      throw lastError;
+    }
+
+    console.log(`[floorplan-parser] Response length: ${text.length}`);
     let rawResult: GeminiRawResult;
 
     try {
-      rawResult = JSON.parse(text);
-    } catch {
+      // Gemini가 markdown 코드블록으로 감쌀 수 있음
+      let jsonText = text;
+      if (jsonText.startsWith("```")) {
+        jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
+      }
+      rawResult = JSON.parse(jsonText);
+    } catch (parseErr) {
+      console.error("[floorplan-parser] JSON parse error:", parseErr);
+      console.error("[floorplan-parser] Raw text (first 1000):", text.substring(0, 1000));
       warnings.push("Gemini 응답 JSON 파싱 실패, Mock 폴백");
       return {
         floorPlan: getMockFloorPlan(options.knownAreaM2),
@@ -777,6 +813,17 @@ export async function extractFloorPlanFromImage(
         processingTimeMs: Date.now() - startTime,
         method: "mock",
       };
+    }
+
+    // 원시 결과 로깅
+    console.log(`[floorplan-parser] Raw: ${rawResult.rooms?.length || 0} rooms, ${rawResult.walls?.length || 0} walls, ${rawResult.dimensions?.length || 0} dims`);
+    if (rawResult.rooms?.[0]?.polygon?.[0]) {
+      const p = rawResult.rooms[0].polygon[0];
+      console.log(`[floorplan-parser] First room first point: (${p.x}, ${p.y}) - ${rawResult.rooms[0].name}`);
+    }
+    if (rawResult.dimensions?.[0]) {
+      const d = rawResult.dimensions[0];
+      console.log(`[floorplan-parser] First dim: ${d.valueMm}mm, (${d.start.x},${d.start.y})→(${d.end.x},${d.end.y})`);
     }
 
     // 결과 검증
@@ -796,6 +843,50 @@ export async function extractFloorPlanFromImage(
 
     // 후처리
     const floorPlan = postProcess(rawResult, calibration);
+
+    // 면적 정규화: knownArea가 주어진 경우 전체 스케일 보정
+    if (options.knownAreaM2 && floorPlan.totalArea > 0) {
+      const areaRatio = floorPlan.totalArea / options.knownAreaM2;
+      if (areaRatio > 1.1 || areaRatio < 0.9) {
+        // 면적 비율이 10% 이상 차이나면 스케일 보정
+        const linearScale = Math.sqrt(areaRatio); // √(detected/known)
+        const round = (v: number) => Math.round(v * 1000) / 1000;
+        console.log(`[floorplan-parser] Area normalization: ${floorPlan.totalArea}m² → ${options.knownAreaM2}m² (scale: ${linearScale.toFixed(3)})`);
+
+        for (const room of floorPlan.rooms) {
+          room.position.x = round(room.position.x / linearScale);
+          room.position.y = round(room.position.y / linearScale);
+          room.position.width = round(room.position.width / linearScale);
+          room.position.height = round(room.position.height / linearScale);
+          room.area = round(room.area / (linearScale * linearScale));
+          if (room.polygon) {
+            room.polygon = room.polygon.map(p => ({
+              x: round(p.x / linearScale),
+              y: round(p.y / linearScale),
+            }));
+          }
+        }
+        for (const wall of floorPlan.walls) {
+          wall.start = { x: round(wall.start.x / linearScale), y: round(wall.start.y / linearScale) };
+          wall.end = { x: round(wall.end.x / linearScale), y: round(wall.end.y / linearScale) };
+        }
+        for (const door of floorPlan.doors) {
+          door.position = { x: round(door.position.x / linearScale), y: round(door.position.y / linearScale) };
+        }
+        for (const win of floorPlan.windows) {
+          win.position = { x: round(win.position.x / linearScale), y: round(win.position.y / linearScale) };
+        }
+        if (floorPlan.fixtures) {
+          for (const fix of floorPlan.fixtures) {
+            fix.position.x = round(fix.position.x / linearScale);
+            fix.position.y = round(fix.position.y / linearScale);
+            fix.position.width = round(fix.position.width / linearScale);
+            fix.position.height = round(fix.position.height / linearScale);
+          }
+        }
+        floorPlan.totalArea = round(floorPlan.rooms.reduce((s, r) => s + r.area, 0));
+      }
+    }
 
     // 신뢰도 계산
     let confidence = 0.5;

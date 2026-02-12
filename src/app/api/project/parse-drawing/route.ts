@@ -89,10 +89,18 @@ export async function POST(request: NextRequest) {
         imageMimeType = "application/pdf";
       }
     } else {
-      // 이미지 파일 전처리
-      const preprocessed = await preprocessFloorPlanImage(fileBuffer, sourceType);
-      imageBase64 = preprocessed.base64;
-      imageMimeType = preprocessed.mimeType;
+      // 이미지 파일: 크기가 4MB 이하이면 전처리 없이 직접 사용 (canvas 재인코딩 품질 저하 방지)
+      const rawBase64 = fileBuffer.toString("base64");
+      const rawSizeBytes = (rawBase64.length * 3) / 4;
+      if (rawSizeBytes < 4 * 1024 * 1024 && (mimeType === "image/png" || mimeType === "image/jpeg")) {
+        imageBase64 = rawBase64;
+        imageMimeType = mimeType;
+        console.log(`[parse-drawing] Using raw image (${(rawSizeBytes / 1024).toFixed(0)} KB), skipping preprocess`);
+      } else {
+        const preprocessed = await preprocessFloorPlanImage(fileBuffer, sourceType);
+        imageBase64 = preprocessed.base64;
+        imageMimeType = preprocessed.mimeType;
+      }
     }
 
     // 크기 검증
