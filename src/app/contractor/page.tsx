@@ -7,6 +7,8 @@ import {
   DollarSign, Bell, Calendar, ChevronRight,
 } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
+import { useRealtimeSubscription } from "@/hooks/useRealtimeSubscription";
+import { toast } from "@/components/ui/Toast";
 import { NOTIFICATION_PRIORITY_COLORS } from "@/types/notification";
 import type { Notification } from "@/types/notification";
 
@@ -59,6 +61,34 @@ export default function ContractorDashboard() {
     }
     loadDashboard();
   }, [authChecked, contractorId]);
+
+  // Realtime: 새 알림 수신 시 토스트 + 목록 업데이트
+  useRealtimeSubscription({
+    table: "contractor_notifications",
+    filter: contractorId ? `contractor_id=eq.${contractorId}` : undefined,
+    event: "INSERT",
+    enabled: !!contractorId,
+    onInsert: (payload) => {
+      const n = payload as Record<string, unknown>;
+      toast({
+        type: n.priority === "HIGH" ? "warning" : "info",
+        title: (n.title as string) || "새 알림",
+        message: (n.message as string) || "",
+      });
+      const newNotification: Notification = {
+        id: (n.id as string) || "",
+        contractorId: (n.contractor_id as string) || "",
+        type: ((n.type as string) || "SYSTEM") as Notification["type"],
+        title: (n.title as string) || "",
+        message: (n.message as string) || "",
+        priority: ((n.priority as string) || "MEDIUM") as Notification["priority"],
+        isRead: false,
+        link: (n.link as string) || undefined,
+        createdAt: new Date().toISOString(),
+      };
+      setNotifications((prev) => [newNotification, ...prev].slice(0, 5));
+    },
+  });
 
   if (!authChecked) {
     return (

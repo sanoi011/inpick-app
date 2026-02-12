@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bot, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star } from "lucide-react";
+import { Bot, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Download } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 interface AILog {
@@ -35,6 +35,24 @@ export default function AdminAILogsPage() {
   const [ratingOnly, setRatingOnly] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [ftStats, setFtStats] = useState<{ count: number; avgRating: number } | null>(null);
+
+  // Fine-tuning 통계 로드
+  useEffect(() => {
+    if (!authChecked) return;
+    fetch("/api/admin/fine-tuning?format=json&minRating=4", {
+      headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
+    })
+      .then((r) => r.json())
+      .then((d) => setFtStats({ count: d.count || 0, avgRating: d.stats?.avgRating || 0 }))
+      .catch(() => setFtStats({ count: 0, avgRating: 0 }));
+  }, [authChecked]);
+
+  const handleDownloadJsonl = () => {
+    const params = new URLSearchParams({ format: "jsonl", minRating: "4" });
+    if (agentFilter) params.set("agentType", agentFilter);
+    window.open(`/api/admin/fine-tuning?${params}`, "_blank");
+  };
 
   useEffect(() => {
     if (authChecked) load();
@@ -64,7 +82,14 @@ export default function AdminAILogsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-gray-900">AI 대화 로그</h2>
-        <p className="text-sm text-gray-500">총 {total}건</p>
+        <div className="flex items-center gap-3">
+          <p className="text-sm text-gray-500">총 {total}건</p>
+          <button onClick={handleDownloadJsonl}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600 text-white hover:bg-blue-700">
+            <Download className="w-3.5 h-3.5" />
+            JSONL 다운로드{ftStats ? ` (${ftStats.count}건)` : ""}
+          </button>
+        </div>
       </div>
 
       {/* 필터 */}

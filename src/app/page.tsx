@@ -1,5 +1,6 @@
 import Header from "@/components/landing/Header";
 import Hero from "@/components/landing/Hero";
+import HowItWorks from "@/components/landing/HowItWorks";
 import LogoCloud from "@/components/landing/LogoCloud";
 import Features from "@/components/landing/Features";
 import PainPoints from "@/components/landing/PainPoints";
@@ -15,6 +16,7 @@ export default function Home() {
     <>
       <Header />
       <Hero />
+      <HowItWorks />
       <LogoCloud />
       <Features />
       <PainPoints />

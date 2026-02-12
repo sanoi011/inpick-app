@@ -11,11 +11,11 @@ const HOME_LINKS = [
 
 const COMPANY_INFO = {
   copyright: "Copyright © 2026 AIOD. All rights reserved.",
-  businessNumber: "사업자등록번호: 예비창업 준비중",
-  ceo: "회사명: AIOD | 플랫폼: INPICK",
+  businessNumber: "사업자등록번호: 예비창업 준비 중",
+  ceo: "회사명: AIOD | 플랫폼명: INPICK",
   email: "이메일: tjsqhs011@naver.com",
-  phone: "연락처: 준비중",
-  address: "사업자주소: 예비창업 예정",
+  phone: "대표: 선우빈",
+  address: "본사: 서울특별시",
 };
 
 const LEGAL_LINKS = [
@@ -30,7 +30,7 @@ export default function LandingFooter() {
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex flex-col gap-10">
           <div className="flex flex-col gap-10 lg:flex-row lg:justify-between">
             <div className="flex flex-col gap-3">
-              <a href="/" className="text-2xl font-bold text-blue-400">INPICK</a>
+              <a href="/" className="text-2xl font-bold text-blue-500">INPICK</a>
               <p className="text-sm text-gray-400">AI 기반 소비자 주도 인테리어 견적 플랫폼</p>
             </div>
             <div className="flex flex-col gap-10 sm:flex-row sm:gap-20">

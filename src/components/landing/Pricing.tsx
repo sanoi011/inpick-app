@@ -7,19 +7,19 @@ import { CreditCard, Calendar, Check } from "lucide-react";
 const PLANS = [
   {
     id: "basic", name: "베이직", description: "처음 인테리어 견적을\n받아보는 소비자",
-    discount: "무료", price: "0원", period: "", buttonText: "무료로 시작하기",
+    discount: "무료", monthlyPrice: "0원", annualPrice: "0원", period: "", buttonText: "무료로 시작하기",
     isHighlighted: false,
     features: ["AI 상담 1회 체험", "기본 견적서 생성", "공간 1개 견적", "실시간 단가 조회"],
   },
   {
     id: "standard", name: "스탠다드", description: "본격적인 인테리어를\n계획하는 소비자",
-    discount: "인기", price: "49,000원", period: "/ 건", buttonText: "견적 시작하기",
+    discount: "인기", monthlyPrice: "49,000원", annualPrice: "39,000원", period: "/ 건", buttonText: "견적 시작하기",
     isHighlighted: true,
     features: ["AI 상담 무제한", "전체 공간 견적서", "3D 뷰어 연동", "전문업체 매칭 3곳", "견적 비교 리포트"],
   },
   {
     id: "pro", name: "프로 (사업자)", description: "인테리어 사업을 운영하는\n전문 시공업체",
-    discount: "B2B", price: "월 99,000원", period: "/ 월", buttonText: "사업자 등록하기",
+    discount: "B2B", monthlyPrice: "99,000원", annualPrice: "79,000원", period: "/ 월", buttonText: "사업자 등록하기",
     isHighlighted: false,
     features: ["입찰 참여 무제한", "AI 비서 기능", "전문업체 협업 매칭", "일정/재무 관리", "포트폴리오 등록"],
   },
@@ -47,6 +47,7 @@ export default function Pricing() {
               animate={{ left: isAnnual ? "calc(100% - 24px)" : "4px" }} transition={{ type: "spring", stiffness: 500, damping: 30 }} />
           </button>
           <span className={`text-base ${isAnnual ? "text-gray-900" : "text-gray-400"}`}>연간 결제</span>
+          {isAnnual && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">20% 할인</span>}
         </motion.div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8 mb-12">
@@ -62,7 +63,7 @@ export default function Pricing() {
                     color: plan.isHighlighted ? "#FFFFFF" : "#374151",
                   }}>{plan.discount}</div>
                   <div className="flex items-baseline gap-1 mb-6">
-                    <span className="text-4xl font-bold text-gray-900">{plan.price}</span>
+                    <span className="text-4xl font-bold text-gray-900">{isAnnual ? plan.annualPrice : plan.monthlyPrice}</span>
                     {plan.period && <span className="text-base text-gray-600">{plan.period}</span>}
                   </div>
                   <a href={plan.id === "pro" ? "/contractor/register" : "/project/new"}

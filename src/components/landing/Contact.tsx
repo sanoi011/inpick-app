@@ -6,10 +6,22 @@ import { FormEvent, useState } from "react";
 
 export default function Contact() {
   const [formData, setFormData] = useState({ name: "", subject: "", email: "", phone: "", question: "" });
+  const [submitState, setSubmitState] = useState<"idle" | "sending" | "sent" | "error">("idle");
 
-  const handleSubmit = (e: FormEvent) => {
+  const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    console.log("Contact form submitted:", formData);
+    setSubmitState("sending");
+    try {
+      // mailto 방식 폴백 (서버 API 없이)
+      const body = `이름: ${formData.name}\n제목: ${formData.subject}\n이메일: ${formData.email}\n전화: ${formData.phone}\n\n${formData.question}`;
+      window.location.href = `mailto:tjsqhs011@naver.com?subject=${encodeURIComponent(`[INPICK 문의] ${formData.subject}`)}&body=${encodeURIComponent(body)}`;
+      setSubmitState("sent");
+      setFormData({ name: "", subject: "", email: "", phone: "", question: "" });
+      setTimeout(() => setSubmitState("idle"), 3000);
+    } catch {
+      setSubmitState("error");
+      setTimeout(() => setSubmitState("idle"), 3000);
+    }
   };
 
   const fadeUpVariants = { hidden: { opacity: 0, y: 30 }, visible: { opacity: 1, y: 0 } };
@@ -63,7 +75,10 @@ export default function Contact() {
               <div className="space-y-2"><label className="text-base font-medium text-gray-900">질문 사항</label>
                 <textarea placeholder="질문 사항을 입력해주세요" value={formData.question} onChange={(e) => setFormData({ ...formData, question: e.target.value })}
                   rows={5} className="w-full px-4 py-3 rounded-lg text-base outline-none bg-gray-100 text-gray-900 resize-y focus:ring-2 focus:ring-blue-500" required /></div>
-              <button type="submit" className="px-8 py-4 rounded-xl text-base font-medium bg-gray-900 text-white hover:scale-105 hover:shadow-lg transition-all">문의 보내기</button>
+              <button type="submit" disabled={submitState === "sending"}
+                className="px-8 py-4 rounded-xl text-base font-medium bg-gray-900 text-white hover:scale-105 hover:shadow-lg transition-all disabled:opacity-50">
+                {submitState === "sending" ? "전송 중..." : submitState === "sent" ? "전송 완료!" : submitState === "error" ? "전송 실패" : "문의 보내기"}
+              </button>
             </form>
           </motion.div>
         </div>

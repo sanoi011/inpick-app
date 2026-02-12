@@ -49,8 +49,8 @@ export default function LogoCloud({ title = "공식 데이터 연동 파트너" 
         }} onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
           <div ref={scrollRef} className="flex items-center gap-12" style={{ willChange: "transform" }}>
             {triplePartners.map((partner, index) => (
-              <div key={`${partner.name}-${index}`} className="flex-shrink-0 h-10 flex items-center justify-center rounded-lg bg-white/60 px-6 py-2" style={{ minWidth: partner.width }}>
-                <span className="text-sm font-medium text-gray-500 whitespace-nowrap">{partner.name}</span>
+              <div key={`${partner.name}-${index}`} className="flex-shrink-0 h-11 flex items-center justify-center rounded-lg border border-gray-200 bg-white px-6 py-2 shadow-sm" style={{ minWidth: partner.width }}>
+                <span className="text-sm font-semibold text-gray-700 whitespace-nowrap">{partner.name}</span>
               </div>
             ))}
           </div>
