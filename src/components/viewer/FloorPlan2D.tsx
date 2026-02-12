@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle } from "react";
+import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from "react";
 import type { ParsedFloorPlan, RoomData, WallData, DoorData, WindowData, FixtureData } from "@/types/floorplan";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
 import { ENG_COLORS, VIEWER_SCALE } from "@/lib/floor-plan/viewer-constants";
@@ -449,7 +449,10 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
 
   const handleMouseUp = useCallback(() => setIsPanning(false), []);
 
-  const hasPolygons = floorPlan.rooms.some((r) => r.polygon && r.polygon.length > 0);
+  const hasPolygons = useMemo(
+    () => floorPlan.rooms.some((r) => r.polygon && r.polygon.length > 0),
+    [floorPlan.rooms]
+  );
 
   return (
     <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col ${className}`}>
@@ -477,7 +480,7 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
         <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#grid)" />
 
         {/* 2. Room fills */}
-        {floorPlan.rooms.map((room) => {
+        {floorPlan.rooms.filter(r => isFinite(r.position.x) && isFinite(r.position.y) && r.position.width > 0 && r.position.height > 0).map((room) => {
           const isSelected = room.id === selectedRoomId;
           const isHovered = room.id === hoveredRoom;
           const fillColor = isSelected

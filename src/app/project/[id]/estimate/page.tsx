@@ -183,14 +183,19 @@ export default function EstimatePage() {
     let estResult: EstimateResult | null = null;
 
     if (useEngine && floorPlan) {
-      // QTY 엔진 실행
-      const fpp = adaptParsedFloorPlan(floorPlan, projectId);
-      const qtyResult = calculateAllQuantities(fpp);
-      estResult = calculateEstimate(qtyResult);
+      // QTY 엔진 실행 (오류 시 폴백)
+      try {
+        const fpp = adaptParsedFloorPlan(floorPlan, projectId);
+        const qtyResult = calculateAllQuantities(fpp);
+        estResult = calculateEstimate(qtyResult);
 
-      secs = viewMode === "trade"
-        ? convertToTradeSections(estResult)
-        : convertToRoomSections(estResult);
+        secs = viewMode === "trade"
+          ? convertToTradeSections(estResult)
+          : convertToRoomSections(estResult);
+      } catch (err) {
+        console.error("[estimate] QTY engine error:", err);
+        secs = generateFallbackEstimate(floorPlan);
+      }
     } else {
       secs = generateFallbackEstimate(floorPlan);
     }

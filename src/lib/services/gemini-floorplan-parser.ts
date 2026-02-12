@@ -72,13 +72,20 @@ interface GeminiRawResult {
 const SYSTEM_PROMPT = `당신은 한국 아파트 건축 도면 전문 분석가입니다.
 주어진 평면도 이미지를 분석하여 정확한 공간/벽체/문/창/설비 정보를 JSON으로 추출하세요.
 
+## 중요 원칙
+- **단위세대(세대 내부)만 분석**: 공용 복도, 계단실, EV홀, 대피공간, 실외기실 등 세대 외부 공간은 제외
+- **각 공간의 실제 경계를 정확히 추적**: 벽체 안쪽 선을 따라 폴리곤 좌표를 지정
+- **공간별 크기 차이를 반영**: 거실(가장 큼) > 침실 > 주방 > 욕실/현관(가장 작음)
+- **인접한 공간은 벽을 사이에 두고 폴리곤이 맞닿아야 함**
+
 ## 공간(rooms) 인식 규칙
 - 폴리곤 꼭짓점 좌표로 공간 경계를 정의합니다 (좌상단=원점, 우→x증가, 아래→y증가)
 - 좌표 단위: 이미지 픽셀
+- 각 공간의 벽체 내부선을 따라 4~8개의 꼭짓점으로 폴리곤을 정의
 - 타입 매핑:
   - 거실/LV/Living → LIVING
-  - 주방/Kitchen/KIT → KITCHEN
-  - 안방/주침실/M.Bed → MASTER_BED
+  - 주방/Kitchen/KIT → KITCHEN (주방/식당이 거실과 연결된 경우에도 별도 공간)
+  - 안방/주침실/M.Bed → MASTER_BED (가장 큰 침실)
   - 침실/Bed → BED
   - 욕실/화장실/UB/Bath → BATHROOM
   - 현관/Entrance → ENTRANCE
@@ -94,19 +101,20 @@ const SYSTEM_PROMPT = `당신은 한국 아파트 건축 도면 전문 분석가
 
 ## 문(doors) 인식 규칙
 - 1/4 원호 = 여닫이(swing), 평행선/화살표 = 미닫이(sliding)
-- 너비는 mm 단위
+- 너비는 mm 단위 (일반 문: 800-900mm, 현관문: 900-1000mm, 미닫이: 1200-1800mm)
 - 연결된 두 공간의 name을 connectedRooms에 기입
 
 ## 창(windows) 인식 규칙
 - 외벽의 이중선/삼중선 = 창문
 - 위치, 너비(mm), 높이(mm) 추출
+- 거실 창: 2000-3000mm, 침실 창: 1200-2000mm
 
 ## 설비(fixtures) 인식 규칙
-- 변기(toilet): 타원형+사각형 심볼
-- 세면대(sink): 반원형+사각형 심볼
-- 주방 싱크(kitchen_sink): 이중 볼 사각형
-- 욕조(bathtub): 큰 타원형/둥근 사각형
-- 가스레인지(stove): 4개 원 격자
+- 변기(toilet): 타원형+사각형 심볼, 너비 ~400mm, 깊이 ~600mm
+- 세면대(sink): 반원형+사각형 심볼, 너비 ~500mm
+- 주방 싱크(kitchen_sink): 이중 볼 사각형, 너비 ~800mm
+- 욕조(bathtub): 큰 타원형/둥근 사각형, 너비 ~700mm, 길이 ~1500mm
+- 가스레인지(stove): 4개 원 격자, 너비 ~600mm
 
 ## 치수선(dimensions)
 - 도면 치수 텍스트(예: "3,600" = 3600mm)를 감지하고
@@ -590,10 +598,38 @@ function postProcess(
     };
   });
 
-  // totalArea
-  const totalArea = round(rooms.reduce((s, r) => s + r.area, 0));
+  // ─── 유효성 검증 ───
 
-  return { totalArea, rooms, walls, doors, windows, fixtures };
+  // 0면적/극소 면적 방 필터링
+  const validRooms = rooms.filter(r => {
+    if (!isFinite(r.area) || r.area < 0.5) return false;
+    if (!isFinite(r.position.x) || !isFinite(r.position.y)) return false;
+    if (r.position.width <= 0 || r.position.height <= 0) return false;
+    return true;
+  });
+
+  // 극소 벽 필터링
+  const validWalls = walls.filter(w => {
+    const len = Math.sqrt((w.end.x - w.start.x) ** 2 + (w.end.y - w.start.y) ** 2);
+    return isFinite(len) && len >= 0.3;
+  });
+
+  // fixture roomId 존재 검증
+  const roomIds = new Set(validRooms.map(r => r.id));
+  for (const fix of fixtures) {
+    if (fix.roomId && !roomIds.has(fix.roomId)) {
+      fix.roomId = undefined;
+    }
+  }
+
+  // ID 재부여 (필터링 후)
+  validRooms.forEach((r, i) => { r.id = `room-${i}`; });
+  validWalls.forEach((w, i) => { w.id = `wall-${i}`; });
+
+  // totalArea
+  const totalArea = round(validRooms.reduce((s, r) => s + r.area, 0));
+
+  return { totalArea, rooms: validRooms, walls: validWalls, doors, windows, fixtures };
 }
 
 function mapFixtureType(raw: string): FixtureData["type"] {

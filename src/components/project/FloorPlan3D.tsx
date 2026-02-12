@@ -299,17 +299,21 @@ function Walls({
   return (
     <group>
       {walls.map((wall) => {
+        // 벽 길이 기반 적응형 tolerance (벽 길이의 60% 이내)
+        const wallLen = Math.sqrt((wall.end.x - wall.start.x) ** 2 + (wall.end.y - wall.start.y) ** 2);
+        const tolerance = Math.max(wallLen * 0.6, 0.5);
+
         const wallDoors = (doors || []).filter((d) => {
           const mx = (wall.start.x + wall.end.x) / 2;
           const my = (wall.start.y + wall.end.y) / 2;
-          return Math.sqrt((d.position.x - mx) ** 2 + (d.position.y - my) ** 2) < 1.5;
+          return Math.sqrt((d.position.x - mx) ** 2 + (d.position.y - my) ** 2) < tolerance;
         });
 
         const wallWindows = (windows || []).filter((w) => {
           if (w.wallId === wall.id) return true;
           const mx = (wall.start.x + wall.end.x) / 2;
           const my = (wall.start.y + wall.end.y) / 2;
-          return Math.sqrt((w.position.x - mx) ** 2 + (w.position.y - my) ** 2) < 1.5;
+          return Math.sqrt((w.position.x - mx) ** 2 + (w.position.y - my) ** 2) < tolerance;
         });
 
         const hasOpenings = wallDoors.length > 0 || wallWindows.length > 0;
@@ -353,7 +357,7 @@ function Walls({
                   <boxGeometry args={[length, WALL_HEIGHT - DOOR_HEIGHT, wt]} />
                   <PBRMat mat={WALL_DARK} />
                 </mesh>
-                <DoorFrame3D cx={cx} cz={cz} width={0.9} angle={angle} wallThickness={wt} />
+                <DoorFrame3D cx={cx} cz={cz} width={wallDoors[0]?.width || 0.9} angle={angle} wallThickness={wt} />
               </>
             )}
 
@@ -364,18 +368,18 @@ function Walls({
                   <PBRMat mat={WALL_DARK} />
                 </mesh>
                 <mesh
-                  position={[cx, (WINDOW_SILL + WINDOW_HEIGHT) + (WALL_HEIGHT - WINDOW_SILL - WINDOW_HEIGHT) / 2, cz]}
+                  position={[cx, (WINDOW_SILL + (wallWindows[0]?.height || WINDOW_HEIGHT)) + (WALL_HEIGHT - WINDOW_SILL - (wallWindows[0]?.height || WINDOW_HEIGHT)) / 2, cz]}
                   rotation={[0, -angle, 0]}
                   castShadow
                 >
-                  <boxGeometry args={[length, WALL_HEIGHT - WINDOW_SILL - WINDOW_HEIGHT, wt]} />
+                  <boxGeometry args={[length, WALL_HEIGHT - WINDOW_SILL - (wallWindows[0]?.height || WINDOW_HEIGHT), wt]} />
                   <PBRMat mat={WALL_DARK} />
                 </mesh>
-                <mesh position={[cx, WINDOW_SILL + WINDOW_HEIGHT / 2, cz]} rotation={[0, -angle, 0]}>
-                  <boxGeometry args={[WINDOW_WIDTH, WINDOW_HEIGHT, 0.02]} />
+                <mesh position={[cx, WINDOW_SILL + (wallWindows[0]?.height || WINDOW_HEIGHT) / 2, cz]} rotation={[0, -angle, 0]}>
+                  <boxGeometry args={[wallWindows[0]?.width || WINDOW_WIDTH, wallWindows[0]?.height || WINDOW_HEIGHT, 0.02]} />
                   <PBRMat mat={GLASS} />
                 </mesh>
-                <WindowFrame3D cx={cx} cz={cz} width={WINDOW_WIDTH} height={WINDOW_HEIGHT} angle={angle} wallThickness={wt} />
+                <WindowFrame3D cx={cx} cz={cz} width={wallWindows[0]?.width || WINDOW_WIDTH} height={wallWindows[0]?.height || WINDOW_HEIGHT} angle={angle} wallThickness={wt} />
               </>
             )}
           </group>
