@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { projectId, address, estimateData, rfqPreferences } = body;
+    const { projectId, address, estimateData, rfqPreferences, userId } = body;
 
     if (!projectId || !address || !estimateData) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
@@ -90,6 +90,7 @@ export async function POST(request: NextRequest) {
         space_type: buildingType,
         region,
         consumer_project_id: projectId,
+        user_id: userId || null,
         rfq_data: {
           ...rfqPreferences,
           roomCount: address.roomCount,

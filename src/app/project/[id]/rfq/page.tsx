@@ -25,6 +25,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
+import { useAuth } from "@/hooks/useAuth";
 
 const AI_TAG_STYLES: Record<string, string> = {
   "AI 추천": "bg-blue-100 text-blue-700",
@@ -84,6 +85,7 @@ export default function RfqPage() {
   const router = useRouter();
   const projectId = params.id as string;
   const { project, updateRfq, updateStatus, setEstimateId } = useProjectState(projectId);
+  const { user } = useAuth();
 
   const [step, setStep] = useState<"form" | "sending" | "bids">(
     project?.rfq?.sentAt ? "bids" : "form"
@@ -101,6 +103,28 @@ export default function RfqPage() {
   const [bids, setBids] = useState<BidData[]>([]);
   const [bidLoading, setBidLoading] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  // Supabase 폴백: localStorage에 estimateId가 없으면 서버에서 조회
+  useEffect(() => {
+    if (project?.estimateId || !projectId) return;
+
+    const checkExistingRfq = async () => {
+      try {
+        const res = await fetch(`/api/rfq?consumerProjectId=${projectId}`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.estimate) {
+          setEstimateId(data.estimate.id);
+          setBids(data.bids || []);
+          setStep("bids");
+        }
+      } catch {
+        // 무시
+      }
+    };
+
+    checkExistingRfq();
+  }, [projectId, project?.estimateId, setEstimateId]);
 
   // 기존 RFQ 제출 여부 확인 + 입찰 로드
   useEffect(() => {
@@ -168,6 +192,7 @@ export default function RfqPage() {
             livingDuringWork,
             noiseRestriction,
           },
+          userId: user?.id || null,
         }),
       });
 
@@ -183,7 +208,7 @@ export default function RfqPage() {
 
     setStep("bids");
   }, [
-    project, projectId, specialNotes, preferredStartDate, preferredDuration,
+    project, projectId, user, specialNotes, preferredStartDate, preferredDuration,
     budgetRange, livingDuringWork, noiseRestriction, updateRfq, updateStatus, setEstimateId,
   ]);
 
