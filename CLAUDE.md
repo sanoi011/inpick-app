@@ -325,8 +325,8 @@
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase 마이그레이션 적용** - `20260213000000_ai_data_pipeline.sql` Supabase 대시보드에서 실행
-2. **PDF 학습 실행** - `npx tsx scripts/extract-lh-knowledge.ts` (DB 마이그레이션 적용 후)
+1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료
+2. ~~**PDF 학습 실행**~~ ✅ 완료 (387개 청크 - 품질점검 200 + 핸드북 24 + 시공한계 54 + 표준상세도 109)
 3. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
 4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
 
@@ -351,4 +351,4 @@
 | `20260210200000_finance_tables.sql` | Supabase 적용 완료 |
 | `20260211000000_credit_tables.sql` | Supabase 적용 완료 |
 | `20260212000000_consumer_rfq_integration.sql` | Supabase 적용 완료 |
-| `20260213000000_ai_data_pipeline.sql` | **Supabase 적용 필요** |
+| `20260213000000_ai_data_pipeline.sql` | Supabase 적용 완료 |

@@ -74,6 +74,15 @@ const PDF_SOURCES: PdfSource[] = [
   },
 ];
 
+// PostgreSQL 호환되지 않는 유니코드 제거 (null bytes 등)
+function sanitizeText(text: string): string {
+  return text
+    .replace(/\x00/g, "")
+    .replace(/\\u0000/g, "")
+    .replace(/[\uFFFE\uFFFF]/g, "")
+    .replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]/g, " ");
+}
+
 // 텍스트 청크 분할 (최대 2000자)
 const MAX_CHUNK_SIZE = 2000;
 
@@ -128,8 +137,8 @@ async function processPdf(source: PdfSource) {
     return { inserted: 0, skipped: true };
   }
 
-  // pdf-parse는 CommonJS 모듈이므로 동적 import
-  const pdfParse = (await import("pdf-parse")).default;
+  // pdf-parse는 CommonJS 모듈 - 직접 lib 경로 사용 (index.js의 테스트 코드 회피)
+  const pdfParse = (await import("pdf-parse/lib/pdf-parse.js")).default;
 
   try {
     const buffer = fs.readFileSync(fullPath);
@@ -142,8 +151,9 @@ async function processPdf(source: PdfSource) {
       return { inserted: 0, skipped: true };
     }
 
-    // 텍스트 → 청크 분할
-    const chunks = splitIntoChunks(data.text);
+    // 텍스트 정제 → 청크 분할
+    const cleanText = sanitizeText(data.text);
+    const chunks = splitIntoChunks(cleanText);
     console.log(`  📝 청크 수: ${chunks.length}`);
 
     let inserted = 0;
