@@ -225,6 +225,25 @@ export default function EstimatePage() {
     };
   }, [useEngine, floorPlan, projectId, viewMode]);
 
+  // 물량산출 결과 로깅 (fire-and-forget, 1회만)
+  const [qtyLogged, setQtyLogged] = useState(false);
+  useEffect(() => {
+    if (!engineResult || qtyLogged) return;
+    setQtyLogged(true);
+    fetch("/api/quantity-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId,
+        floorPlanData: floorPlan,
+        quantityResult: { projectId, itemCount: engineResult.lines.length },
+        estimateResult: engineResult.summary,
+        totalItems: engineResult.lines.length,
+        grandTotal: engineResult.summary.grandTotal,
+      }),
+    }).catch(() => { /* silent */ });
+  }, [engineResult, qtyLogged, projectId, floorPlan]);
+
   const filteredSections = activeRoom
     ? sections.filter((s) => s.roomName === activeRoom)
     : sections;

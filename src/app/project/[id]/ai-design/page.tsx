@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins } from "lucide-react";
+import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useCredits } from "@/hooks/useCredits";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,6 +21,37 @@ const QUICK_PROMPTS = [
   "화이트 & 그레이 모노톤 인테리어",
 ];
 
+// AI 대화 로깅
+async function logDesignConversation(
+  sessionId: string,
+  userMessage: string,
+  assistantResponse: string,
+  userId?: string,
+  responseTimeMs?: number
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/ai-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        userId: userId || null,
+        agentType: "consumer_design",
+        userMessage,
+        assistantResponse,
+        contextType: "floor_plan",
+        modelName: "gemini-2.0-flash",
+        responseTimeMs,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.id;
+    }
+  } catch { /* silent */ }
+  return null;
+}
+
 export default function AIDesignPage() {
   const params = useParams();
   const router = useRouter();
@@ -38,7 +69,10 @@ export default function AIDesignPage() {
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [showChargeModal, setShowChargeModal] = useState(false);
   const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, "up" | "down">>({});
+  const [msgLogIds, setMsgLogIds] = useState<Record<string, string>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef(crypto.randomUUID());
 
   // 데이터 로드
   useEffect(() => {
@@ -81,6 +115,7 @@ export default function AIDesignPage() {
     addChatMessage(userMsg);
     setInput("");
     setIsGenerating(true);
+    const startTime = Date.now();
 
     try {
       // 크레딧 차감
@@ -120,14 +155,23 @@ export default function AIDesignPage() {
         addGeneratedImage(newImage);
 
         // AI 응답 메시지
+        const responseText = data.description || "디자인 이미지를 생성했습니다. 오른쪽 캔버스에서 확인해주세요.";
         const assistantMsg: DesignChatMessage = {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: data.description || "디자인 이미지를 생성했습니다. 오른쪽 캔버스에서 확인해주세요.",
+          content: responseText,
           createdAt: new Date().toISOString(),
         };
         setMessages((prev) => [...prev, assistantMsg]);
         addChatMessage(assistantMsg);
+
+        // 대화 로깅 (fire-and-forget)
+        const elapsed = Date.now() - startTime;
+        logDesignConversation(
+          sessionIdRef.current, input.trim(), responseText, user?.id, elapsed
+        ).then((logId) => {
+          if (logId) setMsgLogIds((prev) => ({ ...prev, [assistantMsg.id]: logId }));
+        });
       } else {
         throw new Error("API error");
       }
@@ -144,6 +188,20 @@ export default function AIDesignPage() {
     setIsGenerating(false);
     setSelectedRoom(null);
   }, [input, isGenerating, canGenerate, spendCredits, selectedRoom, floorPlan, addChatMessage, addGeneratedImage]);
+
+  // 피드백 전송
+  const handleFeedback = async (msgId: string, isHelpful: boolean) => {
+    const logId = msgLogIds[msgId];
+    if (!logId || feedbackSent[msgId]) return;
+    setFeedbackSent((prev) => ({ ...prev, [msgId]: isHelpful ? "up" : "down" }));
+    try {
+      await fetch("/api/ai-log", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: logId, wasHelpful: isHelpful }),
+      });
+    } catch { /* silent */ }
+  };
 
   // 이미지 삭제
   const handleRemoveImage = (imageId: string) => {
@@ -250,12 +308,40 @@ export default function AIDesignPage() {
 
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                  msg.role === "user"
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-100 text-gray-800"
-                }`}>
-                  <p className="whitespace-pre-wrap">{msg.content}</p>
+                <div>
+                  <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
+                    msg.role === "user"
+                      ? "bg-blue-600 text-white"
+                      : "bg-gray-100 text-gray-800"
+                  }`}>
+                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                  </div>
+                  {msg.role === "assistant" && msgLogIds[msg.id] && !isGenerating && (
+                    <div className="flex items-center gap-1 mt-1 ml-1">
+                      <button
+                        onClick={() => handleFeedback(msg.id, true)}
+                        className={`p-1 rounded transition-colors ${
+                          feedbackSent[msg.id] === "up"
+                            ? "text-green-600 bg-green-50"
+                            : "text-gray-300 hover:text-green-500 hover:bg-green-50"
+                        }`}
+                        title="도움이 됐어요"
+                      >
+                        <ThumbsUp className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(msg.id, false)}
+                        className={`p-1 rounded transition-colors ${
+                          feedbackSent[msg.id] === "down"
+                            ? "text-red-600 bg-red-50"
+                            : "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                        }`}
+                        title="개선이 필요해요"
+                      >
+                        <ThumbsDown className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

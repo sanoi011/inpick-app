@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { Send, Bot, User, Loader2, AlertTriangle, Lightbulb, BarChart3, RotateCcw } from "lucide-react";
+import { Send, Bot, User, Loader2, AlertTriangle, Lightbulb, BarChart3, RotateCcw, ThumbsUp, ThumbsDown } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 import { parseAIResponseTags, type AIResponseTagType } from "@/types/contractor-ai";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  logId?: string; // ai_conversations ID (for feedback)
 }
 
 const QUICK_PROMPTS = [
@@ -27,12 +28,45 @@ const TAG_CONFIG: Record<AIResponseTagType, { bg: string; border: string; text: 
 
 const HISTORY_KEY = "inpick_ai_history";
 
+// AI 대화 로깅 (fire-and-forget)
+async function logConversation(
+  sessionId: string,
+  userMessage: string,
+  assistantResponse: string,
+  contractorId?: string,
+  responseTimeMs?: number
+): Promise<string | null> {
+  try {
+    const res = await fetch("/api/ai-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        sessionId,
+        userId: contractorId || null,
+        agentType: "contractor_ai",
+        userMessage,
+        assistantResponse,
+        contextType: "general",
+        modelName: "claude-sonnet-4-5-20250929",
+        responseTimeMs,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      return data.id;
+    }
+  } catch { /* silent */ }
+  return null;
+}
+
 export default function ContractorAIPage() {
   const { contractorId, authChecked } = useContractorAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  const [feedbackSent, setFeedbackSent] = useState<Record<string, "up" | "down">>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const sessionIdRef = useRef(crypto.randomUUID());
 
   // 대화 이력 로드
   useEffect(() => {
@@ -75,6 +109,8 @@ export default function ContractorAIPage() {
     setIsStreaming(true);
     setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
+    const startTime = Date.now();
+
     try {
       const res = await fetch("/api/contractor-ai", {
         method: "POST",
@@ -100,6 +136,7 @@ export default function ContractorAIPage() {
       if (!reader) return;
       const decoder = new TextDecoder();
       let buffer = "";
+      let fullResponse = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -115,6 +152,7 @@ export default function ContractorAIPage() {
             try {
               const parsed = JSON.parse(data);
               if (parsed.text) {
+                fullResponse += parsed.text;
                 setMessages((prev) => {
                   const copy = [...prev];
                   const last = copy[copy.length - 1];
@@ -126,6 +164,20 @@ export default function ContractorAIPage() {
           }
         }
       }
+
+      // 대화 로깅 (fire-and-forget)
+      if (fullResponse) {
+        const elapsed = Date.now() - startTime;
+        logConversation(sessionIdRef.current, msg, fullResponse, contractorId || undefined, elapsed).then((logId) => {
+          if (logId) {
+            setMessages((prev) => {
+              const copy = [...prev];
+              copy[copy.length - 1] = { ...copy[copy.length - 1], logId };
+              return copy;
+            });
+          }
+        });
+      }
     } catch {
       setMessages((prev) => {
         const copy = [...prev];
@@ -135,6 +187,19 @@ export default function ContractorAIPage() {
     } finally {
       setIsStreaming(false);
     }
+  };
+
+  // 피드백 전송
+  const handleFeedback = async (logId: string, isHelpful: boolean) => {
+    if (feedbackSent[logId]) return;
+    setFeedbackSent((prev) => ({ ...prev, [logId]: isHelpful ? "up" : "down" }));
+    try {
+      await fetch("/api/ai-log", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: logId, wasHelpful: isHelpful }),
+      });
+    } catch { /* silent */ }
   };
 
   if (!authChecked) return null;
@@ -156,7 +221,35 @@ export default function ContractorAIPage() {
                   {msg.content}
                 </div>
               ) : (
-                <AIMessageBlock content={msg.content} isStreaming={isStreaming && i === messages.length - 1} />
+                <>
+                  <AIMessageBlock content={msg.content} isStreaming={isStreaming && i === messages.length - 1} />
+                  {msg.logId && !isStreaming && (
+                    <div className="flex items-center gap-1 mt-1 ml-1">
+                      <button
+                        onClick={() => handleFeedback(msg.logId!, true)}
+                        className={`p-1 rounded transition-colors ${
+                          feedbackSent[msg.logId] === "up"
+                            ? "text-green-600 bg-green-50"
+                            : "text-gray-300 hover:text-green-500 hover:bg-green-50"
+                        }`}
+                        title="도움이 됐어요"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(msg.logId!, false)}
+                        className={`p-1 rounded transition-colors ${
+                          feedbackSent[msg.logId] === "down"
+                            ? "text-red-600 bg-red-50"
+                            : "text-gray-300 hover:text-red-500 hover:bg-red-50"
+                        }`}
+                        title="개선이 필요해요"
+                      >
+                        <ThumbsDown className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             {msg.role === "user" && (
