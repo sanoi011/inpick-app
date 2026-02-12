@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins, ThumbsUp, ThumbsDown } from "lucide-react";
+import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins, ThumbsUp, ThumbsDown, Zap, WifiOff } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useCredits } from "@/hooks/useCredits";
 import { useAuth } from "@/hooks/useAuth";
@@ -41,7 +41,7 @@ async function logDesignConversation(
         userMessage,
         assistantResponse,
         contextType: "floor_plan",
-        modelName: "gemini-2.0-flash",
+        modelName: "gemini-2.5-flash-image",
         responseTimeMs,
       }),
     });
@@ -74,6 +74,7 @@ export default function AIDesignPage() {
   const [msgLogIds, setMsgLogIds] = useState<Record<string, string>>({});
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sessionIdRef = useRef(crypto.randomUUID());
+  const [geminiStatus, setGeminiStatus] = useState<"loading" | "active" | "mock">("loading");
 
   // 데이터 로드
   useEffect(() => {
@@ -88,6 +89,14 @@ export default function AIDesignPage() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Gemini API 상태 확인
+  useEffect(() => {
+    fetch("/api/project/gemini-status")
+      .then((res) => res.json())
+      .then((data) => setGeminiStatus(data.status === "configured" ? "active" : "mock"))
+      .catch(() => setGeminiStatus("mock"));
+  }, []);
 
   // 방 클릭 → 프롬프트에 컨텍스트 추가
   const handleRoomClick = (room: RoomData) => {
@@ -141,6 +150,10 @@ export default function AIDesignPage() {
 
       if (res.ok) {
         const data = await res.json();
+
+        // Gemini 상태 반영
+        if (data.isMock) setGeminiStatus("mock");
+        else if (data.isMock === false) setGeminiStatus("active");
 
         // 생성 이미지 저장
         const newImage: GeneratedImage = {
@@ -222,6 +235,22 @@ export default function AIDesignPage() {
       <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">AI 디자인</h2>
+          {/* Gemini 상태 */}
+          <span className={`hidden sm:inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+            geminiStatus === "active"
+              ? "bg-green-50 text-green-700 border border-green-200"
+              : geminiStatus === "mock"
+              ? "bg-orange-50 text-orange-600 border border-orange-200"
+              : "bg-gray-50 text-gray-400 border border-gray-200"
+          }`}>
+            {geminiStatus === "active" ? (
+              <><Zap className="w-3 h-3" /> Gemini API</>
+            ) : geminiStatus === "mock" ? (
+              <><WifiOff className="w-3 h-3" /> Mock 모드</>
+            ) : (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            )}
+          </span>
           {selectedRoom && (
             <span className="hidden sm:inline px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
               {ROOM_TYPE_LABELS[selectedRoom.type]} 선택됨
@@ -429,6 +458,11 @@ export default function AIDesignPage() {
                   <Sparkles className="w-12 h-12 mx-auto mb-3 opacity-30" />
                   <p className="text-sm">AI가 생성한 디자인 이미지가 여기에 표시됩니다</p>
                   <p className="text-xs mt-1">왼쪽에서 원하는 스타일을 입력해보세요</p>
+                  {geminiStatus === "mock" && (
+                    <p className="text-xs text-orange-500 mt-2">
+                      Mock 모드: 실제 이미지 대신 플레이스홀더가 생성됩니다
+                    </p>
+                  )}
                 </div>
               </div>
             ) : (

@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getGeminiClient } from "@/lib/gemini-client";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -22,11 +23,9 @@ const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전�
 async function searchKnowledge(query: string): Promise<string> {
   try {
     const supabase = createClient();
-    // 간단한 키워드 기반 검색 (한글 2글자 이상 단어 추출)
     const keywords = query.match(/[가-힣]{2,}/g) || [];
     if (keywords.length === 0) return "";
 
-    // 상위 3개 키워드로 검색
     const searchTerms = keywords.slice(0, 3);
     const results: { title: string; content: string; category: string }[] = [];
 
@@ -39,7 +38,6 @@ async function searchKnowledge(query: string): Promise<string> {
       if (data) results.push(...data);
     }
 
-    // 중복 제거 + 최대 3개
     const unique = Array.from(new Map(results.map(r => [r.content, r])).values()).slice(0, 3);
     if (unique.length === 0) return "";
 
@@ -52,8 +50,6 @@ async function searchKnowledge(query: string): Promise<string> {
 }
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-
   try {
     const { messages, image, annotations } = await request.json();
 
@@ -64,8 +60,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const client = getGeminiClient();
+
     // API 키 없으면 Mock 응답
-    if (!apiKey) {
+    if (!client) {
       return createMockResponse(messages);
     }
 
@@ -76,88 +74,52 @@ export async function POST(request: NextRequest) {
     // Gemini API 요청 구성
     const contents = buildGeminiContents(messages, image, annotations);
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse&key=${apiKey}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents,
-          systemInstruction: {
-            parts: [{ text: DESIGN_SYSTEM_PROMPT + knowledgeContext }],
-          },
-          generationConfig: {
-            maxOutputTokens: 2048,
-            temperature: 0.7,
-          },
-        }),
-      }
-    );
+    try {
+      const response = await client.models.generateContentStream({
+        model: "gemini-2.0-flash",
+        contents: contents,
+        config: {
+          systemInstruction: DESIGN_SYSTEM_PROMPT + knowledgeContext,
+          maxOutputTokens: 2048,
+          temperature: 0.7,
+        },
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Gemini API error:", response.status, errorText);
-      // 폴백: Mock 응답
-      return createMockResponse(messages);
-    }
-
-    // Gemini SSE → 프론트엔드 SSE 변환 스트림
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream({
-      async start(controller) {
-        const reader = response.body?.getReader();
-        if (!reader) {
-          controller.close();
-          return;
-        }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6).trim();
-                if (!data || data === "[DONE]") continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-                  // Gemini 응답 구조: candidates[0].content.parts[0].text
-                  const text = parsed?.candidates?.[0]?.content?.parts?.[0]?.text;
-                  if (text) {
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-                    );
-                  }
-                } catch {
-                  // JSON 파싱 실패 무시
-                }
+      // SDK async iterator → SSE 스트림 변환
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            for await (const chunk of response) {
+              const text = chunk.text;
+              if (text) {
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
+                );
               }
             }
+          } catch (err: unknown) {
+            const error = err as { message?: string };
+            console.error("Gemini stream error:", error.message);
+          } finally {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
           }
-        } finally {
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-          reader.releaseLock();
-        }
-      },
-    });
+        },
+      });
 
-    return new Response(stream, {
-      headers: {
-        "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
-        Connection: "keep-alive",
-      },
-    });
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          Connection: "keep-alive",
+        },
+      });
+    } catch (err: unknown) {
+      const error = err as { status?: number; message?: string };
+      console.error("Gemini API error:", error.status, error.message);
+      return createMockResponse(messages);
+    }
   } catch (err) {
     console.error("Design AI error:", err);
     return new Response(
