@@ -132,6 +132,52 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "계약 생성 실패" }, { status: 500 });
     }
 
+    // 사업자 프로젝트 자동 생성 (실패해도 계약은 이미 생성됨)
+    try {
+      const projectName = estimate?.title || "인테리어 공사";
+      const { data: autoProject } = await supabase
+        .from("contractor_projects")
+        .insert({
+          contractor_id: bid.contractor_id,
+          contract_id: contract.id,
+          estimate_id: bid.estimate_id,
+          name: projectName,
+          address: estimate?.address || "",
+          start_date: startDate,
+          end_date: endDate,
+          total_budget: totalAmount,
+          status: "planning",
+        })
+        .select()
+        .single();
+
+      if (autoProject) {
+        // 기본 공정 7단계 생성
+        const DEFAULT_PHASES = [
+          "철거", "기초/설비 배관", "전기 배선", "목공", "타일/방수", "도배/도장", "마무리/검수",
+        ];
+        const phases = DEFAULT_PHASES.map((name, idx) => ({
+          project_id: autoProject.id,
+          name,
+          phase_order: idx + 1,
+          status: "pending",
+          checklist: [],
+          dependencies: idx > 0 ? [DEFAULT_PHASES[idx - 1]] : [],
+        }));
+        await supabase.from("project_phases").insert(phases);
+
+        // 활동 로그
+        await supabase.from("project_activities").insert({
+          project_id: autoProject.id,
+          activity_type: "created",
+          description: "계약 체결로 프로젝트가 자동 생성되었습니다",
+          actor: "시스템",
+        });
+      }
+    } catch {
+      // 프로젝트 자동 생성 실패 시 무시 (계약은 이미 성공)
+    }
+
     return NextResponse.json({ contract }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "계약 생성 중 오류가 발생했습니다." }, { status: 500 });
