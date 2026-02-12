@@ -122,6 +122,29 @@ export async function POST(request: NextRequest) {
       .eq("id", estimateId)
       .in("status", ["draft", "confirmed"]);
 
+    // 소비자 알림: 새 입찰 도착
+    try {
+      const { data: estimate } = await supabase
+        .from("estimates")
+        .select("user_id, consumer_project_id")
+        .eq("id", estimateId)
+        .single();
+      if (estimate?.user_id) {
+        const companyName = data.specialty_contractors?.company_name || "업체";
+        await supabase.from("consumer_notifications").insert({
+          user_id: estimate.user_id,
+          type: "BID_RECEIVED",
+          title: "새 입찰이 도착했습니다",
+          message: `${companyName}에서 입찰서를 보냈습니다`,
+          priority: "HIGH",
+          link: estimate.consumer_project_id
+            ? `/project/${estimate.consumer_project_id}/rfq`
+            : undefined,
+          reference_id: data.id,
+        });
+      }
+    } catch { /* silent */ }
+
     return NextResponse.json({ bid: data }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "입찰 등록 중 오류가 발생했습니다." }, { status: 500 });

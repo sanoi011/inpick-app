@@ -183,6 +183,21 @@ export async function POST(request: NextRequest) {
       // 프로젝트 자동 생성 실패 시 무시 (계약은 이미 성공)
     }
 
+    // 소비자 알림: 계약 생성
+    try {
+      if (estimate?.user_id) {
+        await supabase.from("consumer_notifications").insert({
+          user_id: estimate.user_id,
+          type: "CONTRACT_CREATED",
+          title: "계약서가 생성되었습니다",
+          message: `${contract.project_name} 계약서를 확인하고 서명해주세요`,
+          priority: "HIGH",
+          link: `/contract/${contract.bid_id}`,
+          reference_id: contract.id,
+        });
+      }
+    } catch { /* silent */ }
+
     return NextResponse.json({ contract }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "계약 생성 중 오류가 발생했습니다." }, { status: 500 });

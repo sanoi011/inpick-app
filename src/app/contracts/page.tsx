@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Loader2,
   FileText,
   Clock,
   CheckCircle2,
@@ -11,14 +10,25 @@ import {
   PenLine,
   ArrowLeft,
   Inbox,
+  RefreshCw,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/components/ui/Toast";
+import { SkeletonContractCard, SkeletonSummaryCards } from "@/components/ui/Skeleton";
+import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
 import type { Contract, ContractStatus } from "@/types/contract";
 import {
   mapDbContract,
   CONTRACT_STATUS_LABELS,
   CONTRACT_STATUS_COLORS,
 } from "@/types/contract";
+
+const CONTRACT_FILTERS = [
+  { label: "전체", value: "all" },
+  { label: "서명 대기", value: "pending" },
+  { label: "시공중", value: "active" },
+  { label: "완공", value: "done" },
+];
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -118,6 +128,28 @@ export default function ContractsPage() {
   const { user, loading: authLoading } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+
+  const loadContracts = useCallback(async () => {
+    if (!user) return;
+    setLoading(true);
+    setError(false);
+    try {
+      const res = await fetch(`/api/contracts?consumerId=${user.id}`);
+      const data = await res.json();
+      const mapped = (data.contracts || []).map(
+        (c: Record<string, unknown>) => mapDbContract(c)
+      );
+      setContracts(mapped);
+    } catch {
+      setError(true);
+      toast({ type: "error", title: "계약 정보 로드 실패", message: "잠시 후 다시 시도해주세요" });
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -127,30 +159,54 @@ export default function ContractsPage() {
       return;
     }
 
-    async function loadContracts() {
-      try {
-        const res = await fetch(
-          `/api/contracts?consumerId=${user!.id}`
-        );
-        const data = await res.json();
-        const mapped = (data.contracts || []).map(
-          (c: Record<string, unknown>) => mapDbContract(c)
-        );
-        setContracts(mapped);
-      } catch {
-        // 에러 시 빈 목록
-      } finally {
-        setLoading(false);
-      }
+    loadContracts();
+  }, [user, authLoading, router, loadContracts]);
+
+  const filtered = useMemo(() => {
+    let list = contracts;
+
+    if (statusFilter === "pending") {
+      list = list.filter((c) => c.status === "DRAFT" || c.status === "PENDING_SIGNATURE");
+    } else if (statusFilter === "active") {
+      list = list.filter((c) => c.status === "SIGNED" || c.status === "IN_PROGRESS");
+    } else if (statusFilter === "done") {
+      list = list.filter((c) => c.status === "COMPLETED");
     }
 
-    loadContracts();
-  }, [user, authLoading, router]);
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      list = list.filter((c) => {
+        const name = c.projectName || "";
+        const addr = c.address || "";
+        const contractor = ((c as unknown as Record<string, unknown>).specialty_contractors as Record<string, string> | undefined)?.company_name || "";
+        return name.toLowerCase().includes(q) || addr.toLowerCase().includes(q) || contractor.toLowerCase().includes(q);
+      });
+    }
+
+    return list;
+  }, [contracts, statusFilter, search]);
 
   if (authLoading || loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      <div className="min-h-screen bg-gray-50">
+        <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <button onClick={() => router.push("/")} className="text-gray-400 hover:text-gray-600">
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <a href="/" className="text-xl font-bold text-blue-600">INPICK</a>
+            <span className="text-sm text-gray-400">|</span>
+            <span className="text-sm font-medium text-gray-700">내 계약</span>
+          </div>
+        </header>
+        <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+          <SkeletonSummaryCards />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <SkeletonContractCard key={i} />
+            ))}
+          </div>
+        </main>
       </div>
     );
   }
@@ -178,25 +234,50 @@ export default function ContractsPage() {
       <main className="max-w-4xl mx-auto px-6 py-8 space-y-6">
         <SummaryCards contracts={contracts} />
 
-        {contracts.length === 0 ? (
+        {contracts.length > 0 && (
+          <SearchFilterBar
+            searchValue={search}
+            onSearchChange={setSearch}
+            placeholder="프로젝트명, 주소, 시공사 검색..."
+            filters={CONTRACT_FILTERS}
+            activeFilter={statusFilter}
+            onFilterChange={setStatusFilter}
+          />
+        )}
+
+        {error && (
+          <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-red-700">계약 정보를 불러오지 못했습니다.</p>
+            <button
+              onClick={loadContracts}
+              className="flex items-center gap-1 text-sm text-red-600 font-medium hover:text-red-800"
+            >
+              <RefreshCw className="w-3.5 h-3.5" /> 재시도
+            </button>
+          </div>
+        )}
+
+        {filtered.length === 0 && !error ? (
           <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
             <Inbox className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-gray-900 mb-2">
-              아직 계약이 없습니다
+              {contracts.length === 0 ? "아직 계약이 없습니다" : "검색 결과가 없습니다"}
             </h3>
             <p className="text-sm text-gray-500 mb-6">
-              프로젝트를 시작하고 견적을 받아보세요
+              {contracts.length === 0 ? "프로젝트를 시작하고 견적을 받아보세요" : "다른 검색어나 필터를 시도해보세요"}
             </p>
-            <button
-              onClick={() => router.push("/project/new")}
-              className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              프로젝트 시작하기
-            </button>
+            {contracts.length === 0 && (
+              <button
+                onClick={() => router.push("/project/new")}
+                className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                프로젝트 시작하기
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {contracts.map((contract) => (
+            {filtered.map((contract) => (
               <ContractCard
                 key={contract.id}
                 contract={contract}

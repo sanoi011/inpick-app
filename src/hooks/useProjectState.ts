@@ -25,8 +25,14 @@ function getStorageKey(id: string) {
   return `${STORAGE_KEY_PREFIX}${id}`;
 }
 
-// Supabase에 동기화 (fire-and-forget)
-function syncToSupabase(project: ConsumerProject, userId: string) {
+export type SaveStatus = "idle" | "saving" | "saved" | "error";
+
+// Supabase에 동기화
+function syncToSupabase(
+  project: ConsumerProject,
+  userId: string,
+  onStatus?: (status: SaveStatus) => void,
+) {
   // base64 이미지를 제외한 design state
   const designState = project.design
     ? {
@@ -61,6 +67,7 @@ function syncToSupabase(project: ConsumerProject, userId: string) {
       }
     : null;
 
+  onStatus?.("saving");
   fetch("/api/consumer-projects", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -76,16 +83,22 @@ function syncToSupabase(project: ConsumerProject, userId: string) {
       estimateState: project.estimate || null,
       rfqState: project.rfq || null,
     }),
-  }).catch(() => {
-    // silent fail
-  });
+  })
+    .then((res) => {
+      onStatus?.(res.ok ? "saved" : "error");
+    })
+    .catch(() => {
+      onStatus?.("error");
+    });
 }
 
 export function useProjectState(projectId: string) {
   const [project, setProject] = useState<ConsumerProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const { user } = useAuth();
   const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // localStorage에서 로드 + Supabase fallback
   useEffect(() => {
@@ -194,7 +207,13 @@ export function useProjectState(projectId: string) {
       if (user) {
         if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
         syncTimeoutRef.current = setTimeout(() => {
-          syncToSupabase(withTimestamp, user.id);
+          syncToSupabase(withTimestamp, user.id, (s) => {
+            setSaveStatus(s);
+            if (s === "saved") {
+              if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+              savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+            }
+          });
         }, 1000);
       }
     },
@@ -415,9 +434,22 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  const forceSave = useCallback(() => {
+    if (!project || !user) return;
+    if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+    syncToSupabase(project, user.id, (s) => {
+      setSaveStatus(s);
+      if (s === "saved") {
+        if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+        savedTimerRef.current = setTimeout(() => setSaveStatus("idle"), 3000);
+      }
+    });
+  }, [project, user]);
+
   return {
     project,
     loading,
+    saveStatus,
     updateStatus,
     updateAddress,
     updateDesign,
@@ -435,5 +467,6 @@ export function useProjectState(projectId: string) {
     setEstimateId,
     updateRfq,
     saveProject: () => project && saveProject(project),
+    forceSave,
   };
 }

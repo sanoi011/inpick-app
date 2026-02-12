@@ -25,6 +25,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Menu, X, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { NotificationBell } from "@/components/ui/NotificationBell";
 
 interface HeaderProps {
   brandName?: string;
@@ -94,6 +95,8 @@ export default function Header({
             </motion.a>
           )}
           {!authLoading && user && (
+            <>
+            <NotificationBell />
             <div className="relative">
               <motion.button
                 onClick={() => setShowUserMenu((v) => !v)}
@@ -108,6 +111,8 @@ export default function Header({
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
                   <a href="/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 프로젝트</a>
                   <a href="/contracts" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계약</a>
+                  <a href="/notifications" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">알림</a>
+                  <a href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계정</a>
                   <button
                     onClick={() => { setShowUserMenu(false); signOut(); }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -117,6 +122,7 @@ export default function Header({
                 </div>
               )}
             </div>
+            </>
           )}
           <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
             style={{ backgroundColor: colors.buttonSecondaryBg, border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }}
@@ -179,6 +185,14 @@ export default function Header({
                       <a href="/contracts" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
                         onClick={() => setMobileMenuOpen(false)}>
                         내 계약
+                      </a>
+                      <a href="/notifications" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
+                        onClick={() => setMobileMenuOpen(false)}>
+                        알림
+                      </a>
+                      <a href="/account" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
+                        onClick={() => setMobileMenuOpen(false)}>
+                        내 계정
                       </a>
                       <button
                         onClick={() => { setMobileMenuOpen(false); signOut(); }}
