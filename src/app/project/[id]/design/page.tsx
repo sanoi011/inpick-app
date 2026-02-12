@@ -11,7 +11,6 @@ import ViewerToolbar from "@/components/viewer/ViewerToolbar";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import type { CameraMode } from "@/components/project/FloorPlan3D";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
-import DrawingParseResult from "@/components/project/DrawingParseResult";
 import type { RoomType } from "@/types/floorplan";
 import dynamic from "next/dynamic";
 
@@ -24,6 +23,8 @@ const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
     </div>
   ),
 });
+
+const DrawingParseResult = dynamic(() => import("@/components/project/DrawingParseResult"));
 
 // 도면 파일 → API → ParsedFloorPlan
 async function parseDrawingFile(

@@ -18,7 +18,8 @@ import {
   Layers,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
-import CostTable, { type RoomCostSection, type CostItem } from "@/components/project/CostTable";
+import dynamic from "next/dynamic";
+import type { RoomCostSection, CostItem } from "@/components/project/CostTable";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import type { ProjectEstimate } from "@/types/consumer-project";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
@@ -26,6 +27,10 @@ import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
 import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
 import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
+
+const CostTable = dynamic(() => import("@/components/project/CostTable"), {
+  loading: () => <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>,
+});
 
 const UNIT_LABELS: Record<string, string> = {
   SQM: "m²", LM: "m", EA: "개", SET: "세트", LOT: "식",

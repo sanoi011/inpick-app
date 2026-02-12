@@ -23,7 +23,11 @@ import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
-import CreditChargeModal from "@/components/project/CreditChargeModal";
+import dynamic from "next/dynamic";
+
+const CreditChargeModal = dynamic(() => import("@/components/project/CreditChargeModal"), {
+  ssr: false,
+});
 
 export default function RenderingPage() {
   const params = useParams();

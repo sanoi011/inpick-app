@@ -2,6 +2,7 @@
 // POST /api/project/parse-drawing - 도면 파일 업로드 → AI 인식 → ParsedFloorPlan
 
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 import { extractFloorPlanFromImage } from "@/lib/services/gemini-floorplan-parser";
 import { extractPagesFromPdf } from "@/lib/services/pdf-extractor";
 import {
@@ -10,6 +11,13 @@ import {
   getMimeType,
 } from "@/lib/services/image-preprocessor";
 import type { ImageSource } from "@/lib/services/image-preprocessor";
+
+const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
+  ? createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL || "",
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+  : null;
 
 export const maxDuration = 60; // Vercel 60초 타임아웃
 
@@ -115,6 +123,27 @@ export async function POST(request: NextRequest) {
     const result = await extractFloorPlanFromImage(imageBase64, imageMimeType, {
       knownAreaM2: knownArea,
     });
+
+    // 도면 파싱 로그 기록 (fire-and-forget)
+    if (supabase) {
+      const projectId = formData.get("projectId") as string | null;
+      supabase.from("drawing_parse_logs").insert({
+        project_id: projectId || null,
+        file_name: file.name,
+        file_type: filename.split(".").pop() || "unknown",
+        file_size_bytes: file.size,
+        parse_method: result.method,
+        result_json: result.floorPlan,
+        confidence_score: result.confidence,
+        warnings: result.warnings,
+        processing_time_ms: result.processingTimeMs,
+        known_area_m2: knownArea || null,
+        detected_area_m2: result.floorPlan.totalArea,
+        room_count: result.floorPlan.rooms.length,
+      }).then(({ error: logError }) => {
+        if (logError) console.warn("[parse-drawing] Log insert failed:", logError.message);
+      });
+    }
 
     return NextResponse.json({
       floorPlan: result.floorPlan,

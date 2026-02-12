@@ -12,7 +12,11 @@ import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
 import { CREDITS_PER_GENERATION, FREE_GENERATION_LIMIT } from "@/types/credits";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
-import CreditChargeModal from "@/components/project/CreditChargeModal";
+import dynamic from "next/dynamic";
+
+const CreditChargeModal = dynamic(() => import("@/components/project/CreditChargeModal"), {
+  ssr: false,
+});
 
 const QUICK_PROMPTS = [
   "모던 미니멀 스타일로 전체 디자인 해줘",

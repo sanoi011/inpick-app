@@ -651,6 +651,37 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | webpack 설정 | `next.config.mjs` | ✅ 완료 |
 | ONNX 모델 파일 | `public/models/floorplan-yolo.onnx` | ✅ 완료 (11.7 MB) |
 
+## 완료된 작업 (2026-02-16) - 성능 최적화 + PWA + 도면 로그 대시보드
+
+### 성능 최적화
+- `next.config.mjs` - `experimental.optimizePackageImports` 활성화 (lucide-react, three, @react-three/drei, @react-three/postprocessing)
+- `next.config.mjs` - `@next/bundle-analyzer` 통합 (`ANALYZE=true npm run build`로 번들 시각화)
+- `design/page.tsx` - `DrawingParseResult` 동적 임포트
+- `ai-design/page.tsx`, `rendering/page.tsx` - `CreditChargeModal` 동적 임포트 (모달 온디맨드 로드)
+- `estimate/page.tsx` - `CostTable` 동적 임포트
+
+### PWA 지원
+- `public/manifest.json` - 웹 앱 매니페스트 (이름, 아이콘, 테마 색상, standalone 모드)
+- `public/sw.js` - Service Worker (앱 셸 프리캐시, 정적 자산 Cache-First, HTML Network-First + 오프라인 폴백)
+- `public/icons/icon-192x192.png`, `icon-512x512.png` - PWA 아이콘
+- `src/app/layout.tsx` - manifest 링크, theme-color 메타, apple-touch-icon, SW 등록 스크립트
+
+### 관리자 도면 인식 로그 대시보드
+- `src/app/api/admin/drawing-logs/route.ts` (신규) - 도면 파싱 로그 조회 API + 통계 (총 파싱수, 평균 신뢰도, 평균 처리시간, 성공률)
+- `src/app/admin/drawing-logs/page.tsx` (신규) - 도면 로그 관리 페이지
+  - 4개 통계 카드 (총 파싱, 평균 신뢰도, 평균 처리시간, 성공률)
+  - 파싱 방법별 필터 (Gemini Vision / DXF 파서 / Mock)
+  - 신뢰도 배지 (높음/보통/낮음 색상 구분)
+  - 행 확장 시 경고 + 파싱 결과 JSON 요약
+  - 페이지네이션
+- `src/app/admin/layout.tsx` (수정) - 사이드바에 "도면 로그" 메뉴 추가 (FileImage 아이콘)
+- `src/app/api/project/parse-drawing/route.ts` (수정) - 파싱 결과 자동 로깅 (drawing_parse_logs 테이블에 fire-and-forget INSERT)
+
+### 관리자 페이지 현황 (10개 → 11개)
+| 페이지 | 경로 | 상태 |
+|--------|------|------|
+| 도면 로그 | `/admin/drawing-logs` | 신규 완료 |
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -667,14 +698,14 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - ~~84A.pdf, 84d.pdf 인식 테스트 및 검증~~ ✅ 완료
 - ~~파이프라인 품질 개선 (프롬프트/유효성/뷰어/견적)~~ ✅ 완료
 - ~~Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)~~ ✅ 완료 (mAP50: 0.913)
+- ~~도면 인식 로그 분석 대시보드~~ ✅ 완료 (admin/drawing-logs)
 - DXF 파서 실행 및 Ground Truth 비교 검증
-- 도면 인식 로그 분석 대시보드 (admin/ai-logs 확장)
 
 ### 기타 개발 작업
 - Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
 - E2E 테스트 작성 (Playwright/Cypress)
-- 성능 최적화 (번들 분석, 코드 스플리팅)
-- PWA 지원 (오프라인, 서비스 워커)
+- ~~성능 최적화 (번들 분석, 코드 스플리팅)~~ ✅ 완료
+- ~~PWA 지원 (오프라인, 서비스 워커)~~ ✅ 완료
 - 다국어 지원 (i18n)
 
 ## DB 마이그레이션 현황
