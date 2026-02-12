@@ -10,8 +10,9 @@ import type { DesignChatMessage, GeneratedImage } from "@/types/consumer-project
 import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
-import { CREDITS_PER_GENERATION, FREE_GENERATION_LIMIT, CREDIT_PACKAGES } from "@/types/credits";
+import { CREDITS_PER_GENERATION, FREE_GENERATION_LIMIT } from "@/types/credits";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
+import CreditChargeModal from "@/components/project/CreditChargeModal";
 
 const QUICK_PROMPTS = [
   "모던 미니멀 스타일로 전체 디자인 해줘",
@@ -58,7 +59,7 @@ export default function AIDesignPage() {
   const projectId = params.id as string;
   const { project, addChatMessage, addGeneratedImage, removeGeneratedImage, updateStatus } = useProjectState(projectId);
   const { user } = useAuth();
-  const { credits, canGenerate, spendCredits, chargeCredits } = useCredits();
+  const { credits, canGenerate, spendCredits } = useCredits();
 
   const [messages, setMessages] = useState<DesignChatMessage[]>([]);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
@@ -213,12 +214,6 @@ export default function AIDesignPage() {
   const handleNext = () => {
     updateStatus("RENDERING");
     router.push(`/project/${projectId}/rendering`);
-  };
-
-  // 크레딧 충전
-  const handleCharge = async (amount: number) => {
-    await chargeCredits(amount);
-    setShowChargeModal(false);
   };
 
   return (
@@ -494,63 +489,7 @@ export default function AIDesignPage() {
       )}
 
       {/* 크레딧 충전 모달 */}
-      {showChargeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setShowChargeModal(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">크레딧 충전</h3>
-              <button onClick={() => setShowChargeModal(false)}>
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            {credits && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg text-center">
-                <p className="text-xs text-gray-500">현재 잔액</p>
-                <p className="text-2xl font-bold text-gray-900">{credits.balance} 크레딧</p>
-                {credits.freeGenerationsUsed < FREE_GENERATION_LIMIT && (
-                  <p className="text-xs text-green-600 mt-1">
-                    무료 {FREE_GENERATION_LIMIT - credits.freeGenerationsUsed}회 남음
-                  </p>
-                )}
-              </div>
-            )}
-
-            {!user && (
-              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-center">
-                <p className="text-sm text-amber-700">로그인 후 크레딧을 충전할 수 있습니다</p>
-                <a href="/auth" className="inline-block mt-2 px-4 py-1.5 bg-amber-600 text-white text-sm rounded-lg">
-                  로그인하기
-                </a>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              {CREDIT_PACKAGES.map((pkg) => (
-                <button
-                  key={pkg.id}
-                  onClick={() => handleCharge(pkg.credits)}
-                  disabled={!user}
-                  className="w-full flex items-center justify-between p-3 border border-gray-200 rounded-xl hover:border-blue-300 hover:bg-blue-50/50 disabled:opacity-50 transition-colors"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">{pkg.label}</p>
-                    <p className="text-xs text-gray-500">이미지 {pkg.credits / CREDITS_PER_GENERATION}회 생성</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-blue-600">{pkg.price.toLocaleString()}원</p>
-                    {pkg.discount && <p className="text-[10px] text-green-600">{pkg.discount}</p>}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <p className="text-[10px] text-gray-400 text-center mt-3">
-              결제 시스템은 추후 연동 예정입니다 (현재 테스트 모드)
-            </p>
-          </div>
-        </div>
-      )}
+      <CreditChargeModal open={showChargeModal} onClose={() => setShowChargeModal(false)} />
     </div>
   );
 }

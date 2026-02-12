@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Loader2, FileText, CheckCircle2, Pen, Building2, Phone,
   Mail, Calendar, CreditCard, AlertCircle, Shield, Clock,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import type { Contract } from "@/types/contract";
 import { mapDbContract, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS } from "@/types/contract";
 
@@ -124,14 +125,19 @@ function SignatureSection({ contract, onSign }: { contract: Contract; onSign: (t
   );
 }
 
-export default function ContractDetailPage() {
+function ContractDetailContent() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const bidId = params.id as string;
+  const { user } = useAuth();
 
   const [contract, setContract] = useState<Contract | null>(null);
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // 뒤로가기 URL: from 쿼리 > 소비자면 /contracts > 기본 /contractor/bids
+  const backUrl = searchParams.get("from") || (user ? "/contracts" : "/contractor/bids");
 
   useEffect(() => {
     async function load() {
@@ -197,7 +203,7 @@ export default function ContractDetailPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 gap-4">
         <AlertCircle className="w-12 h-12 text-red-400" />
         <p className="text-gray-600">{error}</p>
-        <Link href="/contractor/bids" className="text-sm text-blue-600 hover:underline">목록으로</Link>
+        <Link href={backUrl} className="text-sm text-blue-600 hover:underline">목록으로</Link>
       </div>
     );
   }
@@ -209,7 +215,7 @@ export default function ContractDetailPage() {
       <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <Link href="/contractor/bids" className="text-gray-400 hover:text-gray-600">
+            <Link href={backUrl} className="text-gray-400 hover:text-gray-600">
               <ArrowLeft className="w-5 h-5" />
             </Link>
             <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
@@ -331,5 +337,19 @@ export default function ContractDetailPage() {
         )}
       </main>
     </div>
+  );
+}
+
+export default function ContractDetailPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </div>
+      }
+    >
+      <ContractDetailContent />
+    </Suspense>
   );
 }

@@ -322,20 +322,53 @@
   - 천장 토글
   - 공간 타입별 바닥 재질 자동 매핑
 
+## 완료된 작업 (2026-02-14) - 계약 페이지 + 자재 DB + 프로젝트 동기화 + 결제
+
+### Phase 1: 소비자 "내 계약" 페이지
+- `src/app/contracts/page.tsx` (신규) - 계약 목록 (요약 카드 4종, 카드 리스트, 빈 상태 UI)
+- `src/components/landing/Header.tsx` (수정) - "내 프로젝트" → `/projects`, "내 계약" 링크 추가 (데스크톱+모바일)
+- `src/app/contract/[id]/page.tsx` (수정) - 뒤로가기 소비자/사업자 분기 (`/contracts` vs `/contractor/bids`)
+
+### Phase 2: 자재 카탈로그 DB 마이그레이션
+- `supabase/migrations/20260214000000_material_catalog_seed.sql` (신규) - 3개 테이블 + SEED 데이터 (24옵션, 25부자재)
+  - `material_room_catalog` (room_type, category, part)
+  - `material_options` (catalog_id FK, name, spec, price, unit)
+  - `material_sub_items` (option_id FK, name, specification, unit_price, unit)
+- `src/app/api/materials/route.ts` (신규) - GET /api/materials?roomType=LIVING
+- `src/hooks/useMaterialCatalog.ts` (신규) - DB 로드 + 캐싱 + 하드코딩 폴백
+- `src/app/project/[id]/rendering/page.tsx` (수정) - MATERIAL_CATALOG 상수 제거 → useMaterialCatalog 훅 사용
+
+### Phase 3: 소비자 프로젝트 Supabase 동기화
+- `supabase/migrations/20260214100000_consumer_projects.sql` (신규) - consumer_projects 테이블 + RLS
+- `src/app/api/consumer-projects/route.ts` (신규) - GET/POST/PATCH
+- `src/hooks/useProjectState.ts` (수정) - localStorage-first + background Supabase sync (1초 디바운스)
+  - 로드 시: localStorage → Supabase fetch → 더 최신 것 사용
+  - 저장 시: localStorage 즉시 + Supabase fire-and-forget
+  - base64 이미지 데이터 제외하여 전송
+- `src/app/projects/page.tsx` (신규) - 내 프로젝트 목록 (Supabase + localStorage 병합)
+
+### Phase 4: Toss Payments 결제 시스템
+- `src/app/api/payments/checkout/route.ts` (신규) - 결제 세션 생성 (Mock/실제 분기)
+- `src/app/api/payments/confirm/route.ts` (신규) - Toss API 검증 → 크레딧 충전
+- `src/app/payments/success/page.tsx` (신규) - 결제 성공 UI + confirm API 호출
+- `src/app/payments/fail/page.tsx` (신규) - 에러 메시지 + 재시도
+- `src/components/project/CreditChargeModal.tsx` (신규) - 패키지 선택 → 결제 (Toss SDK 동적 로드 또는 Mock 모드)
+- `src/app/project/[id]/ai-design/page.tsx` (수정) - CreditChargeModal 컴포넌트 사용
+- `src/app/project/[id]/rendering/page.tsx` (수정) - 크레딧 부족 시 CreditChargeModal 표시
+- `.env.local` - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY` 추가 (빈값 = Mock 모드)
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료
-2. ~~**PDF 학습 실행**~~ ✅ 완료 (387개 청크 - 품질점검 200 + 핸드북 24 + 시공한계 54 + 표준상세도 109)
+1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260213 까지)
+2. **Supabase 마이그레이션 적용** - `20260214000000_material_catalog_seed.sql`, `20260214100000_consumer_projects.sql` 실행 필요
 3. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
 4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+5. **Toss Payments 키 발급** - https://developers.tosspayments.com → `.env.local`과 Vercel 환경변수에 `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY` 설정
 
 ### 개발 작업
 - 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
 - Gemini AI 이미지 생성 실제 테스트
-- 결제 시스템 연동 (크레딧 충전 - 토스페이먼츠 등)
-- 자재 카탈로그 DB화 (현재 MATERIAL_CATALOG 하드코딩)
-- 소비자 "내 계약" 페이지 (GET /api/contracts?consumerId=X 활용)
 - 푸시 알림 / WebSocket 실시간 알림 (현재 30초 폴링)
 - 벡터DB + RAG 파이프라인 (AI-INFRA-ROADMAP Phase 2)
 - Fine-tuning 데이터셋 추출 파이프라인 (AI-INFRA-ROADMAP Phase 3)
@@ -352,3 +385,5 @@
 | `20260211000000_credit_tables.sql` | Supabase 적용 완료 |
 | `20260212000000_consumer_rfq_integration.sql` | Supabase 적용 완료 |
 | `20260213000000_ai_data_pipeline.sql` | Supabase 적용 완료 |
+| `20260214000000_material_catalog_seed.sql` | **실행 필요** |
+| `20260214100000_consumer_projects.sql` | **실행 필요** |

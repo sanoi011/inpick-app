@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import type {
   ConsumerProject,
   ConsumerProjectStatus,
@@ -24,36 +25,180 @@ function getStorageKey(id: string) {
   return `${STORAGE_KEY_PREFIX}${id}`;
 }
 
+// Supabase에 동기화 (fire-and-forget)
+function syncToSupabase(project: ConsumerProject, userId: string) {
+  // base64 이미지를 제외한 design state
+  const designState = project.design
+    ? {
+        decisions: project.design.decisions,
+        chatMessages: project.design.chatMessages.slice(-50), // 최근 50개만
+        generatedImages: (project.design.generatedImages || []).map((img) => ({
+          id: img.id,
+          prompt: img.prompt,
+          roomId: img.roomId,
+          roomName: img.roomName,
+          description: img.description,
+          createdAt: img.createdAt,
+          // imageData 제외 (base64 너무 큼)
+        })),
+      }
+    : null;
+
+  // rendering state (base64 제외)
+  const renderingState = project.rendering
+    ? {
+        materials: project.rendering.materials,
+        allConfirmed: project.rendering.allConfirmed,
+        views: project.rendering.views.map((v) => ({
+          id: v.id,
+          roomId: v.roomId,
+          roomName: v.roomName,
+          prompt: v.prompt,
+          confirmed: v.confirmed,
+          createdAt: v.createdAt,
+          // imageData 제외
+        })),
+      }
+    : null;
+
+  fetch("/api/consumer-projects", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      id: project.id,
+      userId,
+      status: project.status,
+      address: project.address || null,
+      drawingId: project.drawingId || null,
+      estimateId: project.estimateId || null,
+      designState,
+      renderingState,
+      estimateState: project.estimate || null,
+      rfqState: project.rfq || null,
+    }),
+  }).catch(() => {
+    // silent fail
+  });
+}
+
 export function useProjectState(projectId: string) {
   const [project, setProject] = useState<ConsumerProject | null>(null);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const syncTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // localStorage에서 로드
+  // localStorage에서 로드 + Supabase fallback
   useEffect(() => {
+    let localProject: ConsumerProject | null = null;
+
+    // 1) localStorage 먼저 로드
     try {
       const stored = localStorage.getItem(getStorageKey(projectId));
       if (stored) {
-        setProject(JSON.parse(stored));
-      } else {
-        const newProject = createNewProject(projectId);
-        localStorage.setItem(getStorageKey(projectId), JSON.stringify(newProject));
-        setProject(newProject);
+        localProject = JSON.parse(stored);
       }
     } catch {
-      const newProject = createNewProject(projectId);
-      setProject(newProject);
+      // ignore
     }
-    setLoading(false);
-  }, [projectId]);
 
-  // 프로젝트 저장
+    if (localProject) {
+      setProject(localProject);
+      setLoading(false);
+    }
+
+    // 2) 로그인 유저면 Supabase에서도 가져와서 비교
+    if (user) {
+      fetch(`/api/consumer-projects?id=${projectId}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("not found");
+          return res.json();
+        })
+        .then((data) => {
+          if (data.project) {
+            const remote = data.project;
+            const remoteUpdated = new Date(remote.updated_at).getTime();
+            const localUpdated = localProject
+              ? new Date(localProject.updatedAt).getTime()
+              : 0;
+
+            // 서버가 더 최신이면 서버 데이터 사용 (단, 로컬 base64 데이터 보존)
+            if (remoteUpdated > localUpdated && localProject) {
+              const merged: ConsumerProject = {
+                ...localProject,
+                status: (remote.status as ConsumerProjectStatus) || localProject.status,
+                address: remote.address || localProject.address,
+                drawingId: remote.drawing_id || localProject.drawingId,
+                estimateId: remote.estimate_id || localProject.estimateId,
+                estimate: remote.estimate_state || localProject.estimate,
+                rfq: remote.rfq_state || localProject.rfq,
+                updatedAt: remote.updated_at,
+              };
+              localStorage.setItem(
+                getStorageKey(projectId),
+                JSON.stringify(merged)
+              );
+              setProject(merged);
+            } else if (!localProject) {
+              // 로컬에 없고 서버에만 있는 경우
+              const reconstructed = createNewProject(projectId);
+              reconstructed.status = (remote.status as ConsumerProjectStatus) || "ADDRESS_SELECTION";
+              reconstructed.address = remote.address;
+              reconstructed.drawingId = remote.drawing_id;
+              reconstructed.estimateId = remote.estimate_id;
+              reconstructed.estimate = remote.estimate_state;
+              reconstructed.rfq = remote.rfq_state;
+              reconstructed.updatedAt = remote.updated_at;
+              localStorage.setItem(
+                getStorageKey(projectId),
+                JSON.stringify(reconstructed)
+              );
+              setProject(reconstructed);
+            }
+          }
+        })
+        .catch(() => {
+          // 서버 실패 → 로컬 데이터만 사용
+        })
+        .finally(() => {
+          if (!localProject) {
+            // 로컬도 서버도 없으면 신규
+            const newProject = createNewProject(projectId);
+            localStorage.setItem(
+              getStorageKey(projectId),
+              JSON.stringify(newProject)
+            );
+            setProject(newProject);
+            setLoading(false);
+          }
+        });
+    } else if (!localProject) {
+      const newProject = createNewProject(projectId);
+      localStorage.setItem(
+        getStorageKey(projectId),
+        JSON.stringify(newProject)
+      );
+      setProject(newProject);
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId, user?.id]);
+
+  // 프로젝트 저장 (localStorage 즉시 + Supabase background)
   const saveProject = useCallback(
     (updated: ConsumerProject) => {
       const withTimestamp = { ...updated, updatedAt: new Date().toISOString() };
       localStorage.setItem(getStorageKey(projectId), JSON.stringify(withTimestamp));
       setProject(withTimestamp);
+
+      // Supabase 동기화 (디바운스 1초)
+      if (user) {
+        if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+        syncTimeoutRef.current = setTimeout(() => {
+          syncToSupabase(withTimestamp, user.id);
+        }, 1000);
+      }
     },
-    [projectId]
+    [projectId, user]
   );
 
   // 상태 업데이트

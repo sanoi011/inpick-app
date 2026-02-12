@@ -17,95 +17,13 @@ import {
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useCredits } from "@/hooks/useCredits";
+import { useMaterialCatalog } from "@/hooks/useMaterialCatalog";
 import type { RenderView, SelectedMaterial, SubMaterial } from "@/types/consumer-project";
 import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
-
-// Mock 자재 카테고리별 데이터
-const MATERIAL_CATALOG: Record<string, { category: string; part: string; options: { name: string; spec: string; price: number; unit: string; subMaterials: SubMaterial[] }[] }[]> = {
-  LIVING: [
-    {
-      category: "바닥", part: "거실 바닥",
-      options: [
-        { name: "강화마루", spec: "12mm 오크", price: 35000, unit: "m²", subMaterials: [{ name: "바닥 밑작업", specification: "레벨링", unitPrice: 8000, unit: "m²" }, { name: "걸레받이", specification: "PVC 60mm", unitPrice: 3000, unit: "m" }] },
-        { name: "원목마루", spec: "15mm 월넛", price: 85000, unit: "m²", subMaterials: [{ name: "바닥 밑작업", specification: "합판깔기", unitPrice: 15000, unit: "m²" }, { name: "걸레받이", specification: "원목 80mm", unitPrice: 8000, unit: "m" }] },
-        { name: "타일", spec: "600x600 포세린", price: 45000, unit: "m²", subMaterials: [{ name: "타일 시멘트", specification: "접착제", unitPrice: 5000, unit: "m²" }, { name: "줄눈재", specification: "2mm", unitPrice: 2000, unit: "m²" }] },
-      ],
-    },
-    {
-      category: "벽", part: "거실 벽면",
-      options: [
-        { name: "실크 벽지", spec: "LG하우시스 친환경", price: 12000, unit: "m²", subMaterials: [{ name: "초배지", specification: "합지", unitPrice: 3000, unit: "m²" }] },
-        { name: "포인트 벽지", spec: "수입 패턴 벽지", price: 25000, unit: "m²", subMaterials: [{ name: "초배지", specification: "합지", unitPrice: 3000, unit: "m²" }] },
-        { name: "페인트", spec: "벤자민무어 매트", price: 18000, unit: "m²", subMaterials: [{ name: "퍼티 작업", specification: "2회", unitPrice: 5000, unit: "m²" }] },
-      ],
-    },
-    {
-      category: "천장", part: "거실 천장",
-      options: [
-        { name: "도장", spec: "KCC 수성페인트", price: 8000, unit: "m²", subMaterials: [] },
-        { name: "우물천장", spec: "석고보드 + 몰딩", price: 35000, unit: "m²", subMaterials: [{ name: "석고보드", specification: "9.5mm", unitPrice: 5000, unit: "m²" }, { name: "크라운 몰딩", specification: "PU 120mm", unitPrice: 12000, unit: "m" }] },
-      ],
-    },
-  ],
-  BED: [
-    {
-      category: "바닥", part: "침실 바닥",
-      options: [
-        { name: "강화마루", spec: "12mm 오크", price: 35000, unit: "m²", subMaterials: [{ name: "바닥 밑작업", specification: "레벨링", unitPrice: 8000, unit: "m²" }] },
-        { name: "원목마루", spec: "15mm 애쉬", price: 75000, unit: "m²", subMaterials: [{ name: "바닥 밑작업", specification: "합판깔기", unitPrice: 15000, unit: "m²" }] },
-      ],
-    },
-    {
-      category: "벽", part: "침실 벽면",
-      options: [
-        { name: "실크 벽지", spec: "친환경 무지", price: 12000, unit: "m²", subMaterials: [] },
-        { name: "포인트 벽지", spec: "그레이 패턴", price: 20000, unit: "m²", subMaterials: [] },
-      ],
-    },
-  ],
-  KITCHEN: [
-    {
-      category: "바닥", part: "주방 바닥",
-      options: [
-        { name: "타일", spec: "300x300 논슬립", price: 40000, unit: "m²", subMaterials: [{ name: "타일 접착제", specification: "방수형", unitPrice: 6000, unit: "m²" }] },
-        { name: "강화마루", spec: "12mm 방수", price: 45000, unit: "m²", subMaterials: [] },
-      ],
-    },
-    {
-      category: "벽", part: "주방 벽면/백스플래시",
-      options: [
-        { name: "서브웨이 타일", spec: "75x150 화이트", price: 35000, unit: "m²", subMaterials: [{ name: "타일 접착제", specification: "일반", unitPrice: 5000, unit: "m²" }] },
-        { name: "강화유리", spec: "5mm 투명", price: 55000, unit: "m²", subMaterials: [{ name: "실리콘", specification: "방수형", unitPrice: 2000, unit: "m" }] },
-      ],
-    },
-  ],
-  BATHROOM: [
-    {
-      category: "바닥", part: "욕실 바닥",
-      options: [
-        { name: "타일", spec: "200x200 논슬립", price: 45000, unit: "m²", subMaterials: [{ name: "방수 시공", specification: "우레탄 2중", unitPrice: 25000, unit: "m²" }] },
-        { name: "대리석", spec: "300x300 백마블", price: 80000, unit: "m²", subMaterials: [{ name: "방수 시공", specification: "우레탄 2중", unitPrice: 25000, unit: "m²" }] },
-      ],
-    },
-    {
-      category: "벽", part: "욕실 벽면",
-      options: [
-        { name: "타일", spec: "300x600 유광", price: 40000, unit: "m²", subMaterials: [{ name: "방수 시공", specification: "벽면 방수", unitPrice: 15000, unit: "m²" }] },
-        { name: "대리석", spec: "600x300 그레이", price: 90000, unit: "m²", subMaterials: [{ name: "방수 시공", specification: "벽면 방수", unitPrice: 15000, unit: "m²" }] },
-      ],
-    },
-  ],
-};
-
-// 기본 자재 카탈로그 (매칭 안 되는 방은 이걸로)
-const DEFAULT_MATERIALS = MATERIAL_CATALOG["LIVING"];
-
-function getMaterialsForRoom(roomType: string) {
-  return MATERIAL_CATALOG[roomType] || MATERIAL_CATALOG[roomType.replace("MASTER_", "")] || DEFAULT_MATERIALS;
-}
+import CreditChargeModal from "@/components/project/CreditChargeModal";
 
 export default function RenderingPage() {
   const params = useParams();
@@ -119,6 +37,7 @@ export default function RenderingPage() {
     updateStatus,
   } = useProjectState(projectId);
   const { credits, canGenerate, spendCredits } = useCredits();
+  const { getMaterialsForRoom } = useMaterialCatalog();
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [renderViews, setRenderViews] = useState<RenderView[]>([]);
@@ -129,6 +48,7 @@ export default function RenderingPage() {
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [showMaterialPanel, setShowMaterialPanel] = useState(false);
+  const [showChargeModal, setShowChargeModal] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 데이터 로드
@@ -162,7 +82,10 @@ export default function RenderingPage() {
   const handleRenderRoom = useCallback(async (room: RoomData) => {
     if (isRendering) return;
 
-    if (!canGenerate()) return;
+    if (!canGenerate()) {
+      setShowChargeModal(true);
+      return;
+    }
 
     setIsRendering(true);
     setRenderingRoomId(room.id);
@@ -666,6 +589,9 @@ export default function RenderingPage() {
           </div>
         </div>
       )}
+
+      {/* 크레딧 충전 모달 */}
+      <CreditChargeModal open={showChargeModal} onClose={() => setShowChargeModal(false)} />
     </div>
   );
 }

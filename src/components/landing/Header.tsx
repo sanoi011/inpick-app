@@ -106,7 +106,8 @@ export default function Header({
               </motion.button>
               {showUserMenu && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
-                  <a href="/project/new" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 프로젝트</a>
+                  <a href="/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 프로젝트</a>
+                  <a href="/contracts" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계약</a>
                   <button
                     onClick={() => { setShowUserMenu(false); signOut(); }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -171,6 +172,14 @@ export default function Header({
                         <User className="w-4 h-4 inline mr-1" />
                         {user.user_metadata?.full_name || user.email?.split("@")[0]}
                       </div>
+                      <a href="/projects" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
+                        onClick={() => setMobileMenuOpen(false)}>
+                        내 프로젝트
+                      </a>
+                      <a href="/contracts" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
+                        onClick={() => setMobileMenuOpen(false)}>
+                        내 계약
+                      </a>
                       <button
                         onClick={() => { setMobileMenuOpen(false); signOut(); }}
                         className="rounded-full px-4 py-3 text-center text-sm font-medium text-red-600 border border-red-200"
