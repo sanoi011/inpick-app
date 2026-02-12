@@ -85,12 +85,12 @@ export default function Hero() {
             className="relative mt-8 w-full max-w-5xl">
             <div className="relative rounded-2xl p-[3px]" style={{ background: "linear-gradient(179deg, #2563EB 0%, #3B82F6 36%, #7C3AED 70%, #EC4899 100%)" }}>
               <div className="relative overflow-hidden rounded-[13px] bg-white">
-                <div className="aspect-[16/9] bg-gradient-to-br from-blue-50 to-indigo-50 flex items-center justify-center">
-                  <div className="text-center p-8">
-                    <div className="text-6xl mb-4">🏠</div>
-                    <p className="text-lg font-semibold text-gray-800">AI 인테리어 견적 데모</p>
-                    <p className="text-sm text-gray-500 mt-2">주소 입력 → AI 상담 → 실시간 3D 견적</p>
-                  </div>
+                <div className="aspect-[16/9] overflow-hidden">
+                  <img
+                    src="/images/hero-kitchen.jpg"
+                    alt="AI 인테리어 견적 데모 - 럭셔리 주방 인테리어"
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               </div>
             </div>
