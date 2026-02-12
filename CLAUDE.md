@@ -357,6 +357,56 @@
 - `src/app/project/[id]/rendering/page.tsx` (수정) - 크레딧 부족 시 CreditChargeModal 표시
 - `.env.local` - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY` 추가 (빈값 = Mock 모드)
 
+## 완료된 작업 (2026-02-14) - 관리자 대시보드
+
+### 관리자 인증 + 레이아웃
+- `src/hooks/useAdminAuth.ts` (신규) - localStorage 기반 관리자 인증 훅
+- `src/app/admin/login/page.tsx` (신규) - 독립 로그인 페이지
+- `src/app/admin/layout.tsx` (신규) - 다크 테마 사이드바 (9개 메뉴, 빨간 액센트)
+- `src/app/api/admin/login/route.ts` (수정) - 응답에 admin id 추가
+- `src/app/admin/page.tsx` (수정) - 로그인/탭 제거, 대시보드 통계만 유지 (9개 지표)
+
+### 관리자 API (5개 신규 + 1개 수정)
+- `src/app/api/admin/users/route.ts` (신규) - 소비자/사업자 목록, 검색, 페이지네이션
+- `src/app/api/admin/projects/route.ts` (신규) - 소비자 프로젝트 전체 조회
+- `src/app/api/admin/credits/route.ts` (신규) - 크레딧 조회 + 수동 부여 (GET/POST)
+- `src/app/api/admin/ai-logs/route.ts` (신규) - AI 대화 로그 조회
+- `src/app/api/admin/contracts/route.ts` (신규) - 입찰/계약 조회
+- `src/app/api/admin/stats/route.ts` (수정) - 9개 통계 지표로 확장
+
+### 관리자 서브페이지 (7개 신규)
+- `src/app/admin/users/page.tsx` - 소비자/사업자 탭, 테이블, 검색, 페이지네이션
+- `src/app/admin/projects/page.tsx` - 상태 필터, 행 확장 JSONB 상세
+- `src/app/admin/contracts/page.tsx` - 입찰/계약 탭, 상태 필터
+- `src/app/admin/credits/page.tsx` - 요약 카드, 사용자별/거래별, 수동 부여 폼
+- `src/app/admin/ai-logs/page.tsx` - 에이전트 타입/평점 필터, 행 확장 메시지 상세
+- `src/app/admin/materials/page.tsx` - 자재/노임/간접비 단가 카드 + 크롤링
+- `src/app/admin/crawlers/page.tsx` - 크롤러 로그 테이블 + 실행
+- `src/app/admin/settings/page.tsx` - 플랫폼 정보, 관리자 계정, 환경변수 상태
+
+### 크레딧 바이패스
+- `src/hooks/useCredits.ts` (수정) - `isAdmin()` 감지 → `canGenerate()`, `spendCredits()` 바이패스
+- 관리자 로그인 시 소비자 워크플로우 전체 무제한 사용 가능
+
+### 관리자 계정
+- ID: `tjsqhs011@naver.com` / PW: `inpick2026!` (환경변수 ADMIN_PASSWORD)
+- admin_profiles 테이블에 시드 완료 (super_admin 권한)
+- 홈페이지 하단 Footer "관리자" 링크 → `/admin` (기존 유지)
+
+## 관리자 페이지 (서브경로 구조)
+| 페이지 | 경로 | 상태 |
+|--------|------|------|
+| 로그인 | `/admin/login` | 완료 |
+| 대시보드 | `/admin` | 완료 |
+| 사용자 관리 | `/admin/users` | 완료 |
+| 프로젝트 | `/admin/projects` | 완료 |
+| 계약/입찰 | `/admin/contracts` | 완료 |
+| 크레딧 | `/admin/credits` | 완료 |
+| AI 로그 | `/admin/ai-logs` | 완료 |
+| 자재/단가 | `/admin/materials` | 완료 |
+| 크롤러 | `/admin/crawlers` | 완료 |
+| 설정 | `/admin/settings` | 완료 |
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)

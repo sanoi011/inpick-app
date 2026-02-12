@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       token,
+      id: admin.id,
       email: admin.email,
       name: admin.name,
       role: admin.role,

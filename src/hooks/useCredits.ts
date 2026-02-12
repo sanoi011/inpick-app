@@ -12,6 +12,12 @@ export function useCredits() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
+  // 관리자 모드 감지 (크레딧 바이패스)
+  const isAdmin = useCallback((): boolean => {
+    if (typeof window === "undefined") return false;
+    return !!localStorage.getItem("admin_token");
+  }, []);
+
   // 크레딧 로드
   const loadCredits = useCallback(async () => {
     if (!user) {
@@ -82,16 +88,18 @@ export function useCredits() {
 
   // 이미지 생성 가능 여부
   const canGenerate = useCallback((): boolean => {
+    if (isAdmin()) return true; // 관리자 바이패스
     if (!credits) return false;
     // 무료 횟수 남음
     if (credits.freeGenerationsUsed < FREE_GENERATION_LIMIT) return true;
     // 크레딧 충분
     if (credits.balance >= CREDITS_PER_GENERATION) return true;
     return false;
-  }, [credits]);
+  }, [credits, isAdmin]);
 
   // 크레딧 사용 (이미지 생성 시)
   const spendCredits = useCallback(async (): Promise<boolean> => {
+    if (isAdmin()) return true; // 관리자 바이패스 - 차감 안 함
     if (!credits || !user) return false;
 
     const isFree = credits.freeGenerationsUsed < FREE_GENERATION_LIMIT;
@@ -151,7 +159,7 @@ export function useCredits() {
       setCredits(updated);
       return true;
     }
-  }, [credits, user, supabase]);
+  }, [credits, user, supabase, isAdmin]);
 
   // 크레딧 충전
   const chargeCredits = useCallback(async (amount: number): Promise<boolean> => {
@@ -194,5 +202,6 @@ export function useCredits() {
     spendCredits,
     chargeCredits,
     reload: loadCredits,
+    isAdmin: isAdmin(),
   };
 }
