@@ -15,164 +15,99 @@ import {
   BarChart3,
   CheckCircle2,
   Loader2,
+  Layers,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import CostTable, { type RoomCostSection, type CostItem } from "@/components/project/CostTable";
 import type { ParsedFloorPlan } from "@/types/floorplan";
-import type { SelectedMaterial, EstimateItem, ProjectEstimate } from "@/types/consumer-project";
+import type { ProjectEstimate } from "@/types/consumer-project";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
+import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
+import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
+import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
+import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
 
-// 노무비 비율 (자재비 기준)
-const LABOR_RATE: Record<string, number> = {
-  바닥: 0.7,
-  벽: 0.8,
-  천장: 0.9,
-  설비: 0.5,
-  전기: 0.8,
-  목공: 0.6,
+const UNIT_LABELS: Record<string, string> = {
+  SQM: "m²", LM: "m", EA: "개", SET: "세트", LOT: "식",
+  M3: "m³", KG: "kg", ROLL: "롤", CAN: "캔", BAG: "포",
 };
 
-// 경비 비율 (재료비+노무비 기준)
-const OVERHEAD_RATE = 0.1;
+// QTY 엔진 결과 → CostTable용 RoomCostSection[] 변환 (공간별 뷰)
+function convertToRoomSections(result: EstimateResult): RoomCostSection[] {
+  const roomMap = new Map<string, CostItem[]>();
 
-// 철거비 (공간 유형별, m² 당)
-const DEMOLITION_COST: Record<string, number> = {
-  BATHROOM: 55000,
-  KITCHEN: 15000,
-  LIVING: 5500,
-  BED: 5500,
-  MASTER_BED: 5500,
-  ENTRANCE: 8000,
-  BALCONY: 4000,
-};
-
-// 확정 자재 기반 견적 생성
-function generateEstimateFromMaterials(
-  materials: SelectedMaterial[],
-  floorPlan: ParsedFloorPlan | null
-): { sections: RoomCostSection[]; estimateItems: EstimateItem[] } {
-  // 방별로 그룹핑
-  const roomMap = new Map<string, { roomId: string; roomName: string; materials: SelectedMaterial[] }>();
-
-  for (const mat of materials) {
-    if (!roomMap.has(mat.roomId)) {
-      roomMap.set(mat.roomId, { roomId: mat.roomId, roomName: mat.roomName, materials: [] });
-    }
-    roomMap.get(mat.roomId)!.materials.push(mat);
+  for (const line of result.lines) {
+    const key = line.roomName || "공통";
+    if (!roomMap.has(key)) roomMap.set(key, []);
+    const overhead = Math.round(line.totalAmount * 0.1); // 간접비 배분
+    roomMap.get(key)!.push({
+      id: `${line.itemCode}-${line.roomName || "common"}`,
+      category: TRADE_NAMES[line.tradeCode] || line.tradeCode,
+      part: line.specification,
+      productName: line.itemName,
+      method: "시공",
+      spec: line.specification,
+      unit: UNIT_LABELS[line.unit] || line.unit,
+      quantity: line.quantity,
+      materialCost: line.materialAmount,
+      laborCost: line.laborAmount,
+      overhead,
+      total: line.totalAmount + overhead,
+      note: "",
+    });
   }
 
   const sections: RoomCostSection[] = [];
-  const estimateItems: EstimateItem[] = [];
-
-  for (const [roomId, group] of Array.from(roomMap.entries())) {
-    const room = floorPlan?.rooms.find((r) => r.id === roomId);
-    const area = room?.area || 20;
-    const roomType = room?.type || "LIVING";
-    const items: CostItem[] = [];
-
-    // 1) 철거비 (공간당 1건)
-    const demolitionRate = DEMOLITION_COST[roomType] || 5500;
-    const demolitionItem: CostItem = {
-      id: `${roomId}-demolition`,
-      category: "철거",
-      part: "전체",
-      productName: `기존 마감재 철거`,
-      method: "철거",
-      spec: "-",
-      unit: "m²",
-      quantity: Math.round(area),
-      materialCost: 0,
-      laborCost: Math.round(area) * demolitionRate,
-      overhead: Math.round(Math.round(area) * demolitionRate * OVERHEAD_RATE),
-      total: Math.round(area) * demolitionRate + Math.round(Math.round(area) * demolitionRate * OVERHEAD_RATE),
-      note: "",
-    };
-    items.push(demolitionItem);
-
-    // 2) 각 자재별 산출
-    for (const mat of group.materials) {
-      const quantity = mat.quantity || Math.round(area);
-      const materialCost = quantity * mat.unitPrice;
-      const laborRate = LABOR_RATE[mat.category] || 0.7;
-      const laborCost = Math.round(materialCost * laborRate);
-      const overhead = Math.round((materialCost + laborCost) * OVERHEAD_RATE);
-      const total = materialCost + laborCost + overhead;
-
-      const mainItem: CostItem = {
-        id: `${roomId}-${mat.category}-main`,
-        category: "마감",
-        part: mat.part,
-        productName: mat.materialName,
-        method: "시공",
-        spec: mat.specification,
-        unit: mat.unit,
-        quantity,
-        materialCost,
-        laborCost,
-        overhead,
-        total,
-        note: "",
-      };
-      items.push(mainItem);
-
-      // 부자재
-      if (mat.subMaterials) {
-        for (const sub of mat.subMaterials) {
-          const subQty = sub.quantity || quantity;
-          const subMatCost = subQty * sub.unitPrice;
-          const subLabor = Math.round(subMatCost * 0.5);
-          const subOverhead = Math.round((subMatCost + subLabor) * OVERHEAD_RATE);
-          const subTotal = subMatCost + subLabor + subOverhead;
-
-          const subItem: CostItem = {
-            id: `${roomId}-${mat.category}-sub-${sub.name}`,
-            category: "부자재",
-            part: mat.part,
-            productName: sub.name,
-            method: "시공",
-            spec: sub.specification,
-            unit: sub.unit,
-            quantity: subQty,
-            materialCost: subMatCost,
-            laborCost: subLabor,
-            overhead: subOverhead,
-            total: subTotal,
-            note: "",
-          };
-          items.push(subItem);
-        }
-      }
-
-      // EstimateItem 저장용
-      estimateItems.push({
-        id: `${roomId}-${mat.category}`,
-        roomId: mat.roomId,
-        roomName: mat.roomName,
-        category: mat.category,
-        part: mat.part,
-        materialName: mat.materialName,
-        specification: mat.specification,
-        unit: mat.unit,
-        quantity,
-        materialCost,
-        laborCost,
-        expense: overhead,
-        total,
-      });
-    }
-
+  for (const [roomName, items] of Array.from(roomMap.entries())) {
     sections.push({
-      roomName: group.roomName,
+      roomName,
       items,
       subtotal: items.reduce((sum, i) => sum + i.total, 0),
     });
   }
 
-  return { sections, estimateItems };
+  return sections;
 }
 
-// 자재가 없을 때 기본 Mock 견적
-function generateDefaultEstimate(floorPlan: ParsedFloorPlan | null): RoomCostSection[] {
+// QTY 엔진 결과 → CostTable용 RoomCostSection[] 변환 (공종별 뷰)
+function convertToTradeSections(result: EstimateResult): RoomCostSection[] {
+  const tradeMap = new Map<string, CostItem[]>();
+
+  for (const line of result.lines) {
+    const tradeName = TRADE_NAMES[line.tradeCode] || line.tradeCode;
+    if (!tradeMap.has(tradeName)) tradeMap.set(tradeName, []);
+    const overhead = Math.round(line.totalAmount * 0.1);
+    tradeMap.get(tradeName)!.push({
+      id: `${line.itemCode}-${line.roomName || "common"}`,
+      category: tradeName,
+      part: line.roomName || "공통",
+      productName: line.itemName,
+      method: "시공",
+      spec: line.specification,
+      unit: UNIT_LABELS[line.unit] || line.unit,
+      quantity: line.quantity,
+      materialCost: line.materialAmount,
+      laborCost: line.laborAmount,
+      overhead,
+      total: line.totalAmount + overhead,
+      note: "",
+    });
+  }
+
+  const sections: RoomCostSection[] = [];
+  for (const [tradeName, items] of Array.from(tradeMap.entries())) {
+    sections.push({
+      roomName: tradeName,
+      items,
+      subtotal: items.reduce((sum, i) => sum + i.total, 0),
+    });
+  }
+
+  return sections;
+}
+
+// 도면 없을 때 기본 Mock 견적 (폴백)
+function generateFallbackEstimate(floorPlan: ParsedFloorPlan | null): RoomCostSection[] {
   if (!floorPlan) return [];
 
   return floorPlan.rooms
@@ -180,66 +115,10 @@ function generateDefaultEstimate(floorPlan: ParsedFloorPlan | null): RoomCostSec
     .map((room) => {
       const q = Math.round(room.area);
       const items: CostItem[] = [
-        {
-          id: `${room.id}-demo`,
-          category: "철거",
-          part: "전체",
-          productName: "기존 마감 철거",
-          method: "철거",
-          spec: "-",
-          unit: "m²",
-          quantity: q,
-          materialCost: 0,
-          laborCost: q * 8000,
-          overhead: q * 800,
-          total: q * 8800,
-          note: "",
-        },
-        {
-          id: `${room.id}-floor`,
-          category: "마감",
-          part: "바닥",
-          productName: "강화마루",
-          method: "시공",
-          spec: "12mm 오크",
-          unit: "m²",
-          quantity: q,
-          materialCost: q * 35000,
-          laborCost: q * 24500,
-          overhead: q * 5950,
-          total: q * 65450,
-          note: "",
-        },
-        {
-          id: `${room.id}-wall`,
-          category: "마감",
-          part: "벽",
-          productName: "실크 벽지",
-          method: "도배",
-          spec: "LG하우시스",
-          unit: "m²",
-          quantity: q * 3,
-          materialCost: q * 3 * 12000,
-          laborCost: q * 3 * 9600,
-          overhead: q * 3 * 2160,
-          total: q * 3 * 23760,
-          note: "",
-        },
-        {
-          id: `${room.id}-ceiling`,
-          category: "마감",
-          part: "천장",
-          productName: "도장",
-          method: "페인트",
-          spec: "수성페인트",
-          unit: "m²",
-          quantity: q,
-          materialCost: q * 8000,
-          laborCost: q * 7200,
-          overhead: q * 1520,
-          total: q * 16720,
-          note: "",
-        },
+        { id: `${room.id}-demo`, category: "철거", part: "전체", productName: "기존 마감 철거", method: "철거", spec: "-", unit: "m²", quantity: q, materialCost: 0, laborCost: q * 8000, overhead: q * 800, total: q * 8800, note: "" },
+        { id: `${room.id}-floor`, category: "바닥재", part: "바닥", productName: "강마루", method: "시공", spec: "중급", unit: "m²", quantity: q, materialCost: q * 35000, laborCost: q * 15000, overhead: q * 5000, total: q * 55000, note: "" },
+        { id: `${room.id}-wall`, category: "도배", part: "벽", productName: "실크 벽지", method: "도배", spec: "합지", unit: "m²", quantity: q * 3, materialCost: q * 3 * 5000, laborCost: q * 3 * 8000, overhead: q * 3 * 1300, total: q * 3 * 14300, note: "" },
+        { id: `${room.id}-ceiling`, category: "천장", part: "천장", productName: "석고보드+도장", method: "시공", spec: "9.5T", unit: "m²", quantity: q, materialCost: q * 17000, laborCost: q * 29000, overhead: q * 4600, total: q * 50600, note: "" },
       ];
 
       return {
@@ -282,6 +161,7 @@ export default function EstimatePage() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
+  const [viewMode, setViewMode] = useState<"room" | "trade">("room");
 
   // 도면 로드
   useEffect(() => {
@@ -295,33 +175,38 @@ export default function EstimatePage() {
     }
   }, [project?.drawingId]);
 
-  // 자재 데이터에서 견적 생성
-  const confirmedMaterials = project?.rendering?.materials || [];
-  const hasMaterials = confirmedMaterials.length > 0;
+  // QTY 엔진 기반 견적 생성
+  const useEngine = !!floorPlan;
 
-  const { sections, totalMaterial, totalLabor, totalOverhead, grandTotal, summary } = useMemo(() => {
+  const { sections, totalMaterial, totalLabor, totalOverhead, grandTotal, summary, engineResult } = useMemo(() => {
     let secs: RoomCostSection[];
+    let estResult: EstimateResult | null = null;
 
-    if (hasMaterials) {
-      const result = generateEstimateFromMaterials(confirmedMaterials, floorPlan);
-      secs = result.sections;
+    if (useEngine && floorPlan) {
+      // QTY 엔진 실행
+      const fpp = adaptParsedFloorPlan(floorPlan, projectId);
+      const qtyResult = calculateAllQuantities(fpp);
+      estResult = calculateEstimate(qtyResult);
+
+      secs = viewMode === "trade"
+        ? convertToTradeSections(estResult)
+        : convertToRoomSections(estResult);
     } else {
-      secs = generateDefaultEstimate(floorPlan);
+      secs = generateFallbackEstimate(floorPlan);
     }
 
-    const gt = secs.reduce((sum, s) => sum + s.subtotal, 0);
-    const tm = secs.reduce(
-      (sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.materialCost, 0),
-      0
-    );
-    const tl = secs.reduce(
-      (sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.laborCost, 0),
-      0
-    );
-    const to = secs.reduce(
-      (sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.overhead, 0),
-      0
-    );
+    const gt = estResult
+      ? estResult.summary.grandTotal
+      : secs.reduce((sum, s) => sum + s.subtotal, 0);
+    const tm = estResult
+      ? estResult.summary.directMaterialCost
+      : secs.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.materialCost, 0), 0);
+    const tl = estResult
+      ? estResult.summary.directLaborCost
+      : secs.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.laborCost, 0), 0);
+    const to = estResult
+      ? (estResult.summary.overheadAmount + estResult.summary.profitAmount + estResult.summary.vatAmount)
+      : secs.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.overhead, 0), 0);
 
     const smry = secs.map((s) => ({
       label: s.roomName,
@@ -336,8 +221,9 @@ export default function EstimatePage() {
       totalOverhead: to,
       grandTotal: gt,
       summary: smry,
+      engineResult: estResult,
     };
-  }, [hasMaterials, confirmedMaterials, floorPlan]);
+  }, [useEngine, floorPlan, projectId, viewMode]);
 
   const filteredSections = activeRoom
     ? sections.filter((s) => s.roomName === activeRoom)
@@ -402,12 +288,12 @@ export default function EstimatePage() {
             <Calculator className="w-4 h-4 text-amber-600" />
             물량산출
           </h2>
-          {hasMaterials && (
+          {useEngine && (
             <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> 확정 자재 기반
+              <CheckCircle2 className="w-3 h-3" /> 17개 공종 산출
             </span>
           )}
-          {!hasMaterials && floorPlan && (
+          {!useEngine && floorPlan && (
             <span className="hidden sm:inline px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full">
               기본 단가 적용
             </span>
@@ -532,12 +418,41 @@ export default function EstimatePage() {
           <div className="p-4">
             <p className="text-xs font-semibold text-gray-600 mb-2">산출 기준</p>
             <div className="space-y-1 text-[11px] text-gray-500">
-              <p>- 단가: 2026년 물가정보 기준</p>
-              <p>- 노무비: 자재비 × 카테고리별 비율</p>
-              <p>- 경비: (재료비+노무비) × 10%</p>
-              <p>- VAT 별도, 부대비용 별도</p>
+              {useEngine ? (
+                <>
+                  <p>- 17개 공종 정밀 물량산출 엔진</p>
+                  <p>- 단가: 2025년 서울 실거래 기준</p>
+                  <p>- 일반관리비: 직접공사비 × 6%</p>
+                  <p>- 이윤: (직접공사비+관리비) × 5%</p>
+                  <p>- VAT: 공급가액 × 10%</p>
+                  <p>- 할증률: 공종별 자재 로스 반영</p>
+                </>
+              ) : (
+                <>
+                  <p>- 단가: 2025년 물가정보 기준</p>
+                  <p>- 노무비: 자재비 × 카테고리별 비율</p>
+                  <p>- 경비: (재료비+노무비) × 10%</p>
+                  <p>- VAT 별도, 부대비용 별도</p>
+                </>
+              )}
               <p>- 실측 후 물량 변동 가능</p>
             </div>
+            {engineResult && (
+              <div className="mt-3 space-y-1 text-[11px]">
+                <div className="flex justify-between text-gray-500">
+                  <span>일반관리비 ({engineResult.summary.overheadRate}%)</span>
+                  <span>{engineResult.summary.overheadAmount.toLocaleString("ko-KR")}원</span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>이윤 ({engineResult.summary.profitRate}%)</span>
+                  <span>{engineResult.summary.profitAmount.toLocaleString("ko-KR")}원</span>
+                </div>
+                <div className="flex justify-between text-gray-500">
+                  <span>부가세 ({engineResult.summary.vatRate}%)</span>
+                  <span>{engineResult.summary.vatAmount.toLocaleString("ko-KR")}원</span>
+                </div>
+              </div>
+            )}
             <div className="mt-3 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
               <p className="text-[10px] text-amber-700">
                 ※ 본 견적은 참고 금액이며, 실제 시공 시 현장 상황에 따라 변동됩니다.
@@ -566,8 +481,28 @@ export default function EstimatePage() {
             </div>
           ) : (
             <>
-              {/* 공간 필터 탭 */}
+              {/* 뷰 모드 + 필터 탭 */}
               <div className="flex items-center gap-2 mb-4 flex-wrap">
+                {useEngine && (
+                  <div className="flex items-center bg-gray-100 rounded-lg p-0.5 mr-2">
+                    <button
+                      onClick={() => { setViewMode("room"); setActiveRoom(null); }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                        viewMode === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                      }`}
+                    >
+                      공간별
+                    </button>
+                    <button
+                      onClick={() => { setViewMode("trade"); setActiveRoom(null); }}
+                      className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1 ${
+                        viewMode === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                      }`}
+                    >
+                      <Layers className="w-3 h-3" /> 공종별
+                    </button>
+                  </div>
+                )}
                 <button
                   onClick={() => setActiveRoom(null)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
