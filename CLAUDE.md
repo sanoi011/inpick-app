@@ -268,22 +268,34 @@
 소비자 업체 선정 → PATCH /api/bids(selected) + POST /api/contracts
 ```
 
+## 완료된 작업 (2026-02-12) - E2E 흐름 완성
+
+### consumer_id 연결 + RFQ 재방문 복구
+- `rfq/page.tsx` - useAuth로 consumer user.id를 POST /api/rfq에 전달
+- `rfq/page.tsx` - localStorage에 estimateId 없으면 GET /api/rfq?consumerProjectId로 Supabase 폴백 조회
+- `api/rfq/route.ts` - userId 수신 → estimates.user_id 설정 (계약서 consumer_id 연결)
+
+### 계약 → 사업자 프로젝트 자동 생성
+- `api/contracts/route.ts` - 계약 생성 성공 후 contractor_projects + 7단계 공정 + 활동 로그 자동 INSERT
+- 실패 시 silent fail (계약 자체는 이미 생성됨)
+
+### 레거시 정리
+- `/project/[id]/bids` - ~400줄 MOCK_BIDS → /rfq 리다이렉트로 교체
+- `api/contracts` GET - consumerId 쿼리 파라미터 지원 (향후 "내 계약" 페이지용)
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase SQL 실행** - 2개 마이그레이션을 Supabase 대시보드 SQL Editor에서 실행
-   - `supabase/migrations/20260211000000_credit_tables.sql`
-   - `supabase/migrations/20260212000000_consumer_rfq_integration.sql`
-   - URL: `https://supabase.com/dashboard/project/pyhsjjtxcfmkcqmaxozd/sql/new`
-2. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
-3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화 (REST API 키 + Client Secret 입력, Redirect URI 등록)
+1. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
+2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
 
 ### 개발 작업
 - 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
 - Gemini AI 이미지 생성 실제 테스트
 - 3D 렌더링 엔진 API 연동 (현재 Mock 이미지)
 - 결제 시스템 연동 (크레딧 충전 - 토스페이먼츠 등)
-- 실제 데이터 E2E 연동 테스트 (소비자 RFQ → 사업자 입찰 → 계약)
+- 자재 카탈로그 DB화 (현재 MATERIAL_CATALOG 하드코딩)
+- 소비자 "내 계약" 페이지 (GET /api/contracts?consumerId=X 활용)
 - 푸시 알림 / WebSocket 실시간 알림 (현재 30초 폴링)
 
 ## DB 마이그레이션 현황
@@ -295,5 +307,5 @@
 | `20260210000000_projects_and_bids.sql` | Supabase 적용 완료 |
 | `20260210100000_schedule_enhance.sql` | Supabase 적용 완료 |
 | `20260210200000_finance_tables.sql` | Supabase 적용 완료 |
-| `20260211000000_credit_tables.sql` | **미적용 - SQL Editor에서 실행 필요** |
-| `20260212000000_consumer_rfq_integration.sql` | **미적용 - SQL Editor에서 실행 필요** |
+| `20260211000000_credit_tables.sql` | Supabase 적용 완료 |
+| `20260212000000_consumer_rfq_integration.sql` | Supabase 적용 완료 |

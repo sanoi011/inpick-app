@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   const supabase = createClient();
   const id = request.nextUrl.searchParams.get("id");
   const estimateId = request.nextUrl.searchParams.get("estimateId");
+  const consumerId = request.nextUrl.searchParams.get("consumerId");
 
   if (id) {
     const { data, error } = await supabase
@@ -35,6 +36,10 @@ export async function GET(request: NextRequest) {
 
   if (estimateId) {
     query.eq("estimate_id", estimateId);
+  }
+
+  if (consumerId) {
+    query.eq("consumer_id", consumerId);
   }
 
   const { data, error } = await query;
