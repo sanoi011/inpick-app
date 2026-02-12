@@ -469,21 +469,83 @@ design/page.tsx (상태 소유)
   └── ViewerToolbar (하단 통합 컨트롤)
 ```
 
+## 완료된 작업 (2026-02-15) - AI 인프라 + SEO + 실시간 + 안정성
+
+### Gemini SDK 업그레이드
+- `src/lib/gemini-client.ts` (수정) - `@google/generative-ai` → `@google/genai` 마이그레이션
+- `src/app/api/project/design-ai/route.ts` (수정) - 새 SDK API 사용
+- `src/app/api/project/generate-image/route.ts` (수정) - 새 SDK API 사용
+- `src/app/api/project/gemini-status/route.ts` (수정) - 상태 체크 갱신
+- `src/app/project/[id]/ai-design/page.tsx` (수정) - 클라이언트 호환
+
+### 벡터DB + RAG 파이프라인
+- `supabase/migrations/20260215000000_vector_embeddings.sql` (신규) - pgvector 확장 + knowledge_embeddings 테이블
+- `src/lib/embedding.ts` (신규) - Gemini `embedding-001` 768차원 임베딩 (텍스트/쿼리)
+- `src/lib/knowledge-search.ts` (신규) - 코사인 유사도 시맨틱 검색 (상위 5건)
+- `scripts/embed-knowledge.ts` (신규) - construction_knowledge → 벡터 임베딩 배치 변환
+  - 실행: `npx tsx scripts/embed-knowledge.ts` (마이그레이션 적용 후)
+- `src/app/api/contractor-ai/route.ts` (수정) - RAG 컨텍스트 주입
+- `src/app/api/project/design-ai/route.ts` (수정) - RAG 컨텍스트 주입
+
+### 홈페이지 이미지 추가
+- `public/images/hero-kitchen.jpg` (204KB) - Hero 섹션 (고급 주방/다이닝)
+- `public/images/feature-living.jpg` (77KB) - AI 상담 feature (따뜻한 거실)
+- `public/images/feature-fireplace.jpg` (197KB) - 단가 연동 feature (벽난로 거실)
+- `public/images/feature-staircase.jpg` (214KB) - 3D 뷰어 feature (모던 계단)
+- `src/components/landing/Hero.tsx` (수정) - 실제 이미지 배치
+- `src/components/landing/Features.tsx` (수정) - 3개 feature 이미지 배치
+
+### 이미지 최적화 + SEO 강화
+- `next.config.mjs` (수정) - `images.formats: ["image/avif", "image/webp"]`
+- `src/components/landing/Hero.tsx` (수정) - `<img>` → `next/image` Image (fill, priority, sizes)
+- `src/components/landing/Features.tsx` (수정) - `<img>` → `next/image` Image (fill, lazy, sizes)
+- `src/app/opengraph-image.tsx` (신규) - ImageResponse 동적 OG 이미지 (1200x630, edge runtime)
+- `src/app/layout.tsx` (수정) - metadataBase, openGraph, twitter, title.template("%s | INPICK")
+- `src/app/robots.ts` (신규) - userAgent *, allow /, disallow /api/ /admin/
+- `src/app/sitemap.ts` (신규) - 16개 정적 페이지 등록
+- 5개 layout.tsx (신규) - 페이지별 metadata export (auth, projects, contracts, contractor/login, admin/login)
+
+### 실시간 알림 (Supabase Realtime)
+- `src/components/ui/Toast.tsx` (신규) - 글로벌 토스트 시스템 (pub/sub, 4타입, 자동 dismiss)
+- `src/hooks/useRealtimeSubscription.ts` (신규) - Supabase Realtime postgres_changes 구독 훅
+- `src/app/layout.tsx` (수정) - `<ToastContainer />` 추가
+- `src/app/project/[id]/rfq/page.tsx` (수정) - 30초 폴링 → Supabase Realtime 채널 (INSERT/UPDATE) + 60초 폴백
+- `src/app/contractor/page.tsx` (수정) - Realtime 알림 구독 + 토스트 표시
+
+### Fine-tuning 데이터 파이프라인
+- `src/app/api/admin/fine-tuning/route.ts` (신규) - JSONL/JSON 추출 (rating≥4 or helpful 필터)
+- `src/app/admin/ai-logs/page.tsx` (수정) - Fine-tuning 다운로드 버튼 + 통계 배지
+
+### 홈페이지 UI 고도화
+- `src/components/landing/HowItWorks.tsx` (신규) - 4단계 워크플로우 섹션
+- `src/app/page.tsx` (수정) - HowItWorks 삽입 (Hero ↔ LogoCloud 사이)
+- `src/components/landing/Contact.tsx` (수정) - mailto 폼 제출 + 상태 표시
+- `src/components/landing/Footer.tsx` (수정) - 회사 정보 업데이트
+- `src/components/landing/Pricing.tsx` (수정) - 연간/월간 토글 실제 동작 (20% 할인)
+- `src/components/landing/LogoCloud.tsx` (수정) - 카드 스타일 개선
+
+### 테스트/안정성 강화
+- `src/lib/api-helpers.ts` (신규) - apiError/apiSuccess/requireEnv/getEnvStatus 유틸
+- `src/components/ui/ErrorBoundary.tsx` (신규) - React 클래스 컴포넌트 에러 바운더리
+- `src/components/ui/LoadingState.tsx` (신규) - LoadingState + EmptyState 공통 컴포넌트
+- `src/app/api/admin/env-check/route.ts` (신규) - 환경변수 상태 확인 API
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260213 까지)
-2. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260214 2개)
-3. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
-4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-5. **Toss Payments 키 발급** - https://developers.tosspayments.com → `.env.local`과 Vercel 환경변수에 `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY` 설정
+1. ~~**Supabase 마이그레이션 적용**~~ ✅ 완료 (20260214 까지)
+2. **Supabase 마이그레이션 적용** - `20260215000000_vector_embeddings.sql` (pgvector 확장 활성화 필요)
+3. **임베딩 스크립트 실행** - 마이그레이션 적용 후 `npx tsx scripts/embed-knowledge.ts`
+4. **Gemini API 키 발급** - https://aistudio.google.com/apikey → `.env.local` + Vercel `GOOGLE_GEMINI_API_KEY`
+5. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+6. **Toss Payments 키 발급** - https://developers.tosspayments.com → `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
 
 ### 개발 작업
-- 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
-- Gemini AI 이미지 생성 실제 테스트
-- 푸시 알림 / WebSocket 실시간 알림 (현재 30초 폴링)
-- 벡터DB + RAG 파이프라인 (AI-INFRA-ROADMAP Phase 2)
-- Fine-tuning 데이터셋 추출 파이프라인 (AI-INFRA-ROADMAP Phase 3)
+- Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
+- E2E 테스트 작성 (Playwright/Cypress)
+- 성능 최적화 (번들 분석, 코드 스플리팅)
+- PWA 지원 (오프라인, 서비스 워커)
+- 다국어 지원 (i18n)
 
 ## DB 마이그레이션 현황
 | 파일 | 상태 |
@@ -499,3 +561,4 @@ design/page.tsx (상태 소유)
 | `20260213000000_ai_data_pipeline.sql` | Supabase 적용 완료 |
 | `20260214000000_material_catalog_seed.sql` | Supabase 적용 완료 |
 | `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
+| `20260215000000_vector_embeddings.sql` | **미적용** (pgvector 확장 필요) |
