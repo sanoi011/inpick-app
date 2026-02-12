@@ -202,6 +202,7 @@ export interface ConsumerProject {
   rendering?: ProjectRendering;
   estimate?: ProjectEstimate;
   rfq?: ProjectRfq;
+  estimateId?: string;
   drawingId?: string;
   createdAt: string;
   updatedAt: string;

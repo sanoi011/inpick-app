@@ -248,6 +248,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // Supabase estimateId 설정
+  const setEstimateId = useCallback(
+    (estimateId: string) => {
+      if (!project) return;
+      saveProject({ ...project, estimateId });
+    },
+    [project, saveProject]
+  );
+
   // RFQ 업데이트
   const updateRfq = useCallback(
     (rfqUpdate: Partial<ProjectRfq>) => {
@@ -278,6 +287,7 @@ export function useProjectState(projectId: string) {
     addRenderView,
     updateMaterial,
     setEstimate,
+    setEstimateId,
     updateRfq,
     saveProject: () => project && saveProject(project),
   };

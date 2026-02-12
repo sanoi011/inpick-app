@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -21,98 +21,10 @@ import {
   TrendingDown,
   ThumbsUp,
   Loader2,
+  Inbox,
+  RefreshCw,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
-
-// Mock 입찰 데이터
-interface MockBid {
-  id: string;
-  companyName: string;
-  representative: string;
-  phone: string;
-  region: string;
-  rating: number;
-  reviewCount: number;
-  totalProjects: number;
-  specialties: string[];
-  bidAmount: number;
-  duration: number;
-  warranty: number;
-  message: string;
-  aiTag: string;
-  aiReason: string;
-}
-
-const MOCK_BIDS: MockBid[] = [
-  {
-    id: "bid-1",
-    companyName: "대한인테리어",
-    representative: "김건설",
-    phone: "010-1234-5678",
-    region: "서울 강남/서초",
-    rating: 4.8,
-    reviewCount: 127,
-    totalProjects: 342,
-    specialties: ["아파트", "주거 리모델링"],
-    bidAmount: 12500000,
-    duration: 21,
-    warranty: 2,
-    message: "안녕하세요. 25년 경력의 대한인테리어입니다. 꼼꼼한 시공과 하자 보증으로 만족스러운 결과를 약속드립니다.",
-    aiTag: "AI 추천",
-    aiReason: "평점 최고, 유사 프로젝트 경험 풍부",
-  },
-  {
-    id: "bid-2",
-    companyName: "미래건설 인테리어",
-    representative: "박시공",
-    phone: "010-9876-5432",
-    region: "서울 강남",
-    rating: 4.6,
-    reviewCount: 89,
-    totalProjects: 215,
-    specialties: ["모던 인테리어", "오피스텔"],
-    bidAmount: 11200000,
-    duration: 18,
-    warranty: 1,
-    message: "합리적인 가격에 트렌디한 디자인을 제공합니다. 3D 렌더링 기반 시공으로 오차를 최소화합니다.",
-    aiTag: "최저가",
-    aiReason: "견적 대비 10.4% 저렴, 빠른 공기",
-  },
-  {
-    id: "bid-3",
-    companyName: "한빛홈데코",
-    representative: "이인테",
-    phone: "010-5555-7777",
-    region: "서울 서초/송파",
-    rating: 4.9,
-    reviewCount: 203,
-    totalProjects: 487,
-    specialties: ["고급 인테리어", "자재 전문"],
-    bidAmount: 14800000,
-    duration: 25,
-    warranty: 3,
-    message: "프리미엄 자재와 장인 시공으로 차별화된 결과를 제공합니다. 3년 하자보증은 저희만의 자신감입니다.",
-    aiTag: "프리미엄",
-    aiReason: "최장 보증 3년, 최다 시공 실적",
-  },
-  {
-    id: "bid-4",
-    companyName: "청춘리빙",
-    representative: "최청춘",
-    phone: "010-3333-4444",
-    region: "서울 강남/역삼",
-    rating: 4.5,
-    reviewCount: 56,
-    totalProjects: 98,
-    specialties: ["원룸/투룸", "소형 평수"],
-    bidAmount: 10800000,
-    duration: 15,
-    warranty: 1,
-    message: "젊은 감각으로 빠르고 깔끔한 시공을 약속합니다. 소형 평수 전문으로 효율적인 공간 활용에 자신 있습니다.",
-    aiTag: "빠른 시공",
-    aiReason: "최단 공기 15일, 합리적 가격",
-  },
-];
 
 const AI_TAG_STYLES: Record<string, string> = {
   "AI 추천": "bg-blue-100 text-blue-700",
@@ -121,11 +33,57 @@ const AI_TAG_STYLES: Record<string, string> = {
   "빠른 시공": "bg-amber-100 text-amber-700",
 };
 
+// 입찰에 AI 태그 부여
+function assignAiTag(bid: BidData, allBids: BidData[]): { tag: string; reason: string } {
+  const minAmount = Math.min(...allBids.map((b) => b.bid_amount));
+  const maxRating = Math.max(...allBids.map((b) => b.specialty_contractors?.rating || 0));
+  const minDays = Math.min(...allBids.map((b) => b.estimated_days || 99));
+  const maxWarranty = Math.max(...allBids.map((b) => (b.metadata?.warranty_months as number) || 0));
+
+  if (bid.specialty_contractors?.rating === maxRating && bid.specialty_contractors?.rating >= 4.5) {
+    return { tag: "AI 추천", reason: `평점 ${bid.specialty_contractors.rating}, 종합 최우수` };
+  }
+  if (bid.bid_amount === minAmount) {
+    return { tag: "최저가", reason: `최저 금액 ${bid.bid_amount.toLocaleString()}원` };
+  }
+  if ((bid.metadata?.warranty_months || 0) === maxWarranty && maxWarranty >= 24) {
+    return { tag: "프리미엄", reason: `최장 보증 ${maxWarranty / 12}년` };
+  }
+  if ((bid.estimated_days || 99) === minDays) {
+    return { tag: "빠른 시공", reason: `최단 공기 ${minDays}일` };
+  }
+  return { tag: "", reason: "" };
+}
+
+interface BidData {
+  id: string;
+  estimate_id: string;
+  contractor_id: string;
+  bid_amount: number;
+  discount_rate?: number;
+  estimated_days?: number;
+  start_available_date?: string;
+  message?: string;
+  metadata?: Record<string, unknown>;
+  status: string;
+  created_at: string;
+  specialty_contractors?: {
+    id: string;
+    company_name: string;
+    contact_name: string;
+    rating: number;
+    total_reviews: number;
+    completed_projects: number;
+    is_verified: boolean;
+    contractor_trades?: { trade_code: string; trade_name: string; experience_years: number }[];
+  };
+}
+
 export default function RfqPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateRfq, updateStatus } = useProjectState(projectId);
+  const { project, updateRfq, updateStatus, setEstimateId } = useProjectState(projectId);
 
   const [step, setStep] = useState<"form" | "sending" | "bids">(
     project?.rfq?.sentAt ? "bids" : "form"
@@ -140,11 +98,48 @@ export default function RfqPage() {
   const [noiseRestriction, setNoiseRestriction] = useState(project?.rfq?.noiseRestriction || "");
 
   const [selectedBid, setSelectedBid] = useState<string | null>(project?.rfq?.selectedBidId || null);
+  const [bids, setBids] = useState<BidData[]>([]);
+  const [bidLoading, setBidLoading] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
-  // 견적요청 발송
+  // 기존 RFQ 제출 여부 확인 + 입찰 로드
+  useEffect(() => {
+    const estimateId = project?.estimateId;
+    if (!estimateId) return;
+
+    const loadBids = async () => {
+      setBidLoading(true);
+      try {
+        const res = await fetch(`/api/bids?estimateId=${estimateId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBids(data.bids || []);
+        }
+      } catch {
+        // 무시
+      } finally {
+        setBidLoading(false);
+      }
+    };
+
+    loadBids();
+
+    // 30초마다 폴링
+    const interval = setInterval(loadBids, 30000);
+    return () => clearInterval(interval);
+  }, [project?.estimateId]);
+
+  // 견적요청 발송 (실제 API)
   const handleSubmitRfq = useCallback(async () => {
-    setStep("sending");
+    if (!project?.address || !project?.estimate) {
+      setSubmitError("주소와 견적 정보가 필요합니다. 이전 단계를 완료해주세요.");
+      return;
+    }
 
+    setStep("sending");
+    setSubmitError("");
+
+    // localStorage 저장
     updateRfq({
       specialNotes,
       preferredStartDate,
@@ -156,21 +151,101 @@ export default function RfqPage() {
     });
     updateStatus("RFQ");
 
-    // Mock: 발송 시뮬레이션
-    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      // Supabase에 RFQ 제출
+      const res = await fetch("/api/rfq", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          address: project.address,
+          estimateData: project.estimate,
+          rfqPreferences: {
+            specialNotes,
+            preferredStartDate,
+            preferredDuration,
+            budgetRange,
+            livingDuringWork,
+            noiseRestriction,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setEstimateId(data.estimateId);
+      } else {
+        console.error("RFQ submission failed");
+      }
+    } catch (err) {
+      console.error("RFQ submission error:", err);
+    }
+
     setStep("bids");
-  }, [specialNotes, preferredStartDate, preferredDuration, budgetRange, livingDuringWork, noiseRestriction, updateRfq, updateStatus]);
+  }, [
+    project, projectId, specialNotes, preferredStartDate, preferredDuration,
+    budgetRange, livingDuringWork, noiseRestriction, updateRfq, updateStatus, setEstimateId,
+  ]);
 
   // 업체 선정
-  const handleSelectBid = (bidId: string) => {
+  const handleSelectBid = async (bidId: string) => {
     setSelectedBid(bidId);
     updateRfq({ selectedBidId: bidId });
+
+    // Supabase에서 입찰 상태 변경
+    try {
+      await fetch("/api/bids", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: bidId, status: "selected" }),
+      });
+    } catch {
+      // 무시
+    }
   };
 
   // 계약 확정
-  const handleConfirmContract = () => {
+  const handleConfirmContract = async () => {
+    if (!selectedBid) return;
+
+    try {
+      const res = await fetch("/api/contracts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bidId: selectedBid }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        updateStatus("CONTRACTED");
+        router.push(`/contract/${data.contract.id}`);
+        return;
+      }
+    } catch {
+      // 실패해도 상태는 업데이트
+    }
+
     updateStatus("CONTRACTED");
     router.push(`/project/${projectId}`);
+  };
+
+  // 수동 새로고침
+  const handleRefreshBids = async () => {
+    const estimateId = project?.estimateId;
+    if (!estimateId) return;
+
+    setBidLoading(true);
+    try {
+      const res = await fetch(`/api/bids?estimateId=${estimateId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setBids(data.bids || []);
+      }
+    } catch {
+      // 무시
+    } finally {
+      setBidLoading(false);
+    }
   };
 
   const estimate = project?.estimate;
@@ -197,21 +272,38 @@ export default function RfqPage() {
             </span>
           )}
         </div>
-        {selectedBid && (
-          <button
-            onClick={handleConfirmContract}
-            className="flex items-center gap-1 px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
-          >
-            <CheckCircle2 className="w-4 h-4" /> 업체 확정
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {step === "bids" && (
+            <button
+              onClick={handleRefreshBids}
+              disabled={bidLoading}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${bidLoading ? "animate-spin" : ""}`} />
+              새로고침
+            </button>
+          )}
+          {selectedBid && (
+            <button
+              onClick={handleConfirmContract}
+              className="flex items-center gap-1 px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+            >
+              <CheckCircle2 className="w-4 h-4" /> 업체 확정
+            </button>
+          )}
+        </div>
       </div>
 
       {/* 메인 */}
       <div className="flex-1 overflow-y-auto bg-gray-50">
         {step === "form" && (
-          /* 특기사항 입력 폼 */
           <div className="max-w-2xl mx-auto p-6">
+            {submitError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-600">
+                {submitError}
+              </div>
+            )}
+
             {/* 프로젝트 요약 */}
             <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
               <h3 className="text-sm font-bold text-gray-900 mb-3">프로젝트 요약</h3>
@@ -251,7 +343,6 @@ export default function RfqPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-5">
               <h3 className="text-sm font-bold text-gray-900">특기사항 입력</h3>
 
-              {/* 시공 희망 기간 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   <Calendar className="w-3.5 h-3.5 inline mr-1" />
@@ -265,7 +356,6 @@ export default function RfqPage() {
                 />
               </div>
 
-              {/* 공사 기간 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   <Clock className="w-3.5 h-3.5 inline mr-1" />
@@ -285,7 +375,6 @@ export default function RfqPage() {
                 </select>
               </div>
 
-              {/* 예산 범위 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   <DollarSign className="w-3.5 h-3.5 inline mr-1" />
@@ -306,7 +395,6 @@ export default function RfqPage() {
                 </select>
               </div>
 
-              {/* 거주 중 시공 */}
               <div>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
@@ -323,7 +411,6 @@ export default function RfqPage() {
                 </label>
               </div>
 
-              {/* 소음 제한 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   <Volume2 className="w-3.5 h-3.5 inline mr-1" />
@@ -338,7 +425,6 @@ export default function RfqPage() {
                 />
               </div>
 
-              {/* 추가 요청사항 */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1.5">
                   <FileText className="w-3.5 h-3.5 inline mr-1" />
@@ -353,7 +439,6 @@ export default function RfqPage() {
                 />
               </div>
 
-              {/* 발송 버튼 */}
               <button
                 onClick={handleSubmitRfq}
                 className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 text-white font-medium rounded-xl hover:bg-purple-700 transition-colors"
@@ -369,7 +454,6 @@ export default function RfqPage() {
         )}
 
         {step === "sending" && (
-          /* 발송 중 */
           <div className="h-full flex items-center justify-center">
             <div className="text-center">
               <Loader2 className="w-12 h-12 animate-spin text-purple-500 mx-auto mb-4" />
@@ -380,133 +464,177 @@ export default function RfqPage() {
         )}
 
         {step === "bids" && (
-          /* 입찰 목록 */
           <div className="max-w-3xl mx-auto p-6">
-            {/* AI 분석 헤더 */}
-            <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-4 mb-6">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <ThumbsUp className="w-4 h-4 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-gray-900 mb-1">AI 입찰 분석 결과</h3>
-                  <p className="text-xs text-gray-600">
-                    {MOCK_BIDS.length}개 업체가 입찰했습니다.
-                    견적 범위: {Math.min(...MOCK_BIDS.map((b) => b.bidAmount)).toLocaleString()}원 ~{" "}
-                    {Math.max(...MOCK_BIDS.map((b) => b.bidAmount)).toLocaleString()}원.{" "}
-                    <strong className="text-blue-700">대한인테리어</strong>가 AI 종합 추천 1위입니다.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 입찰 카드 목록 */}
-            <div className="space-y-4">
-              {MOCK_BIDS.map((bid) => {
-                const isSelected = selectedBid === bid.id;
-                const isRecommended = bid.aiTag === "AI 추천";
-
-                return (
-                  <div
-                    key={bid.id}
-                    className={`bg-white rounded-xl border overflow-hidden transition-all ${
-                      isSelected
-                        ? "border-green-400 ring-2 ring-green-200"
-                        : isRecommended
-                          ? "border-blue-300"
-                          : "border-gray-200"
-                    }`}
-                  >
-                    {/* AI 태그 */}
-                    {bid.aiTag && (
-                      <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
-                        <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${AI_TAG_STYLES[bid.aiTag] || "bg-gray-100 text-gray-600"}`}>
-                          {bid.aiTag}
-                        </span>
-                        <span className="text-[10px] text-gray-400">{bid.aiReason}</span>
-                      </div>
-                    )}
-
-                    <div className="p-4">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-bold text-gray-900">{bid.companyName}</h4>
-                            <div className="flex items-center gap-0.5 text-amber-500">
-                              <Star className="w-3 h-3 fill-current" />
-                              <span className="text-xs font-medium">{bid.rating}</span>
-                              <span className="text-[10px] text-gray-400">({bid.reviewCount})</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
-                            <span className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" /> {bid.region}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Medal className="w-3 h-3" /> {bid.totalProjects}건 시공
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-bold text-gray-900">
-                            {bid.bidAmount.toLocaleString()}
-                            <span className="text-xs font-normal text-gray-500">원</span>
-                          </p>
-                          <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
-                            <span className="flex items-center gap-0.5">
-                              <Clock className="w-3 h-3" /> {bid.duration}일
-                            </span>
-                            <span className="flex items-center gap-0.5">
-                              <ShieldCheck className="w-3 h-3" /> 보증 {bid.warranty}년
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* 전문 분야 */}
-                      <div className="flex gap-1 mb-2">
-                        {bid.specialties.map((s) => (
-                          <span
-                            key={s}
-                            className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full"
-                          >
-                            {s}
-                          </span>
-                        ))}
-                      </div>
-
-                      {/* 메시지 */}
-                      <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 mb-3">
-                        &quot;{bid.message}&quot;
-                      </p>
-
-                      {/* 액션 버튼 */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleSelectBid(bid.id)}
-                          className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
-                            isSelected
-                              ? "bg-green-600 text-white"
-                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                          }`}
-                        >
-                          {isSelected ? (
+            {bids.length > 0 ? (
+              <>
+                {/* AI 분석 헤더 */}
+                <div className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl border border-blue-200 p-4 mb-6">
+                  <div className="flex items-start gap-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <ThumbsUp className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-bold text-gray-900 mb-1">AI 입찰 분석 결과</h3>
+                      <p className="text-xs text-gray-600">
+                        {bids.length}개 업체가 입찰했습니다.
+                        견적 범위: {Math.min(...bids.map((b) => b.bid_amount)).toLocaleString()}원 ~{" "}
+                        {Math.max(...bids.map((b) => b.bid_amount)).toLocaleString()}원.
+                        {(() => {
+                          const best = bids.reduce((a, b) =>
+                            (a.specialty_contractors?.rating || 0) > (b.specialty_contractors?.rating || 0) ? a : b
+                          );
+                          return best.specialty_contractors ? (
                             <>
-                              <CheckCircle2 className="w-3.5 h-3.5" /> 선택됨
+                              {" "}<strong className="text-blue-700">{best.specialty_contractors.company_name}</strong>이(가) AI 종합 추천 1위입니다.
                             </>
-                          ) : (
-                            "업체 선택"
-                          )}
-                        </button>
-                        <button className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
-                          <Phone className="w-3.5 h-3.5" /> 연락하기
-                        </button>
-                      </div>
+                          ) : null;
+                        })()}
+                      </p>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                {/* 입찰 카드 목록 */}
+                <div className="space-y-4">
+                  {bids.map((bid) => {
+                    const isSelected = selectedBid === bid.id;
+                    const { tag: aiTag, reason: aiReason } = assignAiTag(bid, bids);
+                    const isRecommended = aiTag === "AI 추천";
+                    const contractor = bid.specialty_contractors;
+                    const trades = contractor?.contractor_trades || [];
+                    const warrantyMonths = (bid.metadata?.warranty_months as number) || 12;
+
+                    return (
+                      <div
+                        key={bid.id}
+                        className={`bg-white rounded-xl border overflow-hidden transition-all ${
+                          isSelected
+                            ? "border-green-400 ring-2 ring-green-200"
+                            : isRecommended
+                              ? "border-blue-300"
+                              : "border-gray-200"
+                        }`}
+                      >
+                        {aiTag && (
+                          <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
+                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${AI_TAG_STYLES[aiTag] || "bg-gray-100 text-gray-600"}`}>
+                              {aiTag}
+                            </span>
+                            <span className="text-[10px] text-gray-400">{aiReason}</span>
+                          </div>
+                        )}
+
+                        <div className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-gray-900">
+                                  {contractor?.company_name || "업체"}
+                                </h4>
+                                {contractor && (
+                                  <div className="flex items-center gap-0.5 text-amber-500">
+                                    <Star className="w-3 h-3 fill-current" />
+                                    <span className="text-xs font-medium">{contractor.rating}</span>
+                                    <span className="text-[10px] text-gray-400">({contractor.total_reviews})</span>
+                                  </div>
+                                )}
+                                {contractor?.is_verified && (
+                                  <ShieldCheck className="w-3.5 h-3.5 text-blue-500" />
+                                )}
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3 h-3" /> {contractor?.contact_name || ""}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Medal className="w-3 h-3" /> {contractor?.completed_projects || 0}건 시공
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-gray-900">
+                                {bid.bid_amount.toLocaleString()}
+                                <span className="text-xs font-normal text-gray-500">원</span>
+                              </p>
+                              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                                <span className="flex items-center gap-0.5">
+                                  <Clock className="w-3 h-3" /> {bid.estimated_days || 30}일
+                                </span>
+                                <span className="flex items-center gap-0.5">
+                                  <ShieldCheck className="w-3 h-3" /> 보증 {Math.round(warrantyMonths / 12)}년
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {trades.length > 0 && (
+                            <div className="flex gap-1 mb-2">
+                              {trades.map((t) => (
+                                <span key={t.trade_code} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">
+                                  {t.trade_name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+
+                          {bid.message && (
+                            <p className="text-xs text-gray-600 bg-gray-50 rounded-lg p-3 mb-3">
+                              &quot;{bid.message}&quot;
+                            </p>
+                          )}
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleSelectBid(bid.id)}
+                              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                                isSelected
+                                  ? "bg-green-600 text-white"
+                                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                              }`}
+                            >
+                              {isSelected ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5" /> 선택됨
+                                </>
+                              ) : (
+                                "업체 선택"
+                              )}
+                            </button>
+                            <button className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+                              <Phone className="w-3.5 h-3.5" /> 연락하기
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            ) : (
+              /* 입찰 대기 중 UI */
+              <div className="text-center py-16">
+                <div className="w-16 h-16 bg-purple-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Inbox className="w-8 h-8 text-purple-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">사업자 검토 중</h3>
+                <p className="text-sm text-gray-500 mb-1">
+                  견적요청이 성공적으로 발송되었습니다.
+                </p>
+                <p className="text-xs text-gray-400 mb-6">
+                  주변 인테리어 업체들이 프로젝트를 검토하고 입찰서를 작성하고 있습니다.
+                  <br />
+                  입찰이 도착하면 이 화면에 자동으로 표시됩니다. (30초마다 갱신)
+                </p>
+                <button
+                  onClick={handleRefreshBids}
+                  disabled={bidLoading}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-purple-100 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-200 transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${bidLoading ? "animate-spin" : ""}`} />
+                  {bidLoading ? "확인 중..." : "지금 확인하기"}
+                </button>
+              </div>
+            )}
 
             {/* 하단 안내 */}
             <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
