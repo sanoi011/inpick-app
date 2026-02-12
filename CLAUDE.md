@@ -220,10 +220,60 @@
 - `/contract/[id]` - 계약 상세
 - `/auth` - 소비자 인증 (Google OAuth)
 
+## 완료된 작업 (2026-02-12) - 소비자-사업자 RFQ 연동 + 모바일 반응형
+
+### Phase 1: DB 마이그레이션
+- `supabase/migrations/20260212000000_consumer_rfq_integration.sql`
+  - `estimates` 테이블에 `address`, `space_type`, `region`, `rfq_data(JSONB)`, `consumer_project_id` 컬럼 추가
+  - `estimates.status` CHECK에 `confirmed` 추가
+  - `contractor_notifications` 테이블 신규 생성 (type, title, message, priority, is_read, link, reference_id)
+
+### Phase 2: API 라우트
+- `src/app/api/rfq/route.ts` (신규) - 소비자 RFQ → estimates(confirmed) + contractor_notifications 생성
+- `src/app/api/contractor/notifications/route.ts` (수정) - Mock 제거 → 실제 DB 쿼리 + PATCH 읽음 처리
+- `src/app/api/estimates/route.ts` (수정) - status/region 필터 + 신규 컬럼 SELECT
+- `src/types/rfq.ts` (신규) - RfqSubmission, RfqPreferences, RfqResponse, ContractorNotification 타입
+
+### Phase 3: 소비자 RFQ Supabase 연동
+- `src/app/project/[id]/rfq/page.tsx` (수정)
+  - MOCK_BIDS 제거 → POST /api/rfq 실제 호출
+  - 30초 폴링으로 실시간 입찰 조회 (GET /api/bids)
+  - AI 태그 자동 할당 (최고 평점/최저가/프리미엄/빠른 시공)
+  - 입찰 0건 시 "사업자 검토 중" 대기 UI
+  - PATCH /api/bids 업체 선정, POST /api/contracts 계약 체결
+- `src/types/consumer-project.ts` - estimateId 필드 추가
+- `src/hooks/useProjectState.ts` - setEstimateId 메서드 추가
+
+### Phase 4: 사업자 측 RFQ 수신
+- `src/app/contractor/bids/page.tsx` (수정)
+  - RfqData 인터페이스, rfq_data/region/consumer_project_id 추가
+  - "소비자 직접요청" 보라색 배지, RFQ 상세 패널 (희망 시작일, 예산, 특이사항)
+- `src/app/contractor/page.tsx` (수정)
+  - 알림 미읽음 카운트 배지, confirmed 상태 입찰 카운트
+
+### Phase 5: 모바일 반응형 수정
+- `ai-design/page.tsx` - 380px 사이드바 → `w-full md:w-[380px]` + 모바일 "AI 채팅"/"디자인 갤러리" 탭 전환
+- `rendering/page.tsx` - 340px 자재 패널 → `hidden md:flex` + 모바일 플로팅 "자재 선택" 버튼 → 풀스크린 오버레이
+- `estimate/page.tsx` - w-72 요약 패널 → `flex-col md:flex-row` + 모바일 접이식 합계 토글
+- `design/page.tsx` - 상단/하단 바 모바일 래핑 + 뱃지 숨김
+
+### 데이터 플로우 (RFQ 연동 후)
+```
+소비자 RFQ 발송 → POST /api/rfq → estimates(confirmed) + contractor_notifications
+                                          ↓
+사업자 대시보드 ← GET /api/notifications ← contractor_notifications
+사업자 입찰 → POST /api/bids → bids(pending)
+                                    ↓
+소비자 입찰 확인 ← GET /api/bids ← bids 테이블 (30초 폴링)
+소비자 업체 선정 → PATCH /api/bids(selected) + POST /api/contracts
+```
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase SQL 실행** - `supabase/migrations/20260211000000_credit_tables.sql`을 Supabase 대시보드 SQL Editor에서 실행
+1. **Supabase SQL 실행** - 2개 마이그레이션을 Supabase 대시보드 SQL Editor에서 실행
+   - `supabase/migrations/20260211000000_credit_tables.sql`
+   - `supabase/migrations/20260212000000_consumer_rfq_integration.sql`
    - URL: `https://supabase.com/dashboard/project/pyhsjjtxcfmkcqmaxozd/sql/new`
 2. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
 3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화 (REST API 키 + Client Secret 입력, Redirect URI 등록)
@@ -233,9 +283,8 @@
 - Gemini AI 이미지 생성 실제 테스트
 - 3D 렌더링 엔진 API 연동 (현재 Mock 이미지)
 - 결제 시스템 연동 (크레딧 충전 - 토스페이먼츠 등)
-- 사업자 대시보드에 견적요청 수신 연동
-- 모바일 반응형 세부 조정
-- 실제 데이터 연동 테스트
+- 실제 데이터 E2E 연동 테스트 (소비자 RFQ → 사업자 입찰 → 계약)
+- 푸시 알림 / WebSocket 실시간 알림 (현재 30초 폴링)
 
 ## DB 마이그레이션 현황
 | 파일 | 상태 |
@@ -247,3 +296,4 @@
 | `20260210100000_schedule_enhance.sql` | Supabase 적용 완료 |
 | `20260210200000_finance_tables.sql` | Supabase 적용 완료 |
 | `20260211000000_credit_tables.sql` | **미적용 - SQL Editor에서 실행 필요** |
+| `20260212000000_consumer_rfq_integration.sql` | **미적용 - SQL Editor에서 실행 필요** |
