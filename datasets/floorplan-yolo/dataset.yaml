@@ -1,0 +1,7 @@
+# INPICK Floor Plan Symbol Detection
+path: C:/Users/User/Desktop/inpick-app/datasets/floorplan-yolo
+train: images/train
+val: images/val
+
+nc: 8
+names: ["door_swing", "door_sliding", "window", "toilet", "sink", "kitchen_sink", "bathtub", "stove"]
