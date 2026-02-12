@@ -407,6 +407,68 @@
 | 크롤러 | `/admin/crawlers` | 완료 |
 | 설정 | `/admin/settings` | 완료 |
 
+## 완료된 작업 (2026-02-15) - 2D/3D 뷰어 엔지니어링 아이덴티티 업그레이드
+
+### 방향성
+- "아키스케치는 디자인, 인픽은 엔지니어링" — 정밀 치수선, 구조 정보, 기술적 컬러 팔레트
+- 참조: `reference/요구수준/1-1.png`(2D), `1-3.png`(3D), `INPICK-CLAUDE-CODE-PROMPTS.md`
+
+### Phase 1: 공통 상수 + 재질
+- `src/lib/floor-plan/viewer-constants.ts` (신규) - 엔지니어링 컬러 팔레트
+  - `ENG_COLORS`: 벽체(#2D2D3D/#4A4A5A), 공간별 반투명 채우기, 문(#E67E22), 창(#60A5FA), 치수선, 설비, 뱃지, 선택/호버
+  - `VIEWER_SCALE = 50` (1m = 50px)
+- `src/lib/floor-plan/materials.ts` (수정) - `WALL_DARK`, `WALL_DARK_INTERIOR` PBR 재질 추가
+
+### Phase 2: 2D 뷰어 전면 개선 (285→617줄)
+- `src/components/viewer/FloorPlan2D.tsx` (전면 개선)
+  - **팬/줌**: viewBox 상태, 마우스 휠 줌(커서 기준), 드래그 패닝, `forwardRef`+`useImperativeHandle` (resetView/zoomIn/zoomOut)
+  - **벽체**: 두꺼운 채워진 다크 폴리곤 (법선 벡터 기반 4꼭짓점), 코너 채움 (공유 끝점 감지)
+  - **문**: 여닫이 90° 아크 + 잎선, 미닫이 화살표 마커
+  - **창문**: 이중선 (프레임 2개 평행선 + 중앙 유리선), rotation 지원
+  - **치수선**: 외벽 mm 단위, tick mark + 연장선(점선) + 회전 텍스트, 바운딩박스 합성 치수
+  - **설비 심볼**: 양변기(타원+사각), 세면대(반원+수전), 싱크대(이중볼), 욕조(중첩 둥근사각), 가스레인지(4원 버너)
+  - **렌더 순서**: 그리드 → 방채우기 → 설비 → 벽체 → 문/창 → 치수선 → 라벨 → 뱃지
+  - **Props**: `showDimensions`, `showFixtures` 추가, `FloorPlan2DHandle` export
+
+### Phase 3: 3D 뷰어 개선 (509→617줄)
+- `src/components/project/FloorPlan3D.tsx` (개선)
+  - **벽체**: `WALL_PAINT` → `WALL_DARK`/`WALL_DARK_INTERIOR` 다크 재질
+  - **문틀 3D**: `DoorFrame3D` — 좌/우 기둥 + 상부 헤더 (BoxGeometry, #4A4A5A)
+  - **창틀 3D**: `WindowFrame3D` — 4면 프레임(흰색) + 하부 창턱(TILE 재질)
+  - **설비 3D**: `Fixture3D` — 양변기/세면대/싱크/욕조/가스레인지 프리미티브 (CERAMIC/STAINLESS/WOOD_FLOOR 재질)
+  - **조명**: ambient 0.4, directional [12,18,8] 0.6, fill [-8,10,-6] 0.2, 그림자 카메라 ±20
+  - **외부 제어**: `cameraMode?`, `showCeiling?`, `showLabels?` props (내부 상태 폴백)
+  - **CameraMode 타입 export** (ViewerToolbar에서 import)
+
+### Phase 4: 하단 뷰어 툴바
+- `src/components/viewer/ViewerToolbar.tsx` (신규, ~140줄)
+  - 3단 레이아웃: 좌(2D/3D 토글 + 카메라 프리셋) | 중앙(줌) | 우(치수/천장/구조 토글)
+  - lucide-react 아이콘, `bg-white/95 backdrop-blur-sm`, 활성 `bg-gray-800 text-white`
+
+### Phase 5: 통합
+- `src/app/project/[id]/design/page.tsx` (수정)
+  - 상태 리프트업: viewMode, cameraMode, showCeiling, showDimensions, showEngInfo
+  - `floorPlan2DRef` → 2D 뷰어 imperative handle
+  - 상단 바: 2D/3D 토글 제거 (→ 하단 툴바), 뱃지 "INPICK 구조분석" (다크 슬레이트)
+  - 하단 `<ViewerToolbar>` 삽입 (뷰어 ↔ 정보 바 사이)
+
+### 뷰어 아키텍처
+```
+design/page.tsx (상태 소유)
+  ├── FloorPlan2D (ref: resetView/zoomIn/zoomOut)
+  │   ├── SVG viewBox 팬/줌
+  │   ├── WallSegmentSVG + WallCornerJoins
+  │   ├── DoorSVG / WindowSVG
+  │   ├── DimensionLines
+  │   └── FixtureSVG (건축 심볼)
+  ├── FloorPlan3D (props: cameraMode, showCeiling)
+  │   ├── R3F Canvas + Scene
+  │   ├── DoorFrame3D / WindowFrame3D
+  │   ├── Fixture3D (프리미티브)
+  │   └── SSAO + Bloom 후처리
+  └── ViewerToolbar (하단 통합 컨트롤)
+```
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
