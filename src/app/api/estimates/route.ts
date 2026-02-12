@@ -23,11 +23,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ estimate });
   }
 
-  const { data: estimates, error } = await supabase
+  // 필터 파라미터
+  const status = request.nextUrl.searchParams.get("status");
+  const region = request.nextUrl.searchParams.get("region");
+
+  let query = supabase
     .from("estimates")
-    .select("id, title, status, project_type, total_area_m2, total_material, total_labor, total_overhead, grand_total, created_at, updated_at")
+    .select("id, title, status, project_type, space_type, total_area_m2, total_material, total_labor, total_overhead, grand_total, address, region, rfq_data, consumer_project_id, created_at, updated_at")
     .order("created_at", { ascending: false })
     .limit(20);
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+  if (region) {
+    query = query.ilike("region", `%${region}%`);
+  }
+
+  const { data: estimates, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: "견적 목록 조회 실패" }, { status: 500 });

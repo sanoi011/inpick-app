@@ -1,48 +1,84 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
 
-// MVP: 목 알림 생성 (향후 실제 DB 테이블로 교체)
+// GET: 사업자 알림 목록 (실제 DB 조회)
 export async function GET(req: NextRequest) {
+  const supabase = createClient();
   const contractorId = req.nextUrl.searchParams.get("contractorId");
+
   if (!contractorId) {
     return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
   }
 
-  const now = new Date();
-  const notifications = [
-    {
-      id: "n1",
-      contractorId,
-      type: "BID_NEW",
-      title: "새 입찰 공고",
-      message: "강남구 아파트 인테리어 견적이 등록되었습니다",
-      priority: "MEDIUM",
-      isRead: false,
-      link: "/contractor/bids",
-      createdAt: new Date(now.getTime() - 1000 * 60 * 30).toISOString(),
-    },
-    {
-      id: "n2",
-      contractorId,
-      type: "SYSTEM",
-      title: "프로필 완성도",
-      message: "포트폴리오를 추가하면 입찰 선정 확률이 높아집니다",
-      priority: "LOW",
-      isRead: false,
-      link: "/contractor/profile",
-      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 2).toISOString(),
-    },
-    {
-      id: "n3",
-      contractorId,
-      type: "SCHEDULE_CONFLICT",
-      title: "일정 확인",
-      message: "이번 주 예정된 현장 방문이 있습니다",
-      priority: "MEDIUM",
-      isRead: true,
-      link: "/contractor/schedule",
-      createdAt: new Date(now.getTime() - 1000 * 60 * 60 * 5).toISOString(),
-    },
-  ];
+  const { data, error } = await supabase
+    .from("contractor_notifications")
+    .select("*")
+    .eq("contractor_id", contractorId)
+    .order("created_at", { ascending: false })
+    .limit(30);
+
+  if (error) {
+    return NextResponse.json({ error: "알림 조회 실패" }, { status: 500 });
+  }
+
+  // camelCase 변환
+  const notifications = (data || []).map((n) => ({
+    id: n.id,
+    contractorId: n.contractor_id,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    priority: n.priority,
+    isRead: n.is_read,
+    link: n.link,
+    referenceId: n.reference_id,
+    createdAt: n.created_at,
+  }));
 
   return NextResponse.json({ notifications });
+}
+
+// PATCH: 알림 읽음 처리
+export async function PATCH(req: NextRequest) {
+  const supabase = createClient();
+
+  try {
+    const body = await req.json();
+    const { id, ids, markAllRead, contractorId } = body;
+
+    // 전체 읽음 처리
+    if (markAllRead && contractorId) {
+      await supabase
+        .from("contractor_notifications")
+        .update({ is_read: true })
+        .eq("contractor_id", contractorId)
+        .eq("is_read", false);
+
+      return NextResponse.json({ success: true });
+    }
+
+    // 여러 건 읽음 처리
+    if (ids && Array.isArray(ids)) {
+      await supabase
+        .from("contractor_notifications")
+        .update({ is_read: true })
+        .in("id", ids);
+
+      return NextResponse.json({ success: true });
+    }
+
+    // 단일 읽음 처리
+    if (id) {
+      await supabase
+        .from("contractor_notifications")
+        .update({ is_read: true })
+        .eq("id", id);
+
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: "id, ids, 또는 markAllRead가 필요합니다." }, { status: 400 });
+  } catch {
+    return NextResponse.json({ error: "알림 업데이트 실패" }, { status: 500 });
+  }
 }
