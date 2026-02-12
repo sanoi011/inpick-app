@@ -112,16 +112,16 @@ export default function FloorPlanPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-bold text-gray-900">도면 / 3D 매스</h2>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">도면 / 3D 매스</h2>
           {floorPlan && (
-            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+            <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> 도면 로드 완료
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {floorPlan && (
             <>
               {/* 2D/3D 토글 */}
@@ -263,15 +263,15 @@ export default function FloorPlanPage() {
 
       {/* 하단 정보 바 */}
       {floorPlan && (
-        <div className="px-4 py-2 bg-white border-t border-gray-200 flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs text-gray-500">
+        <div className="px-4 py-2 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1">
+          <div className="flex items-center gap-3 text-xs text-gray-500 flex-wrap">
             <span>전용면적: <strong className="text-gray-900">{floorPlan.totalArea}m²</strong></span>
             <span>방: <strong className="text-gray-900">{floorPlan.rooms.length}개</strong></span>
-            <span>
+            <span className="hidden sm:inline">
               {floorPlan.rooms.map((r) => r.name).join(", ")}
             </span>
           </div>
-          <div className="text-xs text-gray-400">
+          <div className="text-xs text-gray-400 truncate max-w-full">
             {project?.address?.roadAddress || "주소 미설정"}
           </div>
         </div>

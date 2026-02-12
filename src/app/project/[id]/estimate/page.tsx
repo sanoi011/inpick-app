@@ -281,6 +281,7 @@ export default function EstimatePage() {
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
 
   // 도면 로드
   useEffect(() => {
@@ -388,31 +389,31 @@ export default function EstimatePage() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)] bg-gray-50">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
             onClick={() => router.push(`/project/${projectId}/rendering`)}
-            className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+            className="hidden sm:flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
           >
             <ArrowLeft className="w-3.5 h-3.5" /> 3D 렌더링
           </button>
-          <div className="w-px h-4 bg-gray-300" />
-          <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+          <div className="hidden sm:block w-px h-4 bg-gray-300" />
+          <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5 whitespace-nowrap">
             <Calculator className="w-4 h-4 text-amber-600" />
-            물량산출 / 견적
+            물량산출
           </h2>
           {hasMaterials && (
-            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+            <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> 확정 자재 기반
             </span>
           )}
           {!hasMaterials && floorPlan && (
-            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full">
-              기본 단가 적용 (자재 미선택)
+            <span className="hidden sm:inline px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full">
+              기본 단가 적용
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <button className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
             <Download className="w-3.5 h-3.5" /> 내보내기
           </button>
@@ -434,10 +435,25 @@ export default function EstimatePage() {
         </div>
       </div>
 
+      {/* 모바일 요약 토글 */}
+      {sections.length > 0 && (
+        <button
+          onClick={() => setShowMobileSummary(!showMobileSummary)}
+          className="md:hidden flex items-center justify-between w-full px-4 py-2 bg-white border-b border-gray-200 text-sm"
+        >
+          <span className="font-medium text-gray-900">
+            공사비 합계: {grandTotal.toLocaleString("ko-KR")}원
+          </span>
+          <span className="text-xs text-blue-600">{showMobileSummary ? "접기" : "상세 보기"}</span>
+        </button>
+      )}
+
       {/* 메인 콘텐츠 */}
-      <div className="flex-1 flex min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
         {/* 좌측: 요약 패널 */}
-        <div className="w-72 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto">
+        <div className={`w-full md:w-72 flex-shrink-0 bg-white border-r border-gray-200 overflow-y-auto ${
+          showMobileSummary ? "block" : "hidden md:block"
+        }`}>
           {/* 총 비용 */}
           <div className="p-4 border-b border-gray-200">
             <p className="text-xs text-gray-500 mb-1">공사비 합계 (VAT 별도)</p>

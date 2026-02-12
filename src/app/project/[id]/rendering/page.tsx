@@ -128,6 +128,7 @@ export default function RenderingPage() {
   const [renderingRoomId, setRenderingRoomId] = useState<string | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
+  const [showMaterialPanel, setShowMaterialPanel] = useState(false);
   const [loading, setLoading] = useState(true);
 
   // 데이터 로드
@@ -300,16 +301,16 @@ export default function RenderingPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-bold text-gray-900">3D 렌더링 + 자재 수정</h2>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">3D 렌더링</h2>
           {allConfirmed && (
-            <span className="px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full flex items-center gap-1">
+            <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> 모든 공간 확인 완료
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {/* 크레딧 */}
           <span className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 text-xs rounded-full border border-amber-200">
             <Coins className="w-3 h-3" />
@@ -452,8 +453,38 @@ export default function RenderingPage() {
           </div>
         </div>
 
+        {/* 모바일 자재 패널 버튼 */}
+        {selectedRoom && (
+          <button
+            onClick={() => setShowMaterialPanel(true)}
+            className="md:hidden fixed bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white text-sm font-medium rounded-full shadow-lg hover:bg-indigo-700 transition-colors"
+          >
+            <Palette className="w-4 h-4" />
+            자재 선택
+          </button>
+        )}
+
+        {/* 모바일 자재 오버레이 배경 */}
+        {showMaterialPanel && (
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setShowMaterialPanel(false)}
+          />
+        )}
+
         {/* 우측: 자재 수정 패널 */}
-        <div className="w-[340px] min-w-[300px] flex-shrink-0 border-l border-gray-200 flex flex-col bg-white overflow-hidden">
+        <div className={`
+          fixed inset-0 z-50 md:static md:z-auto
+          w-full md:w-[340px] md:min-w-[300px] flex-shrink-0 border-l border-gray-200 flex-col bg-white overflow-hidden
+          ${showMaterialPanel ? "flex" : "hidden md:flex"}
+        `}>
+          {/* 모바일 닫기 헤더 */}
+          <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-gray-200">
+            <span className="text-sm font-bold text-gray-900">자재 선택</span>
+            <button onClick={() => setShowMaterialPanel(false)}>
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
           {selectedRoom ? (
             <>
               {/* 방 정보 헤더 */}

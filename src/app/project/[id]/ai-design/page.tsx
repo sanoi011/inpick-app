@@ -37,6 +37,7 @@ export default function AIDesignPage() {
   const [selectedRoom, setSelectedRoom] = useState<RoomData | null>(null);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [showChargeModal, setShowChargeModal] = useState(false);
+  const [mobileView, setMobileView] = useState<"chat" | "canvas">("chat");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // 데이터 로드
@@ -165,16 +166,16 @@ export default function AIDesignPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-bold text-gray-900">AI 디자인 상담</h2>
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">AI 디자인</h2>
           {selectedRoom && (
-            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
+            <span className="hidden sm:inline px-2 py-0.5 bg-blue-50 text-blue-700 text-xs font-medium rounded-full">
               {ROOM_TYPE_LABELS[selectedRoom.type]} 선택됨
             </span>
           )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           {/* 크레딧 표시 */}
           <button
             onClick={() => setShowChargeModal(true)}
@@ -198,10 +199,32 @@ export default function AIDesignPage() {
         </div>
       </div>
 
+      {/* 모바일 탭 전환 */}
+      <div className="flex md:hidden border-b border-gray-200 bg-white">
+        <button
+          onClick={() => setMobileView("chat")}
+          className={`flex-1 py-2 text-xs font-medium text-center transition-colors ${
+            mobileView === "chat" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
+          }`}
+        >
+          AI 채팅
+        </button>
+        <button
+          onClick={() => setMobileView("canvas")}
+          className={`flex-1 py-2 text-xs font-medium text-center transition-colors ${
+            mobileView === "canvas" ? "text-blue-600 border-b-2 border-blue-600" : "text-gray-500"
+          }`}
+        >
+          디자인 갤러리 {generatedImages.length > 0 && `(${generatedImages.length})`}
+        </button>
+      </div>
+
       {/* 메인: 좌 채팅 | 우 캔버스 */}
       <div className="flex-1 flex min-h-0">
         {/* 좌측: AI 채팅 */}
-        <div className="w-[380px] min-w-[320px] flex-shrink-0 border-r border-gray-200 flex flex-col bg-white">
+        <div className={`w-full md:w-[380px] md:min-w-[320px] flex-shrink-0 border-r border-gray-200 flex-col bg-white ${
+          mobileView === "chat" ? "flex" : "hidden md:flex"
+        }`}>
           {/* 채팅 메시지 */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {messages.length === 0 && (
@@ -297,7 +320,9 @@ export default function AIDesignPage() {
         </div>
 
         {/* 우측: 캔버스 */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+        <div className={`flex-1 flex-col min-w-0 bg-gray-50 ${
+          mobileView === "canvas" ? "flex" : "hidden md:flex"
+        }`}>
           {/* 평면도 (공간 클릭 가능) */}
           {floorPlan && (
             <div className="border-b border-gray-200 bg-white">
