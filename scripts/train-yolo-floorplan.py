@@ -37,23 +37,23 @@ def check_prerequisites():
     # 데이터셋 존재 확인
     yaml_path = DATASET_DIR / "dataset.yaml"
     if not yaml_path.exists():
-        print("❌ dataset.yaml not found!")
+        print("[ERROR] dataset.yaml not found!")
         print("   Run: npx tsx scripts/generate-synthetic-training.ts")
         sys.exit(1)
 
     train_imgs = list((DATASET_DIR / "images" / "train").glob("*.png"))
     val_imgs = list((DATASET_DIR / "images" / "val").glob("*.png"))
-    print(f"📊 Dataset: {len(train_imgs)} train, {len(val_imgs)} val images")
+    print(f"[INFO] Dataset: {len(train_imgs)} train, {len(val_imgs)} val images")
 
     if len(train_imgs) < 10:
-        print("⚠️  Very few training images. Results may be poor.")
+        print("[WARN] Very few training images. Results may be poor.")
 
     # ultralytics 설치 확인
     try:
         import ultralytics
-        print(f"✅ ultralytics v{ultralytics.__version__}")
+        print(f"[OK] ultralytics v{ultralytics.__version__}")
     except ImportError:
-        print("❌ ultralytics not installed!")
+        print("[ERROR] ultralytics not installed!")
         print("   Run: pip install ultralytics")
         sys.exit(1)
 
@@ -64,7 +64,7 @@ def train_model(yaml_path: Path):
     """YOLOv8n 모델 학습"""
     from ultralytics import YOLO
 
-    print("\n🏋️ Training YOLOv8n model...")
+    print("\n[TRAIN] Training YOLOv8n model...")
     print(f"   Dataset: {yaml_path}")
     print(f"   Classes: {len(CLASSES)}")
 
@@ -95,7 +95,7 @@ def train_model(yaml_path: Path):
         mixup=0.1,
     )
 
-    print(f"\n✅ Training complete!")
+    print(f"\n[OK] Training complete!")
     print(f"   Best model: {results.save_dir / 'weights' / 'best.pt'}")
     return results
 
@@ -106,10 +106,10 @@ def export_onnx(results):
 
     best_pt = Path(results.save_dir) / "weights" / "best.pt"
     if not best_pt.exists():
-        print("❌ best.pt not found!")
+        print("[ERROR] best.pt not found!")
         return None
 
-    print("\n📦 Exporting to ONNX...")
+    print("\n[EXPORT] Exporting to ONNX...")
     model = YOLO(str(best_pt))
 
     # ONNX 내보내기 (opset 12, dynamic batch)
@@ -127,10 +127,10 @@ def export_onnx(results):
         dest = MODEL_OUTPUT / "floorplan-yolo.onnx"
         shutil.copy2(onnx_path, dest)
         size_mb = os.path.getsize(dest) / (1024 * 1024)
-        print(f"✅ ONNX exported: {dest} ({size_mb:.1f} MB)")
+        print(f"[OK] ONNX exported: {dest} ({size_mb:.1f} MB)")
         return dest
     else:
-        print("❌ ONNX export failed!")
+        print("[ERROR] ONNX export failed!")
         return None
 
 
@@ -141,7 +141,7 @@ def validate_model(results):
     best_pt = Path(results.save_dir) / "weights" / "best.pt"
     model = YOLO(str(best_pt))
 
-    print("\n📊 Validation results:")
+    print("\n[VAL] Validation results:")
     metrics = model.val(data=str(DATASET_DIR / "dataset.yaml"))
 
     print(f"   mAP50: {metrics.box.map50:.3f}")
@@ -167,10 +167,10 @@ def main():
 
     print("\n" + "=" * 50)
     if onnx_path:
-        print(f"✅ Model ready at: {onnx_path}")
+        print(f"[OK] Model ready at: {onnx_path}")
         print("   Next: Use in browser with ONNX Runtime Web")
     else:
-        print("⚠️  Training complete but ONNX export failed.")
+        print("[WARN] Training complete but ONNX export failed.")
     print("=" * 50)
 
 

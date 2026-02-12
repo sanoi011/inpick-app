@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2, AlertTriangle } from "lucide-react";
+import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2, AlertTriangle, Zap } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
@@ -70,7 +70,11 @@ export default function FloorPlanPage() {
   const [parseTimeMs, setParseTimeMs] = useState<number>(0);
   const [pendingFloorPlan, setPendingFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [showParseResult, setShowParseResult] = useState(false);
+  const [yoloAvailable, setYoloAvailable] = useState(false);
+  const [yoloEnhancing, setYoloEnhancing] = useState(false);
+  const [yoloStats, setYoloStats] = useState<{ added: number; corrected: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadedImageRef = useRef<HTMLImageElement | null>(null);
 
   // 뷰어 제어 상태
   const [cameraMode, setCameraMode] = useState<CameraMode>("free");
@@ -78,6 +82,14 @@ export default function FloorPlanPage() {
   const [showDimensions, setShowDimensions] = useState(true);
   const [showEngInfo, setShowEngInfo] = useState(true);
   const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
+
+  // YOLO 모델 로드 시도 (백그라운드, 동적 import)
+  useEffect(() => {
+    import("@/lib/services/yolo-floorplan-detector")
+      .then((mod) => mod.loadModel())
+      .then((ok) => setYoloAvailable(ok))
+      .catch(() => setYoloAvailable(false));
+  }, []);
 
   // 탭1에서 매칭된 도면 자동 로드
   useEffect(() => {
@@ -96,13 +108,21 @@ export default function FloorPlanPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 이미지 파일이면 미리보기
+    // 이미지 파일이면 미리보기 + YOLO용 이미지 준비
     if (file.type.startsWith("image/")) {
       const reader = new FileReader();
-      reader.onload = (ev) => setUploadedFile(ev.target?.result as string);
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setUploadedFile(dataUrl);
+        // YOLO 추론용 이미지 엘리먼트 생성
+        const img = new Image();
+        img.onload = () => { uploadedImageRef.current = img; };
+        img.src = dataUrl;
+      };
       reader.readAsDataURL(file);
     } else {
       setUploadedFile(null);
+      uploadedImageRef.current = null;
     }
 
     setAnalyzing(true);
@@ -138,14 +158,49 @@ export default function FloorPlanPage() {
     toast({ type: "info", title: "카메라 스캐닝", message: "향후 업데이트 예정입니다. 도면 파일을 업로드해주세요." });
   }, []);
 
+  // YOLO 보강 실행 (동적 import로 서버사이드 빌드 에러 방지)
+  const runYoloEnhancement = useCallback(async (plan: ParsedFloorPlan) => {
+    if (!uploadedImageRef.current) return plan;
+
+    setYoloEnhancing(true);
+    try {
+      const yolo = await import("@/lib/services/yolo-floorplan-detector");
+      if (!yolo.isModelLoaded()) { setYoloEnhancing(false); return plan; }
+
+      const img = uploadedImageRef.current;
+      const detections = await yolo.detect(img);
+      if (detections.length === 0) { setYoloEnhancing(false); return plan; }
+
+      const { fuseDetections } = await import("@/lib/services/detection-fusion");
+      const pixelsPerMeter = img.naturalWidth / Math.sqrt(plan.totalArea || 59);
+      const { floorPlan: fused, addedByYolo, correctedByYolo } = fuseDetections(
+        plan, detections, img.naturalWidth, img.naturalHeight, pixelsPerMeter, 0, 0
+      );
+
+      setYoloStats({ added: addedByYolo, corrected: correctedByYolo });
+      if (addedByYolo > 0 || correctedByYolo > 0) {
+        toast({ type: "success", title: "YOLO 보강 완료", message: `${addedByYolo}개 추가, ${correctedByYolo}개 보정` });
+      }
+      setYoloEnhancing(false);
+      return fused;
+    } catch (err) {
+      console.warn("[yolo-enhance] Failed:", err);
+      setYoloEnhancing(false);
+      return plan;
+    }
+  }, []);
+
   // 인식 결과 수용
-  const handleAcceptResult = useCallback(() => {
+  const handleAcceptResult = useCallback(async () => {
     if (pendingFloorPlan) {
-      setFloorPlan(pendingFloorPlan);
+      const enhanced = yoloAvailable
+        ? await runYoloEnhancement(pendingFloorPlan)
+        : pendingFloorPlan;
+      setFloorPlan(enhanced);
       setShowParseResult(false);
       setPendingFloorPlan(null);
     }
-  }, [pendingFloorPlan]);
+  }, [pendingFloorPlan, yoloAvailable, runYoloEnhancement]);
 
   // 다시 분석
   const handleRetry = useCallback(() => {
@@ -383,6 +438,16 @@ export default function FloorPlanPage() {
                   : "bg-red-100 text-red-700"
               }`}>
                 신뢰도 {Math.round(parseConfidence * 100)}%
+              </span>
+            )}
+            {yoloEnhancing && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 flex items-center gap-1">
+                <Loader2 className="w-3 h-3 animate-spin" /> YOLO 보강중
+              </span>
+            )}
+            {yoloStats && (yoloStats.added > 0 || yoloStats.corrected > 0) && (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-purple-100 text-purple-700 flex items-center gap-1">
+                <Zap className="w-3 h-3" /> YOLO +{yoloStats.added} / ~{yoloStats.corrected}
               </span>
             )}
           </div>
