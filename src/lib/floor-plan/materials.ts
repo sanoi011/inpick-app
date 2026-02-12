@@ -67,6 +67,24 @@ export const CERAMIC: PBRMaterialDef = {
   envMapIntensity: 1.0,
 };
 
+// 다크 벽체 (외벽 — 엔지니어링 스타일)
+export const WALL_DARK: PBRMaterialDef = {
+  name: "wall_dark",
+  color: "#2D2D3D",
+  roughness: 0.85,
+  metalness: 0.02,
+  envMapIntensity: 0.4,
+};
+
+// 다크 벽체 (내벽 — 약간 밝은 톤)
+export const WALL_DARK_INTERIOR: PBRMaterialDef = {
+  name: "wall_dark_interior",
+  color: "#3D3D4D",
+  roughness: 0.88,
+  metalness: 0.01,
+  envMapIntensity: 0.35,
+};
+
 // 천장 (화이트 페인트)
 export const CEILING: PBRMaterialDef = {
   name: "ceiling",

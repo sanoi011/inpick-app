@@ -1,11 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Upload, Camera, FileImage, Eye, Box, CheckCircle2, Loader2 } from "lucide-react";
+import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
+import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
+import ViewerToolbar from "@/components/viewer/ViewerToolbar";
 import type { ParsedFloorPlan } from "@/types/floorplan";
+import type { CameraMode } from "@/components/project/FloorPlan3D";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import dynamic from "next/dynamic";
 
@@ -49,6 +52,13 @@ export default function FloorPlanPage() {
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+
+  // 뷰어 제어 상태
+  const [cameraMode, setCameraMode] = useState<CameraMode>("free");
+  const [showCeiling, setShowCeiling] = useState(false);
+  const [showDimensions, setShowDimensions] = useState(true);
+  const [showEngInfo, setShowEngInfo] = useState(true);
+  const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
 
   // 탭1에서 매칭된 도면 자동 로드
   useEffect(() => {
@@ -116,40 +126,19 @@ export default function FloorPlanPage() {
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">도면 / 3D 매스</h2>
           {floorPlan && (
-            <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> 도면 로드 완료
+            <span className="hidden sm:flex px-2 py-0.5 bg-slate-700 text-white text-xs font-medium rounded-full items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> INPICK 구조분석
             </span>
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
           {floorPlan && (
-            <>
-              {/* 2D/3D 토글 */}
-              <div className="flex bg-gray-100 rounded-lg p-0.5">
-                <button
-                  onClick={() => setViewMode("2d")}
-                  className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    viewMode === "2d" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
-                  }`}
-                >
-                  <Eye className="w-3.5 h-3.5" /> 2D
-                </button>
-                <button
-                  onClick={() => setViewMode("3d")}
-                  className={`flex items-center gap-1 px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    viewMode === "3d" ? "bg-white text-blue-700 shadow-sm" : "text-gray-500"
-                  }`}
-                >
-                  <Box className="w-3.5 h-3.5" /> 3D
-                </button>
-              </div>
-              <button
-                onClick={handleNext}
-                className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-              >
-                AI 디자인 <ArrowRight className="w-4 h-4" />
-              </button>
-            </>
+            <button
+              onClick={handleNext}
+              className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              AI 디자인 <ArrowRight className="w-4 h-4" />
+            </button>
           )}
         </div>
       </div>
@@ -241,22 +230,43 @@ export default function FloorPlanPage() {
           </div>
         ) : (
           /* 도면/3D 뷰어 */
-          <div className="h-full">
-            {viewMode === "2d" ? (
-              <div className="h-full p-4 bg-gray-50">
-                <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <FloorPlan2D
-                    floorPlan={floorPlan!}
-                    className="h-full"
-                  />
+          <div className="h-full flex flex-col">
+            <div className="flex-1 min-h-0">
+              {viewMode === "2d" ? (
+                <div className="h-full p-4 bg-gray-50">
+                  <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <FloorPlan2D
+                      ref={floorPlan2DRef}
+                      floorPlan={floorPlan!}
+                      className="h-full"
+                      showDimensions={showDimensions}
+                    />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <FloorPlan3D
-                floorPlan={floorPlan!}
-                className="h-full"
-              />
-            )}
+              ) : (
+                <FloorPlan3D
+                  floorPlan={floorPlan!}
+                  className="h-full"
+                  cameraMode={cameraMode}
+                  showCeiling={showCeiling}
+                />
+              )}
+            </div>
+            <ViewerToolbar
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              cameraMode={cameraMode}
+              onCameraModeChange={setCameraMode}
+              showCeiling={showCeiling}
+              onToggleCeiling={() => setShowCeiling((v) => !v)}
+              onZoomIn={() => floorPlan2DRef.current?.zoomIn()}
+              onZoomOut={() => floorPlan2DRef.current?.zoomOut()}
+              onFitToScreen={() => floorPlan2DRef.current?.resetView()}
+              showDimensions={showDimensions}
+              onToggleDimensions={() => setShowDimensions((v) => !v)}
+              showEngInfo={showEngInfo}
+              onToggleEngInfo={() => setShowEngInfo((v) => !v)}
+            />
           </div>
         )}
       </div>
