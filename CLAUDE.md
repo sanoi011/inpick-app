@@ -283,20 +283,62 @@
 - `/project/[id]/bids` - ~400줄 MOCK_BIDS → /rfq 리다이렉트로 교체
 - `api/contracts` GET - consumerId 쿼리 파라미터 지원 (향후 "내 계약" 페이지용)
 
+## 완료된 작업 (2026-02-13) - MD 스펙 적용 + 물량산출 엔진 + AI 파이프라인 + 3D 고도화
+
+### Phase A: 17개 공종 물량산출 엔진
+- `src/types/floor-plan.ts` - BIM 타입 (FloorPlanProject, Room, Wall, Opening, Fixture)
+- `src/lib/floor-plan/quantity/types.ts` - QtyUnit, TradeCode, TRADE_NAMES, QuantityItem, SURCHARGE_RATES
+- `src/lib/floor-plan/quantity/geometry.ts` - calcPolygonArea, calcPolygonPerimeter, calcWallLength
+- `src/lib/floor-plan/quantity/adapter.ts` - `adaptParsedFloorPlan()` (ParsedFloorPlan → FloorPlanProject)
+- `src/lib/floor-plan/quantity/surface-calculator.ts` - 표면적 산출 엔진
+- `src/lib/floor-plan/quantity/trades/01~17` - 17개 공종 모듈 (철거/조적/미장/방수/타일/목공/바닥재/도배/천장/창호/잡철/배관/위생도기/전기/고정설비/걸레받이/정리)
+- `src/lib/floor-plan/quantity/quantity-calculator.ts` - 17개 공종 통합 산출
+- `src/lib/floor-plan/quantity/unit-price-db.ts` - 60+ 항목 단가DB (2025 서울 기준)
+- `src/lib/floor-plan/quantity/estimate-calculator.ts` - 견적 산출 (직접비+간접비6%+이윤5%+부가세10%)
+- `src/app/project/[id]/estimate/page.tsx` - 실제 QTY 엔진 연동 (공간별/공종별 뷰 전환)
+
+### Phase B: AI 데이터 수집 파이프라인
+- `supabase/migrations/20260213000000_ai_data_pipeline.sql` - 5개 테이블 (ai_conversations, floor_plan_parse_logs, quantity_calculations, construction_cases, construction_knowledge)
+- `src/app/api/ai-log/route.ts` - POST 대화 로깅, PATCH 피드백
+- `src/app/api/quantity-log/route.ts` - POST 물량산출 결과 로깅
+- 사업자 AI 비서 (`contractor/ai/page.tsx`) - 대화 자동 로깅 + 피드백 UI
+- 소비자 AI 디자인 (`ai-design/page.tsx`) - 대화 자동 로깅 + 피드백 UI
+- 견적 페이지 - 물량산출 결과 자동 로깅
+
+### Phase C: LH 표준시방 + 설비 도면 PDF 학습
+- `scripts/extract-lh-knowledge.ts` - PDF 텍스트 추출 → construction_knowledge 테이블
+  - 실행: `npx tsx scripts/extract-lh-knowledge.ts`
+  - 5개 PDF (LH 표준시방 4개 + 설비 도면 1개)
+- `design-ai`, `contractor-ai` 라우트 - construction_knowledge 검색 → 시스템 프롬프트 컨텍스트
+
+### Phase D: 3D 렌더링 고도화
+- `src/lib/floor-plan/materials.ts` - PBR 재질 시스템 (벽면/마루/타일/유리/스테인리스/도기/천장)
+- `src/components/project/FloorPlan3D.tsx` - 전면 개선
+  - PBR 재질 적용 (roughness/metalness/envMapIntensity)
+  - Environment 프리셋 조명 (apartment)
+  - SSAO + Bloom 후처리 효과
+  - 벽체 개구부 표현 (문 상부/창문 하부+상부+유리)
+  - 카메라 모드 (자유/아이소/탑뷰)
+  - 천장 토글
+  - 공간 타입별 바닥 재질 자동 매핑
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
-2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+1. **Supabase 마이그레이션 적용** - `20260213000000_ai_data_pipeline.sql` Supabase 대시보드에서 실행
+2. **PDF 학습 실행** - `npx tsx scripts/extract-lh-knowledge.ts` (DB 마이그레이션 적용 후)
+3. **Gemini API 키 발급** - https://aistudio.google.com/apikey 에서 키 생성 → `.env.local`과 Vercel 환경변수에 `GOOGLE_GEMINI_API_KEY` 설정
+4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
 
 ### 개발 작업
 - 건축도면 STR 데이터 연동 (벽체/문/창호 폴리곤)
 - Gemini AI 이미지 생성 실제 테스트
-- 3D 렌더링 엔진 API 연동 (현재 Mock 이미지)
 - 결제 시스템 연동 (크레딧 충전 - 토스페이먼츠 등)
 - 자재 카탈로그 DB화 (현재 MATERIAL_CATALOG 하드코딩)
 - 소비자 "내 계약" 페이지 (GET /api/contracts?consumerId=X 활용)
 - 푸시 알림 / WebSocket 실시간 알림 (현재 30초 폴링)
+- 벡터DB + RAG 파이프라인 (AI-INFRA-ROADMAP Phase 2)
+- Fine-tuning 데이터셋 추출 파이프라인 (AI-INFRA-ROADMAP Phase 3)
 
 ## DB 마이그레이션 현황
 | 파일 | 상태 |
@@ -309,3 +351,4 @@
 | `20260210200000_finance_tables.sql` | Supabase 적용 완료 |
 | `20260211000000_credit_tables.sql` | Supabase 적용 완료 |
 | `20260212000000_consumer_rfq_integration.sql` | Supabase 적용 완료 |
+| `20260213000000_ai_data_pipeline.sql` | **Supabase 적용 필요** |
