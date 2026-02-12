@@ -78,22 +78,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "userId, amount 필수" }, { status: 400 });
     }
 
-    // 잔액 업데이트
+    // 잔액 조회 (없으면 자동 생성)
     const { data: current } = await supabase
       .from("user_credits")
       .select("balance")
       .eq("user_id", userId)
       .single();
 
-    if (!current) {
-      return NextResponse.json({ error: "사용자를 찾을 수 없습니다" }, { status: 404 });
-    }
+    let newBalance: number;
 
-    const newBalance = current.balance + amount;
-    await supabase
-      .from("user_credits")
-      .update({ balance: newBalance })
-      .eq("user_id", userId);
+    if (!current) {
+      // user_credits 레코드가 없으면 새로 생성
+      newBalance = Math.max(0, amount);
+      const { error: insertErr } = await supabase
+        .from("user_credits")
+        .insert({ user_id: userId, balance: newBalance, free_generations_used: 0 });
+      if (insertErr) {
+        return NextResponse.json({ error: `크레딧 레코드 생성 실패: ${insertErr.message}` }, { status: 500 });
+      }
+    } else {
+      newBalance = current.balance + amount;
+      await supabase
+        .from("user_credits")
+        .update({ balance: newBalance })
+        .eq("user_id", userId);
+    }
 
     // 트랜잭션 기록
     await supabase.from("credit_transactions").insert({
