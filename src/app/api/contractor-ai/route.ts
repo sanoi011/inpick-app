@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
 
 function buildSystemPrompt(context?: Record<string, unknown>) {
   let prompt = `당신은 INPICK의 사업자 AI 비서입니다.
@@ -109,35 +110,6 @@ async function collectContext(contractorId: string): Promise<Record<string, unkn
   }
 }
 
-// construction_knowledge에서 관련 지식 검색
-async function searchKnowledge(query: string): Promise<string> {
-  try {
-    const supabase = createClient();
-    const keywords = query.match(/[가-힣]{2,}/g) || [];
-    if (keywords.length === 0) return "";
-
-    const searchTerms = keywords.slice(0, 3);
-    const results: { title: string; content: string; category: string }[] = [];
-
-    for (const term of searchTerms) {
-      const { data } = await supabase
-        .from("construction_knowledge")
-        .select("title, content, category")
-        .ilike("content", `%${term}%`)
-        .limit(2);
-      if (data) results.push(...data);
-    }
-
-    const unique = Array.from(new Map(results.map(r => [r.content, r])).values()).slice(0, 3);
-    if (unique.length === 0) return "";
-
-    return "\n\n[참고 건설 지식베이스]\n" + unique.map(r =>
-      `[${r.category}] ${r.title}\n${r.content.slice(0, 500)}`
-    ).join("\n---\n");
-  } catch {
-    return "";
-  }
-}
 
 export async function POST(request: NextRequest) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -166,7 +138,7 @@ export async function POST(request: NextRequest) {
 
     // 지식베이스 검색
     const lastUserMsg = messages[messages.length - 1]?.content || "";
-    const knowledgeContext = await searchKnowledge(lastUserMsg);
+    const knowledgeContext = await searchKnowledgeSemantic(lastUserMsg);
 
     const systemPrompt = buildSystemPrompt(context) + knowledgeContext;
 
