@@ -11,6 +11,8 @@ import * as fs from "fs";
 import * as path from "path";
 import type { COCOFile, COCOAnnotation } from "./coco-types";
 import { CATEGORY_TO_ROOM_TYPE, SKIP_CATEGORIES, CATEGORY_LABELS } from "./coco-types";
+import { generateSyntheticStructure } from "./synthetic-walls";
+import { processOneSTR } from "./process-str";
 
 // ─── Types matching src/types/floorplan.ts ───
 
@@ -252,8 +254,8 @@ function processOneSPA(filePath: string): { plan: ParsedFloorPlan; catalog: Cata
     });
   }
 
-  // Generate simple walls from room boundaries (exterior hull)
-  const walls = generateWallsFromRooms(rooms);
+  // Generate synthetic walls, doors, windows, fixtures from room polygons
+  const synthetic = generateSyntheticStructure(rooms);
 
   // Compute total area
   const totalArea = Math.round(rooms.reduce((sum, r) => sum + r.area, 0) * 10) / 10;
@@ -266,9 +268,10 @@ function processOneSPA(filePath: string): { plan: ParsedFloorPlan; catalog: Cata
   const plan: ParsedFloorPlan = {
     totalArea,
     rooms,
-    walls,
-    doors: [],
-    windows: [],
+    walls: synthetic.walls,
+    doors: synthetic.doors,
+    windows: synthetic.windows,
+    fixtures: synthetic.fixtures.length > 0 ? synthetic.fixtures : undefined,
   };
 
   const catalog: CatalogEntry = {
@@ -284,82 +287,99 @@ function processOneSPA(filePath: string): { plan: ParsedFloorPlan; catalog: Cata
   return { plan, catalog };
 }
 
-function generateWallsFromRooms(rooms: RoomData[]): WallData[] {
-  const walls: WallData[] = [];
-
-  // Find overall bounding box of all rooms
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const room of rooms) {
-    if (room.polygon) {
-      for (const p of room.polygon) {
-        if (p.x < minX) minX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y > maxY) maxY = p.y;
-      }
-    }
-  }
-
-  const t = 0.15; // wall thickness
-
-  // Exterior walls
-  walls.push(
-    { id: "wall-top", start: { x: minX, y: minY }, end: { x: maxX, y: minY }, thickness: t, isExterior: true },
-    { id: "wall-right", start: { x: maxX, y: minY }, end: { x: maxX, y: maxY }, thickness: t, isExterior: true },
-    { id: "wall-bottom", start: { x: maxX, y: maxY }, end: { x: minX, y: maxY }, thickness: t, isExterior: true },
-    { id: "wall-left", start: { x: minX, y: maxY }, end: { x: minX, y: minY }, thickness: t, isExterior: true },
-  );
-
-  return walls;
-}
-
 // ─── Main execution ───
 
 function main() {
-  const extractDir = path.resolve(__dirname, "../drawings/_extract/SPA");
+  const spaExtractDir = path.resolve(__dirname, "../drawings/_extract/SPA");
+  const strSampleDir = path.resolve(__dirname, "../drawings/_sample/STR");
+  const strExtractDir = path.resolve(__dirname, "../drawings/_extract/STR");
   const outputDir = path.resolve(__dirname, "../public/floorplans");
-
-  if (!fs.existsSync(extractDir)) {
-    console.error("❌ SPA extract directory not found:", extractDir);
-    process.exit(1);
-  }
 
   // Create output directory
   fs.mkdirSync(outputDir, { recursive: true });
 
-  const files = fs.readdirSync(extractDir).filter((f) => f.startsWith("APT_FP_SPA_") && f.endsWith(".json"));
-  console.log(`Found ${files.length} APT_FP SPA files`);
-
   const catalogEntries: CatalogEntry[] = [];
 
-  for (const file of files) {
-    const filePath = path.join(extractDir, file);
-    console.log(`Processing: ${file}`);
+  // ─── Phase A: Process STR files (real structural data) ───
+  for (const strDir of [strExtractDir, strSampleDir]) {
+    if (!fs.existsSync(strDir)) continue;
+    const strFiles = fs.readdirSync(strDir).filter((f) => f.endsWith(".json"));
+    if (strFiles.length === 0) continue;
 
-    try {
-      const result = processOneSPA(filePath);
-      if (!result) {
-        console.log(`  ⚠ Skipped (no valid room annotations)`);
-        continue;
+    console.log(`\n── STR files from ${path.basename(strDir)} (${strFiles.length} files) ──`);
+
+    for (const file of strFiles) {
+      const filePath = path.join(strDir, file);
+      console.log(`Processing STR: ${file}`);
+
+      try {
+        const result = processOneSTR(filePath);
+        if (!result) continue;
+
+        const { plan, id } = result;
+        const outPath = path.join(outputDir, `${id}.json`);
+        fs.writeFileSync(outPath, JSON.stringify(plan, null, 2));
+        console.log(
+          `  ✓ ${id}: ${plan.totalArea}m², ${plan.walls.length} walls, ${plan.doors.length} doors, ${plan.windows.length} windows`
+        );
+
+        catalogEntries.push({
+          id,
+          fileName: path.basename(file, ".json"),
+          buildingType: "APT",
+          totalArea: plan.totalArea,
+          roomCount: plan.rooms.filter((r) =>
+            ["BED", "MASTER_BED", "LIVING"].includes(r.type)
+          ).length,
+          bathroomCount: plan.rooms.filter((r) => r.type === "BATHROOM").length,
+          rooms: plan.rooms.map((r) => ({ type: r.type, name: r.name, area: r.area })),
+        });
+      } catch (err) {
+        console.error(`  ✗ Error: ${err}`);
       }
-
-      const { plan, catalog } = result;
-
-      // Write individual floor plan
-      const outPath = path.join(outputDir, `${catalog.id}.json`);
-      fs.writeFileSync(outPath, JSON.stringify(plan, null, 2));
-      console.log(`  ✓ ${catalog.id}: ${catalog.totalArea}m², ${catalog.roomCount}rooms, ${catalog.bathroomCount}bath, ${plan.rooms.length} spaces`);
-
-      catalogEntries.push(catalog);
-    } catch (err) {
-      console.error(`  ✗ Error: ${err}`);
     }
   }
 
-  // Write catalog
+  // ─── Phase B: Process SPA files (with synthetic structure) ───
+  if (!fs.existsSync(spaExtractDir)) {
+    console.error("❌ SPA extract directory not found:", spaExtractDir);
+  } else {
+    const spaFiles = fs
+      .readdirSync(spaExtractDir)
+      .filter((f) => f.startsWith("APT_FP_SPA_") && f.endsWith(".json"));
+    console.log(`\n── SPA files (${spaFiles.length} files, synthetic structure) ──`);
+
+    for (const file of spaFiles) {
+      const filePath = path.join(spaExtractDir, file);
+      console.log(`Processing SPA: ${file}`);
+
+      try {
+        const result = processOneSPA(filePath);
+        if (!result) {
+          console.log(`  ⚠ Skipped (no valid room annotations)`);
+          continue;
+        }
+
+        const { plan, catalog } = result;
+
+        // Write individual floor plan
+        const outPath = path.join(outputDir, `${catalog.id}.json`);
+        fs.writeFileSync(outPath, JSON.stringify(plan, null, 2));
+        console.log(
+          `  ✓ ${catalog.id}: ${catalog.totalArea}m², ${plan.walls.length} walls, ${plan.doors.length} doors, ${plan.windows.length} windows, ${plan.fixtures?.length || 0} fixtures`
+        );
+
+        catalogEntries.push(catalog);
+      } catch (err) {
+        console.error(`  ✗ Error: ${err}`);
+      }
+    }
+  }
+
+  // ─── Write catalog ───
   const catalogPath = path.join(outputDir, "index.json");
   const catalog = {
-    version: "1.0",
+    version: "2.0",
     generatedAt: new Date().toISOString(),
     count: catalogEntries.length,
     entries: catalogEntries.sort((a, b) => a.totalArea - b.totalArea),
@@ -367,8 +387,16 @@ function main() {
   fs.writeFileSync(catalogPath, JSON.stringify(catalog, null, 2));
 
   console.log(`\n✅ Done! ${catalogEntries.length} floor plans written to ${outputDir}`);
-  console.log("   Catalog: index.json");
-  console.log("   Area range:", Math.min(...catalogEntries.map((e) => e.totalArea)), "~", Math.max(...catalogEntries.map((e) => e.totalArea)), "m²");
+  console.log("   Catalog: index.json (v2.0)");
+  if (catalogEntries.length > 0) {
+    console.log(
+      "   Area range:",
+      Math.min(...catalogEntries.map((e) => e.totalArea)),
+      "~",
+      Math.max(...catalogEntries.map((e) => e.totalArea)),
+      "m²"
+    );
+  }
 }
 
 main();

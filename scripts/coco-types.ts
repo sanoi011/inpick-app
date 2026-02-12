@@ -59,3 +59,33 @@ export const CATEGORY_LABELS: Record<number, string> = {
   20: "드레스룸",
   22: "기타",
 };
+
+// ─── STR (Structure) categories ───
+
+export const STR_CATEGORIES = {
+  DOOR: 9,       // 구조_출입문
+  WINDOW: 10,    // 구조_창호
+  WALL: 11,      // 구조_벽체
+} as const;
+
+export const FIXTURE_CATEGORIES: Record<number, string> = {
+  4: "toilet",        // 객체_변기
+  5: "sink",          // 객체_세면대
+  6: "kitchen_sink",  // 객체_싱크대
+  7: "bathtub",       // 객체_욕조
+  8: "stove",         // 객체_가스레인지
+};
+
+export const DOOR_TYPE_MAP: Record<string, "swing" | "sliding" | "folding"> = {
+  "여닫이문": "swing",
+  "미닫이문": "sliding",
+  "접이문": "folding",
+  "회전문": "swing",
+  "기타문": "swing",
+};
+
+export const WALL_MATERIAL_MAP: Record<string, { isExterior: boolean; thickness: number }> = {
+  "철근콘크리트벽": { isExterior: true, thickness: 0.20 },
+  "기타벽": { isExterior: false, thickness: 0.12 },
+  "RC벽": { isExterior: true, thickness: 0.20 },
+};
