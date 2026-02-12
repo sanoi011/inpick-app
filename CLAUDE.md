@@ -625,6 +625,32 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - **견적 엔진**: QTY 엔진 try-catch 오류 처리 (크래시 방지)
 - **2D 뷰어**: hasPolygons useMemo, 좌표 유효성 가드
 
+### Phase C 고도화: YOLO 디자인 페이지 통합 + 빌드 호환성 (2026-02-16)
+- **onnxruntime-web 빌드 호환성**: next.config.mjs 서버/클라이언트 분기 설정
+  - 서버: `webpack.IgnorePlugin` (onnxruntime-web 무시)
+  - 클라이언트: `resolve.alias` → CJS 빌드(`ort.min.js`) 사용 (ESM `import.meta` 파싱 에러 회피)
+- **design/page.tsx YOLO 통합**:
+  - YOLO 모델 자동 로드 (`useEffect` + 동적 `import()`)
+  - `runYoloEnhancement()` - 감지 → `fuseDetections()` 융합 파이프라인
+  - `handleAcceptResult`에서 yoloAvailable 시 자동 보강
+  - 하단 상태 바에 YOLO 보강 진행/결과 UI
+- **train-yolo-floorplan.py**: Windows cp949 콘솔 호환 (이모지 → ASCII 태그)
+- **YOLO 학습 결과**: YOLOv8n, 78 train/26 val 합성 이미지, CPU 학습, 100 epochs
+  - **mAP50: 0.913**, mAP50-95: 0.739
+  - 클래스별 AP50: door_swing(0.994), window(0.995), toilet(0.974), stove(0.937), door_sliding(0.961), kitchen_sink(0.889), bathtub(0.831), sink(0.727)
+  - ONNX 모델: `public/models/floorplan-yolo.onnx` (11.7 MB)
+
+### YOLO Phase C 컴포넌트 현황
+| 컴포넌트 | 경로 | 상태 |
+|----------|------|------|
+| 합성 데이터 생성 | `scripts/generate-synthetic-training.ts` | ✅ 완료 |
+| YOLO 학습 | `scripts/train-yolo-floorplan.py` | ✅ 학습 완료 대기 |
+| ONNX 브라우저 추론 | `src/lib/services/yolo-floorplan-detector.ts` | ✅ 완료 |
+| Gemini+YOLO 융합 | `src/lib/services/detection-fusion.ts` | ✅ 완료 |
+| 디자인 페이지 통합 | `src/app/project/[id]/design/page.tsx` | ✅ 완료 |
+| webpack 설정 | `next.config.mjs` | ✅ 완료 |
+| ONNX 모델 파일 | `public/models/floorplan-yolo.onnx` | ✅ 완료 (11.7 MB) |
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -640,7 +666,7 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 ### 개발 작업 (도면 인식 고도화)
 - ~~84A.pdf, 84d.pdf 인식 테스트 및 검증~~ ✅ 완료
 - ~~파이프라인 품질 개선 (프롬프트/유효성/뷰어/견적)~~ ✅ 완료
-- Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)
+- ~~Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)~~ ✅ 완료 (mAP50: 0.913)
 - DXF 파서 실행 및 Ground Truth 비교 검증
 - 도면 인식 로그 분석 대시보드 (admin/ai-logs 확장)
 

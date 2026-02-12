@@ -39,3 +39,15 @@ supabase/.temp/
 # large datasets
 /drawings/
 /reference/
+
+# YOLO training artifacts
+/runs/
+/datasets/
+yolov8n.pt
+*.json.bak
+
+# test results
+parse_result*.json
+api_parse_result.json
+all_parse_results.json
+parse_test_result.json
