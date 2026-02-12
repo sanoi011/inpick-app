@@ -591,12 +591,32 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
                   2D/3D 뷰어 + 물량산출 엔진
 ```
 
+### 도면 인식 테스트 결과 (59.pdf, 2026-02-16)
+- **모델**: gemini-2.5-flash (thinkingBudget: 0, maxOutputTokens: 16384)
+- **응답시간**: 22초
+- **신뢰도**: 1.0
+- **결과**: 12개 공간, 34벽, 9문, 5창, 8설비
+- **면적**: 59.001m² (정규화 후, 실제 전용면적 59m²)
+- **공간**: 안방(5.6m²), 침실2(5.6m²), 욕실1(3.9m²), 현관(3.1m²), 침실1(4.5m²), 드레스룸(3.6m²), 거실(10.4m²), 주방(5.6m²), 욕실2(4.5m²), 침실1(3.9m²), 발코니1(4.2m²), 발코니2(4.2m²)
+
+### Gemini 도면 인식 핵심 설정
+- **thinkingConfig: { thinkingBudget: 0 }** 필수 (없으면 249초 → 있으면 22초)
+- **maxOutputTokens: 16384** 필수 (8192면 JSON 잘림)
+- **responseMimeType: "application/json"** + **responseSchema** 구조화 출력
+- **모델 폴백**: gemini-2.5-flash → gemini-2.0-flash → gemini-2.0-flash-lite → gemini-2.5-flash-lite
+- 4MB 이하 PNG/JPG는 canvas 재인코딩 건너뛰기 (품질 보존)
+- 면적 정규화: knownArea 기반 스케일 보정 (10% 이상 차이 시 자동 조정)
+
 ### 보유 도면 데이터
-- `drawings/_arch/59.pdf` (59㎡형 단위세대 평면도)
+- `drawings/_arch/59.pdf` + `59.png` (59㎡형 단위세대 평면도) ✅ 인식 테스트 완료
 - `drawings/_arch/84A.pdf` (84㎡A형 단위세대 평면도)
 - `drawings/_arch/84d.pdf` (84㎡B형 단위세대 평면도)
 - `drawings/_arch/*.dwg` (3개 DWG 원본)
 - `drawings/_arch/사용승인_대전용산4블럭_건축_0413_날인.pdf` (265페이지 사용승인도서)
+
+### 테스트 스크립트
+- `scripts/test-gemini-parse.mjs` - REST API 직접 호출 테스트 (SDK 우회)
+- `scripts/test-api-parse.mjs` - `/api/project/parse-drawing` 엔드포인트 테스트
 
 ## 다음 작업 (우선순위 순)
 
@@ -605,12 +625,13 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 2. **Supabase 마이그레이션 적용** - `20260215000000_vector_embeddings.sql` (pgvector 확장 필요)
 3. **Supabase 마이그레이션 적용** - `20260216000000_drawing_parse_logs.sql`
 4. **임베딩 스크립트 실행** - 마이그레이션 적용 후 `npx tsx scripts/embed-knowledge.ts`
-5. **Gemini API 키 발급** - https://aistudio.google.com/apikey → `.env.local` + Vercel `GOOGLE_GEMINI_API_KEY`
+5. ~~**Gemini API 키 발급**~~ ✅ 완료 (`.env.local` 설정됨, 도면 인식 테스트 성공)
 6. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
 7. **Toss Payments 키 발급** - https://developers.tosspayments.com → `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
 8. **ODA File Converter 설치** (DWG→DXF 변환용) - https://www.opendesign.com/guestfiles/oda_file_converter
 
 ### 개발 작업 (도면 인식 고도화)
+- 84A.pdf, 84d.pdf 인식 테스트 및 검증
 - Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)
 - DXF 파서 실행 및 Ground Truth 비교 검증
 - Gemini 인식 정확도 개선 (프롬프트 튜닝, 치수선 보정 강화)
