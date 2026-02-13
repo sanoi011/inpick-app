@@ -962,6 +962,26 @@ vectorHints 활용:
   - pageSize: PDF 페이지 크기 → 좌표 정규화
 ```
 
+## 완료된 작업 (2026-02-20) - PDF 견적서 내보내기
+
+### PDF Export 기능
+- `public/fonts/NanumGothic-Regular.ttf` (3.4MB) - 한국어 PDF 렌더링용 폰트
+- `public/fonts/NanumGothic-Bold.ttf` (4.6MB) - 한국어 Bold 폰트
+- `src/lib/pdf/estimate-pdf-generator.ts` (신규, ~280줄) - jsPDF 기반 견적서 PDF 생성기
+  - NanumGothic 한국어 폰트 런타임 로딩 (다운로드 버튼 클릭 시에만 로드)
+  - INPICK 브랜딩 헤더 + 이중선 구분
+  - 프로젝트 정보 박스 (ID, 작성일, 면적, 공간수)
+  - 비용 요약 (파란색 배너, 재료비/노무비/경비 분해)
+  - 엔진 상세 요약 (직접비, 관리비, 이윤, 부가세)
+  - 공간별/공종별 테이블 (구분/품명/규격/단위/수량/재료비/노무비/경비/합계)
+  - 섹션별 소계, 총합계 배너
+  - 산출 기준 설명 + 경고 문구
+  - 모든 페이지 INPICK 푸터 + 페이지 번호
+  - 자동 페이지 넘김 (checkNewPage)
+- `src/app/project/[id]/estimate/page.tsx` (수정) - "PDF 내보내기" 버튼 동작 연결
+  - exporting 상태 + Loader2 스피너
+  - generateEstimatePdf() 호출 → `INPICK_견적서_{projectId}_{date}.pdf` 다운로드
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)

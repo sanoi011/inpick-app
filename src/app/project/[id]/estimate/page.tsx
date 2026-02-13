@@ -27,6 +27,7 @@ import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
 import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
 import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
+import { generateEstimatePdf } from "@/lib/pdf/estimate-pdf-generator";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>,
@@ -167,6 +168,7 @@ export default function EstimatePage() {
   const [saved, setSaved] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [viewMode, setViewMode] = useState<"room" | "trade">("room");
+  const [exporting, setExporting] = useState(false);
 
   // 도면 로드
   useEffect(() => {
@@ -254,6 +256,30 @@ export default function EstimatePage() {
     }).catch(() => { /* silent */ });
   }, [engineResult, qtyLogged, projectId, floorPlan]);
 
+  // PDF 내보내기
+  const handleExportPdf = useCallback(async () => {
+    if (exporting || sections.length === 0) return;
+    setExporting(true);
+    try {
+      await generateEstimatePdf({
+        sections,
+        grandTotal,
+        totalMaterial,
+        totalLabor,
+        totalOverhead,
+        engineSummary: engineResult?.summary ?? null,
+        projectId,
+        floorPlanArea: floorPlan?.totalArea,
+        roomCount: floorPlan?.rooms?.length,
+      });
+    } catch (err) {
+      console.error("[estimate] PDF export error:", err);
+      alert("PDF 내보내기 중 오류가 발생했습니다.");
+    } finally {
+      setExporting(false);
+    }
+  }, [exporting, sections, grandTotal, totalMaterial, totalLabor, totalOverhead, engineResult, projectId, floorPlan]);
+
   const filteredSections = activeRoom
     ? sections.filter((s) => s.roomName === activeRoom)
     : sections;
@@ -329,8 +355,16 @@ export default function EstimatePage() {
           )}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200">
-            <Download className="w-3.5 h-3.5" /> 내보내기
+          <button
+            onClick={handleExportPdf}
+            disabled={exporting || sections.length === 0}
+            className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 disabled:opacity-50"
+          >
+            {exporting ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> PDF 생성중...</>
+            ) : (
+              <><Download className="w-3.5 h-3.5" /> PDF 내보내기</>
+            )}
           </button>
           <button
             onClick={handleSaveAndNext}
