@@ -11,6 +11,8 @@ import {
   getMimeType,
 } from "@/lib/services/image-preprocessor";
 import type { ImageSource } from "@/lib/services/image-preprocessor";
+import { extractPdfVectors } from "@/lib/services/pymupdf-extractor";
+import type { VectorHints } from "@/lib/services/pymupdf-extractor";
 
 const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -119,11 +121,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // PDF인 경우 PyMuPDF 벡터 추출 병렬 시도
+    let vectorHintsPromise: Promise<VectorHints | null> = Promise.resolve(null);
+    if (mimeType === "application/pdf") {
+      vectorHintsPromise = extractPdfVectors(fileBuffer, knownArea)
+        .then(r => r?.vectorHints ?? null)
+        .catch(() => null);
+    }
+
     // Gemini Vision 도면 인식
     const result = await extractFloorPlanFromImage(imageBase64, imageMimeType, {
       knownAreaM2: knownArea,
       sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
     });
+
+    // PyMuPDF 벡터 힌트 수집 (Gemini 완료 후)
+    const vectorHints = await vectorHintsPromise;
 
     // 도면 파싱 로그 기록 (fire-and-forget)
     if (supabase) {
@@ -154,6 +167,15 @@ export async function POST(request: NextRequest) {
       method: result.method,
       roomCount: result.floorPlan.rooms.length,
       totalArea: result.floorPlan.totalArea,
+      ...(vectorHints ? {
+        vectorHints: {
+          dimensionTexts: vectorHints.dimensionTexts,
+          wallLineCount: vectorHints.wallLines.length,
+          scale: vectorHints.scale,
+          pageSize: vectorHints.pageSize,
+        },
+        vectorMethod: "pymupdf_hybrid",
+      } : {}),
     });
   } catch (error) {
     console.error("[parse-drawing] Error:", error);
