@@ -1006,6 +1006,31 @@ vectorHints 활용:
   - 행 확장 시 상세 (파싱방법, 신뢰도, 벽문창설비 수, 품질 바 차트)
 - `src/app/admin/layout.tsx` (수정) - 사이드바 "도면 라이브러리" 메뉴 추가
 
+## 완료된 작업 (2026-02-20) - 우리집찾기 주소-동-호수-평형 매칭
+
+### 아파트 시드 데이터 + Building API 개선
+- `src/lib/data/apartment-seed.ts` (신규) - 알려진 아파트 단지 시드 데이터
+  - KnownApartment, KnownUnitType 인터페이스
+  - 대전용산4블럭: 5동, 3타입(59A/84A/84B), matchKeywords 기반 주소 매칭
+  - `findKnownApartment(address, buildingName)` - 키워드 매칭 함수
+- `src/types/address.ts` (수정) - BuildingInfo 타입 확장
+  - `sampleId?: string` - 매칭된 샘플 도면 ID (sample-59 등)
+  - `typeName?: string` - 평형 타입명 (59A, 84A, 84B)
+  - `complexName?: string` - 아파트 단지명
+- `src/app/api/building/route.ts` (전면 개선) - 3단계 매칭 플로우
+  1. `findKnownApartment()` → `generateKnownApartmentBuildings()` (실제 동/호/타입)
+  2. DATA_API_KEY + 건축물대장 API (기존)
+  3. `generateSimulatedBuilding()` (개선: 3동×3타입×6층 = 54유닛)
+- `src/app/project/[id]/home/page.tsx` (수정) - Step 4 UI 개선
+  - `handleSelectBuilding()`: sampleId 직접 매칭 우선 → 면적 기준 폴백
+  - Step 2 건물 카드: typeName 표시 ("84A형 | 아파트 | 4층")
+  - Step 3 확인카드: 타입+면적 표시, **complexName 비노출** (저작권)
+  - 도면 타입 선택: 추천 배지 표시 (sampleId 일치 시)
+
+### 주의사항
+- **저작권 제한**: 확인카드에 "대전용산4블럭" 단지명 표시 금지 (사용자 요청)
+- `complexName` 필드는 내부 매칭용으로만 사용, UI 노출 불가
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
