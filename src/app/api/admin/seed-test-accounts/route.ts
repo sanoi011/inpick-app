@@ -40,7 +40,11 @@ export async function POST(request: NextRequest) {
 
       if (existing) {
         userId = existing.id;
-        await serviceSupabase.auth.admin.updateUserById(userId, { password: consumerPassword });
+        await serviceSupabase.auth.admin.updateUserById(userId, {
+          password: consumerPassword,
+          email_confirm: true,
+          user_metadata: { full_name: "테스트 사용자" },
+        });
       } else {
         const { data: newUser, error: createError } = await serviceSupabase.auth.admin.createUser({
           email: consumerEmail,
