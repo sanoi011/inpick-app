@@ -812,6 +812,32 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   └── "철거 공정 완료 (2/7 완료)" 알림
 ```
 
+## 완료된 작업 (2026-02-18) - 샘플 도면 타입 선택
+
+### 소비자 섹션1 - 샘플 도면 구현
+- `public/floorplans/sample-59.json` (신규) - 59㎡ 타입 도면 (2BR/1BA, 대전용산4블럭 확장형)
+- `public/floorplans/sample-84a.json` (신규) - 84A㎡ 타입 도면 (3BR/2BA, 드레스룸 포함)
+- `public/floorplans/sample-84b.json` (신규) - 84B㎡ 타입 도면 (3BR/2BA, 판상형)
+- `public/floorplans/index.json` (수정) - v3.0, `sampleTypes` 배열 추가 (59/84A/84B)
+- `src/lib/services/drawing-service.ts` (수정) - `SampleFloorPlanType` 인터페이스, `getSampleTypes()` 함수 추가
+- `src/app/project/[id]/home/page.tsx` (수정) - Step 3에서 3가지 도면 타입 선택 카드 UI
+  - 건물 선택 시 면적 기준 자동 추천 (70㎡ 이하 → 59형, 초과 → 84A형)
+  - 사용자가 3개 타입 중 직접 선택 가능
+  - 선택한 도면 2D 미리보기 즉시 표시
+  - "실시공 건축도면 기반" 뱃지
+
+### 샘플 도면 타입
+| 타입 | 면적 | 방/욕실 | 특징 |
+|------|------|---------|------|
+| 59㎡ | 59m² (18평) | 2BR/1BA | 소형, 거실+주방 개방형 |
+| 84A㎡ | 84m² (25평) | 3BR/2BA | 중형 A타입, 드레스룸 |
+| 84B㎡ | 84m² (25평) | 3BR/2BA | 중형 B타입, 판상형 넓은 거실 |
+
+### 도면 데이터 소스
+- `drawings/_arch/59.pdf` + `59.png` - 대전용산4블럭 59㎡형 확장형
+- `drawings/_arch/84A.pdf` + `84A.png` - 대전용산4블럭 84㎡A-1,2형 확장형
+- `drawings/_arch/84d.pdf` + `84d.png` - 대전용산4블럭 84㎡B형 확장형
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
