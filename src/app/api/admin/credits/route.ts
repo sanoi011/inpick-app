@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
+// 관리자 API는 RLS 바이패스를 위해 service role key 우선 사용
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && serviceKey) return createServiceClient(url, serviceKey);
+  return createClient();
+}
+
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = getSupabase();
   const { searchParams } = request.nextUrl;
   const view = searchParams.get("view") || "users";
   const page = parseInt(searchParams.get("page") || "1");
@@ -69,7 +78,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   try {
     const { userId, amount, type, description } = await request.json();
