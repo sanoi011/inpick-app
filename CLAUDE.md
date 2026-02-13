@@ -982,6 +982,30 @@ vectorHints 활용:
   - exporting 상태 + Loader2 스피너
   - generateEstimatePdf() 호출 → `INPICK_견적서_{projectId}_{date}.pdf` 다운로드
 
+### Track A: 도면확보시스템 인프라
+- `supabase/migrations/20260220000000_floor_plan_collection.sql` (신규) - 4개 테이블
+  - `apartments` - 아파트 단지 정보 (단지명, 주소, 지역, 세대수, 준공년도, 시행/시공사)
+  - `floor_plan_types` - 평면도 타입 (59A, 84A 등, 면적, 방수, 확장형 여부)
+  - `floor_plan_library` - 수집된 도면 라이브러리 (원본파일, 파싱결과, 품질점수, 핑거프린트, 중복검사)
+  - `collection_jobs` - 수집 작업 이력 (batch_parse, crawl, api_fetch 등)
+- `src/types/floor-plan-collection.ts` (신규) - 타입 정의 + DB↔타입 변환 함수
+- `src/lib/services/floor-plan-quality.ts` (신규) - 도면 품질 평가 서비스
+  - wallClosure (25%): 벽체 폐합률 (끝점 연결 검사)
+  - areaAccuracy (25%): 면적 정확도 (합계/분포 검증)
+  - roomDetection (30%): 방 감지 (타입 다양성, 필수 공간 포함)
+  - fixtureDetection (20%): 설비 감지 (욕실 양변기, 주방 싱크)
+- `src/lib/services/floor-plan-fingerprint.ts` (신규) - 구조 핑거프린트 + 중복 검사
+  - 면적/방수/타입분포/벽문창수 기반 핑거프린트 해시
+  - Jaccard 유사도 + 면적 분포 비교로 구조적 유사도 (0~1)
+  - 임계값 0.85 이상 = 중복 후보
+- `src/app/api/admin/apartments/route.ts` (신규) - GET 목록 + POST 등록 (upsert)
+- `src/app/api/admin/floor-plan-library/route.ts` (신규) - GET 목록(필터/페이지네이션) + POST 등록(자동 중복검사)
+- `src/app/admin/floor-plans/page.tsx` (신규) - 관리자 도면 라이브러리 페이지
+  - 4개 통계 카드 (총 도면/검증 완료/중복/평균 품질)
+  - 필터 (전체/검증됨/미검증), 파일명 검색
+  - 행 확장 시 상세 (파싱방법, 신뢰도, 벽문창설비 수, 품질 바 차트)
+- `src/app/admin/layout.tsx` (수정) - 사이드바 "도면 라이브러리" 메뉴 추가
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
