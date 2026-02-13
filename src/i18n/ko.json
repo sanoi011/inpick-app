@@ -1,0 +1,78 @@
+{
+  "common": {
+    "home": "홈",
+    "login": "로그인",
+    "signup": "회원가입",
+    "logout": "로그아웃",
+    "loading": "로딩중...",
+    "error": "오류가 발생했습니다",
+    "retry": "다시 시도",
+    "save": "저장",
+    "cancel": "취소",
+    "confirm": "확인",
+    "delete": "삭제",
+    "edit": "수정",
+    "search": "검색",
+    "back": "뒤로가기",
+    "next": "다음",
+    "prev": "이전",
+    "close": "닫기",
+    "all": "전체",
+    "won": "원"
+  },
+  "landing": {
+    "heroTitle": "AI가 설계하고,\n전문가가 시공하는\n인테리어 플랫폼",
+    "heroDescription": "도면 업로드부터 3D 렌더링, 물량산출, 전문 시공사 매칭까지.\n인테리어의 모든 과정을 INPICK 하나로.",
+    "ctaStart": "무료 견적 받기",
+    "ctaDemo": "데모 체험하기",
+    "features": "서비스 소개",
+    "pricing": "이용 요금",
+    "testimonials": "이용 후기",
+    "faq": "자주 묻는 질문",
+    "contractorSignup": "사업자 등록"
+  },
+  "auth": {
+    "consumer": "일반 고객",
+    "consumerDesc": "인테리어 견적 받기",
+    "contractor": "사업자",
+    "contractorDesc": "입찰 및 프로젝트 관리",
+    "email": "이메일",
+    "password": "비밀번호",
+    "name": "이름",
+    "loginTitle": "로그인하여 서비스를 이용하세요",
+    "googleLogin": "Google로 계속하기",
+    "kakaoLogin": "카카오 로그인 (준비중)",
+    "orEmail": "또는 이메일로",
+    "invalidEmail": "올바른 이메일 형식을 입력해주세요.",
+    "wrongCredentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
+    "contractorLogin": "사업자 로그인",
+    "contractorRegister": "사업자 등록",
+    "noAccount": "아직 등록하지 않으셨나요?"
+  },
+  "project": {
+    "myProjects": "내 프로젝트",
+    "newProject": "새 프로젝트",
+    "home": "우리집 찾기",
+    "design": "도면/3D",
+    "aiDesign": "AI 디자인",
+    "rendering": "3D 렌더링",
+    "estimate": "물량산출",
+    "rfq": "견적요청",
+    "noProjects": "프로젝트가 없습니다",
+    "startProject": "프로젝트 시작하기"
+  },
+  "contract": {
+    "myContracts": "내 계약",
+    "total": "전체",
+    "pendingSign": "서명 대기",
+    "inProgress": "시공중",
+    "completed": "완공",
+    "noContracts": "아직 계약이 없습니다"
+  },
+  "notification": {
+    "title": "알림",
+    "noNotifications": "새 알림이 없습니다",
+    "markAllRead": "모두 읽음",
+    "viewAll": "전체 보기"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "common": {
+    "home": "Home",
+    "login": "Login",
+    "signup": "Sign Up",
+    "logout": "Logout",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "back": "Back",
+    "next": "Next",
+    "prev": "Previous",
+    "close": "Close",
+    "all": "All",
+    "won": "KRW"
+  },
+  "landing": {
+    "heroTitle": "AI-Powered Design,\nExpert Construction,\nOne Platform",
+    "heroDescription": "From floor plan upload to 3D rendering, quantity surveying, and contractor matching.\nAll interior processes in one place with INPICK.",
+    "ctaStart": "Get Free Estimate",
+    "ctaDemo": "Try Demo",
+    "features": "Features",
+    "pricing": "Pricing",
+    "testimonials": "Reviews",
+    "faq": "FAQ",
+    "contractorSignup": "Contractor Signup"
+  },
+  "auth": {
+    "consumer": "Customer",
+    "consumerDesc": "Get interior estimates",
+    "contractor": "Contractor",
+    "contractorDesc": "Bid & project management",
+    "email": "Email",
+    "password": "Password",
+    "name": "Name",
+    "loginTitle": "Login to access the service",
+    "googleLogin": "Continue with Google",
+    "kakaoLogin": "Kakao Login (Coming Soon)",
+    "orEmail": "or with email",
+    "invalidEmail": "Please enter a valid email address.",
+    "wrongCredentials": "Invalid email or password.",
+    "contractorLogin": "Contractor Login",
+    "contractorRegister": "Contractor Register",
+    "noAccount": "Don't have an account yet?"
+  },
+  "project": {
+    "myProjects": "My Projects",
+    "newProject": "New Project",
+    "home": "Find Home",
+    "design": "Floor Plan/3D",
+    "aiDesign": "AI Design",
+    "rendering": "3D Rendering",
+    "estimate": "Quantity Survey",
+    "rfq": "Request Quote",
+    "noProjects": "No projects yet",
+    "startProject": "Start a Project"
+  },
+  "contract": {
+    "myContracts": "My Contracts",
+    "total": "All",
+    "pendingSign": "Pending Signature",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "noContracts": "No contracts yet"
+  },
+  "notification": {
+    "title": "Notifications",
+    "noNotifications": "No new notifications",
+    "markAllRead": "Mark all read",
+    "viewAll": "View All"
+  }
+}

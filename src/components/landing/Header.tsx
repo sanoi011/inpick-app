@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Menu, X, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/ui/NotificationBell";
+import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher";
 
 interface HeaderProps {
   brandName?: string;
@@ -87,6 +88,7 @@ export default function Header({
         </div>
 
         <div className="hidden md:flex items-center gap-2">
+          <LocaleSwitcher />
           {!authLoading && !user && (
             <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
               style={{ color: colors.textMuted }}
@@ -151,9 +153,12 @@ export default function Header({
               className="fixed inset-y-0 right-0 z-[99999] w-full max-w-sm overflow-y-auto bg-white px-6 py-6">
               <div className="flex items-center justify-between">
                 <span className="text-xl font-bold text-blue-600">INPICK</span>
-                <button type="button" className="rounded-full p-2" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기">
-                  <X className="h-5 w-5" style={{ color: colors.text }} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <LocaleSwitcher />
+                  <button type="button" className="rounded-full p-2" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기">
+                    <X className="h-5 w-5" style={{ color: colors.text }} />
+                  </button>
+                </div>
               </div>
               <div className="mt-8 flow-root">
                 <div className="border-b pb-6" style={{ borderColor: colors.navBorder }}>
