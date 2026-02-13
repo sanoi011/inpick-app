@@ -829,14 +829,16 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 ### 샘플 도면 타입
 | 타입 | 면적 | 방/욕실 | 특징 |
 |------|------|---------|------|
-| 59㎡ | 59m² (18평) | 2BR/1BA | 소형, 거실+주방 개방형 |
-| 84A㎡ | 84m² (25평) | 3BR/2BA | 중형 A타입, 드레스룸 |
-| 84B㎡ | 84m² (25평) | 3BR/2BA | 중형 B타입, 판상형 넓은 거실 |
+| 59㎡ | 59m² (18평) | 3BR/2BA | 소형 확장형, 드레스룸 포함 |
+| 84A㎡ | 84m² (25평) | 4BR/2BA | 중형 A타입, 드레스룸+다용도실 |
+| 84B㎡ | 84m² (25평) | 3BR/2BA | 중형 B타입, 판상형 넓은 거실(29㎡) |
 
-### 도면 데이터 소스
+### 도면 데이터 소스 + Gemini Vision 파싱
 - `drawings/_arch/59.pdf` + `59.png` - 대전용산4블럭 59㎡형 확장형
 - `drawings/_arch/84A.pdf` + `84A.png` - 대전용산4블럭 84㎡A-1,2형 확장형
 - `drawings/_arch/84d.pdf` + `84d.png` - 대전용산4블럭 84㎡B형 확장형
+- **Gemini Vision 파싱**: `scripts/parse-samples.mjs`로 실제 건축도면 PNG → parse-drawing API → JSON 변환 (신뢰도 1.0)
+- 수동 좌표 작성 → Gemini AI 인식으로 교체 (정확도 대폭 개선)
 
 ## 다음 작업 (우선순위 순)
 
