@@ -145,11 +145,13 @@ export default function ProjectHomePage() {
     try {
       const samples = await getSampleTypes();
       setSampleTypes(samples);
-      // 면적 기준 자동 선택: 70㎡ 이하 → 59, 그 이상 → 84A
+      // sampleId 직접 매칭 → 면적 기준 폴백
       if (samples.length > 0) {
-        const autoId = building.exclusiveArea <= 70
-          ? samples.find(s => s.id === "sample-59")?.id
-          : samples.find(s => s.id === "sample-84a")?.id;
+        const autoId = building.sampleId
+          ? samples.find(s => s.id === building.sampleId)?.id
+          : building.exclusiveArea <= 70
+            ? samples.find(s => s.id === "sample-59")?.id
+            : samples.find(s => s.id === "sample-84a")?.id;
         const pickId = autoId || samples[0].id;
         setSelectedSampleId(pickId);
         const picked = samples.find(s => s.id === pickId)!;
@@ -443,7 +445,7 @@ export default function ProjectHomePage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900">{unit.hoName}</p>
-                            <p className="text-xs text-gray-500">{unit.buildingType} | {unit.floor}층</p>
+                            <p className="text-xs text-gray-500">{unit.typeName ? `${unit.typeName}형 | ` : ""}{unit.buildingType} | {unit.floor}층</p>
                           </div>
                           <div className="text-right flex-shrink-0">
                             <p className="text-sm font-semibold text-gray-900">{unit.exclusiveArea}m²</p>
@@ -470,6 +472,7 @@ export default function ProjectHomePage() {
                 <p className="text-blue-200 text-sm mt-1">
                   {selectedAddress.buildingName && `${selectedAddress.buildingName} `}
                   {selectedBuilding.dongName} {selectedBuilding.hoName}
+                  {selectedBuilding.typeName && ` (${selectedBuilding.typeName}형, ${selectedBuilding.exclusiveArea}m²)`}
                 </p>
               </div>
 
@@ -547,6 +550,9 @@ export default function ProjectHomePage() {
                     >
                       {selectedSampleId === sample.id && (
                         <CheckCircle2 className="absolute top-2 right-2 w-5 h-5 text-blue-600" />
+                      )}
+                      {selectedBuilding?.sampleId === sample.id && selectedSampleId !== sample.id && (
+                        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">추천</span>
                       )}
                       <p className="text-lg font-bold text-gray-900">{sample.label}</p>
                       <p className="text-xs text-gray-500 mt-1">{sample.description}</p>

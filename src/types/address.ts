@@ -23,4 +23,7 @@ export interface BuildingInfo {
   bathroomCount?: number;
   approvalDate?: string;
   floorPlanAvailable: boolean;
+  sampleId?: string;          // 매칭된 샘플 도면 ID (sample-59 등)
+  typeName?: string;          // 평형 타입명 (59A, 84A, 84B)
+  complexName?: string;       // 아파트 단지명
 }
