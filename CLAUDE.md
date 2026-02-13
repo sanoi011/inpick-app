@@ -840,6 +840,70 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - **Gemini Vision 파싱**: `scripts/parse-samples.mjs`로 실제 건축도면 PNG → parse-drawing API → JSON 변환 (신뢰도 1.0)
 - 수동 좌표 작성 → Gemini AI 인식으로 교체 (정확도 대폭 개선)
 
+## 완료된 작업 (2026-02-19) - 3D 스캔/AI 디자인 추천 Phase 1 MVP
+
+### Step A: 도면 렌더링 버그 수정
+- `src/components/viewer/FloorPlan2D.tsx` (수정) - SVG `minHeight: "300px"` 제거 (CSS 충돌 해결)
+- `src/app/project/[id]/home/page.tsx` (수정) - `drawingError` 상태 + 에러 UI 추가, `max-h-[300px]` → `h-[340px]` 고정 높이
+
+### Step B: "도면이 없으신가요?" UI
+- `src/app/project/[id]/home/page.tsx` (수정) - 접이식 3개 스캔 방식 카드 (LiDAR/사진/손도면)
+  - 각 카드 클릭 → `/project/${id}/design?mode=lidar|photo|hand-drawing`
+
+### Step C: 디자인 페이지 모드별 업로드 UI
+- `src/app/project/[id]/design/page.tsx` (수정) - `useSearchParams()`로 mode 분기
+  - `lidar`: 보라색 테마 RoomPlan JSON 업로드 + 단계별 가이드
+  - `photo`: 에메랄드 테마 다중 사진 업로드 (3~20장) + 촬영 가이드
+  - `hand-drawing`: 앰버 테마 단일 사진 업로드 + 손도면 팁
+  - 기본: 기존 도면 파일 업로드
+
+### Step D: Apple RoomPlan JSON 변환기
+- `src/types/roomplan.ts` (신규) - RoomPlanCapturedRoom, RoomPlanWall/Door/Window/Object/Floor, ScannedFurniture 타입
+- `src/lib/services/roomplan-converter.ts` (신규) - `convertRoomPlanToFloorPlan()`
+  - 4x4 transform 행렬 → position/rotation 추출 (column-major)
+  - XZ→XY 평면 변환, 벽 중심선+두께, floors→방 (폴리곤+면적), 설비/가구 분류
+- `src/app/api/project/convert-roomplan/route.ts` (신규) - POST: JSON body → ParsedFloorPlan
+
+### Step E: 다중 사진 공간 분석 API
+- `src/app/api/project/analyze-photos/route.ts` (신규) - POST multipart/form-data
+  - 3~20장 사진 → Gemini 2.0 Flash Vision → 추정 평면도
+  - approximateArea/roomCount 힌트 파라미터
+  - Mock 폴백 (API 키 미설정 시)
+
+### Step F: 손도면 인식 강화
+- `src/lib/services/image-preprocessor.ts` (수정) - `hand_drawing` 소스 타입 추가
+  - 이진화 전처리 (threshold 160, 선 강화)
+- `src/lib/services/gemini-floorplan-parser.ts` (수정) - 손도면 전용 프롬프트 추가
+  - "직선=벽, 기호=문/설비, 손글씨=공간이름" 지침
+- `src/app/api/project/parse-drawing/route.ts` (수정) - sourceType 전달
+
+### Step G: AI 디자인 추천 패널 (Tab 3)
+- `src/app/project/[id]/ai-design/page.tsx` (수정) - 우측 캔버스 상단에 구조화 패널 추가
+  - 5가지 스타일 선택 (모던/북유럽/클래식/미니멀/내추럴)
+  - 3단계 예산 (경제형 1,500만원 / 표준형 3,000만원 / 프리미엄 5,000만원+)
+  - 6개 우선순위 복수 선택 (채광/수납/동선/개방감/방음/청소)
+  - "AI 디자인 추천 받기" → 방별 자재+가구 추천 카드 + 총 견적
+  - "이 디자인으로 물량산출 하기" → Tab 5 연결
+- `src/app/api/project/design-recommend/route.ts` (신규) - Gemini 2.0 Flash 구조화 출력
+  - 방별 자재(바닥/벽/천장) + 가구 추천 + 예상 비용
+  - Mock 폴백 (API 키 미설정 시)
+
+### 3D 스캔/AI 디자인 추천 아키텍처
+```
+도면이 없는 경우 → "도면이 없으신가요?" (3가지 대체 입력)
+  ├── LiDAR 스캔 → JSON 업로드 → convert-roomplan API → ParsedFloorPlan
+  ├── 사진 촬영 → 다중 사진 업로드 → analyze-photos API → 추정 평면도
+  └── 손도면 촬영 → 사진 업로드 → parse-drawing API (hand_drawing 모드)
+                            ↓
+                  ParsedFloorPlan → 2D/3D 뷰어
+                            ↓
+AI 디자인 추천 → POST /api/project/design-recommend
+  ├── 스타일 + 예산 + 우선순위
+  └── Gemini AI → 방별 자재/가구 추천 + 총 견적
+                            ↓
+                  "이 디자인으로 물량산출 하기" → Tab 5 (물량산출)
+```
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
