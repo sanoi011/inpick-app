@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft, Loader2, FileText, CheckCircle2, Pen, Building2, Phone,
-  Mail, Calendar, CreditCard, AlertCircle, Shield, Clock,
+  Mail, Calendar, CreditCard, AlertCircle, Shield, Clock, MessageCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { Contract } from "@/types/contract";
 import { mapDbContract, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS } from "@/types/contract";
+import { ChatWindow } from "@/components/chat/ChatWindow";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -210,6 +211,19 @@ function ContractDetailContent() {
 
   const contractor = (contract as unknown as Record<string, unknown>).specialty_contractors as Record<string, string> | undefined;
 
+  // 채팅 사용자 정보 결정
+  const isContractor = !user; // 사업자는 Supabase Auth 없이 localStorage 인증
+  const chatUserId = isContractor
+    ? (typeof window !== "undefined" ? localStorage.getItem("contractor_id") || "" : "")
+    : (user?.id || "");
+  const chatUserType: "consumer" | "contractor" = isContractor ? "contractor" : "consumer";
+  const chatUserName = isContractor
+    ? (typeof window !== "undefined" ? localStorage.getItem("contractor_name") || "시공사" : "시공사")
+    : (user?.user_metadata?.full_name || user?.email?.split("@")[0] || "고객");
+  const chatOtherName = isContractor
+    ? "고객"
+    : (contractor?.company_name || "시공사");
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 sticky top-0 z-10">
@@ -298,6 +312,24 @@ function ContractDetailContent() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 실시간 채팅 */}
+        {chatUserId && (
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+              <MessageCircle className="w-4 h-4 text-blue-600" />
+              <h3 className="text-sm font-bold text-gray-900">실시간 채팅</h3>
+              <span className="text-xs text-gray-400">· {chatOtherName}</span>
+            </div>
+            <ChatWindow
+              roomId={contract.id}
+              currentUserId={chatUserId}
+              currentUserType={chatUserType}
+              currentUserName={chatUserName}
+              className="border-0 rounded-none"
+            />
           </div>
         )}
 

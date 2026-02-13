@@ -682,6 +682,86 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 |--------|------|------|
 | 도면 로그 | `/admin/drawing-logs` | 신규 완료 |
 
+## 완료된 작업 (2026-02-17) - 사업자 페이지 기능 강화
+
+### Step 1: 대시보드 실제 통계 연동
+- `src/app/api/contractor/stats/route.ts` (신규) - 5개 통계 한번에 반환
+  - 활성 프로젝트 수 (contractor_projects WHERE status IN preparing, in_progress)
+  - 대기 입찰 수 (bids WHERE status=pending)
+  - 미수금 합계 (invoices WHERE status IN sent, overdue SUM total)
+  - 월간 매출 (payment_records WHERE 이번달 income SUM)
+  - 평균 평점 (specialty_contractors.rating)
+- `src/app/contractor/page.tsx` (수정) - stats API 호출 + estimates 폴백
+
+### Step 2: 매칭 알고리즘 실제 구현
+- `src/app/api/matching/route.ts` (수정) - Mock → 실제 DB 기반 점수
+  - 거리: 인접 지역 매핑 (seoul↔gyeonggi 등) 100/70/30
+  - 가격: 입찰 이력 평균 대비 경쟁력 (bids 테이블)
+  - 일정: 활성 프로젝트 수 기반 가용성 감점 (contractor_projects)
+  - 신뢰도: 인증 + 리뷰 수 + 입찰 이력 수 기반
+
+### Step 3: 재무 기능 강화
+- `src/app/api/contractor/finance/expenses/route.ts` (수정) - PATCH 편집 + DELETE 삭제 추가
+- `src/app/api/contractor/finance/invoices/route.ts` (수정) - PATCH 상태 변경 (draft→sent→paid/overdue)
+- `src/app/contractor/finance/page.tsx` (수정)
+  - 지출 인라인 편집/삭제 (연필/휴지통 아이콘)
+  - 청구서 상태 변경 버튼 (발송/수금 완료/연체 처리)
+  - CSV 내보내기 (BOM 포함 한글 Excel 호환)
+  - 최근 6개월 매출/지출 바 차트
+
+### Step 4: 프로필 파일 업로드
+- `src/app/api/contractor/upload/route.ts` (신규) - Supabase Storage 업로드
+  - multipart/form-data, 5MB 제한, jpg/png/webp/pdf
+  - contractors/{id}/{folder}/{timestamp}.ext 경로
+- `src/app/contractor/profile/page.tsx` (수정)
+  - 서류 탭: URL 입력 → 파일 드래그&드롭 업로드
+  - 포트폴리오 탭: 이미지 파일 업로드 + URL 입력 병행
+  - FileDropZone 컴포넌트 (드래그, 진행률, 에러 표시)
+
+### 테스트 계정 + 관리자 크레딧 부여 (이전 세션)
+- `src/app/api/admin/seed-test-accounts/route.ts` (신규) - test@inpick.kr / contractor@inpick.kr 생성
+- `src/app/admin/users/page.tsx` (수정) - "테스트 계정 생성" 버튼 + 사용자별 크레딧 부여
+
+## 완료된 작업 (2026-02-17) - 실시간 채팅 + 안정성 개선
+
+### 실시간 채팅 시스템
+- `supabase/migrations/20260217000000_chat_messages.sql` (신규) - chat_messages + chat_rooms 테이블, RLS, Realtime
+- `src/app/api/chat/route.ts` (신규) - GET 메시지 조회 (페이지네이션), POST 전송, PATCH 읽음처리
+- `src/app/api/chat/rooms/route.ts` (신규) - GET 채팅방 목록 + 미읽음 카운트
+- `src/components/chat/ChatWindow.tsx` (신규) - 실시간 채팅 UI
+  - Supabase Realtime postgres_changes 구독
+  - 옵티미스틱 메시지 삽입 + 실패 시 롤백
+  - 자동 스크롤 + 스크롤 다운 버튼
+  - 날짜 구분선, 시스템 메시지, 읽음 처리
+- `src/app/contract/[id]/page.tsx` (수정) - 계약 상세에 ChatWindow 통합
+  - 소비자/사업자 자동 감지 (useAuth + localStorage)
+  - roomId = contract.id
+
+### E2E 테스트 (Playwright)
+- `e2e/smoke.spec.ts` - 14 테스트 (퍼블릭/사업자/관리자 페이지 로드)
+- `e2e/contractor-auth.spec.ts` - 6 테스트 (로그인, 대시보드, 사이드바 네비게이션)
+- `e2e/consumer-workflow.spec.ts` - 7 테스트 (프로젝트 생성, 6탭, 목록)
+- `e2e/api.spec.ts` - 8 테스트 (API 엔드포인트 스모크)
+
+### 에러 핸들링 강화
+- `src/app/error.tsx` - 글로벌 에러 바운더리
+- `src/app/not-found.tsx` - 커스텀 404 페이지
+- `src/app/api/contractor/upload/route.ts` - 폴더 화이트리스트 (경로 탐색 방지)
+
+### i18n 다국어 지원
+- `src/i18n/ko.json`, `en.json` - 한/영 번역 키
+- `src/hooks/useLocale.ts` - localStorage 기반 로케일 관리 + t() 함수
+- `src/components/ui/LocaleSwitcher.tsx` - KR/EN 토글 버튼
+- Header 데스크톱 + 모바일 메뉴에 LocaleSwitcher 추가
+
+### 모바일 반응형 (사업자 6개 페이지)
+- `contractor/ai`, `matching`, `schedule`, `finance`, `projects`, `bids` - 375px 대응
+
+### 소비자 기능 수정
+- 이메일 포맷 검증, 카카오 버튼 비활성화 (준비중)
+- AI 디자인 크레딧 차감 시점 수정 (성공 후)
+- RFQ 에러 토스트, 계약 목록 타입 안전성
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -703,10 +783,11 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 
 ### 기타 개발 작업
 - Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
-- E2E 테스트 작성 (Playwright/Cypress)
+- ~~E2E 테스트 작성 (Playwright/Cypress)~~ ✅ 완료 (33 테스트)
 - ~~성능 최적화 (번들 분석, 코드 스플리팅)~~ ✅ 완료
 - ~~PWA 지원 (오프라인, 서비스 워커)~~ ✅ 완료
-- 다국어 지원 (i18n)
+- ~~다국어 지원 (i18n)~~ ✅ 완료 (한/영)
+- ~~실시간 채팅~~ ✅ 완료 (Supabase Realtime)
 
 ## DB 마이그레이션 현황
 | 파일 | 상태 |
@@ -724,3 +805,4 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
 | `20260215000000_vector_embeddings.sql` | **미적용** (pgvector 확장 필요) |
 | `20260216000000_drawing_parse_logs.sql` | **미적용** |
+| `20260217000000_chat_messages.sql` | **미적용** |
