@@ -10,6 +10,12 @@ export interface ChecklistItem {
   completedAt?: string;
 }
 
+export interface PhasePhoto {
+  url: string;
+  fileName?: string;
+  uploadedAt: string;
+}
+
 export interface ProjectPhase {
   id: string;
   projectId: string;
@@ -21,6 +27,7 @@ export interface ProjectPhase {
   dependencies: string[];
   checklist: ChecklistItem[];
   notes?: string;
+  photos: PhasePhoto[];
   createdAt: string;
 }
 
@@ -101,6 +108,7 @@ function mapDbPhase(db: Record<string, unknown>): ProjectPhase {
     dependencies: (db.dependencies as string[]) || [],
     checklist: (db.checklist as ChecklistItem[]) || [],
     notes: db.notes as string | undefined,
+    photos: (db.photos as PhasePhoto[]) || [],
     createdAt: db.created_at as string,
   };
 }

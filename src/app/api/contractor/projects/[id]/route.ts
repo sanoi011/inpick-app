@@ -90,6 +90,13 @@ export async function PATCH(
       if (phaseStatus) updates.status = phaseStatus;
       if (checklist !== undefined) updates.checklist = checklist;
 
+      // 공정명 조회 (알림용)
+      const { data: phaseRow } = await supabase
+        .from("project_phases")
+        .select("name, phase_order")
+        .eq("id", phaseId)
+        .single();
+
       const { error } = await supabase
         .from("project_phases")
         .update(updates)
@@ -110,9 +117,91 @@ export async function PATCH(
           .from("contractor_projects")
           .update({ progress_pct: progressPct, updated_at: new Date().toISOString() })
           .eq("id", projectId);
+
+        // 소비자 알림: 공정 상태 변경 시
+        if (phaseStatus && phaseRow) {
+          try {
+            const { data: project } = await supabase
+              .from("contractor_projects")
+              .select("contract_id, name")
+              .eq("id", projectId)
+              .single();
+
+            if (project?.contract_id) {
+              const { data: contract } = await supabase
+                .from("contracts")
+                .select("consumer_id, bid_id")
+                .eq("id", project.contract_id)
+                .single();
+
+              if (contract?.consumer_id) {
+                const statusLabel = phaseStatus === "completed" ? "완료" : phaseStatus === "in_progress" ? "진행중" : "대기";
+                await supabase.from("consumer_notifications").insert({
+                  user_id: contract.consumer_id,
+                  type: "PROJECT_UPDATE",
+                  title: `${phaseRow.name} 공정 ${statusLabel}`,
+                  message: `${project.name}: ${phaseRow.name} 공정이 ${statusLabel}되었습니다 (${completed}/${phases.length} 완료)`,
+                  priority: phaseStatus === "completed" ? "MEDIUM" : "LOW",
+                  link: `/contract/${contract.bid_id}`,
+                  reference_id: project.contract_id,
+                });
+              }
+            }
+          } catch { /* 알림 실패는 무시 */ }
+        }
       }
 
       return NextResponse.json({ success: true });
+    }
+
+    // 공정 사진 추가
+    if (action === "addPhasePhoto") {
+      const { phaseId, photoUrl, fileName } = data;
+      if (!phaseId || !photoUrl) return NextResponse.json({ error: "phaseId, photoUrl 필요" }, { status: 400 });
+
+      const { data: phase } = await supabase
+        .from("project_phases")
+        .select("photos")
+        .eq("id", phaseId)
+        .single();
+
+      const photos = Array.isArray(phase?.photos) ? [...phase.photos] : [];
+      if (photos.length >= 5) {
+        return NextResponse.json({ error: "사진은 최대 5장까지 가능합니다" }, { status: 400 });
+      }
+
+      photos.push({ url: photoUrl, fileName: fileName || "", uploadedAt: new Date().toISOString() });
+
+      await supabase
+        .from("project_phases")
+        .update({ photos, updated_at: new Date().toISOString() })
+        .eq("id", phaseId);
+
+      return NextResponse.json({ success: true, photos });
+    }
+
+    // 공정 사진 삭제
+    if (action === "removePhasePhoto") {
+      const { phaseId, photoIndex } = data;
+      if (!phaseId || photoIndex === undefined) return NextResponse.json({ error: "phaseId, photoIndex 필요" }, { status: 400 });
+
+      const { data: phase } = await supabase
+        .from("project_phases")
+        .select("photos")
+        .eq("id", phaseId)
+        .single();
+
+      const photos = Array.isArray(phase?.photos) ? [...phase.photos] : [];
+      if (photoIndex >= 0 && photoIndex < photos.length) {
+        photos.splice(photoIndex, 1);
+      }
+
+      await supabase
+        .from("project_phases")
+        .update({ photos, updated_at: new Date().toISOString() })
+        .eq("id", phaseId);
+
+      return NextResponse.json({ success: true, photos });
     }
 
     // 이슈 추가
@@ -141,6 +230,102 @@ export async function PATCH(
       });
 
       return NextResponse.json({ issue }, { status: 201 });
+    }
+
+    // 공정표 생성/재생성
+    if (action === "generateSchedule") {
+      const { data: project } = await supabase
+        .from("contractor_projects")
+        .select("*, project_phases(*)")
+        .eq("id", projectId)
+        .single();
+
+      if (!project) return NextResponse.json({ error: "프로젝트 없음" }, { status: 404 });
+
+      const phases = (project.project_phases as { id: string; phase_order: number }[])
+        .sort((a, b) => a.phase_order - b.phase_order);
+
+      if (!project.start_date || !project.end_date) {
+        return NextResponse.json({ error: "시작일/종료일이 필요합니다" }, { status: 400 });
+      }
+
+      const { generateSchedule } = await import("@/lib/schedule/schedule-generator");
+      const schedule = generateSchedule({
+        projectId,
+        projectName: project.name,
+        startDate: project.start_date,
+        endDate: project.end_date,
+        existingPhaseIds: phases.map((p) => p.id),
+      });
+
+      // 기존 sub-task 삭제
+      await supabase.from("schedule_tasks").delete().eq("project_id", projectId);
+
+      // phase 업데이트 + sub-task 생성
+      for (const phase of schedule.phases) {
+        await supabase
+          .from("project_phases")
+          .update({
+            start_date: phase.startDate,
+            end_date: phase.endDate,
+            duration_days: phase.durationDays,
+            weight: phase.weight,
+            trade_codes: phase.tradeCodes,
+            color: phase.color,
+          })
+          .eq("id", phase.id);
+
+        if (phase.tasks.length > 0) {
+          const taskRows = phase.tasks.map((t) => ({
+            phase_id: phase.id,
+            project_id: projectId,
+            trade_code: t.tradeCode,
+            name: t.name,
+            start_date: t.startDate,
+            end_date: t.endDate,
+            duration_days: t.durationDays,
+            sort_order: t.sortOrder,
+            status: "pending",
+          }));
+          await supabase.from("schedule_tasks").insert(taskRows);
+        }
+      }
+
+      await supabase
+        .from("contractor_projects")
+        .update({ schedule_generated_at: new Date().toISOString() })
+        .eq("id", projectId);
+
+      await supabase.from("project_activities").insert({
+        project_id: projectId,
+        activity_type: "phase_update",
+        description: "공정표가 생성되었습니다",
+        actor: "시스템",
+      });
+
+      return NextResponse.json({ schedule });
+    }
+
+    // 개별 공정 날짜 수동 변경
+    if (action === "updatePhaseSchedule") {
+      const { phaseId, startDate, endDate } = data;
+      if (!phaseId || !startDate || !endDate) {
+        return NextResponse.json({ error: "phaseId, startDate, endDate 필요" }, { status: 400 });
+      }
+
+      const { diffDays } = await import("@/lib/schedule/date-utils");
+      const duration = diffDays(startDate, endDate) + 1;
+
+      await supabase
+        .from("project_phases")
+        .update({
+          start_date: startDate,
+          end_date: endDate,
+          duration_days: duration,
+        })
+        .eq("id", phaseId);
+
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "알 수 없는 action" }, { status: 400 });

@@ -170,7 +170,66 @@ export async function POST(request: NextRequest) {
           checklist: [],
           dependencies: idx > 0 ? [DEFAULT_PHASES[idx - 1]] : [],
         }));
-        await supabase.from("project_phases").insert(phases);
+        const { data: insertedPhases } = await supabase
+          .from("project_phases")
+          .insert(phases)
+          .select("id, phase_order");
+
+        // 공정표 자동 생성
+        if (insertedPhases && insertedPhases.length > 0) {
+          try {
+            const { generateSchedule } = await import("@/lib/schedule/schedule-generator");
+            const phaseIds = insertedPhases
+              .sort((a: { phase_order: number }, b: { phase_order: number }) => a.phase_order - b.phase_order)
+              .map((p: { id: string }) => p.id);
+
+            const schedule = generateSchedule({
+              projectId: autoProject.id,
+              projectName: projectName,
+              startDate,
+              endDate,
+              existingPhaseIds: phaseIds,
+            });
+
+            // 각 phase에 날짜/기간/색상 업데이트
+            for (const phase of schedule.phases) {
+              await supabase
+                .from("project_phases")
+                .update({
+                  start_date: phase.startDate,
+                  end_date: phase.endDate,
+                  duration_days: phase.durationDays,
+                  weight: phase.weight,
+                  trade_codes: phase.tradeCodes,
+                  color: phase.color,
+                })
+                .eq("id", phase.id);
+
+              // sub-task 생성
+              if (phase.tasks.length > 0) {
+                const taskRows = phase.tasks.map((t) => ({
+                  phase_id: phase.id,
+                  project_id: autoProject.id,
+                  trade_code: t.tradeCode,
+                  name: t.name,
+                  start_date: t.startDate,
+                  end_date: t.endDate,
+                  duration_days: t.durationDays,
+                  sort_order: t.sortOrder,
+                  status: "pending",
+                }));
+                await supabase.from("schedule_tasks").insert(taskRows);
+              }
+            }
+
+            await supabase
+              .from("contractor_projects")
+              .update({ schedule_generated_at: new Date().toISOString() })
+              .eq("id", autoProject.id);
+          } catch {
+            // 공정표 생성 실패해도 무시
+          }
+        }
 
         // 활동 로그
         await supabase.from("project_activities").insert({

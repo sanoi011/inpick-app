@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 import {
   Loader2, FolderKanban, Plus, ChevronDown, ChevronUp,
   CheckSquare, Square, AlertTriangle, Clock, Activity,
-  MapPin, Calendar, DollarSign, X,
+  MapPin, Calendar, DollarSign, X, BarChart3, List, RefreshCw,
+  Camera, Trash2, ImageIcon,
 } from "lucide-react";
 import {
   type Project, type ProjectPhase, type ProjectIssue, type ProjectActivity,
@@ -13,6 +15,9 @@ import {
   PROJECT_STATUS_LABELS, PROJECT_STATUS_COLORS,
   PHASE_STATUS_COLORS, ISSUE_SEVERITY_COLORS,
 } from "@/types/project";
+import type { ConstructionSchedule } from "@/types/construction-schedule";
+
+const GanttChart = dynamic(() => import("@/components/schedule/GanttChart").then(m => ({ default: m.GanttChart })), { ssr: false });
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -42,6 +47,12 @@ export default function ProjectsPage() {
   const [showIssueForm, setShowIssueForm] = useState(false);
   const [issueForm, setIssueForm] = useState({ title: "", description: "", severity: "medium" as string });
 
+  // 공정표
+  const [detailViewMode, setDetailViewMode] = useState<"list" | "gantt">("list");
+  const [schedule, setSchedule] = useState<ConstructionSchedule | null>(null);
+  const [scheduleLoading, setScheduleLoading] = useState(false);
+  const [generatingSchedule, setGeneratingSchedule] = useState(false);
+
   const loadProjects = useCallback(async () => {
     if (!contractorId) return;
     try {
@@ -60,11 +71,51 @@ export default function ProjectsPage() {
     if (expandedId === projectId) { setExpandedId(null); setDetailProject(null); return; }
     setExpandedId(projectId);
     setDetailLoading(true);
+    setDetailViewMode("list");
+    setSchedule(null);
     try {
       const res = await fetch(`/api/contractor/projects/${projectId}`);
       const data = await res.json();
       if (data.project) setDetailProject(mapDbProject(data.project));
     } catch { /* ignore */ } finally { setDetailLoading(false); }
+  };
+
+  // 공정표 로드
+  const loadSchedule = async (projectId: string) => {
+    setScheduleLoading(true);
+    try {
+      const res = await fetch(`/api/contractor/projects/${projectId}/schedule`);
+      const data = await res.json();
+      if (data.generated && data.schedule) setSchedule(data.schedule);
+      else setSchedule(null);
+    } catch { setSchedule(null); } finally { setScheduleLoading(false); }
+  };
+
+  // 공정표 생성
+  const handleGenerateSchedule = async () => {
+    if (!detailProject) return;
+    setGeneratingSchedule(true);
+    try {
+      const res = await fetch(`/api/contractor/projects/${detailProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "generateSchedule" }),
+      });
+      if (res.ok) await loadSchedule(detailProject.id);
+    } catch { /* ignore */ } finally { setGeneratingSchedule(false); }
+  };
+
+  // 공정표 바 드래그 업데이트
+  const handlePhaseUpdate = async (phaseId: string, startDate: string, endDate: string) => {
+    if (!detailProject) return;
+    try {
+      await fetch(`/api/contractor/projects/${detailProject.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "updatePhaseSchedule", phaseId, startDate, endDate }),
+      });
+      await loadSchedule(detailProject.id);
+    } catch { /* ignore */ }
   };
 
   // 프로젝트 생성
@@ -215,18 +266,72 @@ export default function ProjectsPage() {
                     <div className="flex justify-center py-8"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
                   ) : detailProject ? (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                      {/* 공정 타임라인 */}
+                      {/* 공정 타임라인 / 공정표 */}
                       <div className="lg:col-span-2">
-                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
-                          <Clock className="w-4 h-4 text-blue-600" /> 공정 현황
-                        </h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                            <Clock className="w-4 h-4 text-blue-600" /> 공정 현황
+                          </h4>
+                          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                            <button onClick={() => setDetailViewMode("list")}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                                detailViewMode === "list" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                              }`}>
+                              <List className="w-3.5 h-3.5" /> 리스트
+                            </button>
+                            <button onClick={() => { setDetailViewMode("gantt"); if (!schedule) loadSchedule(detailProject.id); }}
+                              className={`flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                                detailViewMode === "gantt" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                              }`}>
+                              <BarChart3 className="w-3.5 h-3.5" /> 공정표
+                            </button>
+                          </div>
+                        </div>
+
+                        {detailViewMode === "list" ? (
                         <div className="space-y-2">
                           {detailProject.phases.map((phase) => (
                             <PhaseCard key={phase.id} phase={phase}
                               onStatusChange={handlePhaseStatus}
-                              onChecklistToggle={handleChecklistToggle} />
+                              onChecklistToggle={handleChecklistToggle}
+                              projectId={detailProject.id}
+                              contractorId={contractorId || ""}
+                              onReload={() => loadDetail(detailProject.id)} />
                           ))}
                         </div>
+                        ) : (
+                        <div>
+                          {scheduleLoading ? (
+                            <div className="flex items-center justify-center py-12">
+                              <Loader2 className="w-6 h-6 animate-spin text-blue-600" />
+                              <span className="ml-2 text-sm text-gray-500">공정표 로딩...</span>
+                            </div>
+                          ) : schedule ? (
+                            <div>
+                              <GanttChart schedule={schedule} editable onPhaseUpdate={handlePhaseUpdate} />
+                              <button onClick={handleGenerateSchedule} disabled={generatingSchedule}
+                                className="mt-3 flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
+                                <RefreshCw className={`w-3.5 h-3.5 ${generatingSchedule ? "animate-spin" : ""}`} />
+                                공정표 재생성
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-center py-12 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                              <BarChart3 className="w-10 h-10 text-gray-300 mx-auto mb-3" />
+                              <p className="text-sm text-gray-500 mb-1">공정표가 아직 생성되지 않았습니다</p>
+                              <p className="text-xs text-gray-400 mb-4">프로젝트 시작/종료일 기반으로 자동 생성됩니다</p>
+                              <button onClick={handleGenerateSchedule} disabled={generatingSchedule || !detailProject.startDate || !detailProject.endDate}
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                                {generatingSchedule ? <Loader2 className="w-4 h-4 animate-spin" /> : <BarChart3 className="w-4 h-4" />}
+                                공정표 생성
+                              </button>
+                              {(!detailProject.startDate || !detailProject.endDate) && (
+                                <p className="text-xs text-amber-500 mt-2">시작일과 종료일을 먼저 설정해주세요</p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        )}
 
                         {/* 이슈 섹션 */}
                         <div className="mt-6">
@@ -347,13 +452,50 @@ export default function ProjectsPage() {
 
 /* ─── 서브 컴포넌트 ─── */
 
-function PhaseCard({ phase, onStatusChange, onChecklistToggle }: {
+function PhaseCard({ phase, onStatusChange, onChecklistToggle, projectId, contractorId, onReload }: {
   phase: ProjectPhase;
   onStatusChange: (phaseId: string, status: string) => void;
   onChecklistToggle: (phase: ProjectPhase, idx: number) => void;
+  projectId: string;
+  contractorId: string;
+  onReload: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const completedCount = phase.checklist.filter(c => c.completed).length;
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !contractorId) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("contractorId", contractorId);
+      formData.append("folder", "phases");
+      const uploadRes = await fetch("/api/contractor/upload", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) { alert(uploadData.error || "업로드 실패"); return; }
+
+      await fetch(`/api/contractor/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "addPhasePhoto", phaseId: phase.id, photoUrl: uploadData.url, fileName: file.name }),
+      });
+      onReload();
+    } catch { /* ignore */ } finally { setUploading(false); e.target.value = ""; }
+  };
+
+  const handlePhotoDelete = async (idx: number) => {
+    try {
+      await fetch(`/api/contractor/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "removePhasePhoto", phaseId: phase.id, photoIndex: idx }),
+      });
+      onReload();
+    } catch { /* ignore */ }
+  };
 
   return (
     <div className="border border-gray-200 rounded-lg">
@@ -366,6 +508,9 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle }: {
           </span>
           {phase.checklist.length > 0 && (
             <span className="text-xs text-gray-400">{completedCount}/{phase.checklist.length}</span>
+          )}
+          {phase.photos.length > 0 && (
+            <span className="flex items-center gap-0.5 text-xs text-gray-400"><ImageIcon className="w-3 h-3" />{phase.photos.length}</span>
           )}
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -381,6 +526,36 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle }: {
               </button>
             ))}
           </div>
+
+          {/* 시공 사진 */}
+          <div className="mb-3">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs font-medium text-gray-600 flex items-center gap-1">
+                <Camera className="w-3 h-3" /> 시공 사진 ({phase.photos.length}/5)
+              </span>
+              {phase.photos.length < 5 && (
+                <label className="text-xs text-blue-600 hover:underline cursor-pointer flex items-center gap-1">
+                  {uploading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                  {uploading ? "업로드중..." : "사진 추가"}
+                  <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} disabled={uploading} />
+                </label>
+              )}
+            </div>
+            {phase.photos.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                {phase.photos.map((photo, idx) => (
+                  <div key={idx} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    <img src={photo.url} alt={photo.fileName || `사진 ${idx + 1}`} className="w-full h-full object-cover" />
+                    <button onClick={() => handlePhotoDelete(idx)}
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <Trash2 className="w-4 h-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 체크리스트 */}
           {phase.checklist.length > 0 ? (
             <div className="space-y-1.5">

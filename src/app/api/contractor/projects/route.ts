@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
 
     let query = supabase
       .from("contractor_projects")
-      .select(`*, project_phases(count)`)
+      .select(`*, project_phases(id, phase_order, status, color)`)
       .eq("contractor_id", contractorId)
       .order("updated_at", { ascending: false });
 

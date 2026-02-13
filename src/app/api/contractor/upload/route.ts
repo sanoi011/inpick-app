@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "file, contractorId 필수" }, { status: 400 });
     }
 
-    const ALLOWED_FOLDERS = ["documents", "portfolio", "samples"];
+    const ALLOWED_FOLDERS = ["documents", "portfolio", "samples", "phases"];
     if (!ALLOWED_FOLDERS.includes(folder)) {
       return NextResponse.json({ error: "허용되지 않는 폴더입니다." }, { status: 400 });
     }

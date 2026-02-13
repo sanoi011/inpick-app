@@ -762,6 +762,56 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - AI 디자인 크레딧 차감 시점 수정 (성공 후)
 - RFQ 에러 토스트, 계약 목록 타입 안전성
 
+## 완료된 작업 (2026-02-18) - 공정표 자동 생성 + Gantt 차트
+
+### Step A: 타입 + 상수 + 날짜유틸 + 생성엔진
+- `src/types/construction-schedule.ts` (신규) - ConstructionSchedule, PhaseSchedule, ScheduleTask, GanttViewMode, PHASE_GANTT_COLORS
+- `src/lib/schedule/schedule-constants.ts` (신규) - TRADE_PHASE_MAP (17공종→7공정), BASE_PHASE_WEIGHTS, PHASE_NAMES, getTradesForPhase
+- `src/lib/schedule/date-utils.ts` (신규) - addDays, diffDays, formatDateKR, getMonthColumns, dayOffset
+- `src/lib/schedule/schedule-generator.ts` (신규) - generateSchedule (60:40 비중 블렌딩, 순차 배분, sub-task 비례 생성)
+
+### Step B: DB 마이그레이션 + API
+- `supabase/migrations/20260218000000_construction_schedule.sql` (신규) - project_phases에 duration_days, weight, trade_codes, color, photos 추가, schedule_tasks 테이블
+- `src/app/api/contracts/route.ts` (수정) - 계약 생성 시 공정표 자동 생성
+- `src/app/api/contractor/projects/[id]/route.ts` (수정) - generateSchedule, updatePhaseSchedule, addPhasePhoto, removePhasePhoto 액션
+- `src/app/api/contractor/projects/[id]/schedule/route.ts` (신규) - 공정표 조회 (project_phases + schedule_tasks JOIN)
+- `src/app/api/schedule/route.ts` (신규) - contractId로 공정표 조회 (소비자용)
+
+### Step C: Gantt 차트 컴포넌트
+- `src/components/schedule/GanttChart.tsx` (신규) - SVG/DOM 하이브리드 Gantt (드래그/리사이즈, 뷰모드, sub-task, 툴팁)
+- `src/components/schedule/ScheduleOverview.tsx` (신규) - 소비자용 읽기 전용 바 차트
+
+### Step D: 페이지 통합
+- `src/app/contractor/projects/page.tsx` (수정) - 리스트/공정표 탭 토글, GanttChart(editable), 생성/재생성 버튼
+- `src/app/contract/[id]/page.tsx` (수정) - ScheduleOverview 시공 일정 섹션 추가
+- `src/app/contractor/page.tsx` (수정) - 활성 프로젝트 미니 7-segment 공정 진행 바
+
+### Step E: 시공 사진 + 소비자 알림
+- `src/types/project.ts` (수정) - PhasePhoto 타입, ProjectPhase.photos 필드 추가
+- `src/app/api/contractor/upload/route.ts` (수정) - "phases" 폴더 허용
+- `src/app/contractor/projects/page.tsx` (수정) - PhaseCard 사진 업로드/삭제 UI (최대 5장)
+- `src/app/api/contractor/projects/[id]/route.ts` (수정) - 공정 상태 변경 시 consumer_notifications INSERT
+- `src/app/api/contractor/projects/route.ts` (수정) - project_phases 실제 데이터 SELECT (count 대신)
+
+### 공정표 아키텍처
+```
+계약 생성 → POST /api/contracts
+  └── generateSchedule() → 7공정 날짜 배분 + sub-task 생성
+      └── project_phases UPDATE + schedule_tasks INSERT
+
+사업자 뷰:
+  contractor/projects → 리스트/공정표 탭 토글
+    └── GanttChart (editable=true, 드래그로 날짜 변경)
+    └── PhaseCard (상태 변경, 사진 업로드, 체크리스트)
+
+소비자 뷰:
+  contract/[id] → ScheduleOverview (읽기 전용)
+    └── GET /api/schedule?contractId=xxx
+
+공정 상태 변경 → consumer_notifications INSERT
+  └── "철거 공정 완료 (2/7 완료)" 알림
+```
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -805,4 +855,6 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
 | `20260215000000_vector_embeddings.sql` | **미적용** (pgvector 확장 필요) |
 | `20260216000000_drawing_parse_logs.sql` | **미적용** |
+| `20260216000000_consumer_notifications.sql` | **미적용** |
 | `20260217000000_chat_messages.sql` | **미적용** |
+| `20260218000000_construction_schedule.sql` | **미적용** |

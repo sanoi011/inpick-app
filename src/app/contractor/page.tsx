@@ -29,22 +29,37 @@ export default function ContractorDashboard() {
   });
   const [recentEstimates, setRecentEstimates] = useState<{ id: string; title: string; status: string; grand_total: number; created_at: string }[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [activeProjects, setActiveProjects] = useState<{ id: string; name: string; progressPct: number; phases: { status: string; color: string }[] }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!authChecked || !contractorId) return;
     async function loadDashboard() {
       try {
-        const [statsRes, estimateRes, notiRes] = await Promise.all([
+        const [statsRes, estimateRes, notiRes, projRes] = await Promise.all([
           fetch(`/api/contractor/stats?contractorId=${contractorId}`).catch(() => null),
           fetch("/api/estimates"),
           fetch(`/api/contractor/notifications?contractorId=${contractorId}`).catch(() => null),
+          fetch(`/api/contractor/projects?contractorId=${contractorId}&status=in_progress`).catch(() => null),
         ]);
         const statsData = statsRes ? await statsRes.json().catch(() => null) : null;
         const estimateData = await estimateRes.json();
         const estimates = estimateData.estimates || [];
         const notiData = notiRes ? await notiRes.json().catch(() => ({ notifications: [] })) : { notifications: [] };
 
+        const projData = projRes ? await projRes.json().catch(() => ({ projects: [] })) : { projects: [] };
+        const projList = (projData.projects || []).slice(0, 3).map((p: Record<string, unknown>) => ({
+          id: p.id as string,
+          name: p.name as string,
+          progressPct: typeof p.progress_pct === "number" ? p.progress_pct : 0,
+          phases: ((p.project_phases || []) as Record<string, unknown>[])
+            .sort((a, b) => (a.phase_order as number) - (b.phase_order as number))
+            .map((ph) => ({
+              status: ph.status as string,
+              color: (ph.color as string) || "#6B7280",
+            })),
+        }));
+        setActiveProjects(projList);
         setRecentEstimates(estimates.slice(0, 5));
         setNotifications((notiData.notifications || []).slice(0, 5));
         setStats({
@@ -165,6 +180,41 @@ export default function ContractorDashboard() {
               </Link>
             ))}
           </div>
+
+          {/* 활성 프로젝트 미니 공정 진행률 */}
+          {activeProjects.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 mb-8">
+              <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="font-semibold text-gray-900 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-blue-600" /> 진행 중 프로젝트
+                </h2>
+                <Link href="/contractor/projects" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                  전체 보기 <ChevronRight className="w-3 h-3" />
+                </Link>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {activeProjects.map((proj) => (
+                  <Link key={proj.id} href="/contractor/projects" className="px-5 py-3 flex items-center gap-4 hover:bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{proj.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{proj.progressPct}% 완료</p>
+                    </div>
+                    <div className="flex rounded-full overflow-hidden h-2.5 w-40 bg-gray-100 flex-shrink-0">
+                      {proj.phases.length > 0 ? proj.phases.map((ph, i) => (
+                        <div key={i} className="transition-all" style={{
+                          width: `${100 / proj.phases.length}%`,
+                          backgroundColor: ph.color || "#6B7280",
+                          opacity: ph.status === "completed" ? 1 : ph.status === "in_progress" ? 0.6 : 0.2,
+                        }} />
+                      )) : (
+                        <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${proj.progressPct}%` }} />
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
             {/* 알림 */}

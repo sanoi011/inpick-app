@@ -11,6 +11,8 @@ import { useAuth } from "@/hooks/useAuth";
 import type { Contract } from "@/types/contract";
 import { mapDbContract, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS } from "@/types/contract";
 import { ChatWindow } from "@/components/chat/ChatWindow";
+import type { ConstructionSchedule } from "@/types/construction-schedule";
+import { ScheduleOverview } from "@/components/schedule/ScheduleOverview";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -136,6 +138,7 @@ function ContractDetailContent() {
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<ConstructionSchedule | null>(null);
 
   // 뒤로가기 URL: from 쿼리 > 소비자면 /contracts > 기본 /contractor/bids
   const backUrl = searchParams.get("from") || (user ? "/contracts" : "/contractor/bids");
@@ -176,6 +179,18 @@ function ContractDetailContent() {
     }
     load();
   }, [bidId]);
+
+  // 공정표 로드 (계약 ID로 조회)
+  useEffect(() => {
+    if (!contract?.id) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/schedule?contractId=${contract.id}`);
+        const data = await res.json();
+        if (data.generated && data.schedule) setSchedule(data.schedule);
+      } catch { /* ignore */ }
+    })();
+  }, [contract?.id]);
 
   const handleSign = async (type: 'consumer' | 'contractor') => {
     if (!contract) return;
@@ -312,6 +327,16 @@ function ContractDetailContent() {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* 시공 일정 (공정표) */}
+        {schedule && (
+          <div className="bg-white border border-gray-200 rounded-xl p-6">
+            <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2 mb-4">
+              <Calendar className="w-4 h-4 text-blue-600" /> 시공 일정
+            </h3>
+            <ScheduleOverview schedule={schedule} />
           </div>
         )}
 
