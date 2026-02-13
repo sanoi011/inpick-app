@@ -360,7 +360,7 @@ export default function BidsPage() {
                       {bidFormId === est.id ? (
                         <div className="bg-gray-50 rounded-lg p-4">
                           <h4 className="text-sm font-semibold text-gray-900 mb-3">입찰서 작성</h4>
-                          <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">입찰 금액 (원) *</label>
                               <input type="number" value={bidForm.bidAmount} onChange={(e) => setBidForm(f => ({ ...f, bidAmount: e.target.value }))}
@@ -387,7 +387,7 @@ export default function BidsPage() {
                             <textarea value={bidForm.message} onChange={(e) => setBidForm(f => ({ ...f, message: e.target.value }))}
                               placeholder="고객에게 전달할 메시지" rows={3} className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
                           </div>
-                          <div className="grid grid-cols-2 gap-3 mb-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">강점 (쉼표 구분)</label>
                               <input value={bidForm.highlights} onChange={(e) => setBidForm(f => ({ ...f, highlights: e.target.value }))}

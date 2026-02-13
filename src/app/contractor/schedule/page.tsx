@@ -237,8 +237,8 @@ export default function SchedulePage() {
 
           {/* 주간 뷰 */}
           {view === "weekly" && (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="grid grid-cols-7">
+            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
+              <div className="grid grid-cols-7 min-w-[640px]">
                 {getWeekDates(currentDate).map((d) => {
                   const ds = dateStr(d);
                   const items = schedulesByDate.get(ds) || [];
@@ -333,7 +333,7 @@ export default function SchedulePage() {
                 <input value={form.title} onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
                   placeholder="일정 제목" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">날짜 *</label>
                   <input type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))}

@@ -355,7 +355,7 @@ export default function FinancePage() {
               {summary.receivables.total > 0 && (
                 <div className="bg-white border border-gray-200 rounded-xl p-5">
                   <h3 className="text-sm font-semibold text-gray-900 mb-3">미수금 현황</h3>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <ReceivableBar label="정상" amount={summary.receivables.current} total={summary.receivables.total} color="bg-green-500" />
                     <ReceivableBar label="30일 초과" amount={summary.receivables.overdue30} total={summary.receivables.total} color="bg-amber-400" />
                     <ReceivableBar label="60일 초과" amount={summary.receivables.overdue60} total={summary.receivables.total} color="bg-orange-500" />

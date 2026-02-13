@@ -215,7 +215,7 @@ export default function ContractorAIPage() {
                 <Bot className="w-4 h-4 text-indigo-600" />
               </div>
             )}
-            <div className={`max-w-lg ${msg.role === "user" ? "" : ""}`}>
+            <div className={`max-w-[85%] sm:max-w-lg ${msg.role === "user" ? "" : ""}`}>
               {msg.role === "user" ? (
                 <div className="px-4 py-3 rounded-2xl text-sm bg-indigo-600 text-white whitespace-pre-wrap">
                   {msg.content}

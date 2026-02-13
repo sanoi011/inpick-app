@@ -152,7 +152,7 @@ export default function ProjectsPage() {
       </div>
 
       {/* 상태 필터 */}
-      <div className="flex gap-1.5 mb-6">
+      <div className="flex flex-wrap gap-1.5 mb-6">
         {STATUS_FILTERS.map((f) => (
           <button key={f.value} onClick={() => { setStatusFilter(f.value); setLoading(true); }}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${

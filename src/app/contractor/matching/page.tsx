@@ -238,7 +238,7 @@ export default function MatchingPage() {
                     </span>
                   </div>
                   {/* 점수 바 */}
-                  <div className="grid grid-cols-6 gap-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                     {Object.entries(SCORE_LABELS).map(([key, label]) => (
                       <div key={key}>
                         <div className="flex items-center justify-between mb-0.5">
@@ -287,7 +287,7 @@ export default function MatchingPage() {
                 <input type="number" value={collabForm.proposedAmount} onChange={(e) => setCollabForm(f => ({ ...f, proposedAmount: e.target.value }))}
                   placeholder="0" className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm" />
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">시작일</label>
                   <input type="date" value={collabForm.startDate} onChange={(e) => setCollabForm(f => ({ ...f, startDate: e.target.value }))}
