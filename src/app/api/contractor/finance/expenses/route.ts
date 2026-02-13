@@ -38,6 +38,68 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, contractorId, description, amount, category, expenseDate } = body;
+
+    if (!id || !contractorId) {
+      return NextResponse.json({ error: "id, contractorId 필수" }, { status: 400 });
+    }
+
+    const supabase = createClient();
+    const updates: Record<string, unknown> = {};
+    if (description !== undefined) updates.description = description;
+    if (amount !== undefined) updates.amount = amount;
+    if (category !== undefined) updates.category = category;
+    if (expenseDate !== undefined) updates.expense_date = expenseDate;
+
+    const { data, error } = await supabase
+      .from("expense_records")
+      .update(updates)
+      .eq("id", id)
+      .eq("contractor_id", contractorId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: "지출 수정 실패" }, { status: 500 });
+    }
+
+    return NextResponse.json({ expense: data });
+  } catch (err) {
+    console.error("Expense PATCH error:", err);
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const id = req.nextUrl.searchParams.get("id");
+  const contractorId = req.nextUrl.searchParams.get("contractorId");
+
+  if (!id || !contractorId) {
+    return NextResponse.json({ error: "id, contractorId 필수" }, { status: 400 });
+  }
+
+  try {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("expense_records")
+      .delete()
+      .eq("id", id)
+      .eq("contractor_id", contractorId);
+
+    if (error) {
+      return NextResponse.json({ error: "지출 삭제 실패" }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Expense DELETE error:", err);
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

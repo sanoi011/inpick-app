@@ -35,10 +35,12 @@ export default function ContractorDashboard() {
     if (!authChecked || !contractorId) return;
     async function loadDashboard() {
       try {
-        const [estimateRes, notiRes] = await Promise.all([
+        const [statsRes, estimateRes, notiRes] = await Promise.all([
+          fetch(`/api/contractor/stats?contractorId=${contractorId}`).catch(() => null),
           fetch("/api/estimates"),
           fetch(`/api/contractor/notifications?contractorId=${contractorId}`).catch(() => null),
         ]);
+        const statsData = statsRes ? await statsRes.json().catch(() => null) : null;
         const estimateData = await estimateRes.json();
         const estimates = estimateData.estimates || [];
         const notiData = notiRes ? await notiRes.json().catch(() => ({ notifications: [] })) : { notifications: [] };
@@ -46,12 +48,12 @@ export default function ContractorDashboard() {
         setRecentEstimates(estimates.slice(0, 5));
         setNotifications((notiData.notifications || []).slice(0, 5));
         setStats({
-          activeProjects: estimates.filter((e: { status: string }) => e.status === "in_progress").length,
-          pendingBids: estimates.filter((e: { status: string }) => e.status === "confirmed" || e.status === "draft").length,
-          completedProjects: estimates.filter((e: { status: string }) => e.status === "completed").length,
-          avgRating: "-",
-          monthlyRevenue: 0,
-          receivableTotal: 0,
+          activeProjects: statsData?.activeProjects ?? estimates.filter((e: { status: string }) => e.status === "in_progress").length,
+          pendingBids: statsData?.pendingBids ?? estimates.filter((e: { status: string }) => e.status === "confirmed" || e.status === "draft").length,
+          completedProjects: statsData?.completedProjects ?? estimates.filter((e: { status: string }) => e.status === "completed").length,
+          avgRating: statsData?.avgRating ?? "-",
+          monthlyRevenue: statsData?.monthlyRevenue ?? 0,
+          receivableTotal: statsData?.receivableTotal ?? 0,
         });
       } catch {
         // silently fail

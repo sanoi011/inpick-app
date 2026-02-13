@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 import {
   Loader2, DollarSign, TrendingUp, TrendingDown, AlertCircle,
-  FileText, Plus, X, Receipt,
+  FileText, Plus, X, Receipt, Download, Edit3, Trash2, Check,
 } from "lucide-react";
 import {
   type Invoice, type ExpenseRecord, type FinanceSummary, type ProjectProfit,
@@ -32,6 +32,14 @@ const EXPENSE_CATS = [
   { value: "other", label: "기타" },
 ];
 
+const INVOICE_STATUS_FLOW: Record<string, { next: string; label: string }[]> = {
+  draft: [{ next: "sent", label: "발송" }],
+  sent: [{ next: "paid", label: "수금 완료" }, { next: "overdue", label: "연체 처리" }],
+  overdue: [{ next: "paid", label: "수금 완료" }],
+  paid: [],
+  cancelled: [],
+};
+
 export default function FinancePage() {
   const { contractorId, authChecked } = useContractorAuth();
   const [loading, setLoading] = useState(true);
@@ -50,6 +58,13 @@ export default function FinancePage() {
   const [expenseFilter, setExpenseFilter] = useState("all");
   const [showExpenseForm, setShowExpenseForm] = useState(false);
   const [expenseForm, setExpenseForm] = useState({ description: "", amount: "", category: "material", expenseDate: "" });
+
+  // 지출 편집
+  const [editingExpense, setEditingExpense] = useState<string | null>(null);
+  const [editExpenseForm, setEditExpenseForm] = useState({ description: "", amount: "", category: "", expenseDate: "" });
+
+  // 월간 추이
+  const [monthlyTrend, setMonthlyTrend] = useState<{ month: string; revenue: number; expense: number }[]>([]);
 
   const [saving, setSaving] = useState(false);
 
@@ -81,13 +96,53 @@ export default function FinancePage() {
     setExpenses((data.expenses || []).map((e: Record<string, unknown>) => mapDbExpense(e)));
   }, [contractorId, expenseFilter]);
 
+  // 월간 추이 계산 (최근 6개월)
+  const loadMonthlyTrend = useCallback(async () => {
+    if (!contractorId) return;
+    const now = new Date();
+    const months: { month: string; revenue: number; expense: number }[] = [];
+
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const label = `${d.getMonth() + 1}월`;
+      months.push({ month: label, revenue: 0, expense: 0 });
+    }
+
+    try {
+      const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
+
+      const [, expRes] = await Promise.all([
+        fetch(`/api/contractor/finance/payments?contractorId=${contractorId}&from=${sixMonthsAgo}`).catch(() => null),
+        fetch(`/api/contractor/finance/expenses?contractorId=${contractorId}`).catch(() => null),
+      ]);
+
+      // payments may not support date range filter, use all expenses instead
+      if (expRes) {
+        const expData = await expRes.json();
+        const allExpenses = (expData.expenses || []) as { amount: number; expense_date: string }[];
+        for (const exp of allExpenses) {
+          if (!exp.expense_date) continue;
+          const expDate = new Date(exp.expense_date);
+          const monthIdx = months.findIndex((m) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (5 - months.indexOf(m)), 1);
+            return expDate.getFullYear() === d.getFullYear() && expDate.getMonth() === d.getMonth();
+          });
+          if (monthIdx >= 0) months[monthIdx].expense += exp.amount || 0;
+        }
+      }
+    } catch { /* ignore */ }
+
+    setMonthlyTrend(months);
+  }, [contractorId]);
+
   useEffect(() => {
     if (authChecked && contractorId) {
       loadSummary();
       loadInvoices();
       loadExpenses();
+      loadMonthlyTrend();
     }
-  }, [authChecked, contractorId, loadSummary, loadInvoices, loadExpenses]);
+  }, [authChecked, contractorId, loadSummary, loadInvoices, loadExpenses, loadMonthlyTrend]);
 
   // 청구서 생성
   const handleCreateInvoice = async () => {
@@ -110,6 +165,22 @@ export default function FinancePage() {
         loadSummary();
       }
     } catch { /* ignore */ } finally { setSaving(false); }
+  };
+
+  // 청구서 상태 변경
+  const handleInvoiceStatusChange = async (invoiceId: string, newStatus: string) => {
+    if (!contractorId) return;
+    try {
+      const res = await fetch("/api/contractor/finance/invoices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: invoiceId, contractorId, status: newStatus }),
+      });
+      if (res.ok) {
+        loadInvoices();
+        loadSummary();
+      }
+    } catch { /* ignore */ }
   };
 
   // 지출 추가
@@ -137,7 +208,73 @@ export default function FinancePage() {
     } catch { /* ignore */ } finally { setSaving(false); }
   };
 
+  // 지출 수정
+  const handleEditExpense = async (id: string) => {
+    if (!contractorId) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/contractor/finance/expenses", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          contractorId,
+          description: editExpenseForm.description,
+          amount: Number(editExpenseForm.amount),
+          category: editExpenseForm.category,
+          expenseDate: editExpenseForm.expenseDate || undefined,
+        }),
+      });
+      if (res.ok) {
+        setEditingExpense(null);
+        loadExpenses();
+        loadSummary();
+      }
+    } catch { /* ignore */ } finally { setSaving(false); }
+  };
+
+  // 지출 삭제
+  const handleDeleteExpense = async (id: string) => {
+    if (!contractorId || !confirm("이 지출 기록을 삭제하시겠습니까?")) return;
+    try {
+      const res = await fetch(`/api/contractor/finance/expenses?id=${id}&contractorId=${contractorId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        loadExpenses();
+        loadSummary();
+      }
+    } catch { /* ignore */ }
+  };
+
+  // CSV 내보내기
+  const exportCsv = (type: "invoices" | "expenses") => {
+    let csv = "";
+    if (type === "invoices") {
+      csv = "번호,상태,설명,공급가,세금,합계,생성일,만기일\n";
+      for (const inv of invoices) {
+        csv += `${inv.invoiceNumber},${INVOICE_STATUS_LABELS[inv.status] || inv.status},"${inv.description || ""}",${inv.amount},${inv.tax},${inv.total},${inv.createdAt},${inv.dueDate || ""}\n`;
+      }
+    } else {
+      csv = "카테고리,내용,금액,날짜\n";
+      for (const exp of expenses) {
+        csv += `${EXPENSE_CATEGORY_LABELS[exp.category] || exp.category},"${exp.description}",${exp.amount},${exp.expenseDate}\n`;
+      }
+    }
+
+    // BOM for Korean Excel compatibility
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${type}_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (!authChecked) return null;
+
+  const maxTrend = Math.max(...monthlyTrend.map((m) => Math.max(m.revenue, m.expense)), 1);
 
   return (
     <div className="px-6 py-8 max-w-7xl mx-auto">
@@ -181,6 +318,38 @@ export default function FinancePage() {
                 <SummaryCard label="예상 잔액" value={`${fmt(summary.projectedBalance)}원`}
                   icon={<DollarSign className="w-5 h-5 text-blue-500" />} />
               </div>
+
+              {/* 월간 추이 미니차트 */}
+              {monthlyTrend.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-5">
+                  <h3 className="text-sm font-semibold text-gray-900 mb-4">최근 6개월 추이</h3>
+                  <div className="flex items-end gap-3 h-32">
+                    {monthlyTrend.map((m) => (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1">
+                        <div className="w-full flex gap-0.5 items-end" style={{ height: "96px" }}>
+                          <div className="flex-1 bg-green-400 rounded-t"
+                            style={{ height: `${Math.max(2, (m.revenue / maxTrend) * 96)}px` }}
+                            title={`매출: ${fmt(m.revenue)}원`} />
+                          <div className="flex-1 bg-red-300 rounded-t"
+                            style={{ height: `${Math.max(2, (m.expense / maxTrend) * 96)}px` }}
+                            title={`지출: ${fmt(m.expense)}원`} />
+                        </div>
+                        <span className="text-xs text-gray-500">{m.month}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-4 mt-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-green-400 rounded" />
+                      <span className="text-xs text-gray-500">매출</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-3 h-3 bg-red-300 rounded" />
+                      <span className="text-xs text-gray-500">지출</span>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 미수금 단계별 */}
               {summary.receivables.total > 0 && (
@@ -240,10 +409,18 @@ export default function FinancePage() {
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setShowInvoiceForm(true)}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 flex items-center gap-1">
-                  <Plus className="w-3.5 h-3.5" /> 청구서 생성
-                </button>
+                <div className="flex items-center gap-2">
+                  {invoices.length > 0 && (
+                    <button onClick={() => exportCsv("invoices")}
+                      className="px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1">
+                      <Download className="w-3.5 h-3.5" /> CSV
+                    </button>
+                  )}
+                  <button onClick={() => setShowInvoiceForm(true)}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5" /> 청구서 생성
+                  </button>
+                </div>
               </div>
 
               {showInvoiceForm && (
@@ -282,27 +459,43 @@ export default function FinancePage() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {invoices.map((inv) => (
-                    <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-xs font-mono text-gray-400">{inv.invoiceNumber}</span>
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${INVOICE_STATUS_COLORS[inv.status]}`}>
-                            {INVOICE_STATUS_LABELS[inv.status]}
-                          </span>
+                  {invoices.map((inv) => {
+                    const statusActions = INVOICE_STATUS_FLOW[inv.status] || [];
+                    return (
+                      <div key={inv.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-xs font-mono text-gray-400">{inv.invoiceNumber}</span>
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${INVOICE_STATUS_COLORS[inv.status]}`}>
+                              {INVOICE_STATUS_LABELS[inv.status]}
+                            </span>
+                          </div>
+                          {inv.description && <p className="text-sm text-gray-700">{inv.description}</p>}
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {new Date(inv.createdAt).toLocaleDateString("ko-KR")}
+                            {inv.dueDate && ` | 만기: ${inv.dueDate}`}
+                          </p>
                         </div>
-                        {inv.description && <p className="text-sm text-gray-700">{inv.description}</p>}
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {new Date(inv.createdAt).toLocaleDateString("ko-KR")}
-                          {inv.dueDate && ` | 만기: ${inv.dueDate}`}
-                        </p>
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-gray-900">{fmt(inv.total)}원</p>
+                            <p className="text-xs text-gray-400">공급가 {fmt(inv.amount)} + 세금 {fmt(inv.tax)}</p>
+                          </div>
+                          {statusActions.length > 0 && (
+                            <div className="flex flex-col gap-1">
+                              {statusActions.map((action) => (
+                                <button key={action.next}
+                                  onClick={() => handleInvoiceStatusChange(inv.id, action.next)}
+                                  className="px-2 py-1 text-xs font-medium rounded bg-gray-100 text-gray-700 hover:bg-gray-200 whitespace-nowrap">
+                                  {action.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-gray-900">{fmt(inv.total)}원</p>
-                        <p className="text-xs text-gray-400">공급가 {fmt(inv.amount)} + 세금 {fmt(inv.tax)}</p>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -312,7 +505,7 @@ export default function FinancePage() {
           {section === "expenses" && (
             <div>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 flex-wrap">
                   {EXPENSE_CATS.map((c) => (
                     <button key={c.value} onClick={() => setExpenseFilter(c.value)}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium ${expenseFilter === c.value ? "bg-green-600 text-white" : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"}`}>
@@ -320,10 +513,18 @@ export default function FinancePage() {
                     </button>
                   ))}
                 </div>
-                <button onClick={() => setShowExpenseForm(true)}
-                  className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 flex items-center gap-1">
-                  <Plus className="w-3.5 h-3.5" /> 지출 추가
-                </button>
+                <div className="flex items-center gap-2">
+                  {expenses.length > 0 && (
+                    <button onClick={() => exportCsv("expenses")}
+                      className="px-3 py-1.5 bg-white text-gray-600 border border-gray-200 rounded-lg text-xs font-medium hover:bg-gray-50 flex items-center gap-1">
+                      <Download className="w-3.5 h-3.5" /> CSV
+                    </button>
+                  )}
+                  <button onClick={() => setShowExpenseForm(true)}
+                    className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 flex items-center gap-1">
+                    <Plus className="w-3.5 h-3.5" /> 지출 추가
+                  </button>
+                </div>
               </div>
 
               {showExpenseForm && (
@@ -380,17 +581,74 @@ export default function FinancePage() {
               ) : (
                 <div className="space-y-2">
                   {expenses.map((exp) => (
-                    <div key={exp.id} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center justify-between">
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${EXPENSE_CATEGORY_COLORS[exp.category]}`}>
-                            {EXPENSE_CATEGORY_LABELS[exp.category]}
-                          </span>
-                          <h4 className="text-sm font-medium text-gray-900">{exp.description}</h4>
+                    <div key={exp.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                      {editingExpense === exp.id ? (
+                        // 편집 모드
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <input value={editExpenseForm.description}
+                              onChange={(e) => setEditExpenseForm(f => ({ ...f, description: e.target.value }))}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="내용" />
+                            <input type="number" value={editExpenseForm.amount}
+                              onChange={(e) => setEditExpenseForm(f => ({ ...f, amount: e.target.value }))}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm" placeholder="금액" />
+                            <select value={editExpenseForm.category}
+                              onChange={(e) => setEditExpenseForm(f => ({ ...f, category: e.target.value }))}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+                              <option value="material">자재비</option>
+                              <option value="labor">노무비</option>
+                              <option value="equipment">장비비</option>
+                              <option value="transport">운반비</option>
+                              <option value="office">사무비</option>
+                              <option value="insurance">보험료</option>
+                              <option value="other">기타</option>
+                            </select>
+                            <input type="date" value={editExpenseForm.expenseDate}
+                              onChange={(e) => setEditExpenseForm(f => ({ ...f, expenseDate: e.target.value }))}
+                              className="px-3 py-2 border border-gray-200 rounded-lg text-sm" />
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <button onClick={() => setEditingExpense(null)}
+                              className="px-3 py-1.5 text-gray-600 text-xs hover:bg-gray-100 rounded-lg">취소</button>
+                            <button onClick={() => handleEditExpense(exp.id)} disabled={saving}
+                              className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 disabled:opacity-50 flex items-center gap-1">
+                              <Check className="w-3 h-3" /> {saving ? "저장중..." : "저장"}
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-xs text-gray-400">{exp.expenseDate}{exp.projectName && ` | ${exp.projectName}`}</p>
-                      </div>
-                      <p className="text-lg font-bold text-red-600">-{fmt(exp.amount)}원</p>
+                      ) : (
+                        // 조회 모드
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${EXPENSE_CATEGORY_COLORS[exp.category]}`}>
+                                {EXPENSE_CATEGORY_LABELS[exp.category]}
+                              </span>
+                              <h4 className="text-sm font-medium text-gray-900">{exp.description}</h4>
+                            </div>
+                            <p className="text-xs text-gray-400">{exp.expenseDate}{exp.projectName && ` | ${exp.projectName}`}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-lg font-bold text-red-600">-{fmt(exp.amount)}원</p>
+                            <button onClick={() => {
+                              setEditingExpense(exp.id);
+                              setEditExpenseForm({
+                                description: exp.description,
+                                amount: String(exp.amount),
+                                category: exp.category,
+                                expenseDate: exp.expenseDate || "",
+                              });
+                            }}
+                              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button onClick={() => handleDeleteExpense(exp.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

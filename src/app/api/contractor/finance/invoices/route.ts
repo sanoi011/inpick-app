@@ -34,6 +34,45 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { id, contractorId, status, dueDate } = body;
+
+    if (!id || !contractorId) {
+      return NextResponse.json({ error: "id, contractorId 필수" }, { status: 400 });
+    }
+
+    const validStatuses = ["draft", "sent", "paid", "overdue", "cancelled"];
+    if (status && !validStatuses.includes(status)) {
+      return NextResponse.json({ error: "유효하지 않은 상태" }, { status: 400 });
+    }
+
+    const supabase = createClient();
+    const updates: Record<string, unknown> = {};
+    if (status) updates.status = status;
+    if (dueDate !== undefined) updates.due_date = dueDate;
+    if (status === "paid") updates.paid_at = new Date().toISOString();
+
+    const { data, error } = await supabase
+      .from("invoices")
+      .update(updates)
+      .eq("id", id)
+      .eq("contractor_id", contractorId)
+      .select()
+      .single();
+
+    if (error) {
+      return NextResponse.json({ error: "청구서 수정 실패" }, { status: 500 });
+    }
+
+    return NextResponse.json({ invoice: data });
+  } catch (err) {
+    console.error("Invoice PATCH error:", err);
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

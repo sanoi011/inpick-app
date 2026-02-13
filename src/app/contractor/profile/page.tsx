@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Loader2, Save, Plus, X, Star, Trash2, Edit3,
-  Building2, Phone, Mail, MapPin, FileText, Briefcase, Image,
+  Building2, Phone, Mail, MapPin, FileText, Briefcase, Image, Upload,
 } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 
@@ -61,6 +61,7 @@ export default function ProfilePage() {
   const [portfolio, setPortfolio] = useState<PortfolioItem[]>([]);
   const [showPortfolioForm, setShowPortfolioForm] = useState(false);
   const [portfolioForm, setPortfolioForm] = useState({ title: "", description: "", projectType: "", completionDate: "", imageUrl: "", tags: "" });
+  const [portfolioImageUrls, setPortfolioImageUrls] = useState<string[]>([]);
 
   // 리뷰
   const [reviews, setReviews] = useState<ReviewItem[]>([]);
@@ -150,6 +151,10 @@ export default function ProfilePage() {
   async function addPortfolio() {
     if (!portfolioForm.title) return;
     try {
+      const allImages = [
+        ...portfolioImageUrls.map((url, i) => ({ url, caption: "", order: i })),
+        ...(portfolioForm.imageUrl ? [{ url: portfolioForm.imageUrl, caption: "", order: portfolioImageUrls.length }] : []),
+      ];
       const res = await fetch("/api/contractor/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -159,13 +164,14 @@ export default function ProfilePage() {
           description: portfolioForm.description,
           projectType: portfolioForm.projectType,
           completionDate: portfolioForm.completionDate || null,
-          images: portfolioForm.imageUrl ? [{ url: portfolioForm.imageUrl, caption: "", order: 0 }] : [],
+          images: allImages,
           tags: portfolioForm.tags ? portfolioForm.tags.split(",").map(s => s.trim()).filter(Boolean) : [],
         }),
       });
       if (res.ok) {
         setShowPortfolioForm(false);
         setPortfolioForm({ title: "", description: "", projectType: "", completionDate: "", imageUrl: "", tags: "" });
+        setPortfolioImageUrls([]);
         loadProfile();
       }
     } catch { /* ignore */ }
@@ -336,15 +342,25 @@ export default function ProfilePage() {
       {tab === "docs" && (
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1 block">사업자등록증 이미지 URL</label>
-            <input value={profile.businessLicenseUrl} onChange={e => setProfile({ ...profile, businessLicenseUrl: e.target.value })}
-              placeholder="https://..." className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none" />
-            <p className="text-xs text-gray-400 mt-1">향후 파일 업로드 기능이 추가될 예정입니다</p>
+            <label className="text-sm font-medium text-gray-700 mb-2 block">사업자등록증</label>
+            <FileDropZone
+              accept="image/jpeg,image/png,image/webp,application/pdf"
+              contractorId={contractorId || ""}
+              folder="documents"
+              onUploaded={(url) => setProfile({ ...profile, businessLicenseUrl: url })}
+            />
           </div>
           {profile.businessLicenseUrl && (
             <div className="border border-gray-200 rounded-lg p-3">
               <p className="text-xs text-gray-500 mb-2">미리보기</p>
-              <img src={profile.businessLicenseUrl} alt="사업자등록증" className="max-w-xs rounded" onError={e => (e.currentTarget.style.display = "none")} />
+              {profile.businessLicenseUrl.endsWith(".pdf") ? (
+                <a href={profile.businessLicenseUrl} target="_blank" rel="noopener noreferrer"
+                  className="text-sm text-blue-600 hover:underline flex items-center gap-1">
+                  <FileText className="w-4 h-4" /> PDF 파일 열기
+                </a>
+              ) : (
+                <img src={profile.businessLicenseUrl} alt="사업자등록증" className="max-w-xs rounded" onError={e => (e.currentTarget.style.display = "none")} />
+              )}
             </div>
           )}
           <button onClick={saveProfile} disabled={saving}
@@ -381,8 +397,30 @@ export default function ProfilePage() {
                 <input type="date" value={portfolioForm.completionDate} onChange={e => setPortfolioForm({ ...portfolioForm, completionDate: e.target.value })}
                   className="px-3 py-2.5 rounded-lg border border-gray-300 text-sm" />
               </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700 mb-2 block">이미지 업로드</label>
+                <FileDropZone
+                  accept="image/jpeg,image/png,image/webp"
+                  contractorId={contractorId || ""}
+                  folder="portfolio"
+                  onUploaded={(url) => setPortfolioImageUrls(prev => [...prev, url])}
+                />
+                {portfolioImageUrls.length > 0 && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {portfolioImageUrls.map((url, i) => (
+                      <div key={i} className="relative w-16 h-16 rounded border border-gray-200 overflow-hidden">
+                        <img src={url} alt="" className="w-full h-full object-cover" />
+                        <button onClick={() => setPortfolioImageUrls(prev => prev.filter((_, j) => j !== i))}
+                          className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs">
+                          <X className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <input value={portfolioForm.imageUrl} onChange={e => setPortfolioForm({ ...portfolioForm, imageUrl: e.target.value })}
-                placeholder="이미지 URL" className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm" />
+                placeholder="또는 이미지 URL 직접 입력" className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm" />
               <input value={portfolioForm.tags} onChange={e => setPortfolioForm({ ...portfolioForm, tags: e.target.value })}
                 placeholder="태그 (쉼표 구분: 모던, 미니멀)" className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm" />
               <button onClick={addPortfolio} disabled={!portfolioForm.title}
@@ -492,6 +530,94 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function FileDropZone({ accept, contractorId, folder, onUploaded }: {
+  accept: string;
+  contractorId: string;
+  folder: string;
+  onUploaded: (url: string) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleUpload = async (file: File) => {
+    setError("");
+    if (file.size > 5 * 1024 * 1024) {
+      setError("파일 크기가 5MB를 초과합니다.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("contractorId", contractorId);
+      formData.append("folder", folder);
+
+      const res = await fetch("/api/contractor/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        onUploaded(data.url);
+      } else {
+        setError(data.error || "업로드 실패");
+      }
+    } catch {
+      setError("네트워크 오류");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files[0];
+    if (file) handleUpload(file);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleUpload(file);
+    e.target.value = "";
+  };
+
+  return (
+    <div>
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`relative border-2 border-dashed rounded-xl p-6 text-center transition-colors cursor-pointer
+          ${dragOver ? "border-blue-400 bg-blue-50" : "border-gray-200 hover:border-gray-300 bg-gray-50"}`}
+      >
+        <input
+          type="file"
+          accept={accept}
+          onChange={handleFileSelect}
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
+        {uploading ? (
+          <div className="flex flex-col items-center gap-2">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+            <p className="text-sm text-gray-500">업로드 중...</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-2">
+            <Upload className="w-6 h-6 text-gray-400" />
+            <p className="text-sm text-gray-600">파일을 드래그하거나 클릭하여 업로드</p>
+            <p className="text-xs text-gray-400">JPG, PNG, PDF (최대 5MB)</p>
+          </div>
+        )}
+      </div>
+      {error && <p className="text-xs text-red-600 mt-1">{error}</p>}
     </div>
   );
 }
