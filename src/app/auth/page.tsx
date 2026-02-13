@@ -42,7 +42,8 @@ function ConsumerAuthForm() {
           setError(error.message);
         }
       } else {
-        router.push("/project/new");
+        const returnUrl = searchParams.get("returnUrl");
+        router.push(returnUrl || "/project/new");
       }
     } catch {
       setError("로그인 중 오류가 발생했습니다.");
@@ -136,18 +137,13 @@ function ConsumerAuthForm() {
           <span className="font-medium text-neutral-700">Google로 계속하기</span>
         </button>
         <button
-          onClick={() => handleOAuth("kakao")}
-          disabled={!!oauthLoading}
-          className="w-full flex items-center justify-center gap-3 py-3 bg-[#FEE500] rounded-lg hover:bg-[#FDD835] transition-colors disabled:opacity-50"
+          disabled
+          className="w-full flex items-center justify-center gap-3 py-3 bg-[#FEE500] rounded-lg opacity-50 cursor-not-allowed"
         >
-          {oauthLoading === "kakao" ? (
-            <Loader2 className="w-5 h-5 animate-spin text-neutral-700" />
-          ) : (
-            <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#3C1E1E">
-              <path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.76 5.01 4.41 6.36l-1.12 4.12c-.1.36.3.65.62.45l4.84-3.2c.41.04.82.07 1.25.07 5.52 0 10-3.36 10-7.5S17.52 3 12 3z" />
-            </svg>
-          )}
-          <span className="font-medium text-neutral-900">카카오로 계속하기</span>
+          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#3C1E1E">
+            <path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.76 5.01 4.41 6.36l-1.12 4.12c-.1.36.3.65.62.45l4.84-3.2c.41.04.82.07 1.25.07 5.52 0 10-3.36 10-7.5S17.52 3 12 3z" />
+          </svg>
+          <span className="font-medium text-neutral-900">카카오 로그인 (준비중)</span>
         </button>
       </div>
 
@@ -235,6 +231,7 @@ function ContractorAuthForm() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) { setError("이메일을 입력해주세요."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("올바른 이메일 형식을 입력해주세요."); return; }
     setLoading(true);
     setError("");
 

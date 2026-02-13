@@ -79,8 +79,8 @@ function ContractCard({
   contract: Contract;
   onClick: () => void;
 }) {
-  const contractor = (contract as unknown as Record<string, unknown>)
-    .specialty_contractors as Record<string, string> | undefined;
+  const contractor = ((contract as unknown as Record<string, unknown>)
+    ?.specialty_contractors || null) as Record<string, string> | null;
 
   return (
     <button
@@ -178,7 +178,7 @@ export default function ContractsPage() {
       list = list.filter((c) => {
         const name = c.projectName || "";
         const addr = c.address || "";
-        const contractor = ((c as unknown as Record<string, unknown>).specialty_contractors as Record<string, string> | undefined)?.company_name || "";
+        const contractor = (((c as unknown as Record<string, unknown>)?.specialty_contractors || {}) as Record<string, string>).company_name || "";
         return name.toLowerCase().includes(q) || addr.toLowerCase().includes(q) || contractor.toLowerCase().includes(q);
       });
     }
@@ -281,7 +281,7 @@ export default function ContractsPage() {
               <ContractCard
                 key={contract.id}
                 contract={contract}
-                onClick={() => router.push(`/contract/${contract.bidId}`)}
+                onClick={() => router.push(`/contract/${contract.id}`)}
               />
             ))}
           </div>

@@ -132,9 +132,6 @@ export default function AIDesignPage() {
     const startTime = Date.now();
 
     try {
-      // 크레딧 차감
-      await spendCredits();
-
       // 이미지 생성 API 호출
       const roomContext = selectedRoom
         ? `${ROOM_TYPE_LABELS[selectedRoom.type]} ${selectedRoom.area}m²`
@@ -154,6 +151,9 @@ export default function AIDesignPage() {
 
       if (res.ok) {
         const data = await res.json();
+
+        // 크레딧 차감 (성공 시에만)
+        await spendCredits();
 
         // Gemini 상태 반영
         if (data.isMock) setGeminiStatus("mock");

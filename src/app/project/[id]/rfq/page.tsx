@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useAuth } from "@/hooks/useAuth";
+import { toast } from "@/components/ui/Toast";
 
 const AI_TAG_STYLES: Record<string, string> = {
   "AI 추천": "bg-blue-100 text-blue-700",
@@ -224,10 +225,10 @@ export default function RfqPage() {
         const data = await res.json();
         setEstimateId(data.estimateId);
       } else {
-        console.error("RFQ submission failed");
+        toast({ type: "error", title: "견적요청 실패", message: "서버 오류가 발생했습니다. 다시 시도해주세요." });
       }
-    } catch (err) {
-      console.error("RFQ submission error:", err);
+    } catch {
+      toast({ type: "error", title: "네트워크 오류", message: "견적요청 발송 중 오류가 발생했습니다." });
     }
 
     setStep("bids");
@@ -243,13 +244,16 @@ export default function RfqPage() {
 
     // Supabase에서 입찰 상태 변경
     try {
-      await fetch("/api/bids", {
+      const res = await fetch("/api/bids", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: bidId, status: "selected" }),
       });
+      if (!res.ok) {
+        toast({ type: "error", title: "업체 선정 실패", message: "다시 시도해주세요" });
+      }
     } catch {
-      // 무시
+      toast({ type: "error", title: "네트워크 오류", message: "업체 선정 중 오류가 발생했습니다" });
     }
   };
 
@@ -268,14 +272,13 @@ export default function RfqPage() {
         const data = await res.json();
         updateStatus("CONTRACTED");
         router.push(`/contract/${data.contract.id}`);
-        return;
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast({ type: "error", title: "계약 생성 실패", message: errData.error || "다시 시도해주세요" });
       }
     } catch {
-      // 실패해도 상태는 업데이트
+      toast({ type: "error", title: "네트워크 오류", message: "계약 생성 중 오류가 발생했습니다" });
     }
-
-    updateStatus("CONTRACTED");
-    router.push(`/project/${projectId}`);
   };
 
   // 수동 새로고침
