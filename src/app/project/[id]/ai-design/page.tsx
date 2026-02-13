@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins, ThumbsUp, ThumbsDown, Zap, WifiOff } from "lucide-react";
+import { ArrowRight, Send, Loader2, X, Sparkles, Maximize2, Coins, ThumbsUp, ThumbsDown, Zap, WifiOff, ChevronDown, ChevronUp, Calculator } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useCredits } from "@/hooks/useCredits";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,6 +17,47 @@ import dynamic from "next/dynamic";
 const CreditChargeModal = dynamic(() => import("@/components/project/CreditChargeModal"), {
   ssr: false,
 });
+
+// ─── 디자인 추천 관련 타입/상수 ───
+
+interface RoomDesignResult {
+  roomId: string;
+  roomName: string;
+  materials: { surface: string; recommendation: string; unitPrice: number; estimatedCost: number }[];
+  furniture: { category: string; recommendation: string; estimatedPrice: number; reason: string }[];
+  estimatedCost: number;
+}
+
+interface DesignRecommendationResult {
+  designs: RoomDesignResult[];
+  totalEstimate: number;
+  designDescription: string;
+  method?: string;
+  warnings?: string[];
+}
+
+const STYLE_OPTIONS = [
+  { key: "모던", label: "모던" },
+  { key: "북유럽", label: "북유럽" },
+  { key: "클래식", label: "클래식" },
+  { key: "미니멀", label: "미니멀" },
+  { key: "내추럴", label: "내추럴" },
+];
+
+const BUDGET_OPTIONS = [
+  { key: "economy", label: "경제형", desc: "1,500만원" },
+  { key: "standard", label: "표준형", desc: "3,000만원" },
+  { key: "premium", label: "프리미엄", desc: "5,000만원+" },
+];
+
+const PRIORITY_OPTIONS = [
+  { key: "채광", label: "채광" },
+  { key: "수납", label: "수납" },
+  { key: "동선", label: "동선" },
+  { key: "개방감", label: "개방감" },
+  { key: "방음", label: "방음" },
+  { key: "청소", label: "청소" },
+];
 
 const QUICK_PROMPTS = [
   "모던 미니멀 스타일로 전체 디자인 해줘",
@@ -79,6 +120,15 @@ export default function AIDesignPage() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const sessionIdRef = useRef(crypto.randomUUID());
   const [geminiStatus, setGeminiStatus] = useState<"loading" | "active" | "mock">("loading");
+
+  // 디자인 추천 상태
+  const [showRecommendPanel, setShowRecommendPanel] = useState(true);
+  const [selectedStyle, setSelectedStyle] = useState("모던");
+  const [selectedBudget, setSelectedBudget] = useState("standard");
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>(["채광", "수납"]);
+  const [isRecommending, setIsRecommending] = useState(false);
+  const [recommendation, setRecommendation] = useState<DesignRecommendationResult | null>(null);
+  const [expandedRoomDesign, setExpandedRoomDesign] = useState<string | null>(null);
 
   // 데이터 로드
   useEffect(() => {
@@ -226,6 +276,55 @@ export default function AIDesignPage() {
     setGeneratedImages((prev) => prev.filter((img) => img.id !== imageId));
     removeGeneratedImage(imageId);
   };
+
+  // 우선순위 토글
+  const togglePriority = (key: string) => {
+    setSelectedPriorities((prev) =>
+      prev.includes(key) ? prev.filter((p) => p !== key) : [...prev, key]
+    );
+  };
+
+  // AI 디자인 추천 요청
+  const handleRecommend = useCallback(async () => {
+    if (!floorPlan || isRecommending) return;
+    setIsRecommending(true);
+    setRecommendation(null);
+
+    try {
+      const res = await fetch("/api/project/design-recommend", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          floorPlan,
+          preferences: {
+            style: selectedStyle,
+            budget: selectedBudget,
+            priorities: selectedPriorities,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendation(data);
+        // 첫 방 자동 열기
+        if (data.designs?.length > 0) {
+          setExpandedRoomDesign(data.designs[0].roomId);
+        }
+      } else {
+        throw new Error("API error");
+      }
+    } catch {
+      setRecommendation({
+        designs: [],
+        totalEstimate: 0,
+        designDescription: "추천 생성에 실패했습니다. 다시 시도해주세요.",
+        warnings: ["API 호출 실패"],
+      });
+    }
+
+    setIsRecommending(false);
+  }, [floorPlan, isRecommending, selectedStyle, selectedBudget, selectedPriorities]);
 
   // 다음 단계
   const handleNext = () => {
@@ -453,6 +552,176 @@ export default function AIDesignPage() {
               />
             </div>
           )}
+
+          {/* AI 디자인 추천 패널 */}
+          <div className="border-b border-gray-200 bg-white">
+            <button
+              onClick={() => setShowRecommendPanel(!showRecommendPanel)}
+              className="w-full flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+            >
+              <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-purple-500" />
+                AI 디자인 추천
+              </span>
+              {showRecommendPanel ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
+            </button>
+
+            {showRecommendPanel && (
+              <div className="px-4 pb-4 space-y-3">
+                {/* 스타일 선택 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1.5 block">인테리어 스타일</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {STYLE_OPTIONS.map((s) => (
+                      <button
+                        key={s.key}
+                        onClick={() => setSelectedStyle(s.key)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          selectedStyle === s.key
+                            ? "bg-purple-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 예산 범위 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1.5 block">예산 범위</label>
+                  <div className="flex gap-2">
+                    {BUDGET_OPTIONS.map((b) => (
+                      <button
+                        key={b.key}
+                        onClick={() => setSelectedBudget(b.key)}
+                        className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${
+                          selectedBudget === b.key
+                            ? "border-purple-500 bg-purple-50 text-purple-700"
+                            : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
+                        }`}
+                      >
+                        <div>{b.label}</div>
+                        <div className="text-[10px] opacity-70">{b.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 우선순위 */}
+                <div>
+                  <label className="text-xs font-medium text-gray-600 mb-1.5 block">우선순위 (복수 선택)</label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRIORITY_OPTIONS.map((p) => (
+                      <button
+                        key={p.key}
+                        onClick={() => togglePriority(p.key)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                          selectedPriorities.includes(p.key)
+                            ? "bg-blue-600 text-white"
+                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 추천 버튼 */}
+                <button
+                  onClick={handleRecommend}
+                  disabled={!floorPlan || isRecommending}
+                  className="w-full py-2.5 bg-purple-600 text-white text-sm font-bold rounded-xl hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {isRecommending ? (
+                    <><Loader2 className="w-4 h-4 animate-spin" /> 추천 생성 중...</>
+                  ) : (
+                    <><Sparkles className="w-4 h-4" /> AI 디자인 추천 받기</>
+                  )}
+                </button>
+                {!floorPlan && (
+                  <p className="text-[10px] text-gray-400 text-center">도면이 로드되면 추천을 받을 수 있습니다</p>
+                )}
+
+                {/* 추천 결과 */}
+                {recommendation && (
+                  <div className="mt-3 space-y-2">
+                    {recommendation.designDescription && (
+                      <div className="p-3 bg-purple-50 rounded-xl border border-purple-100">
+                        <p className="text-xs text-purple-800">{recommendation.designDescription}</p>
+                      </div>
+                    )}
+
+                    {recommendation.designs.map((design) => (
+                      <div key={design.roomId} className="border border-gray-200 rounded-xl overflow-hidden">
+                        <button
+                          onClick={() => setExpandedRoomDesign(expandedRoomDesign === design.roomId ? null : design.roomId)}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <span className="text-xs font-bold text-gray-800">{design.roomName}</span>
+                          <span className="text-xs font-medium text-purple-600">
+                            {design.estimatedCost.toLocaleString()}원
+                          </span>
+                        </button>
+                        {expandedRoomDesign === design.roomId && (
+                          <div className="p-3 space-y-2">
+                            {/* 자재 */}
+                            {design.materials.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">자재</p>
+                                {design.materials.map((m, i) => (
+                                  <div key={i} className="flex justify-between text-xs py-0.5">
+                                    <span className="text-gray-600">{m.surface}: {m.recommendation}</span>
+                                    <span className="text-gray-800 font-medium">{m.estimatedCost.toLocaleString()}원</span>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {/* 가구 */}
+                            {design.furniture.length > 0 && (
+                              <div>
+                                <p className="text-[10px] font-bold text-gray-500 uppercase mb-1">가구</p>
+                                {design.furniture.map((f, i) => (
+                                  <div key={i} className="text-xs py-0.5">
+                                    <div className="flex justify-between">
+                                      <span className="text-gray-600">{f.category}: {f.recommendation}</span>
+                                      <span className="text-gray-800 font-medium">{f.estimatedPrice.toLocaleString()}원</span>
+                                    </div>
+                                    <p className="text-[10px] text-gray-400">{f.reason}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+
+                    {/* 총 예상 견적 */}
+                    {recommendation.totalEstimate > 0 && (
+                      <div className="flex items-center justify-between p-3 bg-gray-900 text-white rounded-xl">
+                        <span className="text-xs font-bold">총 예상 견적</span>
+                        <span className="text-sm font-bold">{recommendation.totalEstimate.toLocaleString()}원</span>
+                      </div>
+                    )}
+
+                    {/* 견적받기 연결 */}
+                    {recommendation.designs.length > 0 && (
+                      <button
+                        onClick={() => router.push(`/project/${projectId}/estimate`)}
+                        className="w-full py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <Calculator className="w-3.5 h-3.5" />
+                        이 디자인으로 물량산출 하기
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* 생성된 이미지 갤러리 */}
           <div className="flex-1 overflow-y-auto p-4">

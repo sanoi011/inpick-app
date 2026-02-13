@@ -1,7 +1,7 @@
 // src/lib/services/image-preprocessor.ts
 // 이미지 전처리 (서버사이드, Gemini 입력 최적화)
 
-export type ImageSource = "pdf" | "photo" | "scan";
+export type ImageSource = "pdf" | "photo" | "scan" | "hand_drawing";
 
 export interface PreprocessResult {
   base64: string;
@@ -48,21 +48,30 @@ export async function preprocessFloorPlanImage(
   // 이미지 그리기
   ctx.drawImage(img, 0, 0, newW, newH);
 
-  // 사진/스캔 소스면 그레이스케일 + 대비 강화
-  if (source === "photo" || source === "scan") {
+  // 사진/스캔/손도면 소스면 전처리 적용
+  if (source === "photo" || source === "scan" || source === "hand_drawing") {
     const imageData = ctx.getImageData(0, 0, newW, newH);
     const data = imageData.data;
 
-    for (let i = 0; i < data.length; i += 4) {
-      // 그레이스케일 변환
-      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-
-      // 대비 강화 (contrast stretch)
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 1.5 + 128));
-
-      data[i] = enhanced;
-      data[i + 1] = enhanced;
-      data[i + 2] = enhanced;
+    if (source === "hand_drawing") {
+      // 손도면: 그레이스케일 → 이진화(threshold) → 선 강화
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        // 이진화: 밝은 부분은 흰색, 어두운 부분(선)은 검정
+        const binary = gray < 160 ? 0 : 255;
+        data[i] = binary;
+        data[i + 1] = binary;
+        data[i + 2] = binary;
+      }
+    } else {
+      // 사진/스캔: 그레이스케일 + 대비 강화
+      for (let i = 0; i < data.length; i += 4) {
+        const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+        const enhanced = Math.min(255, Math.max(0, (gray - 128) * 1.5 + 128));
+        data[i] = enhanced;
+        data[i + 1] = enhanced;
+        data[i + 2] = enhanced;
+      }
     }
 
     ctx.putImageData(imageData, 0, 0);

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
-import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2, AlertTriangle, Zap } from "lucide-react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { ArrowRight, Upload, Camera, FileImage, CheckCircle2, Loader2, AlertTriangle, Zap, Smartphone, PenTool, ImagePlus, Info } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
@@ -57,8 +57,10 @@ async function parseDrawingFile(
 export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const projectId = params.id as string;
   const { project, updateStatus } = useProjectState(projectId);
+  const uploadMode = searchParams.get("mode") as "lidar" | "photo" | "hand-drawing" | null;
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,7 +76,10 @@ export default function FloorPlanPage() {
   const [yoloAvailable, setYoloAvailable] = useState(false);
   const [yoloEnhancing, setYoloEnhancing] = useState(false);
   const [yoloStats, setYoloStats] = useState<{ added: number; corrected: number } | null>(null);
+  const [, setMultiPhotos] = useState<File[]>([]);
+  const [multiPhotoUrls, setMultiPhotoUrls] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const multiFileInputRef = useRef<HTMLInputElement>(null);
   const uploadedImageRef = useRef<HTMLImageElement | null>(null);
 
   // 뷰어 제어 상태
@@ -157,6 +162,86 @@ export default function FloorPlanPage() {
   // 카메라 3D 스캐닝 (향후 WebXR 연동)
   const handleCameraScan = useCallback(async () => {
     toast({ type: "info", title: "카메라 스캐닝", message: "향후 업데이트 예정입니다. 도면 파일을 업로드해주세요." });
+  }, []);
+
+  // 다중 사진 업로드 → analyze-photos API
+  const handleMultiPhotoUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const fileArr = Array.from(files).filter(f => f.type.startsWith("image/")).slice(0, 20);
+    if (fileArr.length < 3) {
+      toast({ type: "error", title: "사진 부족", message: "최소 3장 이상의 사진이 필요합니다." });
+      return;
+    }
+
+    setMultiPhotos(fileArr);
+    const urls = fileArr.map(f => URL.createObjectURL(f));
+    setMultiPhotoUrls(urls);
+    setAnalyzing(true);
+
+    try {
+      const formData = new FormData();
+      fileArr.forEach(f => formData.append("photos", f));
+      if (project?.address?.exclusiveArea) formData.append("approximateArea", String(project.address.exclusiveArea));
+      if (project?.address?.roomCount) formData.append("roomCount", String(project.address.roomCount));
+
+      const res = await fetch("/api/project/analyze-photos", { method: "POST", body: formData });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "알 수 없는 오류" }));
+        throw new Error(err.error || `서버 오류 (${res.status})`);
+      }
+      const result = await res.json();
+      setPendingFloorPlan(result.floorPlan);
+      setParseConfidence(result.confidence);
+      setParseWarnings(result.warnings || []);
+      setParseMethod("photo_analysis");
+      setParseTimeMs(result.processingTimeMs || 0);
+      setShowParseResult(true);
+      toast({ type: "success", title: "공간 분석 완료", message: `${result.floorPlan.rooms.length}개 공간 감지` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+      toast({ type: "error", title: "사진 분석 실패", message: msg });
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [project?.address?.exclusiveArea, project?.address?.roomCount]);
+
+  // RoomPlan JSON 업로드
+  const handleRoomPlanUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAnalyzing(true);
+    try {
+      const text = await file.text();
+      const jsonData = JSON.parse(text);
+
+      const res = await fetch("/api/project/convert-roomplan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomPlanData: jsonData }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "알 수 없는 오류" }));
+        throw new Error(err.error || `서버 오류 (${res.status})`);
+      }
+
+      const result = await res.json();
+      setPendingFloorPlan(result.floorPlan);
+      setParseConfidence(result.confidence);
+      setParseWarnings(result.warnings || []);
+      setParseMethod("roomplan_json");
+      setParseTimeMs(0);
+      setShowParseResult(true);
+      toast({ type: "success", title: "RoomPlan 변환 완료", message: `${result.floorPlan.rooms.length}개 공간 감지` });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "JSON 파싱 오류";
+      toast({ type: "error", title: "RoomPlan 변환 실패", message: msg });
+    } finally {
+      setAnalyzing(false);
+    }
   }, []);
 
   // YOLO 보강 실행 (동적 import로 서버사이드 빌드 에러 방지)
@@ -285,14 +370,149 @@ export default function FloorPlanPage() {
           </div>
         ) : !floorPlan && !analyzing ? (
           /* 도면 없음 → 업로드 UI */
-          <div className="h-full flex items-center justify-center bg-gray-50 p-8">
+          <div className="h-full flex items-center justify-center bg-gray-50 p-8 overflow-y-auto">
             <div className="max-w-lg w-full">
               {project?.drawingId ? (
                 <div className="text-center mb-8">
                   <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
                   <p className="text-gray-600">도면을 불러오는 중...</p>
                 </div>
+              ) : uploadMode === "lidar" ? (
+                /* LiDAR 스캔 모드 - RoomPlan JSON 업로드 */
+                <>
+                  <div className="text-center mb-8">
+                    <div className="w-20 h-20 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <Smartphone className="w-10 h-10 text-violet-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">LiDAR 스캔 데이터 업로드</h2>
+                    <p className="text-sm text-gray-500">
+                      iPhone/iPad의 RoomPlan으로 스캔한 JSON 파일을 업로드하세요
+                    </p>
+                  </div>
+
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-violet-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-violet-800">
+                        <p className="font-medium mb-1">스캔 방법</p>
+                        <ol className="list-decimal list-inside space-y-1 text-xs text-violet-700">
+                          <li>iPhone 12 Pro 이상 또는 iPad Pro에서 3D 스캔 앱 실행</li>
+                          <li>방을 천천히 돌며 벽면, 문, 창문을 스캔</li>
+                          <li>스캔 완료 후 JSON 내보내기</li>
+                          <li>내보낸 JSON 파일을 아래에 업로드</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex flex-col items-center gap-3 p-8 bg-white border-2 border-dashed border-violet-300 rounded-xl hover:border-violet-500 hover:bg-violet-50/50 cursor-pointer transition-colors">
+                    <Upload className="w-10 h-10 text-violet-400" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-700">RoomPlan JSON 파일 업로드</p>
+                      <p className="text-xs text-gray-400 mt-1">.json 파일</p>
+                    </div>
+                    <input type="file" accept=".json" onChange={handleRoomPlanUpload} className="hidden" />
+                  </label>
+                </>
+              ) : uploadMode === "photo" ? (
+                /* 다중 사진 모드 */
+                <>
+                  <div className="text-center mb-8">
+                    <div className="w-20 h-20 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <ImagePlus className="w-10 h-10 text-emerald-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">실내 사진으로 도면 생성</h2>
+                    <p className="text-sm text-gray-500">
+                      방 사진 3~20장을 업로드하면 AI가 도면을 추정합니다
+                    </p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-emerald-800">
+                        <p className="font-medium mb-1">촬영 가이드</p>
+                        <ul className="list-disc list-inside space-y-1 text-xs text-emerald-700">
+                          <li>각 방의 전체 모습이 보이도록 촬영</li>
+                          <li>벽면, 문, 창문이 잘 보이는 각도로</li>
+                          <li>가능하면 방의 네 구석에서 각각 촬영</li>
+                          <li>복도, 현관도 촬영하면 더 정확합니다</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex flex-col items-center gap-3 p-8 bg-white border-2 border-dashed border-emerald-300 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/50 cursor-pointer transition-colors">
+                    <Camera className="w-10 h-10 text-emerald-400" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-700">사진 선택 (3~20장)</p>
+                      <p className="text-xs text-gray-400 mt-1">JPG, PNG</p>
+                    </div>
+                    <input ref={multiFileInputRef} type="file" accept="image/*" multiple onChange={handleMultiPhotoUpload} className="hidden" />
+                  </label>
+
+                  {/* 선택된 사진 미리보기 */}
+                  {multiPhotoUrls.length > 0 && (
+                    <div className="mt-4">
+                      <p className="text-xs text-gray-500 mb-2">{multiPhotoUrls.length}장 선택됨</p>
+                      <div className="grid grid-cols-5 gap-2">
+                        {multiPhotoUrls.slice(0, 10).map((url, i) => (
+                          <img key={i} src={url} alt={`사진 ${i + 1}`} className="w-full h-16 object-cover rounded-lg border border-gray-200" />
+                        ))}
+                        {multiPhotoUrls.length > 10 && (
+                          <div className="w-full h-16 bg-gray-100 rounded-lg border border-gray-200 flex items-center justify-center text-xs text-gray-500">
+                            +{multiPhotoUrls.length - 10}장
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : uploadMode === "hand-drawing" ? (
+                /* 손도면 모드 */
+                <>
+                  <div className="text-center mb-8">
+                    <div className="w-20 h-20 bg-amber-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                      <PenTool className="w-10 h-10 text-amber-500" />
+                    </div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-2">손도면 사진 업로드</h2>
+                    <p className="text-sm text-gray-500">
+                      종이에 그린 도면을 촬영하면 AI가 디지털 도면으로 변환합니다
+                    </p>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                      <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-sm text-amber-800">
+                        <p className="font-medium mb-1">손도면 작성 팁</p>
+                        <ul className="list-disc list-inside space-y-1 text-xs text-amber-700">
+                          <li>벽을 직선으로 그리고 문/창문 위치를 표시</li>
+                          <li>각 방의 이름과 대략적인 치수(m)를 기입</li>
+                          <li>밝은 곳에서 도면이 잘 보이게 촬영</li>
+                          <li>그림자가 지지 않도록 주의</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label className="flex flex-col items-center gap-3 p-8 bg-white border-2 border-dashed border-amber-300 rounded-xl hover:border-amber-500 hover:bg-amber-50/50 cursor-pointer transition-colors">
+                    <Upload className="w-10 h-10 text-amber-400" />
+                    <div className="text-center">
+                      <p className="text-sm font-medium text-gray-700">손도면 사진 업로드</p>
+                      <p className="text-xs text-gray-400 mt-1">JPG, PNG</p>
+                    </div>
+                    <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileUpload} className="hidden" />
+                  </label>
+
+                  {uploadedFile && (
+                    <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+                      <img src={uploadedFile} alt="업로드된 손도면" className="w-full max-h-48 object-contain rounded-lg" />
+                    </div>
+                  )}
+                </>
               ) : (
+                /* 기본 모드 - 도면 파일 업로드 */
                 <>
                   <div className="text-center mb-8">
                     <div className="w-20 h-20 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -300,33 +520,22 @@ export default function FloorPlanPage() {
                     </div>
                     <h2 className="text-xl font-bold text-gray-900 mb-2">도면을 등록해주세요</h2>
                     <p className="text-sm text-gray-500">
-                      우리집 찾기에서 매칭된 도면이 없습니다.<br />
                       아래 방법으로 도면을 등록할 수 있습니다.
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* 도면 파일 업로드 */}
                     <label className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-colors">
                       <Upload className="w-8 h-8 text-gray-400" />
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-700">도면 파일 업로드</p>
                         <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG</p>
                       </div>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/*,.pdf"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                      />
+                      <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
                     </label>
 
-                    {/* 카메라 3D 스캐닝 */}
-                    <button
-                      onClick={handleCameraScan}
-                      className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-colors"
-                    >
+                    <button onClick={handleCameraScan}
+                      className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-dashed border-gray-300 rounded-xl hover:border-blue-400 hover:bg-blue-50/50 cursor-pointer transition-colors">
                       <Camera className="w-8 h-8 text-gray-400" />
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-700">카메라 3D 스캐닝</p>
@@ -335,14 +544,9 @@ export default function FloorPlanPage() {
                     </button>
                   </div>
 
-                  {/* 업로드된 파일 미리보기 */}
                   {uploadedFile && (
                     <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
-                      <img
-                        src={uploadedFile}
-                        alt="업로드된 도면"
-                        className="w-full max-h-48 object-contain rounded-lg"
-                      />
+                      <img src={uploadedFile} alt="업로드된 도면" className="w-full max-h-48 object-contain rounded-lg" />
                     </div>
                   )}
                 </>

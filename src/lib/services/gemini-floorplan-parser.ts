@@ -276,7 +276,17 @@ const JSON_SCHEMA = {
 
 interface CalibrationOptions {
   knownAreaM2?: number; // 전용면적 (건물정보에서 전달)
+  sourceType?: "pdf" | "photo" | "scan" | "hand_drawing";
 }
+
+const HAND_DRAWING_PROMPT_ADDITION = `
+## 추가 지침 (손도면)
+이것은 손으로 그린 평면도 스케치입니다. 다음 사항을 고려하세요:
+- 직선으로 보이는 선은 벽으로 인식하세요
+- 손으로 그린 기호(원, 사각형 등)를 문/설비로 인식하세요
+- 손글씨 텍스트에서 공간 이름을 읽어주세요
+- 비율이 정확하지 않을 수 있으므로 텍스트 치수를 우선합니다
+- 연필/펜 선이 불규칙해도 벽체로 해석하세요`;
 
 function calibrateCoordinates(
   raw: GeminiRawResult,
@@ -783,7 +793,7 @@ export async function extractFloorPlanFromImage(
             {
               role: "user",
               parts: [
-                { text: SYSTEM_PROMPT },
+                { text: SYSTEM_PROMPT + (options.sourceType === "hand_drawing" ? HAND_DRAWING_PROMPT_ADDITION : "") },
                 {
                   inlineData: {
                     mimeType: mimeType as "image/png" | "image/jpeg",
@@ -791,7 +801,7 @@ export async function extractFloorPlanFromImage(
                   },
                 },
                 {
-                  text: `이 건축 도면을 분석하여 JSON으로 출력하세요.${
+                  text: `이 ${options.sourceType === "hand_drawing" ? "손으로 그린 평면도 스케치를" : "건축 도면을"} 분석하여 JSON으로 출력하세요.${
                     options.knownAreaM2
                       ? ` 참고: 이 세대의 전용면적은 ${options.knownAreaM2}m²입니다.`
                       : ""

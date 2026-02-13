@@ -122,6 +122,7 @@ export async function POST(request: NextRequest) {
     // Gemini Vision 도면 인식
     const result = await extractFloorPlanFromImage(imageBase64, imageMimeType, {
       knownAreaM2: knownArea,
+      sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
     });
 
     // 도면 파싱 로그 기록 (fire-and-forget)
