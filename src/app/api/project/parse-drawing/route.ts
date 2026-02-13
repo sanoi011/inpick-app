@@ -121,22 +121,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PDF인 경우 PyMuPDF 벡터 추출 병렬 시도
-    let vectorHintsPromise: Promise<VectorHints | null> = Promise.resolve(null);
+    // PDF인 경우 PyMuPDF 벡터 추출 (Gemini 호출 전에 완료 필요 - 프롬프트에 치수 힌트 주입)
+    let vectorHints: VectorHints | null = null;
     if (mimeType === "application/pdf") {
-      vectorHintsPromise = extractPdfVectors(fileBuffer, knownArea)
-        .then(r => r?.vectorHints ?? null)
-        .catch(() => null);
+      try {
+        const pyResult = await extractPdfVectors(fileBuffer, knownArea);
+        vectorHints = pyResult?.vectorHints ?? null;
+        if (vectorHints) {
+          console.log(`[parse-drawing] PyMuPDF: ${vectorHints.dimensionTexts.length} dimension texts, ${vectorHints.wallLines.length} wall lines`);
+        }
+      } catch {
+        // PyMuPDF 실패는 무시 (Gemini만으로도 동작)
+      }
     }
 
-    // Gemini Vision 도면 인식
+    // Gemini Vision 도면 인식 (vectorHints 치수 텍스트를 프롬프트에 주입)
     const result = await extractFloorPlanFromImage(imageBase64, imageMimeType, {
       knownAreaM2: knownArea,
       sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
+      dimensionHints: vectorHints?.dimensionTexts,
+      vectorScale: vectorHints?.scale,
     });
-
-    // PyMuPDF 벡터 힌트 수집 (Gemini 완료 후)
-    const vectorHints = await vectorHintsPromise;
 
     // 도면 파싱 로그 기록 (fire-and-forget)
     if (supabase) {

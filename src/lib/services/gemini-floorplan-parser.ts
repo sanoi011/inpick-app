@@ -274,9 +274,21 @@ const JSON_SCHEMA = {
 
 // ─── 좌표 보정 ───
 
+/** PyMuPDF 벡터 추출 치수 힌트 */
+interface VectorDimensionHint {
+  text: string;
+  value_mm: number;
+  x: number;
+  y: number;
+}
+
 interface CalibrationOptions {
   knownAreaM2?: number; // 전용면적 (건물정보에서 전달)
   sourceType?: "pdf" | "photo" | "scan" | "hand_drawing";
+  /** PyMuPDF에서 추출한 치수 텍스트 (mm 값) */
+  dimensionHints?: VectorDimensionHint[];
+  /** PyMuPDF 스케일 (m/pt) */
+  vectorScale?: number;
 }
 
 const HAND_DRAWING_PROMPT_ADDITION = `
@@ -738,6 +750,29 @@ function getMockFloorPlan(knownArea?: number): ParsedFloorPlan {
 
 // ─── 메인 함수 ───
 
+function buildUserPrompt(options: CalibrationOptions): string {
+  const isHandDrawing = options.sourceType === "hand_drawing";
+  let prompt = `이 ${isHandDrawing ? "손으로 그린 평면도 스케치를" : "건축 도면을"} 분석하여 JSON으로 출력하세요.`;
+
+  if (options.knownAreaM2) {
+    prompt += ` 참고: 이 세대의 전용면적은 ${options.knownAreaM2}m²입니다.`;
+  }
+
+  // PyMuPDF 벡터 치수 힌트 주입
+  if (options.dimensionHints && options.dimensionHints.length > 0) {
+    const uniqueValues = Array.from(new Set(options.dimensionHints.map(d => d.value_mm))).sort((a, b) => b - a);
+    const topValues = uniqueValues.slice(0, 20);
+    prompt += `\n\n참고: PDF 벡터 데이터에서 추출된 치수값(mm): ${topValues.join(", ")}`;
+    prompt += `\n이 치수값들을 참고하여 각 벽체/공간의 크기를 더 정확하게 산출하세요.`;
+    // 가장 큰 치수는 전체 폭/깊이
+    if (topValues[0] > 5000) {
+      prompt += ` 전체 세대의 최대 치수는 약 ${topValues[0]}mm입니다.`;
+    }
+  }
+
+  return prompt;
+}
+
 export interface FloorPlanParseResult {
   floorPlan: ParsedFloorPlan;
   confidence: number;
@@ -801,11 +836,7 @@ export async function extractFloorPlanFromImage(
                   },
                 },
                 {
-                  text: `이 ${options.sourceType === "hand_drawing" ? "손으로 그린 평면도 스케치를" : "건축 도면을"} 분석하여 JSON으로 출력하세요.${
-                    options.knownAreaM2
-                      ? ` 참고: 이 세대의 전용면적은 ${options.knownAreaM2}m²입니다.`
-                      : ""
-                  }`,
+                  text: buildUserPrompt(options),
                 },
               ],
             },
@@ -942,6 +973,8 @@ export async function extractFloorPlanFromImage(
     if (rawResult.windows.length > 0) confidence += 0.05;
     if (rawResult.fixtures.length > 0) confidence += 0.05;
     if (floorPlan.rooms.length >= 4) confidence += 0.05;
+    // PyMuPDF 벡터 힌트 보너스: 치수 텍스트가 풍부하면 보정 정확도 향상
+    if (options.dimensionHints && options.dimensionHints.length >= 10) confidence += 0.05;
     if (options.knownAreaM2) {
       const areaError = Math.abs(floorPlan.totalArea - options.knownAreaM2) / options.knownAreaM2;
       if (areaError < 0.1) confidence += 0.05;
