@@ -2,38 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export async function GET(req: NextRequest) {
-  const supabase = createClient();
-  const userId = req.nextUrl.searchParams.get("userId");
+  try {
+    const supabase = createClient();
+    const userId = req.nextUrl.searchParams.get("userId");
 
-  if (!userId) {
-    return NextResponse.json({ error: "userId 필요" }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ error: "userId 필요" }, { status: 400 });
+    }
+
+    const { data, error } = await supabase
+      .from("consumer_notifications")
+      .select("*")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    if (error) {
+      return NextResponse.json({ error: "알림 조회 실패" }, { status: 500 });
+    }
+
+    const notifications = (data || []).map((n) => ({
+      id: n.id,
+      userId: n.user_id,
+      type: n.type,
+      title: n.title,
+      message: n.message,
+      priority: n.priority,
+      isRead: n.is_read,
+      link: n.link,
+      referenceId: n.reference_id,
+      createdAt: n.created_at,
+    }));
+
+    return NextResponse.json({ notifications });
+  } catch {
+    return NextResponse.json({ error: "알림 조회 중 오류 발생" }, { status: 500 });
   }
-
-  const { data, error } = await supabase
-    .from("consumer_notifications")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(30);
-
-  if (error) {
-    return NextResponse.json({ error: "알림 조회 실패" }, { status: 500 });
-  }
-
-  const notifications = (data || []).map((n) => ({
-    id: n.id,
-    userId: n.user_id,
-    type: n.type,
-    title: n.title,
-    message: n.message,
-    priority: n.priority,
-    isRead: n.is_read,
-    link: n.link,
-    referenceId: n.reference_id,
-    createdAt: n.created_at,
-  }));
-
-  return NextResponse.json({ notifications });
 }
 
 export async function PATCH(req: NextRequest) {

@@ -138,6 +138,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 사업자 프로젝트 자동 생성 (실패해도 계약은 이미 생성됨)
+    let projectCreated = false;
     try {
       const projectName = estimate?.title || "인테리어 공사";
       const { data: autoProject } = await supabase
@@ -178,6 +179,7 @@ export async function POST(request: NextRequest) {
           description: "계약 체결로 프로젝트가 자동 생성되었습니다",
           actor: "시스템",
         });
+        projectCreated = true;
       }
     } catch {
       // 프로젝트 자동 생성 실패 시 무시 (계약은 이미 성공)
@@ -198,7 +200,7 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* silent */ }
 
-    return NextResponse.json({ contract }, { status: 201 });
+    return NextResponse.json({ contract, projectCreated }, { status: 201 });
   } catch {
     return NextResponse.json({ error: "계약 생성 중 오류가 발생했습니다." }, { status: 500 });
   }
