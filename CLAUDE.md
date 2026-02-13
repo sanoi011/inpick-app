@@ -904,6 +904,64 @@ AI 디자인 추천 → POST /api/project/design-recommend
                   "이 디자인으로 물량산출 하기" → Tab 5 (물량산출)
 ```
 
+## 완료된 작업 (2026-02-19) - PyMuPDF 벡터 기반 도면 인식 파이프라인
+
+### PyMuPDF 벡터 추출 파이프라인
+- `scripts/parse-pdf-vector.py` (신규, ~670줄) - 3단계 파이프라인
+  - **Stage 1: Extract** - PyMuPDF `page.get_drawings()` → 선분/사각형/텍스트 추출
+    - 최소 길이 필터링 (MIN_LINE_LENGTH_PT=3, MIN_WALL_LENGTH_PT=15)
+    - 두께(width) 히스토그램 자동 생성
+  - **Stage 2: Classify** - 선분 분류
+    - 두께 히스토그램 퍼센타일 기반 자동 임계값 (p90=외벽, p70=내벽)
+    - 도면 영역 바운딩박스 자동 감지 (바깥=치수선)
+    - 해치 패턴 감지 (등간격 대각선 그룹 ≥8)
+    - 치수 텍스트 근접 선 감지 (3~5자리 숫자)
+  - **Stage 3: Merge** - 벽 병합 + ParsedFloorPlan JSON 생성
+    - 평행선 쌍 → 단일 벽 (중심선 + 두께)
+    - 스케일 자동 결정 (치수 텍스트 → known_area 역산 → 기본값)
+    - 벽 중복 제거 + 최소 길이 필터 (0.3m)
+    - vectorHints 출력 (Gemini 하이브리드 통합용)
+  - **Debug**: `--debug` 플래그로 PDF 위에 분류 결과 색상 오버레이 PNG 생성
+  - 실행: `python scripts/parse-pdf-vector.py drawings/_arch/59.pdf --known-area 59 --debug`
+
+### Node.js 래퍼 + 하이브리드 API
+- `src/lib/services/pymupdf-extractor.ts` (신규) - child_process.spawn 래퍼
+  - 임시 PDF 파일 쓰기/삭제, 30초 타임아웃
+  - VectorHints / PyMuPDFResult 타입 정의
+  - 실패 시 null 반환 (graceful fallback)
+- `src/app/api/project/parse-drawing/route.ts` (수정) - 하이브리드 파이프라인
+  - PDF 업로드 시 PyMuPDF 벡터 추출 **병렬** 실행
+  - Gemini Vision 결과 + vectorHints 응답에 포함
+  - vectorHints: dimensionTexts, wallLineCount, scale, pageSize
+- `requirements.txt` (신규) - PyMuPDF>=1.23.0, Pillow>=10.0.0, numpy>=1.24.0
+
+### 테스트 결과
+| 도면 | 선분 | 분류 | 벽 | 치수텍스트 | 벡터힌트선 | 스케일 |
+|------|------|------|-----|----------|-----------|--------|
+| 59㎡ | 4,337 | ext:92 int:0 dim:225 hatch:957 | 12 | 73 | 92 | 0.032 m/pt |
+| 84A㎡ | 4,601 | ext:82 int:0 dim:850 hatch:896 | 9 | - | - | - |
+
+### 한계 및 참고사항
+- 한국어 텍스트 인식 불가 (PDF 폰트 인코딩 문제) → 방 이름은 Gemini Vision이 담당
+- 문/창문 호(arc) 미감지 (이 PDF들은 곡선 대신 선분으로 구성) → Gemini가 담당
+- **핵심 가치**: 정밀 벽 좌표 + 73개 치수 텍스트 → Gemini 결과 보정에 활용
+- Python 경로: `C:\Users\User\AppData\Local\Programs\Python\Python312\python.exe`
+- 환경: Python 3.12.10, PyMuPDF 1.27.1, NumPy 2.4.2, Pillow 12.1.1
+
+### 파이프라인 아키텍처
+```
+PDF 업로드 → POST /api/project/parse-drawing
+  ├── [병렬 1] PDF → pdfjs-dist → PNG → Gemini Vision → ParsedFloorPlan
+  ├── [병렬 2] PDF → PyMuPDF → 벡터 추출 → 분류 → 병합 → vectorHints
+  └── 응답: { floorPlan, vectorHints, vectorMethod: "pymupdf_hybrid" }
+
+vectorHints 활용:
+  - dimensionTexts: 치수 텍스트 값(mm) → 좌표 보정 기준
+  - wallLines: 벡터 벽 좌표 → Gemini 벽 좌표 스냅
+  - scale: pt→m 변환 계수 → 면적 검증
+  - pageSize: PDF 페이지 크기 → 좌표 정규화
+```
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
