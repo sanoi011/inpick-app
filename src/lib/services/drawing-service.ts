@@ -10,10 +10,16 @@ export interface DrawingCatalogEntry {
   rooms: { type: string; name: string; area: number }[];
 }
 
+export interface SampleFloorPlanType extends DrawingCatalogEntry {
+  label: string;
+  description: string;
+}
+
 interface DrawingCatalog {
   version: string;
   generatedAt: string;
   count: number;
+  sampleTypes?: SampleFloorPlanType[];
   entries: DrawingCatalogEntry[];
 }
 
@@ -54,6 +60,16 @@ export async function findMatchingDrawing(
     return scored[0].entry;
   } catch {
     return null;
+  }
+}
+
+/** Get available sample floor plan types */
+export async function getSampleTypes(): Promise<SampleFloorPlanType[]> {
+  try {
+    const catalog = await loadCatalog();
+    return catalog.sampleTypes || [];
+  } catch {
+    return [];
   }
 }
 

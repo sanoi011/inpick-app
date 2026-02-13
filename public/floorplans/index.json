@@ -1,7 +1,71 @@
 {
-  "version": "2.0",
-  "generatedAt": "2026-02-12T05:23:52.212Z",
-  "count": 10,
+  "version": "3.0",
+  "generatedAt": "2026-02-18T12:00:00.000Z",
+  "count": 13,
+  "sampleTypes": [
+    {
+      "id": "sample-59",
+      "fileName": "대전용산4블럭_59형_확장형",
+      "buildingType": "아파트",
+      "totalArea": 59,
+      "roomCount": 2,
+      "bathroomCount": 1,
+      "label": "59㎡",
+      "description": "방 2개, 욕실 1개 (소형)",
+      "rooms": [
+        { "type": "LIVING", "name": "거실", "area": 18.5 },
+        { "type": "KITCHEN", "name": "주방", "area": 6.2 },
+        { "type": "MASTER_BED", "name": "안방", "area": 13.0 },
+        { "type": "BED", "name": "침실", "area": 9.0 },
+        { "type": "BATHROOM", "name": "화장실", "area": 3.8 },
+        { "type": "ENTRANCE", "name": "현관", "area": 2.6 },
+        { "type": "BALCONY", "name": "발코니", "area": 12.4 }
+      ]
+    },
+    {
+      "id": "sample-84a",
+      "fileName": "대전용산4블럭_84A형_확장형",
+      "buildingType": "아파트",
+      "totalArea": 84,
+      "roomCount": 3,
+      "bathroomCount": 2,
+      "label": "84A㎡",
+      "description": "방 3개, 욕실 2개, 드레스룸 (중형 A타입)",
+      "rooms": [
+        { "type": "LIVING", "name": "거실", "area": 22.0 },
+        { "type": "KITCHEN", "name": "주방", "area": 7.8 },
+        { "type": "MASTER_BED", "name": "안방", "area": 14.4 },
+        { "type": "BED", "name": "침실2", "area": 10.2 },
+        { "type": "BED", "name": "침실3", "area": 8.8 },
+        { "type": "BATHROOM", "name": "화장실1", "area": 4.2 },
+        { "type": "BATHROOM", "name": "화장실2", "area": 3.2 },
+        { "type": "DRESSROOM", "name": "드레스룸", "area": 3.0 },
+        { "type": "ENTRANCE", "name": "현관", "area": 3.8 },
+        { "type": "BALCONY", "name": "발코니", "area": 12.5 }
+      ]
+    },
+    {
+      "id": "sample-84b",
+      "fileName": "대전용산4블럭_84B형_확장형",
+      "buildingType": "아파트",
+      "totalArea": 84,
+      "roomCount": 3,
+      "bathroomCount": 2,
+      "label": "84B㎡",
+      "description": "방 3개, 욕실 2개 (중형 B타입, 판상형)",
+      "rooms": [
+        { "type": "LIVING", "name": "거실", "area": 24.0 },
+        { "type": "KITCHEN", "name": "주방", "area": 7.5 },
+        { "type": "MASTER_BED", "name": "안방", "area": 14.5 },
+        { "type": "BED", "name": "침실2", "area": 10.0 },
+        { "type": "BED", "name": "침실3", "area": 9.0 },
+        { "type": "BATHROOM", "name": "화장실1", "area": 4.0 },
+        { "type": "BATHROOM", "name": "화장실2", "area": 3.0 },
+        { "type": "ENTRANCE", "name": "현관", "area": 4.0 },
+        { "type": "BALCONY", "name": "발코니", "area": 11.5 }
+      ]
+    }
+  ],
   "entries": [
     {
       "id": "apt-fp-371618742",

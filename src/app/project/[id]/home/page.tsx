@@ -9,8 +9,8 @@ import {
 import { useProjectState } from "@/hooks/useProjectState";
 import type { AddressSearchResult, BuildingInfo } from "@/types/address";
 import type { ParsedFloorPlan } from "@/types/floorplan";
-import { findMatchingDrawing, loadFloorPlan } from "@/lib/services/drawing-service";
-import type { DrawingCatalogEntry } from "@/lib/services/drawing-service";
+import { getSampleTypes, loadFloorPlan } from "@/lib/services/drawing-service";
+import type { DrawingCatalogEntry, SampleFloorPlanType } from "@/lib/services/drawing-service";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 
 type Step = "search" | "building" | "confirm";
@@ -59,6 +59,8 @@ export default function ProjectHomePage() {
   const [drawingLoading, setDrawingLoading] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [recentAddresses, setRecentAddresses] = useState<AddressSearchResult[]>([]);
+  const [sampleTypes, setSampleTypes] = useState<SampleFloorPlanType[]>([]);
+  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
 
   // 이미 주소가 설정된 프로젝트면 confirm 단계로
   useEffect(() => {
@@ -134,21 +136,39 @@ export default function ProjectHomePage() {
     setSelectedBuilding(building);
     setStep("confirm");
 
-    // 건축도면 매칭 시도
+    // 샘플 도면 타입 로드
     setDrawingLoading(true);
     try {
-      const match = await findMatchingDrawing(
-        building.exclusiveArea,
-        building.roomCount || 3,
-        building.buildingType
-      );
-      if (match) {
-        setMatchedDrawing(match);
-        const plan = await loadFloorPlan(match.id);
+      const samples = await getSampleTypes();
+      setSampleTypes(samples);
+      // 면적 기준 자동 선택: 70㎡ 이하 → 59, 그 이상 → 84A
+      if (samples.length > 0) {
+        const autoId = building.exclusiveArea <= 70
+          ? samples.find(s => s.id === "sample-59")?.id
+          : samples.find(s => s.id === "sample-84a")?.id;
+        const pickId = autoId || samples[0].id;
+        setSelectedSampleId(pickId);
+        const picked = samples.find(s => s.id === pickId)!;
+        setMatchedDrawing(picked);
+        const plan = await loadFloorPlan(pickId);
         setMatchedFloorPlan(plan);
       }
     } catch {
-      // 매칭 실패 시 무시
+      // 로드 실패 시 무시
+    } finally {
+      setDrawingLoading(false);
+    }
+  };
+
+  const handleSelectSampleType = async (sample: SampleFloorPlanType) => {
+    setSelectedSampleId(sample.id);
+    setMatchedDrawing(sample);
+    setDrawingLoading(true);
+    try {
+      const plan = await loadFloorPlan(sample.id);
+      setMatchedFloorPlan(plan);
+    } catch {
+      setMatchedFloorPlan(null);
     } finally {
       setDrawingLoading(false);
     }
@@ -498,18 +518,48 @@ export default function ProjectHomePage() {
               </div>
             </div>
 
-            {/* 매칭된 도면 미리보기 */}
+            {/* 샘플 도면 타입 선택 */}
+            {sampleTypes.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3 text-left">도면 타입을 선택하세요</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {sampleTypes.map((sample) => (
+                    <button
+                      key={sample.id}
+                      onClick={() => handleSelectSampleType(sample)}
+                      className={`relative p-4 rounded-xl border-2 text-left transition-all ${
+                        selectedSampleId === sample.id
+                          ? "border-blue-500 bg-blue-50 shadow-md"
+                          : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
+                      }`}
+                    >
+                      {selectedSampleId === sample.id && (
+                        <CheckCircle2 className="absolute top-2 right-2 w-5 h-5 text-blue-600" />
+                      )}
+                      <p className="text-lg font-bold text-gray-900">{sample.label}</p>
+                      <p className="text-xs text-gray-500 mt-1">{sample.description}</p>
+                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+                        <span>{sample.totalArea}m²</span>
+                        <span>({(sample.totalArea * 0.3025).toFixed(0)}평)</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* 선택된 도면 미리보기 */}
             {drawingLoading && (
               <div className="flex items-center justify-center py-8 bg-white rounded-2xl border border-gray-200 mb-6">
                 <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                <span className="text-sm text-gray-500">건축도면 매칭 중...</span>
+                <span className="text-sm text-gray-500">도면 로딩 중...</span>
               </div>
             )}
             {!drawingLoading && matchedFloorPlan && matchedDrawing && (
               <div className="mb-6">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                    AI 건축도면 데이터 기반
+                    실시공 건축도면 기반
                   </span>
                   <span className="text-xs text-gray-400">
                     {matchedDrawing.totalArea}m² / {matchedDrawing.roomCount}방 / {matchedDrawing.bathroomCount}욕실
