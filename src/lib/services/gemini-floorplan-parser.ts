@@ -9,6 +9,7 @@ import type {
   DoorData,
   WindowData,
   FixtureData,
+  DimensionData,
   RoomType,
 } from "@/types/floorplan";
 
@@ -648,10 +649,51 @@ function postProcess(
   validRooms.forEach((r, i) => { r.id = `room-${i}`; });
   validWalls.forEach((w, i) => { w.id = `wall-${i}`; });
 
+  // 재질 자동 매핑 + center 계산
+  const TILE_ROOMS = new Set<string>(['BATHROOM', 'ENTRANCE', 'BALCONY', 'UTILITY']);
+  for (const room of validRooms) {
+    // 바닥 재질
+    room.material = TILE_ROOMS.has(room.type) ? 'tile' : 'wood';
+
+    // 중심점 (폴리곤 centroid 또는 position 중심)
+    if (room.polygon && room.polygon.length >= 3) {
+      let cx = 0, cy = 0;
+      for (const p of room.polygon) { cx += p.x; cy += p.y; }
+      room.center = { x: round(cx / room.polygon.length), y: round(cy / room.polygon.length) };
+    } else {
+      room.center = {
+        x: round(room.position.x + room.position.width / 2),
+        y: round(room.position.y + room.position.height / 2),
+      };
+    }
+  }
+
+  // 벽 타입 매핑
+  for (const wall of validWalls) {
+    wall.wallType = wall.isExterior ? 'exterior' : (wall.thickness <= 0.1 ? 'partition' : 'interior');
+  }
+
+  // 치수선 데이터 보존 (Gemini 인식 결과)
+  const dimensions: DimensionData[] = (raw.dimensions || []).map((d, i) => ({
+    id: `dim-${i}`,
+    startPoint: { x: toM(d.start.x, calib.offsetX), y: toM(d.start.y, calib.offsetY) },
+    endPoint: { x: toM(d.end.x, calib.offsetX), y: toM(d.end.y, calib.offsetY) },
+    valueMm: d.valueMm,
+    label: `${d.valueMm}`,
+  }));
+
   // totalArea
   const totalArea = round(validRooms.reduce((s, r) => s + r.area, 0));
 
-  return { totalArea, rooms: validRooms, walls: validWalls, doors, windows, fixtures };
+  return {
+    totalArea,
+    rooms: validRooms,
+    walls: validWalls,
+    doors,
+    windows,
+    fixtures,
+    ...(dimensions.length > 0 ? { dimensions } : {}),
+  };
 }
 
 function mapFixtureType(raw: string): FixtureData["type"] {

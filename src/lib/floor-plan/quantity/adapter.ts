@@ -162,6 +162,7 @@ export function adaptParsedFloorPlan(
     height: DEFAULT_WALL_HEIGHT,
     material: w.isExterior ? 'CONCRETE' as const : 'BLOCK' as const,
     isExterior: w.isExterior,
+    wallType: w.wallType || (w.isExterior ? 'exterior' as const : 'interior' as const),
     constructionStatus: 'EXISTING' as const,
   }));
 
@@ -180,6 +181,9 @@ export function adaptParsedFloorPlan(
       name: r.name || ROOM_TYPE_NAMES[r.type] || r.type,
       type: roomType,
       polygon: toPolygonMm(r),
+      holes: r.holes?.map(hole => hole.map(p => ({ x: toMm(p.x), y: toMm(p.y) }))),
+      center: r.center ? { x: toMm(r.center.x), y: toMm(r.center.y) } : undefined,
+      floorMaterial: r.material,
       ceilingHeight: DEFAULT_CEILING_HEIGHT,
       isWetArea,
       floorLevelOffset: isWetArea ? -50 : 0, // 욕실 50mm 단차

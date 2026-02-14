@@ -16,6 +16,9 @@ export interface Room {
   name: string;
   type: string; // LIVING_ROOM, BEDROOM, MASTER_BEDROOM, KITCHEN, BATHROOM, ENTRANCE, BALCONY, UTILITY, CORRIDOR, DRESSROOM, STUDY, DINING
   polygon: Polygon2D; // mm 좌표
+  holes?: Polygon2D[]; // 중정/샤프트 hole 폴리곤
+  center?: Point2D; // 명시적 중심점
+  floorMaterial?: 'wood' | 'tile' | 'unknown'; // 바닥 재질
   ceilingHeight: number; // mm (기본 2700)
   isWetArea: boolean;
   floorLevelOffset: number; // mm (습식 공간 단차, 기본 0)
@@ -51,6 +54,7 @@ export interface Wall {
   height: number; // mm
   material: 'CONCRETE' | 'BLOCK' | 'DRYWALL' | 'WOOD';
   isExterior: boolean;
+  wallType?: 'exterior' | 'interior' | 'partition'; // isExterior 보완
   constructionStatus: 'EXISTING' | 'DEMOLISH' | 'NEW';
 }
 

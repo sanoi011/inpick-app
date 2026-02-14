@@ -10,6 +10,8 @@ export type RoomType =
   | 'CORRIDOR'
   | 'DRESSROOM';
 
+export type RoomMaterial = 'wood' | 'tile' | 'unknown';
+
 export interface RoomData {
   id: string;
   type: RoomType;
@@ -17,7 +19,12 @@ export interface RoomData {
   area: number;
   position: { x: number; y: number; width: number; height: number };
   polygon?: { x: number; y: number }[];
+  holes?: { x: number; y: number }[][];
+  center?: { x: number; y: number };
+  material?: RoomMaterial;
 }
+
+export type WallType = 'exterior' | 'interior' | 'partition';
 
 export interface WallData {
   id: string;
@@ -25,6 +32,7 @@ export interface WallData {
   end: { x: number; y: number };
   thickness: number;
   isExterior: boolean;
+  wallType?: WallType;
   polygon?: { x: number; y: number }[];
 }
 
@@ -53,6 +61,25 @@ export interface FixtureData {
   roomId?: string;
 }
 
+// 개구부 후보 (도면 인식 결과 검증용)
+export interface OpeningCandidate {
+  id: string;
+  wallId: string;
+  typeGuess: 'swing_door' | 'entrance_door' | 'window' | 'opening';
+  positionOnWall: number; // mm (벽 시작점에서 중심까지)
+  width: number;
+  confidence: number; // 0-1
+}
+
+// 치수선 데이터 (인식된 치수 정보)
+export interface DimensionData {
+  id: string;
+  startPoint: { x: number; y: number };
+  endPoint: { x: number; y: number };
+  valueMm: number;
+  label: string;
+}
+
 export interface ParsedFloorPlan {
   totalArea: number;
   rooms: RoomData[];
@@ -60,6 +87,8 @@ export interface ParsedFloorPlan {
   doors: DoorData[];
   windows: WindowData[];
   fixtures?: FixtureData[];
+  dimensions?: DimensionData[];
+  openingCandidates?: OpeningCandidate[];
 }
 
 export interface FloorPlan {

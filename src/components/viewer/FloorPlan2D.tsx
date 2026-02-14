@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef, forwardRef, useImperativeHandle, useMemo } from "react";
-import type { ParsedFloorPlan, RoomData, WallData, DoorData, WindowData, FixtureData } from "@/types/floorplan";
+import type { ParsedFloorPlan, RoomData, WallData, DoorData, WindowData, FixtureData, DimensionData } from "@/types/floorplan";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
 import { ENG_COLORS, VIEWER_SCALE } from "@/lib/floor-plan/viewer-constants";
 
@@ -203,11 +203,51 @@ function WindowSVG({ win, scale }: { win: WindowData; scale: number }) {
   );
 }
 
-function DimensionLines({ walls, scale, bounds }: {
+function DimensionLines({ walls, scale, bounds, dimensions }: {
   walls: WallData[];
   scale: number;
   bounds: { minX: number; minY: number; maxX: number; maxY: number };
+  dimensions?: DimensionData[];
 }) {
+  // Stored dimension data → render directly
+  if (dimensions && dimensions.length > 0) {
+    return (
+      <g>
+        {dimensions.map((dim) => {
+          const sx = dim.startPoint.x * scale;
+          const sy = dim.startPoint.y * scale;
+          const ex = dim.endPoint.x * scale;
+          const ey = dim.endPoint.y * scale;
+          const mx = (sx + ex) / 2;
+          const my = (sy + ey) / 2;
+          const dx = ex - sx;
+          const dy = ey - sy;
+          const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const tickLen = 4;
+          const tnx = -Math.sin(angle * Math.PI / 180) * tickLen;
+          const tny = Math.cos(angle * Math.PI / 180) * tickLen;
+
+          return (
+            <g key={dim.id}>
+              <line x1={sx} y1={sy} x2={ex} y2={ey}
+                stroke={ENG_COLORS.DIMENSION_LINE} strokeWidth={0.5} />
+              <line x1={sx - tnx} y1={sy - tny} x2={sx + tnx} y2={sy + tny}
+                stroke={ENG_COLORS.DIMENSION_LINE} strokeWidth={0.5} />
+              <line x1={ex - tnx} y1={ey - tny} x2={ex + tnx} y2={ey + tny}
+                stroke={ENG_COLORS.DIMENSION_LINE} strokeWidth={0.5} />
+              <text x={mx} y={my - 3} textAnchor="middle" dominantBaseline="auto"
+                fill={ENG_COLORS.DIMENSION_TEXT} fontSize={8} fontWeight={500}
+                transform={`rotate(${angle}, ${mx}, ${my - 3})`}>
+                {dim.valueMm.toLocaleString()}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }
+
+  // Fallback: auto-compute from walls
   const exteriorWalls = walls.filter((w) => w.isExterior);
 
   // 벽이 없는 경우 바운딩박스에서 합성 치수선
@@ -467,7 +507,7 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* 1. Grid */}
+        {/* 1. Grid + Material Patterns */}
         <defs>
           <pattern id="grid" width={scale} height={scale} patternUnits="userSpaceOnUse">
             <path d={`M ${scale} 0 L 0 0 0 ${scale}`} fill="none" stroke={ENG_COLORS.GRID_LINE} strokeWidth="0.5" />
@@ -475,11 +515,23 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
           <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
             <polygon points="0 0, 8 3, 0 6" fill={ENG_COLORS.DOOR_ARC} />
           </marker>
+          {/* Wood grain pattern */}
+          <pattern id="wood-pattern" width="12" height="12" patternUnits="userSpaceOnUse">
+            <rect width="12" height="12" fill={ENG_COLORS.MATERIAL_PATTERNS.WOOD_BG} />
+            <line x1="0" y1="3" x2="12" y2="3" stroke={ENG_COLORS.MATERIAL_PATTERNS.WOOD_LINE} strokeWidth="0.3" opacity="0.5" />
+            <line x1="0" y1="7" x2="12" y2="7" stroke={ENG_COLORS.MATERIAL_PATTERNS.WOOD_LINE} strokeWidth="0.2" opacity="0.35" />
+            <line x1="0" y1="10.5" x2="12" y2="10.5" stroke={ENG_COLORS.MATERIAL_PATTERNS.WOOD_LINE} strokeWidth="0.25" opacity="0.4" />
+          </pattern>
+          {/* Tile grid pattern */}
+          <pattern id="tile-pattern" width="10" height="10" patternUnits="userSpaceOnUse">
+            <rect width="10" height="10" fill={ENG_COLORS.MATERIAL_PATTERNS.TILE_BG} />
+            <path d="M 10 0 L 0 0 0 10" fill="none" stroke={ENG_COLORS.MATERIAL_PATTERNS.TILE_LINE} strokeWidth="0.3" opacity="0.45" />
+          </pattern>
         </defs>
         <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill={ENG_COLORS.BACKGROUND} />
         <rect x={viewBox.x} y={viewBox.y} width={viewBox.w} height={viewBox.h} fill="url(#grid)" />
 
-        {/* 2. Room fills */}
+        {/* 2. Room fills (material pattern + color overlay + hole support) */}
         {floorPlan.rooms.filter(r => isFinite(r.position.x) && isFinite(r.position.y) && r.position.width > 0 && r.position.height > 0).map((room) => {
           const isSelected = room.id === selectedRoomId;
           const isHovered = room.id === hoveredRoom;
@@ -489,6 +541,22 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
           const strokeColor = isSelected ? ENG_COLORS.SELECTED_STROKE : isHovered ? ENG_COLORS.HOVER_STROKE : "transparent";
           const strokeW = isSelected ? 2 : isHovered ? 1.5 : 0;
           const usePolygon = room.polygon && room.polygon.length >= 3;
+          const hasHoles = usePolygon && room.holes && room.holes.length > 0;
+          const materialFill = room.material === 'tile' ? 'url(#tile-pattern)'
+            : room.material === 'wood' ? 'url(#wood-pattern)' : undefined;
+
+          // Build SVG path d-string for polygon + holes (evenodd fill)
+          const buildPathD = () => {
+            let d = room.polygon!.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scale},${p.y * scale}`).join(' ') + ' Z';
+            if (hasHoles) {
+              for (const hole of room.holes!) {
+                d += ' ' + hole.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scale},${p.y * scale}`).join(' ') + ' Z';
+              }
+            }
+            return d;
+          };
+
+          const polyPoints = usePolygon ? room.polygon!.map((p) => `${p.x * scale},${p.y * scale}`).join(" ") : "";
 
           return (
             <g
@@ -498,14 +566,42 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
               onMouseLeave={() => setHoveredRoom(null)}
               className="cursor-pointer"
             >
+              {/* Material pattern base layer */}
+              {materialFill && (
+                usePolygon ? (
+                  hasHoles ? (
+                    <path d={buildPathD()} fill={materialFill} fillRule="evenodd" />
+                  ) : (
+                    <polygon points={polyPoints} fill={materialFill} />
+                  )
+                ) : (
+                  <rect
+                    x={room.position.x * scale} y={room.position.y * scale}
+                    width={room.position.width * scale} height={room.position.height * scale}
+                    fill={materialFill} rx={2}
+                  />
+                )
+              )}
+              {/* Room type color overlay */}
               {usePolygon ? (
-                <polygon
-                  points={room.polygon!.map((p) => `${p.x * scale},${p.y * scale}`).join(" ")}
-                  fill={fillColor}
-                  stroke={strokeColor}
-                  strokeWidth={strokeW}
-                  strokeLinejoin="round"
-                />
+                hasHoles ? (
+                  <path
+                    d={buildPathD()}
+                    fill={fillColor}
+                    fillRule="evenodd"
+                    stroke={strokeColor}
+                    strokeWidth={strokeW}
+                    strokeLinejoin="round"
+                  />
+                ) : (
+                  <polygon
+                    points={polyPoints}
+                    fill={fillColor}
+                    stroke={strokeColor}
+                    strokeWidth={strokeW}
+                    strokeLinejoin="round"
+                  />
+                )
               ) : (
                 <rect
                   x={room.position.x * scale}
@@ -547,14 +643,19 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
 
         {/* 6. Dimension lines */}
         {showDimensions && (
-          <DimensionLines walls={floorPlan.walls} scale={scale} bounds={bounds} />
+          <DimensionLines walls={floorPlan.walls} scale={scale} bounds={bounds} dimensions={floorPlan.dimensions} />
         )}
 
         {/* 7. Room labels (on top of everything) */}
         {floorPlan.rooms.map((room) => {
           const usePolygon = room.polygon && room.polygon.length >= 3;
           let labelX: number, labelY: number, roomW: number;
-          if (usePolygon) {
+          if (room.center) {
+            // Prefer stored center point
+            labelX = room.center.x * scale;
+            labelY = room.center.y * scale;
+            roomW = room.position.width;
+          } else if (usePolygon) {
             const c = polygonCentroid(room.polygon!);
             labelX = c.x * scale;
             labelY = c.y * scale;

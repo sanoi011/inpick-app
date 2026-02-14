@@ -51,6 +51,14 @@ export const ENG_COLORS = {
   // 라벨
   LABEL_NAME: "#2D2D3D",
   LABEL_AREA: "#6B7280",
+
+  // 재질 패턴
+  MATERIAL_PATTERNS: {
+    WOOD_LINE: "#D4C4A8",
+    WOOD_BG: "#F5F0E8",
+    TILE_LINE: "#C8C8D0",
+    TILE_BG: "#F0F0F4",
+  },
 } as const;
 
 export const VIEWER_SCALE = 50; // 1m = 50px in SVG
