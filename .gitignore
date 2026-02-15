@@ -51,3 +51,10 @@ parse_result*.json
 api_parse_result.json
 all_parse_results.json
 parse_test_result.json
+
+# Python floorplan-ai artifacts
+python/floorplan-ai/models/*.pt
+python/floorplan-ai/outputs/
+python/floorplan-ai/__pycache__/
+python/floorplan-ai/data/
+python/floorplan-ai/src/__pycache__/

@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "dev:ai": "cd python/floorplan-ai && python main.py serve --port 8100",
+    "dev:full": "concurrently \"npm run dev\" \"npm run dev:ai\""
   },
   "dependencies": {
     "@google/genai": "^1.41.0",

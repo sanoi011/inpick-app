@@ -1,0 +1,39 @@
+# YOLOv8 Floor Plan Symbol Detection Dataset Config
+# 한국 아파트 평면도 심볼 감지용
+
+path: ./data
+train: train/images
+val: val/images
+test: test/images
+
+# 심볼 클래스 정의 (한국 아파트 평면도 기준)
+nc: 13  # number of classes
+names:
+  0: wall
+  1: door_swing
+  2: door_sliding
+  3: door_entrance
+  4: window
+  5: column
+  6: toilet
+  7: bathtub
+  8: sink
+  9: kitchen_sink
+  10: stairs
+  11: elevator
+  12: dimension_line
+
+# 한국어 매핑 (코드 내 참조용)
+# wall: 벽
+# door_swing: 여닫이문
+# door_sliding: 미닫이문
+# door_entrance: 현관문
+# window: 창문
+# column: 기둥
+# toilet: 변기
+# bathtub: 욕조
+# sink: 세면대
+# kitchen_sink: 싱크대
+# stairs: 계단
+# elevator: 엘리베이터
+# dimension_line: 치수선

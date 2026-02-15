@@ -1,0 +1,84 @@
+# InPick Floor Plan Recognition Pipeline Configuration
+
+pipeline:
+  name: "inpick-floorplan-v1"
+  version: "0.1.0"
+
+# Stage 1: 전처리
+preprocessor:
+  target_size: 1280          # YOLO 입력 크기
+  binarize_threshold: 127    # 이진화 임계값
+  denoise_kernel: 3          # 노이즈 제거 커널 크기
+  deskew: true               # 기울기 보정
+  enhance_contrast: true     # 대비 강화
+
+# Stage 2: YOLOv8 심볼 감지
+symbol_detector:
+  model_path: "models/floorplan_yolov8n.pt"  # 학습된 모델 경로
+  pretrained: "yolov8n.pt"                    # 사전학습 모델 (fine-tune 시작점)
+  confidence_threshold: 0.25
+  iou_threshold: 0.45
+  max_detections: 300
+  device: "auto"  # auto, cpu, cuda:0
+  img_size: 1280
+
+# Stage 3: OCR 텍스트 인식
+text_recognizer:
+  engine: "easyocr"          # easyocr 또는 tesseract
+  languages: ["ko", "en"]
+  confidence_threshold: 0.3
+  # 한국 아파트 방 이름 사전
+  room_names:
+    - "안방"
+    - "거실"
+    - "주방"
+    - "욕실"
+    - "화장실"
+    - "발코니"
+    - "다용도실"
+    - "현관"
+    - "드레스룸"
+    - "팬트리"
+    - "방"
+    - "침실"
+    - "서재"
+
+# Stage 4: 벽 추출
+wall_extractor:
+  method: "hybrid"  # hough, morphology, hybrid
+  # Hough Transform 파라미터
+  hough:
+    rho: 1
+    theta_resolution: 1      # degree
+    threshold: 100
+    min_line_length: 50
+    max_line_gap: 10
+  # 형태학적 처리 파라미터
+  morphology:
+    wall_thickness_min: 3     # 픽셀
+    wall_thickness_max: 20    # 픽셀
+    kernel_size: 3
+  # 벽 병합 파라미터
+  merge:
+    angle_tolerance: 5        # degree
+    distance_tolerance: 10    # 픽셀
+    min_wall_length: 30       # 픽셀
+
+# Stage 5: 벡터화 & SVG 출력
+vectorizer:
+  scale_factor: 1.0          # 픽셀 → mm 변환 비율 (자동 감지 가능)
+  auto_detect_scale: true    # 치수선으로 축척 자동 감지
+  svg_stroke_width: 2
+  svg_wall_color: "#333333"
+  svg_door_color: "#0066CC"
+  svg_window_color: "#00AA00"
+  output_format: "svg"       # svg, json, both
+  coordinate_precision: 1    # 소수점 자릿수
+
+# API 서버
+api:
+  host: "0.0.0.0"
+  port: 8000
+  max_file_size_mb: 50
+  allowed_extensions: [".png", ".jpg", ".jpeg", ".pdf", ".tiff"]
+  cors_origins: ["*"]

@@ -1,849 +1,192 @@
 {
-  "totalArea": 58.999,
+  "totalArea": 59.0,
   "rooms": [
     {
       "id": "room-0",
-      "type": "MASTER_BED",
-      "name": "안방",
-      "area": 5.45,
-      "position": {
-        "x": 0,
-        "y": 0,
-        "width": 2.723,
-        "height": 2.001
-      },
+      "type": "BATHROOM",
+      "name": "욕실 1",
+      "area": 3.46,
+      "position": { "x": 0, "y": 0.5, "width": 1.73, "height": 2.0 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 0
-        },
-        {
-          "x": 0,
-          "y": 2.001
-        },
-        {
-          "x": 2.723,
-          "y": 2.001
-        },
-        {
-          "x": 2.723,
-          "y": 0
-        },
-        {
-          "x": 0,
-          "y": 0
-        }
-      ]
+        { "x": 0, "y": 0.5 }, { "x": 1.73, "y": 0.5 },
+        { "x": 1.73, "y": 2.5 }, { "x": 0, "y": 2.5 }
+      ],
+      "center": { "x": 0.865, "y": 1.5 },
+      "material": "tile"
     },
     {
       "id": "room-1",
-      "type": "BATHROOM",
-      "name": "욕실 2",
-      "area": 3.937,
-      "position": {
-        "x": 0,
-        "y": 2.001,
-        "width": 2.723,
-        "height": 1.446
-      },
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 3.48,
+      "position": { "x": 2.76, "y": 1.0, "width": 1.74, "height": 2.0 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 2.001
-        },
-        {
-          "x": 0,
-          "y": 3.447
-        },
-        {
-          "x": 2.723,
-          "y": 3.447
-        },
-        {
-          "x": 2.723,
-          "y": 2.001
-        },
-        {
-          "x": 0,
-          "y": 2.001
-        }
-      ]
+        { "x": 2.76, "y": 1.0 }, { "x": 4.5, "y": 1.0 },
+        { "x": 4.5, "y": 3.0 }, { "x": 2.76, "y": 3.0 }
+      ],
+      "center": { "x": 3.63, "y": 2.0 },
+      "material": "tile"
     },
     {
       "id": "room-2",
-      "type": "DRESSROOM",
-      "name": "드레스룸",
-      "area": 2.251,
-      "position": {
-        "x": 2.723,
-        "y": 2.001,
-        "width": 1.557,
-        "height": 1.446
-      },
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 5.73,
+      "position": { "x": 5.58, "y": 0.3, "width": 3.58, "height": 1.6 },
       "polygon": [
-        {
-          "x": 2.723,
-          "y": 2.001
-        },
-        {
-          "x": 2.723,
-          "y": 3.447
-        },
-        {
-          "x": 4.28,
-          "y": 3.447
-        },
-        {
-          "x": 4.28,
-          "y": 2.001
-        },
-        {
-          "x": 2.723,
-          "y": 2.001
-        }
-      ]
+        { "x": 5.58, "y": 0.3 }, { "x": 9.16, "y": 0.3 },
+        { "x": 9.16, "y": 1.9 }, { "x": 5.58, "y": 1.9 }
+      ],
+      "center": { "x": 7.37, "y": 1.1 },
+      "material": "tile"
     },
     {
       "id": "room-3",
-      "type": "KITCHEN",
-      "name": "주방/식당",
-      "area": 9.58,
-      "position": {
-        "x": 4.28,
-        "y": 0,
-        "width": 2.78,
-        "height": 3.447
-      },
+      "type": "BATHROOM",
+      "name": "욕실 2",
+      "area": 2.62,
+      "position": { "x": 9.16, "y": 0.5, "width": 1.54, "height": 1.7 },
       "polygon": [
-        {
-          "x": 4.28,
-          "y": 0
-        },
-        {
-          "x": 4.28,
-          "y": 3.447
-        },
-        {
-          "x": 7.06,
-          "y": 3.447
-        },
-        {
-          "x": 7.06,
-          "y": 0
-        },
-        {
-          "x": 4.28,
-          "y": 0
-        }
-      ]
+        { "x": 9.16, "y": 0.5 }, { "x": 10.7, "y": 0.5 },
+        { "x": 10.7, "y": 2.2 }, { "x": 9.16, "y": 2.2 }
+      ],
+      "center": { "x": 9.93, "y": 1.35 },
+      "material": "tile"
     },
     {
       "id": "room-4",
-      "type": "LIVING",
-      "name": "거실",
-      "area": 13.413,
-      "position": {
-        "x": 7.06,
-        "y": 0,
-        "width": 3.891,
-        "height": 3.447
-      },
+      "type": "DRESSROOM",
+      "name": "드레스룸",
+      "area": 2.26,
+      "position": { "x": 10.7, "y": 0.5, "width": 1.88, "height": 1.2 },
       "polygon": [
-        {
-          "x": 7.06,
-          "y": 0
-        },
-        {
-          "x": 7.06,
-          "y": 3.447
-        },
-        {
-          "x": 10.951,
-          "y": 3.447
-        },
-        {
-          "x": 10.951,
-          "y": 0
-        },
-        {
-          "x": 7.06,
-          "y": 0
-        }
-      ]
+        { "x": 10.7, "y": 0.5 }, { "x": 12.58, "y": 0.5 },
+        { "x": 12.58, "y": 1.7 }, { "x": 10.7, "y": 1.7 }
+      ],
+      "center": { "x": 11.64, "y": 1.1 },
+      "material": "wood"
     },
     {
       "id": "room-5",
-      "type": "BALCONY",
-      "name": "발코니 2",
-      "area": 3.089,
-      "position": {
-        "x": 4.28,
-        "y": 3.447,
-        "width": 2.78,
-        "height": 1.112
-      },
+      "type": "BED",
+      "name": "침실 3",
+      "area": 8.0,
+      "position": { "x": 0, "y": 3.0, "width": 2.76, "height": 2.9 },
       "polygon": [
-        {
-          "x": 4.28,
-          "y": 3.447
-        },
-        {
-          "x": 4.28,
-          "y": 4.559
-        },
-        {
-          "x": 7.06,
-          "y": 4.559
-        },
-        {
-          "x": 7.06,
-          "y": 3.447
-        },
-        {
-          "x": 4.28,
-          "y": 3.447
-        }
-      ]
+        { "x": 0, "y": 3.0 }, { "x": 2.76, "y": 3.0 },
+        { "x": 2.76, "y": 5.9 }, { "x": 0, "y": 5.9 }
+      ],
+      "center": { "x": 1.38, "y": 4.45 },
+      "material": "wood"
     },
     {
       "id": "room-6",
-      "type": "BALCONY",
-      "name": "발코니 1",
-      "area": 4.326,
-      "position": {
-        "x": 7.06,
-        "y": 3.447,
-        "width": 3.891,
-        "height": 1.112
-      },
+      "type": "BED",
+      "name": "침실 2",
+      "area": 8.18,
+      "position": { "x": 2.76, "y": 3.0, "width": 2.82, "height": 2.9 },
       "polygon": [
-        {
-          "x": 7.06,
-          "y": 3.447
-        },
-        {
-          "x": 7.06,
-          "y": 4.559
-        },
-        {
-          "x": 10.951,
-          "y": 4.559
-        },
-        {
-          "x": 10.951,
-          "y": 3.447
-        },
-        {
-          "x": 7.06,
-          "y": 3.447
-        }
-      ]
+        { "x": 2.76, "y": 3.0 }, { "x": 5.58, "y": 3.0 },
+        { "x": 5.58, "y": 5.9 }, { "x": 2.76, "y": 5.9 }
+      ],
+      "center": { "x": 4.17, "y": 4.45 },
+      "material": "wood"
     },
     {
       "id": "room-7",
-      "type": "ENTRANCE",
-      "name": "현관",
-      "area": 3.935,
-      "position": {
-        "x": 0,
-        "y": 3.447,
-        "width": 2.723,
-        "height": 1.445
-      },
+      "type": "LIVING",
+      "name": "거실",
+      "area": 13.96,
+      "position": { "x": 5.58, "y": 1.9, "width": 3.58, "height": 4.0 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 3.447
-        },
-        {
-          "x": 0,
-          "y": 4.892
-        },
-        {
-          "x": 2.723,
-          "y": 4.892
-        },
-        {
-          "x": 2.723,
-          "y": 3.447
-        },
-        {
-          "x": 0,
-          "y": 3.447
-        }
-      ]
+        { "x": 5.58, "y": 1.9 }, { "x": 9.16, "y": 1.9 },
+        { "x": 9.16, "y": 5.9 }, { "x": 5.58, "y": 5.9 }
+      ],
+      "center": { "x": 7.37, "y": 3.9 },
+      "material": "wood"
     },
     {
       "id": "room-8",
-      "type": "BATHROOM",
-      "name": "욕실 1",
-      "area": 3.937,
-      "position": {
-        "x": 0,
-        "y": 4.892,
-        "width": 2.723,
-        "height": 1.446
-      },
+      "type": "MASTER_BED",
+      "name": "안방",
+      "area": 10.94,
+      "position": { "x": 9.16, "y": 2.7, "width": 3.42, "height": 3.2 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 4.892
-        },
-        {
-          "x": 0,
-          "y": 6.338
-        },
-        {
-          "x": 2.723,
-          "y": 6.338
-        },
-        {
-          "x": 2.723,
-          "y": 4.892
-        },
-        {
-          "x": 0,
-          "y": 4.892
-        }
-      ]
+        { "x": 9.16, "y": 2.7 }, { "x": 12.58, "y": 2.7 },
+        { "x": 12.58, "y": 5.9 }, { "x": 9.16, "y": 5.9 }
+      ],
+      "center": { "x": 10.87, "y": 4.3 },
+      "material": "wood"
     },
     {
       "id": "room-9",
-      "type": "BED",
-      "name": "침실 2",
-      "area": 4.538,
-      "position": {
-        "x": 0,
-        "y": 6.338,
-        "width": 2.723,
-        "height": 1.667
-      },
+      "type": "BALCONY",
+      "name": "발코니 1",
+      "area": 4.2,
+      "position": { "x": 5.58, "y": 5.9, "width": 7.0, "height": 0.6 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 6.338
-        },
-        {
-          "x": 0,
-          "y": 8.004
-        },
-        {
-          "x": 2.723,
-          "y": 8.004
-        },
-        {
-          "x": 2.723,
-          "y": 6.338
-        },
-        {
-          "x": 0,
-          "y": 6.338
-        }
-      ]
+        { "x": 5.58, "y": 5.9 }, { "x": 12.58, "y": 5.9 },
+        { "x": 12.58, "y": 6.5 }, { "x": 5.58, "y": 6.5 }
+      ],
+      "center": { "x": 9.08, "y": 6.2 },
+      "material": "tile"
     },
     {
       "id": "room-10",
-      "type": "BED",
-      "name": "침실 3",
-      "area": 4.543,
-      "position": {
-        "x": 0,
-        "y": 8.004,
-        "width": 2.723,
-        "height": 1.668
-      },
+      "type": "BALCONY",
+      "name": "발코니 2",
+      "area": 3.12,
+      "position": { "x": 3.5, "y": 0, "width": 2.08, "height": 1.5 },
       "polygon": [
-        {
-          "x": 0,
-          "y": 8.004
-        },
-        {
-          "x": 0,
-          "y": 9.672
-        },
-        {
-          "x": 2.723,
-          "y": 9.672
-        },
-        {
-          "x": 2.723,
-          "y": 8.004
-        },
-        {
-          "x": 0,
-          "y": 8.004
-        }
-      ]
+        { "x": 3.5, "y": 0 }, { "x": 5.58, "y": 0 },
+        { "x": 5.58, "y": 1.5 }, { "x": 3.5, "y": 1.5 }
+      ],
+      "center": { "x": 4.54, "y": 0.75 },
+      "material": "tile"
     }
   ],
   "walls": [
-    {
-      "id": "wall-0",
-      "start": {
-        "x": 0,
-        "y": 0
-      },
-      "end": {
-        "x": 10.951,
-        "y": 0
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-1",
-      "start": {
-        "x": 10.951,
-        "y": 0
-      },
-      "end": {
-        "x": 10.951,
-        "y": 4.559
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-2",
-      "start": {
-        "x": 10.951,
-        "y": 4.559
-      },
-      "end": {
-        "x": 7.06,
-        "y": 4.559
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-3",
-      "start": {
-        "x": 7.06,
-        "y": 4.559
-      },
-      "end": {
-        "x": 4.28,
-        "y": 4.559
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-4",
-      "start": {
-        "x": 4.28,
-        "y": 4.559
-      },
-      "end": {
-        "x": 0,
-        "y": 4.559
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-5",
-      "start": {
-        "x": 0,
-        "y": 4.559
-      },
-      "end": {
-        "x": 0,
-        "y": 0
-      },
-      "thickness": 0.2,
-      "isExterior": true
-    },
-    {
-      "id": "wall-6",
-      "start": {
-        "x": 0,
-        "y": 2.001
-      },
-      "end": {
-        "x": 2.723,
-        "y": 2.001
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-7",
-      "start": {
-        "x": 2.723,
-        "y": 2.001
-      },
-      "end": {
-        "x": 2.723,
-        "y": 3.447
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-8",
-      "start": {
-        "x": 2.723,
-        "y": 3.447
-      },
-      "end": {
-        "x": 0,
-        "y": 3.447
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-9",
-      "start": {
-        "x": 4.28,
-        "y": 2.001
-      },
-      "end": {
-        "x": 4.28,
-        "y": 0
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-10",
-      "start": {
-        "x": 4.28,
-        "y": 2.001
-      },
-      "end": {
-        "x": 7.06,
-        "y": 2.001
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-11",
-      "start": {
-        "x": 7.06,
-        "y": 2.001
-      },
-      "end": {
-        "x": 7.06,
-        "y": 0
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-12",
-      "start": {
-        "x": 0,
-        "y": 4.892
-      },
-      "end": {
-        "x": 2.723,
-        "y": 4.892
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-13",
-      "start": {
-        "x": 2.723,
-        "y": 4.892
-      },
-      "end": {
-        "x": 2.723,
-        "y": 6.338
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-14",
-      "start": {
-        "x": 2.723,
-        "y": 6.338
-      },
-      "end": {
-        "x": 0,
-        "y": 6.338
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-15",
-      "start": {
-        "x": 0,
-        "y": 8.004
-      },
-      "end": {
-        "x": 2.723,
-        "y": 8.004
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    },
-    {
-      "id": "wall-16",
-      "start": {
-        "x": 0,
-        "y": 9.672
-      },
-      "end": {
-        "x": 2.723,
-        "y": 9.672
-      },
-      "thickness": 0.12,
-      "isExterior": false
-    }
+    { "id": "wall-ext-n", "start": { "x": 0, "y": 0 }, "end": { "x": 12.58, "y": 0 }, "thickness": 0.135, "isExterior": true, "wallType": "exterior" },
+    { "id": "wall-ext-e", "start": { "x": 12.58, "y": 0 }, "end": { "x": 12.58, "y": 6.5 }, "thickness": 0.135, "isExterior": true, "wallType": "exterior" },
+    { "id": "wall-ext-s1", "start": { "x": 12.58, "y": 6.5 }, "end": { "x": 5.58, "y": 6.5 }, "thickness": 0.135, "isExterior": true, "wallType": "exterior" },
+    { "id": "wall-ext-s2", "start": { "x": 5.58, "y": 5.9 }, "end": { "x": 0, "y": 5.9 }, "thickness": 0.135, "isExterior": true, "wallType": "exterior" },
+    { "id": "wall-ext-w", "start": { "x": 0, "y": 5.9 }, "end": { "x": 0, "y": 0 }, "thickness": 0.135, "isExterior": true, "wallType": "exterior" },
+    { "id": "wall-int-1", "start": { "x": 2.76, "y": 3.0 }, "end": { "x": 2.76, "y": 5.9 }, "thickness": 0.12, "isExterior": false, "wallType": "interior" },
+    { "id": "wall-int-2", "start": { "x": 5.58, "y": 0 }, "end": { "x": 5.58, "y": 5.9 }, "thickness": 0.12, "isExterior": false, "wallType": "interior" },
+    { "id": "wall-int-3", "start": { "x": 9.16, "y": 0 }, "end": { "x": 9.16, "y": 5.9 }, "thickness": 0.24, "isExterior": false, "wallType": "interior" },
+    { "id": "wall-int-4", "start": { "x": 0, "y": 3.0 }, "end": { "x": 5.58, "y": 3.0 }, "thickness": 0.12, "isExterior": false, "wallType": "interior" },
+    { "id": "wall-int-5", "start": { "x": 9.16, "y": 2.7 }, "end": { "x": 12.58, "y": 2.7 }, "thickness": 0.12, "isExterior": false, "wallType": "interior" },
+    { "id": "wall-int-6", "start": { "x": 1.73, "y": 0.5 }, "end": { "x": 1.73, "y": 2.5 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" },
+    { "id": "wall-int-7", "start": { "x": 0, "y": 2.5 }, "end": { "x": 1.73, "y": 2.5 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" },
+    { "id": "wall-int-8", "start": { "x": 4.5, "y": 1.0 }, "end": { "x": 4.5, "y": 3.0 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" },
+    { "id": "wall-int-9", "start": { "x": 2.76, "y": 1.0 }, "end": { "x": 4.5, "y": 1.0 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" },
+    { "id": "wall-int-10", "start": { "x": 10.7, "y": 0.5 }, "end": { "x": 10.7, "y": 2.2 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" },
+    { "id": "wall-int-11", "start": { "x": 9.16, "y": 2.2 }, "end": { "x": 12.58, "y": 2.2 }, "thickness": 0.12, "isExterior": false, "wallType": "partition" }
   ],
   "doors": [
-    {
-      "id": "door-0",
-      "position": {
-        "x": 2.723,
-        "y": 1.001
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "MASTER_BED",
-        "CORRIDOR"
-      ]
-    },
-    {
-      "id": "door-1",
-      "position": {
-        "x": 2.723,
-        "y": 2.723
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "BATHROOM",
-        "DRESSROOM"
-      ]
-    },
-    {
-      "id": "door-2",
-      "position": {
-        "x": 4.28,
-        "y": 2.723
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "DRESSROOM",
-        "KITCHEN"
-      ]
-    },
-    {
-      "id": "door-3",
-      "position": {
-        "x": 2.723,
-        "y": 4.169
-      },
-      "width": 0.9,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "ENTRANCE",
-        "CORRIDOR"
-      ]
-    },
-    {
-      "id": "door-4",
-      "position": {
-        "x": 2.723,
-        "y": 5.614
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "BATHROOM",
-        "CORRIDOR"
-      ]
-    },
-    {
-      "id": "door-5",
-      "position": {
-        "x": 2.723,
-        "y": 7.171
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "BED",
-        "CORRIDOR"
-      ]
-    },
-    {
-      "id": "door-6",
-      "position": {
-        "x": 2.723,
-        "y": 8.839
-      },
-      "width": 0.8,
-      "rotation": 90,
-      "type": "swing",
-      "connectedRooms": [
-        "BED",
-        "CORRIDOR"
-      ]
-    }
+    { "id": "door-0", "position": { "x": 3.63, "y": 0.5 }, "width": 0.9, "rotation": 0, "type": "swing", "connectedRooms": ["ENTRANCE", "CORRIDOR"] },
+    { "id": "door-1", "position": { "x": 0.87, "y": 2.5 }, "width": 0.8, "rotation": 180, "type": "swing", "connectedRooms": ["BATHROOM", "CORRIDOR"] },
+    { "id": "door-2", "position": { "x": 1.38, "y": 3.0 }, "width": 0.8, "rotation": 0, "type": "swing", "connectedRooms": ["BED", "CORRIDOR"] },
+    { "id": "door-3", "position": { "x": 4.17, "y": 3.0 }, "width": 0.8, "rotation": 0, "type": "swing", "connectedRooms": ["BED", "CORRIDOR"] },
+    { "id": "door-4", "position": { "x": 6.5, "y": 1.9 }, "width": 1.5, "rotation": 0, "type": "sliding", "connectedRooms": ["KITCHEN", "LIVING"] },
+    { "id": "door-5", "position": { "x": 9.16, "y": 4.0 }, "width": 0.9, "rotation": 90, "type": "swing", "connectedRooms": ["MASTER_BED", "LIVING"] },
+    { "id": "door-6", "position": { "x": 9.93, "y": 2.2 }, "width": 0.7, "rotation": 180, "type": "swing", "connectedRooms": ["BATHROOM", "CORRIDOR"] },
+    { "id": "door-7", "position": { "x": 11.64, "y": 1.7 }, "width": 0.7, "rotation": 180, "type": "swing", "connectedRooms": ["DRESSROOM", "MASTER_BED"] }
   ],
   "windows": [
-    {
-      "id": "window-0",
-      "position": {
-        "x": 1.357,
-        "y": 0
-      },
-      "width": 1.2,
-      "height": 1.2,
-      "rotation": 0,
-      "wallId": "wall-6"
-    },
-    {
-      "id": "window-1",
-      "position": {
-        "x": 5.114,
-        "y": 0
-      },
-      "width": 1.2,
-      "height": 1.2,
-      "rotation": 0,
-      "wallId": "wall-0"
-    },
-    {
-      "id": "window-2",
-      "position": {
-        "x": 9.005,
-        "y": 0
-      },
-      "width": 2.5,
-      "height": 2.2,
-      "rotation": 0,
-      "wallId": "wall-11"
-    },
-    {
-      "id": "window-3",
-      "position": {
-        "x": 5.114,
-        "y": 4.559
-      },
-      "width": 1.2,
-      "height": 1.2,
-      "rotation": 180,
-      "wallId": "wall-3"
-    },
-    {
-      "id": "window-4",
-      "position": {
-        "x": 1.357,
-        "y": 4.559
-      },
-      "width": 1.2,
-      "height": 1.2,
-      "rotation": 180,
-      "wallId": "wall-12"
-    }
+    { "id": "win-0", "position": { "x": 1.38, "y": 5.9 }, "width": 1.8, "height": 1.2, "rotation": 0, "wallId": "wall-ext-s2" },
+    { "id": "win-1", "position": { "x": 4.17, "y": 5.9 }, "width": 1.8, "height": 1.2, "rotation": 0, "wallId": "wall-ext-s2" },
+    { "id": "win-2", "position": { "x": 7.37, "y": 5.9 }, "width": 2.4, "height": 2.2, "rotation": 0, "wallId": "wall-ext-s2" },
+    { "id": "win-3", "position": { "x": 10.87, "y": 5.9 }, "width": 2.0, "height": 2.0, "rotation": 0, "wallId": "wall-ext-s1" },
+    { "id": "win-4", "position": { "x": 0, "y": 1.5 }, "width": 0.6, "height": 0.6, "rotation": 270, "wallId": "wall-ext-w" }
   ],
   "fixtures": [
-    {
-      "id": "fixture-0",
-      "type": "toilet",
-      "roomId": "room-1",
-      "position": {
-        "x": 0.188,
-        "y": 1.978,
-        "width": 0.625,
-        "height": 0.938
-      }
-    },
-    {
-      "id": "fixture-1",
-      "type": "sink",
-      "roomId": "room-1",
-      "position": {
-        "x": 0.888,
-        "y": 2.056,
-        "width": 0.782,
-        "height": 0.782
-      }
-    },
-    {
-      "id": "fixture-2",
-      "type": "bathtub",
-      "roomId": "room-1",
-      "position": {
-        "x": 0.661,
-        "y": 1.899,
-        "width": 2.345,
-        "height": 1.094
-      }
-    },
-    {
-      "id": "fixture-3",
-      "type": "kitchen_sink",
-      "roomId": "room-3",
-      "position": {
-        "x": 4.323,
-        "y": 0.31,
-        "width": 1.251,
-        "height": 0.938
-      }
-    },
-    {
-      "id": "fixture-4",
-      "type": "stove",
-      "roomId": "room-3",
-      "position": {
-        "x": 5.59,
-        "y": 0.31,
-        "width": 0.938,
-        "height": 0.938
-      }
-    },
-    {
-      "id": "fixture-5",
-      "type": "toilet",
-      "roomId": "room-8",
-      "position": {
-        "x": 0.188,
-        "y": 4.868,
-        "width": 0.625,
-        "height": 0.938
-      }
-    },
-    {
-      "id": "fixture-6",
-      "type": "sink",
-      "roomId": "room-8",
-      "position": {
-        "x": 0.888,
-        "y": 4.946,
-        "width": 0.782,
-        "height": 0.782
-      }
-    },
-    {
-      "id": "fixture-7",
-      "type": "bathtub",
-      "roomId": "room-8",
-      "position": {
-        "x": 0.661,
-        "y": 4.79,
-        "width": 2.345,
-        "height": 1.094
-      }
-    }
+    { "id": "fix-0", "type": "toilet", "roomId": "room-0", "position": { "x": 0.15, "y": 0.7, "width": 0.45, "height": 0.65 } },
+    { "id": "fix-1", "type": "sink", "roomId": "room-0", "position": { "x": 0.8, "y": 0.6, "width": 0.5, "height": 0.45 } },
+    { "id": "fix-2", "type": "bathtub", "roomId": "room-0", "position": { "x": 0.1, "y": 1.5, "width": 1.5, "height": 0.75 } },
+    { "id": "fix-3", "type": "toilet", "roomId": "room-3", "position": { "x": 9.3, "y": 0.7, "width": 0.45, "height": 0.65 } },
+    { "id": "fix-4", "type": "sink", "roomId": "room-3", "position": { "x": 9.9, "y": 0.6, "width": 0.5, "height": 0.45 } },
+    { "id": "fix-5", "type": "kitchen_sink", "roomId": "room-2", "position": { "x": 5.8, "y": 0.4, "width": 1.2, "height": 0.6 } },
+    { "id": "fix-6", "type": "stove", "roomId": "room-2", "position": { "x": 7.2, "y": 0.4, "width": 0.6, "height": 0.6 } }
   ]
 }

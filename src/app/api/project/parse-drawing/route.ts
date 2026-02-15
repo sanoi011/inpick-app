@@ -13,6 +13,9 @@ import {
 import type { ImageSource } from "@/lib/services/image-preprocessor";
 import { extractPdfVectors } from "@/lib/services/pymupdf-extractor";
 import type { VectorHints } from "@/lib/services/pymupdf-extractor";
+import { callFloorplanAI } from "@/lib/services/floorplan-ai-client";
+import { convertFloorplanAIResult } from "@/lib/services/floorplan-ai-converter";
+import { enhancedFuse } from "@/lib/services/enhanced-fusion";
 
 const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -121,9 +124,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PDF인 경우 PyMuPDF 벡터 추출 (Gemini 호출 전에 완료 필요 - 프롬프트에 치수 힌트 주입)
+    // 병렬 3호출: Gemini Vision + PyMuPDF + floorplan-ai
+    const isPdf = mimeType === "application/pdf";
+
+    // 1단계: PyMuPDF 벡터 추출 (Gemini 프롬프트에 힌트 주입 필요 → 먼저 실행)
     let vectorHints: VectorHints | null = null;
-    if (mimeType === "application/pdf") {
+    if (isPdf) {
       try {
         const pyResult = await extractPdfVectors(fileBuffer, knownArea);
         vectorHints = pyResult?.vectorHints ?? null;
@@ -131,17 +137,46 @@ export async function POST(request: NextRequest) {
           console.log(`[parse-drawing] PyMuPDF: ${vectorHints.dimensionTexts.length} dimension texts, ${vectorHints.wallLines.length} wall lines`);
         }
       } catch {
-        // PyMuPDF 실패는 무시 (Gemini만으로도 동작)
+        // PyMuPDF 실패는 무시
       }
     }
 
-    // Gemini Vision 도면 인식 (vectorHints 치수 텍스트를 프롬프트에 주입)
-    const result = await extractFloorPlanFromImage(imageBase64, imageMimeType, {
-      knownAreaM2: knownArea,
-      sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
-      dimensionHints: vectorHints?.dimensionTexts,
-      vectorScale: vectorHints?.scale,
-    });
+    // 2단계: Gemini Vision + floorplan-ai 병렬 실행
+    const [geminiSettled, aiSettled] = await Promise.allSettled([
+      extractFloorPlanFromImage(imageBase64, imageMimeType, {
+        knownAreaM2: knownArea,
+        sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
+        dimensionHints: vectorHints?.dimensionTexts,
+        vectorScale: vectorHints?.scale,
+      }),
+      callFloorplanAI(fileBuffer, file.name),
+    ]);
+
+    // Gemini 결과 추출
+    const result = geminiSettled.status === "fulfilled"
+      ? geminiSettled.value
+      : null;
+
+    if (!result) {
+      return NextResponse.json(
+        { error: "도면 분석에 실패했습니다. 다시 시도해주세요." },
+        { status: 500 }
+      );
+    }
+
+    // floorplan-ai 결과 변환
+    const aiRawResult = aiSettled.status === "fulfilled" ? aiSettled.value : null;
+    const aiParsedPlan = aiRawResult
+      ? convertFloorplanAIResult(aiRawResult, knownArea)
+      : null;
+
+    if (aiParsedPlan) {
+      console.log(`[parse-drawing] floorplan-ai: ${aiParsedPlan.rooms.length} rooms, ${aiParsedPlan.walls.length} walls, ${aiParsedPlan.doors.length} doors`);
+    }
+
+    // 3단계: Enhanced Fusion (Gemini + floorplan-ai + PyMuPDF)
+    const fusionResult = enhancedFuse(result.floorPlan, aiParsedPlan, vectorHints);
+    result.floorPlan = fusionResult.floorPlan;
 
     // 도면 파싱 로그 기록 (fire-and-forget)
     if (supabase) {
@@ -180,6 +215,11 @@ export async function POST(request: NextRequest) {
           pageSize: vectorHints.pageSize,
         },
         vectorMethod: "pymupdf_hybrid",
+      } : {}),
+      aiPipelineUsed: !!aiParsedPlan,
+      ...(aiParsedPlan ? {
+        aiPipelineStats: fusionResult.stats,
+        aiPipelineSources: fusionResult.sources,
       } : {}),
     });
   } catch (error) {
