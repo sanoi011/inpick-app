@@ -1,8 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import { motion } from "motion/react";
-import { Check, GitBranch, Star, Brain, Calculator, Users, Eye } from "lucide-react";
+import { Check, GitBranch, Star } from "lucide-react";
+import {
+  AIConsultAnimation,
+  PriceSyncAnimation,
+  EstimateViewerAnimation,
+  ContractorMatchAnimation,
+} from "./FeatureAnimations";
 
 const FEATURES = [
   {
@@ -10,7 +15,7 @@ const FEATURES = [
     title: "대화만으로",
     titleBreak: "견적이 완성됩니다.",
     description: "AI가 고객의 인테리어 니즈를 파악하고, 최적의 마감재와 스타일을 추천합니다",
-    image: "/images/feature-living.jpg",
+    animation: "ai-consult" as const,
     checkItems: [
       "대화형 AI가 인테리어 니즈 파악",
       "실시간 단가 기반 견적 자동 생성",
@@ -22,7 +27,7 @@ const FEATURES = [
     title: "공식 기관 데이터로,",
     titleBreak: "정확한 견적을.",
     description: "한국물가협회, 대한건설협회, 조달청 3대 공식 데이터를 자동 연동합니다.",
-    image: "/images/feature-fireplace.jpg",
+    animation: "price-sync" as const,
     subFeatures: [
       { icon: "branch" as const, title: "자재 단가 실시간 반영", description: "한국물가협회 데이터를 매월 자동 갱신하여 최신 자재 단가를 적용합니다" },
       { icon: "star" as const, title: "노임 단가 공식 기준", description: "대한건설협회 공시 노임단가를 기준으로 정확한 인건비를 산출합니다" },
@@ -34,7 +39,7 @@ const FEATURES = [
     titleBreak: "견적을 확인하세요.",
     description: "견적 항목과 3D 공간이 실시간 연동됩니다.",
     descriptionBreak: "마감재를 선택하면 3D 뷰어에서 바로 확인할 수 있어요.",
-    image: "/images/feature-staircase.jpg",
+    animation: "estimate-viewer" as const,
   },
   {
     label: "전문업체 매칭",
@@ -42,8 +47,11 @@ const FEATURES = [
     titleBreak: "자동으로 매칭.",
     description: "AI가 견적 내용을 분석하여 최적의 전문업체를 자동 매칭합니다.",
     descriptionBreak: "거리, 평점, 가격, 일정 등 6가지 요소를 종합 분석합니다.",
+    animation: "contractor-match" as const,
   },
 ];
+
+type AnimationType = "ai-consult" | "price-sync" | "estimate-viewer" | "contractor-match";
 
 function Badge({ children }: { children: React.ReactNode }) {
   return (
@@ -61,10 +69,21 @@ function GradientCheckIcon() {
   );
 }
 
+function AnimationVisual({ type }: { type: AnimationType }) {
+  switch (type) {
+    case "ai-consult":
+      return <AIConsultAnimation />;
+    case "price-sync":
+      return <PriceSyncAnimation />;
+    case "estimate-viewer":
+      return <EstimateViewerAnimation />;
+    case "contractor-match":
+      return <ContractorMatchAnimation />;
+  }
+}
+
 function FeatureSection({ feature, index }: { feature: typeof FEATURES[0]; index: number }) {
   const isReversed = index % 2 === 1;
-  const icons = [Brain, Calculator, Eye, Users];
-  const Icon = icons[index] || Brain;
 
   const content = (
     <div className="flex flex-col justify-center space-y-6">
@@ -104,24 +123,7 @@ function FeatureSection({ feature, index }: { feature: typeof FEATURES[0]; index
 
   const visual = (
     <div className="relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm">
-      {feature.image ? (
-        <div className="relative aspect-[4/3] overflow-hidden rounded-xl">
-          <Image
-            src={feature.image}
-            alt={feature.label}
-            fill
-            className="object-cover"
-            sizes="(max-width: 1024px) 100vw, 50vw"
-          />
-        </div>
-      ) : (
-        <div className="flex aspect-[4/3] items-center justify-center rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50">
-          <div className="text-center">
-            <Icon className="mx-auto h-16 w-16 text-blue-600 mb-4" strokeWidth={1.5} />
-            <p className="text-sm text-gray-500">{feature.label}</p>
-          </div>
-        </div>
-      )}
+      <AnimationVisual type={feature.animation} />
     </div>
   );
 

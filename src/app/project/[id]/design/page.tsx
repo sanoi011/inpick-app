@@ -25,6 +25,7 @@ const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
 });
 
 const DrawingParseResult = dynamic(() => import("@/components/project/DrawingParseResult"));
+const WallDrawingCanvas = dynamic(() => import("@/components/wall-drawing/WallDrawingCanvas"), { ssr: false });
 
 // 도면 파일 → API → ParsedFloorPlan
 async function parseDrawingFile(
@@ -62,7 +63,7 @@ export default function FloorPlanPage() {
   const searchParams = useSearchParams();
   const projectId = params.id as string;
   const { project, updateStatus } = useProjectState(projectId);
-  const uploadMode = searchParams.get("mode") as "lidar" | "photo" | "hand-drawing" | null;
+  const uploadMode = searchParams.get("mode") as "lidar" | "photo" | "hand-drawing" | "draw" | null;
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [loading, setLoading] = useState(true);
@@ -355,7 +356,19 @@ export default function FloorPlanPage() {
 
       {/* 메인 영역 */}
       <div className="flex-1 min-h-0">
-        {showParseResult && pendingFloorPlan ? (
+        {uploadMode === "draw" && !floorPlan ? (
+          /* 직접 그리기 모드 */
+          <div className="h-full">
+            <WallDrawingCanvas
+              knownArea={project?.address?.exclusiveArea}
+              onComplete={(plan) => {
+                setFloorPlan(plan);
+                toast({ type: "success", title: "도면 생성 완료", message: `${plan.rooms.length}개 공간, ${plan.walls.length}개 벽` });
+              }}
+              className="h-full"
+            />
+          </div>
+        ) : showParseResult && pendingFloorPlan ? (
           /* 인식 결과 확인 */
           <div className="h-full flex items-center justify-center bg-gray-50 p-8 overflow-y-auto">
             <div className="max-w-lg w-full">

@@ -557,6 +557,32 @@ export default function ProjectHomePage() {
                     <p className="text-sm font-bold text-gray-900">손도면 촬영</p>
                     <p className="text-xs text-gray-500 mt-1">종이 도면을 사진으로 변환</p>
                   </button>
+                  <button
+                    onClick={() => {
+                      if (selectedAddress && selectedBuilding) {
+                        updateAddress({
+                          roadAddress: selectedAddress.roadAddress,
+                          zipCode: selectedAddress.zipCode,
+                          buildingName: selectedAddress.buildingName,
+                          dongName: selectedBuilding.dongName,
+                          hoName: selectedBuilding.hoName,
+                          exclusiveArea: selectedBuilding.exclusiveArea,
+                          supplyArea: selectedBuilding.supplyArea,
+                          roomCount: selectedBuilding.roomCount || 3,
+                          bathroomCount: selectedBuilding.bathroomCount || 1,
+                          buildingType: selectedBuilding.buildingType,
+                          floor: selectedBuilding.floor,
+                          totalFloor: selectedBuilding.totalFloor,
+                        });
+                      }
+                      router.push(`/project/${projectId}/design?mode=draw`);
+                    }}
+                    className="p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-indigo-400 hover:shadow-sm transition-all text-left"
+                  >
+                    <PenTool className="w-7 h-7 text-indigo-600 mb-2" />
+                    <p className="text-sm font-bold text-gray-900">직접 그리기</p>
+                    <p className="text-xs text-gray-500 mt-1">벽과 문/창문을 직접 그리기</p>
+                  </button>
                 </div>
               )}
             </div>
