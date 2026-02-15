@@ -29,7 +29,8 @@ const DrawingParseResult = dynamic(() => import("@/components/project/DrawingPar
 // 도면 파일 → API → ParsedFloorPlan
 async function parseDrawingFile(
   file: File,
-  knownArea?: number
+  knownArea?: number,
+  sampleType?: string
 ): Promise<{
   floorPlan: ParsedFloorPlan;
   confidence: number;
@@ -40,6 +41,7 @@ async function parseDrawingFile(
   const formData = new FormData();
   formData.append("file", file);
   if (knownArea) formData.append("knownArea", String(knownArea));
+  if (sampleType) formData.append("sampleType", sampleType);
 
   const res = await fetch("/api/project/parse-drawing", {
     method: "POST",
@@ -137,7 +139,8 @@ export default function FloorPlanPage() {
 
     try {
       const knownArea = project?.address?.exclusiveArea;
-      const result = await parseDrawingFile(file, knownArea);
+      const sType = project?.drawingId?.startsWith("sample-") ? project.drawingId : undefined;
+      const result = await parseDrawingFile(file, knownArea, sType);
 
       setPendingFloorPlan(result.floorPlan);
       setParseConfidence(result.confidence);

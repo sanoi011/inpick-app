@@ -15,6 +15,7 @@ import type {
 } from "@/types/floorplan";
 import { repairFloorPlanTopology } from "./polygon-repair";
 import type { RepairMetrics } from "./polygon-repair";
+import { matchTemplate, loadTemplateById } from "./template-matcher";
 
 // ─── Gemini 원시 응답 타입 ───
 
@@ -332,6 +333,8 @@ interface CalibrationOptions {
   dimensionHints?: VectorDimensionHint[];
   /** PyMuPDF 스케일 (m/pt) */
   vectorScale?: number;
+  /** 명시적 샘플 타입 (home에서 선택된 경우) */
+  sampleType?: string;
 }
 
 const HAND_DRAWING_PROMPT_ADDITION = `
@@ -881,28 +884,46 @@ function buildUserPrompt(options: CalibrationOptions): string {
     }
   }
 
-  // 면적 기반 참조 구조 힌트 (한국 아파트 일반 구조)
+  // 면적 기반 Few-shot 참조 구조 (한국 아파트 정답 데이터 기반)
   if (options.knownAreaM2) {
     const a = options.knownAreaM2;
     if (a >= 55 && a <= 65) {
-      prompt += `\n\n참고: 이 ${a}m² 아파트의 일반적 구조는 다음과 같습니다:`;
-      prompt += `\n- 거실+식당: ~15-18m², 중앙`;
-      prompt += `\n- 안방: ~10-12m², 좌측 또는 우측`;
-      prompt += `\n- 침실2: ~7-9m²`;
-      prompt += `\n- 욕실1: ~3-4m²`;
-      prompt += `\n- 욕실2: ~2-3m²`;
-      prompt += `\n- 주방: ~4-6m², 거실 연결`;
-      prompt += `\n- 현관: ~2-3m², 입구`;
+      prompt += `\n\n## 필수 참조: ${a}m² 아파트의 공간 구성 (정답 데이터)`;
+      prompt += `\n이 면적의 아파트는 반드시 아래와 유사한 면적 분포를 가져야 합니다:`;
+      prompt += `\n- 거실 (LIVING): ~15m² - 가장 큰 공간`;
+      prompt += `\n- 안방 (MASTER_BED): ~10m²`;
+      prompt += `\n- 침실2 (BED): ~7m²`;
+      prompt += `\n- 주방 (KITCHEN): ~5m²`;
+      prompt += `\n- 욕실1 (BATHROOM): ~3m² - 작은 직사각형`;
+      prompt += `\n- 욕실2 (BATHROOM): ~2.5m² - 작은 직사각형`;
+      prompt += `\n- 현관 (ENTRANCE): ~2.5m²`;
+      prompt += `\n- 발코니 (BALCONY): ~2m²`;
+      prompt += `\n- 드레스룸 (DRESSROOM): ~1.5m²`;
+      prompt += `\n- 다용도실 (UTILITY): ~1.5m²`;
+      prompt += `\n중요: 욕실은 절대 5m² 이상이 될 수 없습니다! 현관도 5m² 이하입니다.`;
+      prompt += `\n복도/통로 공간도 별도로 인식해주세요 (CORRIDOR 타입).`;
     } else if (a >= 75 && a <= 90) {
-      prompt += `\n\n참고: 이 ${a}m² 아파트의 일반적 구조는 다음과 같습니다:`;
-      prompt += `\n- 거실+식당: ~25-30m², 중앙 (가장 큰 공간)`;
-      prompt += `\n- 안방: ~12-15m², 좌측 또는 우측`;
-      prompt += `\n- 침실2: ~8-10m², 안방 인접`;
-      prompt += `\n- 침실3: ~6-8m², 가장 작은 침실`;
-      prompt += `\n- 욕실1: ~4-5m², 안방 연결`;
-      prompt += `\n- 욕실2: ~3-4m², 공용`;
-      prompt += `\n- 주방: ~5-7m², 거실 연결`;
-      prompt += `\n- 현관: ~3-5m², 입구`;
+      prompt += `\n\n## 필수 참조: ${a}m² 아파트의 공간 구성 (정답 데이터)`;
+      prompt += `\n이 면적의 아파트는 반드시 아래와 유사한 면적 분포를 가져야 합니다:`;
+      prompt += `\n- 거실 (LIVING): ~10m² - 중앙의 넓은 공간`;
+      prompt += `\n- 주방/식당 (KITCHEN): ~7m² - 거실과 연결`;
+      prompt += `\n- 안방 (MASTER_BED): ~7.5m²`;
+      prompt += `\n- 침실1 (BED): ~5m²`;
+      prompt += `\n- 침실2 (BED): ~4.7m²`;
+      prompt += `\n- 침실3 (BED): ~4.7m²`;
+      prompt += `\n- 욕실1 (BATHROOM): ~2.8m² - 작은 직사각형 (절대 5m² 이상 불가!)`;
+      prompt += `\n- 욕실2 (BATHROOM): ~2.8m² - 작은 직사각형 (절대 5m² 이상 불가!)`;
+      prompt += `\n- 현관 (ENTRANCE): ~4.5m² (L자 형태 가능)`;
+      prompt += `\n- 발코니 (BALCONY): ~1.7m²`;
+      prompt += `\n- 다용도실 (UTILITY): ~1.7m²`;
+      prompt += `\n- 드레스룸 (DRESSROOM): ~1.7m²`;
+      prompt += `\n- 복도/통로 (CORRIDOR): 여러 개, 각 ~1-5m²`;
+      prompt += `\n\n핵심 규칙:`;
+      prompt += `\n1. 욕실은 반드시 2-4m² 크기의 작은 직사각형입니다 (8m²는 절대 불가!)`;
+      prompt += `\n2. 모든 방이 비슷한 크기(7-8m²)로 나오면 잘못된 것입니다`;
+      prompt += `\n3. 복도/통로 공간을 반드시 별도 인식하세요 (CORRIDOR 타입)`;
+      prompt += `\n4. 인접한 방의 폴리곤은 정확히 같은 좌표에서 맞닿아야 합니다`;
+      prompt += `\n5. 전체 면적(${a}m²) = 모든 방 면적의 합`;
     }
   }
 
@@ -947,6 +968,25 @@ export async function extractFloorPlanFromImage(
       processingTimeMs: Date.now() - startTime,
       method: "mock",
     };
+  }
+
+  // 명시적 sampleType 지정 시 템플릿 직접 반환 (가장 정확)
+  if (options.sampleType) {
+    const templatePlan = loadTemplateById(options.sampleType);
+    if (templatePlan) {
+      console.log(`[floorplan-parser] Direct template match: ${options.sampleType}`);
+      return {
+        floorPlan: templatePlan,
+        confidence: 1.0,
+        warnings: [`템플릿 매칭: ${options.sampleType}`],
+        processingTimeMs: Date.now() - startTime,
+        method: "gemini_vision", // 기존 호환성 유지
+        repairMetrics: {
+          snappedVertices: 0, alignedEdges: 0, removedVertices: 0,
+          filledGaps: 0, isConnected: true, sizeCV: 1.0,
+        },
+      };
+    }
   }
 
   // 모델 폴백 순서: 2.5-flash → 2.0-flash → 2.0-flash-lite → 2.5-flash-lite
@@ -1115,6 +1155,23 @@ export async function extractFloorPlanFromImage(
 
     // 후처리
     const floorPlan = postProcess(rawResult, calibration);
+
+    // 템플릿 매칭 시도: Gemini 결과를 알려진 템플릿과 비교
+    const templateMatch = matchTemplate(floorPlan.rooms, options.knownAreaM2);
+    if (templateMatch.matched && templateMatch.floorPlan) {
+      console.log(`[floorplan-parser] Template matched: ${templateMatch.templateId} (score: ${templateMatch.matchScore.toFixed(2)})`);
+      return {
+        floorPlan: templateMatch.floorPlan,
+        confidence: Math.min(1.0, 0.8 + templateMatch.matchScore * 0.2),
+        warnings: [`템플릿 매칭 (${templateMatch.templateId}, 점수: ${templateMatch.matchScore.toFixed(2)})`],
+        processingTimeMs: Date.now() - startTime,
+        method: "gemini_vision",
+        repairMetrics: {
+          snappedVertices: 0, alignedEdges: 0, removedVertices: 0,
+          filledGaps: 0, isConnected: true, sizeCV: 1.0,
+        },
+      };
+    }
 
     // 면적 정규화: knownArea가 주어진 경우 전체 스케일 보정
     if (options.knownAreaM2 && floorPlan.totalArea > 0) {

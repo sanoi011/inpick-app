@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const file = formData.get("file") as File | null;
     const knownAreaStr = formData.get("knownArea") as string | null;
     const sourceType = (formData.get("source") as ImageSource) || "pdf";
+    const sampleType = formData.get("sampleType") as string | null;
 
     if (!file) {
       return NextResponse.json(
@@ -148,6 +149,7 @@ export async function POST(request: NextRequest) {
         sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
         dimensionHints: vectorHints?.dimensionTexts,
         vectorScale: vectorHints?.scale,
+        sampleType: sampleType || undefined,
       }),
       callFloorplanAI(fileBuffer, file.name),
     ]);
