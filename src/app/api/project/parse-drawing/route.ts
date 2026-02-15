@@ -177,7 +177,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 3단계: Enhanced Fusion (Gemini + floorplan-ai + PyMuPDF)
-    const fusionResult = enhancedFuse(result.floorPlan, aiParsedPlan, vectorHints);
+    // 템플릿 매칭 결과는 이미 정확하므로 fusion 스킵
+    const isTemplateMatch = result.confidence >= 1.0 && result.repairMetrics?.sizeCV === 1.0;
+    const fusionResult = isTemplateMatch
+      ? { floorPlan: result.floorPlan, stats: {}, sources: {} }
+      : enhancedFuse(result.floorPlan, aiParsedPlan, vectorHints);
     result.floorPlan = fusionResult.floorPlan;
 
     // 도면 파싱 로그 기록 (fire-and-forget)

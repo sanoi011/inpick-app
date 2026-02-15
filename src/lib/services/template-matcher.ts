@@ -54,6 +54,38 @@ const TEMPLATES: TemplateInfo[] = [
 // 템플릿 데이터 캐시
 const templateCache = new Map<string, ParsedFloorPlan>();
 
+// 타일 바닥 공간 타입
+const TILE_ROOMS = new Set(["BATHROOM", "ENTRANCE", "BALCONY", "UTILITY"]);
+
+/**
+ * 템플릿 데이터에 렌더링 필수 필드 보강 (material, center, wallType)
+ */
+function enrichTemplateData(plan: ParsedFloorPlan): void {
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+
+  // Rooms: material + center
+  for (const room of plan.rooms) {
+    if (!room.material) {
+      room.material = TILE_ROOMS.has(room.type) ? "tile" : "wood";
+    }
+    if (!room.center && room.polygon && room.polygon.length >= 3) {
+      let cx = 0, cy = 0;
+      for (const p of room.polygon) { cx += p.x; cy += p.y; }
+      room.center = {
+        x: round(cx / room.polygon.length),
+        y: round(cy / room.polygon.length),
+      };
+    }
+  }
+
+  // Walls: wallType
+  for (const wall of plan.walls) {
+    if (!wall.wallType) {
+      wall.wallType = wall.isExterior ? "exterior" : "partition";
+    }
+  }
+}
+
 /**
  * 템플릿 JSON 파일을 로드 (캐시 포함)
  */
@@ -66,6 +98,7 @@ function loadTemplate(template: TemplateInfo): ParsedFloorPlan | null {
     const fullPath = path.join(process.cwd(), template.filePath);
     const data = fs.readFileSync(fullPath, "utf-8");
     const parsed = JSON.parse(data) as ParsedFloorPlan;
+    enrichTemplateData(parsed);
     templateCache.set(template.id, parsed);
     return parsed;
   } catch {

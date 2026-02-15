@@ -37,7 +37,12 @@
           "x": 6.727,
           "y": 3.956
         }
-      ]
+      ],
+      "material": "tile",
+      "center": {
+        "x": 5.77,
+        "y": 5.275
+      }
     },
     {
       "id": "room-1",
@@ -67,7 +72,12 @@
           "x": 8.902,
           "y": 3.956
         }
-      ]
+      ],
+      "material": "tile",
+      "center": {
+        "x": 7.815,
+        "y": 5.144
+      }
     },
     {
       "id": "room-2",
@@ -97,7 +107,12 @@
           "x": 6.727,
           "y": 6.331
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 5.689,
+        "y": 7.123
+      }
     },
     {
       "id": "room-3",
@@ -127,7 +142,12 @@
           "x": 6.727,
           "y": 7.914
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 5.689,
+        "y": 9.101
+      }
     },
     {
       "id": "room-4",
@@ -161,7 +181,12 @@
           "x": 4.65,
           "y": 3.956
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 2.79,
+        "y": 7.28
+      }
     },
     {
       "id": "room-5",
@@ -191,7 +216,12 @@
           "x": 4.65,
           "y": 1.583
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 2.325,
+        "y": 2.77
+      }
     },
     {
       "id": "room-6",
@@ -221,7 +251,12 @@
           "x": 2.176,
           "y": 0
         }
-      ]
+      ],
+      "material": "tile",
+      "center": {
+        "x": 1.088,
+        "y": 0.792
+      }
     },
     {
       "id": "room-7",
@@ -251,7 +286,12 @@
           "x": 6.727,
           "y": 1.583
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 5.689,
+        "y": 2.77
+      }
     },
     {
       "id": "room-8",
@@ -281,7 +321,12 @@
           "x": 11.08,
           "y": 6.331
         }
-      ]
+      ],
+      "material": "wood",
+      "center": {
+        "x": 9.991,
+        "y": 8.31
+      }
     },
     {
       "id": "room-9",
@@ -311,7 +356,12 @@
           "x": 12.068,
           "y": 7.914
         }
-      ]
+      ],
+      "material": "tile",
+      "center": {
+        "x": 11.574,
+        "y": 9.101
+      }
     },
     {
       "id": "room-10",
@@ -341,7 +391,12 @@
           "x": 11.08,
           "y": 0
         }
-      ]
+      ],
+      "material": "tile",
+      "center": {
+        "x": 8.904,
+        "y": 0.792
+      }
     }
   ],
   "walls": [
@@ -356,7 +411,8 @@
         "y": 10.288
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     },
     {
       "id": "wall-1",
@@ -369,7 +425,8 @@
         "y": 0
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     },
     {
       "id": "wall-2",
@@ -382,7 +439,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-3",
@@ -395,7 +453,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-4",
@@ -408,7 +467,8 @@
         "y": 3.956
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-5",
@@ -421,7 +481,8 @@
         "y": 3.956
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-6",
@@ -434,7 +495,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-7",
@@ -447,7 +509,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-8",
@@ -460,7 +523,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-9",
@@ -473,7 +537,8 @@
         "y": 10.288
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     },
     {
       "id": "wall-10",
@@ -486,7 +551,8 @@
         "y": 3.956
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-11",
@@ -499,7 +565,8 @@
         "y": 3.956
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-12",
@@ -512,7 +579,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-13",
@@ -525,7 +593,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-14",
@@ -538,7 +607,8 @@
         "y": 5.539
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-15",
@@ -551,7 +621,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-16",
@@ -564,7 +635,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-17",
@@ -577,7 +649,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-18",
@@ -590,7 +663,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-19",
@@ -603,7 +677,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-20",
@@ -616,7 +691,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-21",
@@ -629,7 +705,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-22",
@@ -642,7 +719,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-23",
@@ -655,7 +733,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-24",
@@ -668,7 +747,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-25",
@@ -681,7 +761,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-26",
@@ -694,7 +775,8 @@
         "y": 6.331
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-27",
@@ -707,7 +789,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-28",
@@ -720,7 +803,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-29",
@@ -733,7 +817,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-30",
@@ -746,7 +831,8 @@
         "y": 1.583
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     },
     {
       "id": "wall-31",
@@ -759,7 +845,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-32",
@@ -772,7 +859,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-33",
@@ -785,7 +873,8 @@
         "y": 7.914
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-34",
@@ -798,7 +887,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-35",
@@ -811,7 +901,8 @@
         "y": 10.288
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-36",
@@ -824,7 +915,8 @@
         "y": 0
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     },
     {
       "id": "wall-37",
@@ -837,7 +929,8 @@
         "y": 1.583
       },
       "thickness": 0.12,
-      "isExterior": false
+      "isExterior": false,
+      "wallType": "partition"
     },
     {
       "id": "wall-38",
@@ -850,7 +943,8 @@
         "y": 10.288
       },
       "thickness": 0.2,
-      "isExterior": true
+      "isExterior": true,
+      "wallType": "exterior"
     }
   ],
   "doors": [
