@@ -4,6 +4,7 @@ InPick 프론트엔드에서 호출하는 REST API
 """
 
 import io
+import json
 import tempfile
 import uuid
 from pathlib import Path
@@ -13,8 +14,32 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, Response
 from loguru import logger
+
+
+def _convert_numpy(obj):
+    """재귀적으로 numpy 타입을 Python 네이티브 타입으로 변환"""
+    if isinstance(obj, dict):
+        return {k: _convert_numpy(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_convert_numpy(v) for v in obj]
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.bool_,)):
+        return bool(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+
+def numpy_json_response(data: dict, status_code: int = 200) -> Response:
+    """numpy 타입을 안전하게 JSON 응답으로 변환"""
+    converted = _convert_numpy(data)
+    content = json.dumps(converted, ensure_ascii=False)
+    return Response(content=content, status_code=status_code, media_type="application/json")
 
 from .pipeline import FloorPlanPipeline
 
@@ -93,7 +118,7 @@ async def recognize_floorplan(file: UploadFile = File(...)):
                 raise HTTPException(400, "이미지를 디코딩할 수 없습니다")
             result = pipeline.run(image=image, output_dir=str(output_dir))
 
-        return JSONResponse(content={
+        return numpy_json_response({
             "job_id": job_id,
             "vector_data": result["vector_data"],
             "timing": result["timing"],
@@ -170,7 +195,7 @@ async def recognize_quick(file: UploadFile = File(...)):
             cv2.imwrite(str(tmp_path), image)
             result = pipeline.run_quick(str(tmp_path))
 
-        return JSONResponse(content=result)
+        return numpy_json_response(result)
 
     except Exception as e:
         logger.error(f"빠른 인식 실패: {e}")

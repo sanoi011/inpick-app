@@ -9,6 +9,21 @@ import math
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 from loguru import logger
+import numpy as np
+
+
+class _NumpyEncoder(json.JSONEncoder):
+    """numpy 타입을 JSON 직렬화 가능하게 변환"""
+    def default(self, obj):
+        if isinstance(obj, (np.integer,)):
+            return int(obj)
+        if isinstance(obj, (np.floating,)):
+            return float(obj)
+        if isinstance(obj, (np.bool_,)):
+            return bool(obj)
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
 
 
 class FloorPlanVectorizer:
@@ -263,7 +278,7 @@ class FloorPlanVectorizer:
 
     def to_json(self, data: Dict, output_path: str) -> str:
         """벡터 데이터를 JSON 파일로 출력"""
-        json_str = json.dumps(data, ensure_ascii=False, indent=2)
+        json_str = json.dumps(data, ensure_ascii=False, indent=2, cls=_NumpyEncoder)
         Path(output_path).write_text(json_str, encoding="utf-8")
         logger.info(f"JSON 저장: {output_path}")
         return json_str
