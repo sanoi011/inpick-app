@@ -1031,6 +1031,102 @@ vectorHints 활용:
 - **저작권 제한**: 확인카드에 "대전용산4블럭" 단지명 표시 금지 (사용자 요청)
 - `complexName` 필드는 내부 매칭용으로만 사용, UI 노출 불가
 
+## 완료된 작업 (2026-02-21) - floorplan-ai Python 파이프라인 통합
+
+### 통합 전략: 병렬 보강 (Parallel Enhancement)
+```
+PDF/이미지 업로드 → POST /api/project/parse-drawing
+  ├─ [Step 1] PyMuPDF 벡터 추출 (PDF 전용, Gemini 프롬프트 힌트)
+  ├─ [Step 2 병렬] Gemini Vision (시맨틱: 방 이름/타입/폴리곤)
+  ├─ [Step 2 병렬] floorplan-ai (기하학: 벽 Hough/심볼 YOLO/OCR 치수)
+  └─ [Step 3] Enhanced Fusion → 최종 ParsedFloorPlan
+```
+
+### Phase 1: Python 소스 복사
+- `python/floorplan-ai/` (신규 디렉토리) - 5단계 파이프라인 소스
+  - `src/pipeline.py` - FloorPlanPipeline 오케스트레이터
+  - `src/preprocessor.py` - OpenCV 전처리 (그레이스케일, 이진화, 노이즈 제거)
+  - `src/symbol_detector.py` - YOLOv8 심볼 감지 (13클래스: 벽, 문3종, 창, 기둥, 설비5종, 계단, 엘리베이터, 치수선)
+  - `src/text_recognizer.py` - EasyOCR 텍스트 인식 (한국어+영어)
+  - `src/wall_extractor.py` - Hough Transform + Morphology 벽 추출
+  - `src/vectorizer.py` - 픽셀→mm 좌표 변환, 스케일 자동 감지, JSON/SVG 출력
+  - `src/api_server.py` - FastAPI 서버 (POST /api/v1/recognize)
+  - `main.py` - CLI + 서버 진입점
+  - `run_pipeline.py` - child_process용 CLI 스크립트 (stdout JSON)
+  - `configs/pipeline_config.yaml` - 파이프라인 설정
+  - `configs/yolo_floorplan.yaml` - YOLO 학습 설정
+  - `tests/test_pipeline.py` - 12개 단위 테스트 (모두 통과)
+
+### Phase 2: TypeScript 클라이언트
+- `src/lib/services/floorplan-ai-client.ts` (신규) - HTTP/child_process 클라이언트
+  - `FloorplanAIResult` 인터페이스 (walls/rooms/symbols/texts/timing)
+  - `callFloorplanAI(imageBuffer, filename)` → HTTP 우선 (FLOORPLAN_AI_URL), child_process 폴백
+  - 타임아웃: HTTP 45초 / child_process 60초
+  - 실패 시 `null` 반환 (graceful degradation)
+
+### Phase 3: 출력 포맷 변환기
+- `src/lib/services/floorplan-ai-converter.ts` (신규) - FloorplanAIResult → ParsedFloorPlan
+  - mm → m 좌표 변환 (÷1000)
+  - 한글 방 이름 → RoomType 매핑 (안방→MASTER_BED, 거실→LIVING 등)
+  - 심볼 13클래스 분류: door_swing/sliding/entrance → DoorData, window → WindowData, toilet/sink/bathtub/kitchen_sink → FixtureData
+  - fixture roomId, window wallId, door connectedRooms 자동 할당
+
+### Phase 4: Enhanced Fusion 엔진
+- `src/lib/services/enhanced-fusion.ts` (신규) - 3소스 융합
+  - 방(rooms): Gemini 우선 (시맨틱 정확)
+  - 벽(walls): floorplan-ai 우선 (Hough Transform 기하학 정밀)
+  - 문/창/설비: 합집합 (중심점 0.5m 이내 중복 제거)
+  - 치수(dimensions): floorplan-ai 우선 (EasyOCR 특화)
+  - Gemini만 있으면 기존과 동일, floorplan-ai만 있으면 변환 결과 그대로
+  - 응답에 `sources` (각 요소별 소스), `stats` (감지 수 통계) 포함
+
+### Phase 5: API 라우트 수정
+- `src/app/api/project/parse-drawing/route.ts` (수정)
+  - 기존 병렬 2개 (Gemini + PyMuPDF) → 병렬 3개 (+ floorplan-ai)
+  - PyMuPDF 먼저 실행 (Gemini 힌트용) → Gemini + floorplan-ai 병렬 실행
+  - Enhanced Fusion으로 최종 결과 생성
+  - 응답 추가 필드: `aiPipelineUsed`, `aiPipelineStats`, `aiPipelineSources`
+
+### Phase 6: 환경 설정
+- `.env.local` (수정) - `FLOORPLAN_AI_URL=http://localhost:8100` 추가
+- `package.json` (수정) - npm 스크립트 추가
+  - `dev:ai`: Python FastAPI 서버 기동 (port 8100)
+  - `dev:full`: Next.js + AI 서버 동시 실행 (concurrently)
+- `.gitignore` (수정) - Python 아티팩트 제외 (models/*.pt, outputs/, __pycache__/, data/)
+
+### floorplan-ai 사용 방법
+```bash
+# 1. Python 의존성 설치 (최초 1회)
+pip install -r python/floorplan-ai/requirements.txt
+
+# 2. FastAPI 서버 기동
+npm run dev:ai   # → http://localhost:8100
+
+# 3. Next.js 개발 서버 (별도 터미널)
+npm run dev
+
+# 또는 동시 실행
+npm run dev:full
+```
+
+### floorplan-ai 파이프라인 컴포넌트 현황
+| 컴포넌트 | 경로 | 상태 |
+|----------|------|------|
+| Python 파이프라인 | `python/floorplan-ai/` | 완료 (12 테스트 통과) |
+| CLI 스크립트 | `python/floorplan-ai/run_pipeline.py` | 완료 |
+| TS 클라이언트 | `src/lib/services/floorplan-ai-client.ts` | 완료 |
+| 포맷 변환기 | `src/lib/services/floorplan-ai-converter.ts` | 완료 |
+| 융합 엔진 | `src/lib/services/enhanced-fusion.ts` | 완료 |
+| API 라우트 | `src/app/api/project/parse-drawing/route.ts` | 완료 (3소스 병렬) |
+
+### 도면 인식 파이프라인 전체 구성 (4소스)
+| 소스 | 역할 | 강점 |
+|------|------|------|
+| **Gemini Vision** | 시맨틱 분석 (방 이름/타입/폴리곤) | 한국어 이해, 맥락 추론 |
+| **floorplan-ai** | 기하학 분석 (벽/심볼/OCR) | YOLOv8 정밀 감지, Hough 벽 추출 |
+| **PyMuPDF** | PDF 벡터 추출 (치수/선분) | 손실 없는 벡터 데이터 |
+| **YOLO ONNX** | 브라우저 심볼 보강 | 클라이언트 측 실시간 |
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -1048,6 +1144,7 @@ vectorHints 활용:
 - ~~파이프라인 품질 개선 (프롬프트/유효성/뷰어/견적)~~ ✅ 완료
 - ~~Phase C: YOLO 심볼 감지 모델 (브라우저 ONNX 추론, 합성 학습 데이터)~~ ✅ 완료 (mAP50: 0.913)
 - ~~도면 인식 로그 분석 대시보드~~ ✅ 완료 (admin/drawing-logs)
+- ~~floorplan-ai Python 파이프라인 통합 (Gemini+AI 3소스 융합)~~ ✅ 완료
 - DXF 파서 실행 및 Ground Truth 비교 검증
 
 ### 기타 개발 작업
