@@ -189,7 +189,11 @@ if __name__ == "__main__":
         if label in results:
             d = results[label]
             fp = d.get("floorPlan", {})
-            print(f"{label:10s} {d.get('totalArea','?'):>6s} "
+            area_val = d.get('totalArea', '?')
+            conf_val = d.get('confidence', '?')
+            area_str = f"{area_val}" if isinstance(area_val, (int, float)) else str(area_val)
+            conf_str = f"{conf_val}" if isinstance(conf_val, (int, float)) else str(conf_val)
+            print(f"{label:10s} {area_str:>6s} "
                   f"{len(fp.get('rooms',[])):>6d} "
                   f"{len(fp.get('walls',[])):>6d} "
                   f"{len(fp.get('doors',[])):>6d} "
@@ -197,7 +201,7 @@ if __name__ == "__main__":
                   f"{len(fp.get('fixtures',[])):>9d} "
                   f"{len(fp.get('dimensions',[])):>5d} "
                   f"{'Y' if d.get('aiPipelineUsed') else 'N':>4s} "
-                  f"{d.get('confidence','?'):>5s}")
+                  f"{conf_str:>5s}")
         else:
             print(f"{label:10s}  FAILED")
 
