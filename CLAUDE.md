@@ -1198,6 +1198,74 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   └─ [Step 3] Enhanced Fusion → 최종 ParsedFloorPlan
 ```
 
+## 완료된 작업 (2026-02-22) - 손도면 벽 그리기 도구 + 랜딩 Feature 애니메이션
+
+### 손도면 벽 그리기 도구 (5개 신규 + 2개 수정)
+- `src/types/wall-drawing.ts` (신규) - 드로잉 상태 타입 정의
+  - DrawingTool, OpeningType, DrawingPoint, DrawnWall, WallOpening, DetectedRoom
+  - DrawingState, DrawingAction (undo/redo 지원)
+  - OPENING_DEFAULTS: 한국 아파트 표준 치수 (여닫이 900/미닫이 1800/현관문 950/창문 1500/거실창 2400mm)
+  - 상수: GRID_SIZE=0.5m, SNAP_THRESHOLD=0.2m, STRAIGHTEN_ANGLE=15°
+- `src/lib/wall-drawing/geometry.ts` (신규) - 직선 보정 + 스냅 + 기하학 유틸
+  - `straightenLine()`: ±15° 이내 수평/수직 자동 보정
+  - `findNearestEndpoint()`: 기존 벽 끝점 0.2m 이내 스냅
+  - `snapPoint()`: 끝점 스냅 > 그리드 스냅 우선순위
+  - `snapToGrid()`: 0.5m 그리드 스냅
+  - `pointToSegmentDistance()`, `getPositionOnSegment()`, `interpolateOnSegment()`
+  - `polygonArea()` (Shoelace), `polygonCentroid()`, `wallNormal()`
+  - `screenToMeters()`, `metersToScreen()` 좌표 변환
+- `src/lib/wall-drawing/room-detector.ts` (신규) - 닫힌 영역(방) 자동 감지
+  - Planar graph face detection 알고리즘
+  - 벽 끝점 → 노드, 벽 → 양방향 간선 그래프 구축
+  - 각도순 정렬 + 최소 순환(face) 탐색
+  - Shoelace 면적 계산, signed area로 외부/내부 구분
+  - 노이즈 필터 (1m² 미만 제거, 200m² 초과 제거)
+- `src/lib/wall-drawing/export-floorplan.ts` (신규) - DrawingState → ParsedFloorPlan 변환
+  - 면적 정규화: `linearScale = √(targetArea/currentArea)` 좌표 스케일 보정
+  - 벽 → WallData (법선 벡터 기반 4꼭짓점 폴리곤)
+  - 개구부 → DoorData (swing/sliding/entrance) + WindowData (window/large_window)
+  - 방 → RoomData (바운딩박스, 중심점, 재질 자동 추정)
+- `src/components/wall-drawing/WallDrawingCanvas.tsx` (신규, ~1,000줄) - SVG 인터랙티브 캔버스
+  - `useReducer` + undo/redo 스택 (최대 50 액션)
+  - 5가지 도구: 벽/선택/개구부/삭제/라벨
+  - SVG 렌더링: 그리드 → 방 채우기 → 벽(두께 폴리곤) → 개구부 심볼 → 프리뷰 선
+  - 개구부 SVG: 여닫이(90° 아크+잎선), 미닫이(화살표), 창문(이중선+유리선)
+  - 포인터 이벤트: 벽 드래그+직선보정, 개구부 팝오버, 방 라벨링 팝오버
+  - 벽 변경 시 300ms 디바운스 자동 방 감지
+  - 마우스 휠 줌 + 드래그 팬 + 키보드 단축키 (Ctrl+Z/Y, Esc, 1-5)
+- `src/app/project/[id]/design/page.tsx` (수정) - `mode=draw` 분기 추가
+  - WallDrawingCanvas 동적 임포트 (SSR 제외)
+  - 완료 시 ParsedFloorPlan → 기존 2D/3D 뷰어 + 물량산출 연결
+- `src/app/project/[id]/home/page.tsx` (수정) - "직접 그리기" 4번째 옵션 추가
+  - indigo 테마 카드 → `/project/${id}/design?mode=draw`
+
+### 벽 그리기 도구 데이터 플로우
+```
+사용자 벽 그리기 (삐뚤빼뚤)
+  → straightenLine() 직선 보정 (±15°)
+  → snapPoint() 끝점/그리드 스냅
+  → DrawingState (useReducer)
+  → detectRooms() 자동 방 감지 (300ms 디바운스)
+  → 사용자 방 라벨링 (거실/안방/...)
+  → 사용자 개구부 배치 (문/창문)
+  → exportToFloorPlan() + 면적 정규화
+  → ParsedFloorPlan → 2D/3D 뷰어 → 물량산출
+```
+
+### 접근 경로
+- `/project/[id]/home` → "도면이 없으신가요?" → "직접 그리기"
+- → `/project/[id]/design?mode=draw`
+
+### 랜딩 페이지 Feature 애니메이션 (정적 이미지 → 인터랙티브 애니메이션)
+- `src/components/landing/FeatureAnimations.tsx` (신규, ~500줄) - 4개 애니메이션 컴포넌트
+  - `AIConsultAnimation`: 다크 채팅 UI, 타이핑 효과 → AI 응답 → 디자인 완성 카드 (무한 루프)
+  - `PriceSyncAnimation`: 3대 기관(물가협회/건설협회/조달청) 소스 순환 + LIVE 단가 업데이트 shimmer
+  - `EstimateViewerAnimation`: 3D 방 와이어프레임 + 자동 스크롤 견적 테이블 (공종별 금액)
+  - `ContractorMatchAnimation`: 4단계 검증 (사업자등록→면허→포트폴리오→검증완료) 프로그레스+스탬프
+- `src/components/landing/Features.tsx` (수정) - 정적 Image → AnimationVisual 교체
+  - `feature.image` 제거 → `feature.animation` 타입 기반 컴포넌트 렌더링
+  - 참조: `reference/imege/AI 상담.png`, `3D 견적뷰어.png`, `실시간 단가연동.png`, `전문업체 매칭.png`
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
