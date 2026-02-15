@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
-import { getGeminiClient } from "@/lib/gemini-client";
+import { getOpenAIClient } from "@/lib/openai-client";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getGeminiClient();
+    const client = getOpenAIClient();
 
     // API 키 없으면 Mock 응답
     if (!client) {
@@ -42,27 +43,25 @@ export async function POST(request: NextRequest) {
     const lastUserMsg = messages[messages.length - 1]?.content || "";
     const knowledgeContext = await searchKnowledgeSemantic(lastUserMsg);
 
-    // Gemini API 요청 구성
-    const contents = buildGeminiContents(messages, image, annotations);
+    // OpenAI API 요청 구성
+    const openaiMessages = buildOpenAIMessages(messages, image, annotations, knowledgeContext);
 
     try {
-      const response = await client.models.generateContentStream({
-        model: "gemini-2.0-flash",
-        contents: contents,
-        config: {
-          systemInstruction: DESIGN_SYSTEM_PROMPT + knowledgeContext,
-          maxOutputTokens: 2048,
-          temperature: 0.7,
-        },
+      const stream = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: openaiMessages,
+        max_tokens: 2048,
+        temperature: 0.7,
+        stream: true,
       });
 
-      // SDK async iterator → SSE 스트림 변환
+      // OpenAI 스트림 → SSE 변환
       const encoder = new TextEncoder();
-      const stream = new ReadableStream({
+      const readableStream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of response) {
-              const text = chunk.text;
+            for await (const chunk of stream) {
+              const text = chunk.choices[0]?.delta?.content;
               if (text) {
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (err: unknown) {
             const error = err as { message?: string };
-            console.error("Gemini stream error:", error.message);
+            console.error("OpenAI stream error:", error.message);
           } finally {
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
@@ -79,7 +78,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return new Response(stream, {
+      return new Response(readableStream, {
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
@@ -88,7 +87,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (err: unknown) {
       const error = err as { status?: number; message?: string };
-      console.error("Gemini API error:", error.status, error.message);
+      console.error("OpenAI API error:", error.status, error.message);
       return createMockResponse(messages);
     }
   } catch (err) {
@@ -100,49 +99,60 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Gemini API contents 구성
-function buildGeminiContents(
+// OpenAI messages 구성
+function buildOpenAIMessages(
   messages: { role: string; content: string }[],
   image?: string,
-  annotations?: { type: string; label?: string; color: string }[]
+  annotations?: { type: string; label?: string; color: string }[],
+  knowledgeContext?: string
 ) {
-  const contents: { role: string; parts: Record<string, unknown>[] }[] = [];
+  type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
 
-  // 이전 메시지 변환 (Gemini는 user/model 역할 사용)
-  for (const msg of messages) {
-    const role = msg.role === "assistant" ? "model" : "user";
-    contents.push({
-      role,
-      parts: [{ text: msg.content }],
-    });
-  }
+  const openaiMessages: ChatCompletionMessageParam[] = [];
 
-  // 마지막 user 메시지에 이미지/주석 정보 추가
-  if (contents.length > 0) {
-    const lastUserIdx = contents.length - 1;
-    if (contents[lastUserIdx].role === "user") {
-      // 이미지 첨부
+  // System message
+  openaiMessages.push({
+    role: "system",
+    content: DESIGN_SYSTEM_PROMPT + (knowledgeContext || ""),
+  });
+
+  // 대화 이력
+  for (let i = 0; i < messages.length; i++) {
+    const msg = messages[i];
+    const role = msg.role === "assistant" ? "assistant" as const : "user" as const;
+
+    // 마지막 user 메시지에 이미지/주석 추가
+    if (i === messages.length - 1 && role === "user") {
+      const contentParts: ContentPart[] = [];
+
+      // 이미지 (base64 data URL)
       if (image && image.startsWith("data:image")) {
-        const base64Data = image.split(",")[1];
-        const mimeType = image.split(";")[0].split(":")[1] || "image/jpeg";
-        contents[lastUserIdx].parts.unshift({
-          inlineData: { mimeType, data: base64Data },
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: image },
         });
       }
 
-      // 주석 컨텍스트 추가
+      contentParts.push({ type: "text", text: msg.content });
+
+      // 주석 컨텍스트
       if (annotations && annotations.length > 0) {
         const annotationDesc = annotations
-          .map((a, i) => `주석 ${i + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`)
+          .map((a: { type: string; label?: string }, idx: number) => `주석 ${idx + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`)
           .join("\n");
-        contents[lastUserIdx].parts.push({
+        contentParts.push({
+          type: "text",
           text: `\n\n[사용자가 도면/사진에 표시한 주석]\n${annotationDesc}`,
         });
       }
+
+      openaiMessages.push({ role: "user", content: contentParts });
+    } else {
+      openaiMessages.push({ role, content: msg.content });
     }
   }
 
-  return contents;
+  return openaiMessages;
 }
 
 // Mock 응답 생성

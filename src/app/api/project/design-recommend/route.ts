@@ -2,7 +2,7 @@
 // POST /api/project/design-recommend - AI 디자인 추천 (스타일/예산/우선순위 → 방별 추천)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
+import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 
 export const maxDuration = 60;
@@ -43,7 +43,7 @@ const DESIGN_PROMPT = `당신은 한국 인테리어 디자인 전문가입니�
 - 추천 이유를 간단히 설명합니다
 - 전체 디자인 컨셉을 2-3문장으로 설명합니다
 
-반드시 아래 JSON 스키마에 맞춰 출력하세요.`;
+반드시 아래 JSON 스키마에 맞춰 출력하세요. 마크다운 코드 블록 없이 순수 JSON만 출력하세요.`;
 
 const DESIGN_SCHEMA = {
   type: "object" as const,
@@ -147,8 +147,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Gemini 미설정 시 Mock
-    if (!isGeminiConfigured()) {
+    // OpenAI 미설정 시 Mock
+    if (!isOpenAIConfigured()) {
       const result = getMockRecommendation(floorPlan, preferences);
       return NextResponse.json({
         ...result,
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const client = getGeminiClient();
+    const client = getOpenAIClient();
     if (!client) {
       const result = getMockRecommendation(floorPlan, preferences);
       return NextResponse.json({
@@ -174,15 +174,16 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    const response = await client.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: DESIGN_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(DESIGN_SCHEMA, null, 2),
+        },
         {
           role: "user",
-          parts: [
-            { text: DESIGN_PROMPT },
-            {
-              text: `## 평면도 정보
+          content: `## 평면도 정보
 총 면적: ${floorPlan.totalArea}㎡
 공간 목록:
 ${roomSummary}
@@ -194,20 +195,14 @@ ${roomSummary}
 
 위 정보를 바탕으로 방별 인테리어 디자인을 추천하세요.
 각 방의 roomId는 평면도의 room id를 그대로 사용하세요.`,
-            },
-          ],
         },
       ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: DESIGN_SCHEMA,
-        temperature: 0.3,
-        maxOutputTokens: 8192,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+      max_tokens: 8192,
     });
 
-    const text = response.text || "";
+    const text = response.choices[0]?.message?.content || "";
     let result: DesignRecommendation;
 
     try {
@@ -229,7 +224,7 @@ ${roomSummary}
 
     return NextResponse.json({
       ...result,
-      method: "gemini_design",
+      method: "ai_design",
       warnings: [],
       processingTimeMs,
     });

@@ -1,7 +1,7 @@
 // src/lib/services/gemini-floorplan-parser.ts
-// Gemini Vision 2.0 Flash 기반 건축 도면 인식 엔진
+// GPT-4o Vision 기반 건축 도면 인식 엔진
 
-import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
+import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
 import type {
   ParsedFloorPlan,
   RoomData,
@@ -947,8 +947,8 @@ export async function extractFloorPlanFromImage(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  if (!isGeminiConfigured()) {
-    warnings.push("Gemini API 키가 설정되지 않아 Mock 데이터를 반환합니다");
+  if (!isOpenAIConfigured()) {
+    warnings.push("OpenAI API 키가 설정되지 않아 Mock 데이터를 반환합니다");
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.3,
@@ -958,9 +958,9 @@ export async function extractFloorPlanFromImage(
     };
   }
 
-  const client = getGeminiClient();
+  const client = getOpenAIClient();
   if (!client) {
-    warnings.push("Gemini 클라이언트 초기화 실패");
+    warnings.push("OpenAI 클라이언트 초기화 실패");
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.3,
@@ -989,55 +989,59 @@ export async function extractFloorPlanFromImage(
     }
   }
 
-  // 모델 폴백 순서: 2.5-flash → 2.0-flash → 2.0-flash-lite → 2.5-flash-lite
-  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash-lite"];
+  // 모델 폴백 순서: gpt-4o → gpt-4o-mini
+  const MODELS = ["gpt-4o", "gpt-4o-mini"];
 
-  // Gemini 호출 함수 (재시도용)
-  async function callGemini(extraPrompt?: string, temp: number = 0.1): Promise<GeminiRawResult | null> {
+  // JSON 스키마 문자열 (시스템 프롬프트에 포함)
+  const JSON_SCHEMA_STR = JSON.stringify(JSON_SCHEMA, null, 2);
+
+  // OpenAI Vision 호출 함수 (재시도용)
+  async function callVisionModel(extraPrompt?: string, temp: number = 0.1): Promise<GeminiRawResult | null> {
     let text = "";
     let lastError: unknown = null;
 
     const systemPrompt = SYSTEM_PROMPT +
       (options.sourceType === "hand_drawing" ? HAND_DRAWING_PROMPT_ADDITION : "") +
-      (extraPrompt || "");
+      (extraPrompt || "") +
+      `\n\n반드시 아래 JSON 스키마에 정확히 맞춰 출력하세요. 마크다운 코드 블록 없이 순수 JSON만 출력하세요.\n${JSON_SCHEMA_STR}`;
 
     for (const modelName of MODELS) {
       try {
         console.log(`[floorplan-parser] Trying model: ${modelName}${extraPrompt ? " (retry)" : ""}`);
-        const response = await client!.models.generateContent({
+        const response = await client!.chat.completions.create({
           model: modelName,
-          contents: [
+          messages: [
+            {
+              role: "system",
+              content: systemPrompt,
+            },
             {
               role: "user",
-              parts: [
-                { text: systemPrompt },
+              content: [
                 {
-                  inlineData: {
-                    mimeType: mimeType as "image/png" | "image/jpeg",
-                    data: imageBase64,
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${mimeType};base64,${imageBase64}`,
                   },
                 },
                 {
+                  type: "text",
                   text: buildUserPrompt(options),
                 },
               ],
             },
           ],
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: JSON_SCHEMA,
-            temperature: temp,
-            maxOutputTokens: 16384,
-            thinkingConfig: { thinkingBudget: 0 },
-          },
+          response_format: { type: "json_object" },
+          temperature: temp,
+          max_tokens: 16384,
         });
-        text = response.text || "";
+        text = response.choices[0]?.message?.content || "";
         console.log(`[floorplan-parser] Success with model: ${modelName}`);
         break;
       } catch (modelError) {
         lastError = modelError;
         const errMsg = modelError instanceof Error ? modelError.message : String(modelError);
-        const isRateLimit = errMsg.includes("429") || errMsg.includes("RESOURCE_EXHAUSTED") || errMsg.includes("quota");
+        const isRateLimit = errMsg.includes("429") || errMsg.includes("rate_limit") || errMsg.includes("quota");
         if (isRateLimit && modelName !== MODELS[MODELS.length - 1]) {
           console.warn(`[floorplan-parser] Rate limited on ${modelName}, trying next model...`);
           warnings.push(`${modelName} 할당량 초과, 다른 모델로 재시도`);
@@ -1079,10 +1083,10 @@ export async function extractFloorPlanFromImage(
 
   try {
     // 1차 시도
-    let rawResult = await callGemini();
+    let rawResult = await callVisionModel();
 
     if (!rawResult) {
-      warnings.push("Gemini 응답 파싱 실패, Mock 폴백");
+      warnings.push("AI 응답 파싱 실패, Mock 폴백");
       return {
         floorPlan: getMockFloorPlan(options.knownAreaM2),
         confidence: 0.2,
@@ -1127,7 +1131,7 @@ export async function extractFloorPlanFromImage(
 - 벽으로 구획된 실제 공간의 형태와 크기를 반영하세요
 - 모든 방을 같은 크기로 만들지 마세요!`;
 
-      const retryResult = await callGemini(CORRECTION_PROMPT, 0.3);
+      const retryResult = await callVisionModel(CORRECTION_PROMPT, 0.3);
       if (retryResult && retryResult.rooms && retryResult.rooms.length > 0) {
         const calib1 = calibrateCoordinates(retryResult, options);
         const cv1 = detectGridPattern(retryResult, calib1);
@@ -1271,7 +1275,7 @@ export async function extractFloorPlanFromImage(
     };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
-    warnings.push(`Gemini API 오류: ${errMsg}`);
+    warnings.push(`OpenAI API 오류: ${errMsg}`);
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.1,

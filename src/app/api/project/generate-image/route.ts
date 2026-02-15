@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient } from "@/lib/gemini-client";
+import { getOpenAIClient } from "@/lib/openai-client";
 
 // ─── Mock 이미지 생성 ───
 
@@ -73,45 +73,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const client = getGeminiClient();
+    const client = getOpenAIClient();
 
     if (client) {
       try {
-        const systemPrompt = `당신은 INPICK의 AI 인테리어 디자이너입니다.
-사용자의 요청에 맞는 인테리어 디자인 이미지를 생성하세요.
-${roomContext ? `현재 공간 정보: ${roomContext}` : ""}
-${floorPlanContext ? `평면도 정보: ${floorPlanContext}` : ""}
-포토리얼리스틱한 인테리어 디자인 이미지를 생성해주세요.`;
+        const fullPrompt = [
+          "Photorealistic interior design image of a Korean apartment.",
+          roomContext ? `Room info: ${roomContext}` : "",
+          floorPlanContext ? `Floor plan: ${floorPlanContext}` : "",
+          `User request: ${prompt}`,
+        ].filter(Boolean).join("\n");
 
-        const response = await client.models.generateContent({
-          model: "gemini-2.5-flash-image",
-          contents: `${systemPrompt}\n\n사용자 요청: ${prompt}`,
-          config: {
-            responseModalities: ["TEXT", "IMAGE"],
-            temperature: 0.8,
-          },
+        const response = await client.images.generate({
+          model: "dall-e-3",
+          prompt: fullPrompt,
+          n: 1,
+          size: "1024x1024",
+          quality: "standard",
+          response_format: "b64_json",
         });
 
-        const parts = response.candidates?.[0]?.content?.parts || [];
-        let imageData = "";
-        let description = "";
+        const imageB64 = response.data?.[0]?.b64_json;
+        const revisedPrompt = response.data?.[0]?.revised_prompt || "";
 
-        for (const part of parts) {
-          if (part.inlineData) {
-            imageData = `data:${part.inlineData.mimeType || "image/png"};base64,${part.inlineData.data}`;
-          }
-          if (part.text) {
-            description += part.text;
-          }
+        if (imageB64) {
+          return NextResponse.json({
+            imageData: `data:image/png;base64,${imageB64}`,
+            description: revisedPrompt,
+            isMock: false,
+          });
         }
-
-        if (imageData) {
-          return NextResponse.json({ imageData, description, isMock: false });
-        }
-        // 이미지 없으면 텍스트만 반환된 경우 → Mock 폴백
+        // 이미지 없으면 Mock 폴백
       } catch (err: unknown) {
         const error = err as { status?: number; message?: string };
-        console.error("Gemini image generation error:", error.message);
+        console.error("DALL-E image generation error:", error.message);
 
         if (error.status === 429) {
           return NextResponse.json(

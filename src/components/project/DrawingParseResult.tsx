@@ -87,7 +87,7 @@ export default function DrawingParseResult({
             <div>
               <h3 className="text-sm font-bold">도면 인식 결과</h3>
               <p className="text-xs opacity-80 mt-0.5">
-                {method === "gemini_vision" ? "Gemini AI 분석" : "Mock 데이터"}
+                {method === "mock" ? "Mock 데이터" : "AI 도면 분석"}
                 {processingTimeMs && ` (${(processingTimeMs / 1000).toFixed(1)}초)`}
               </p>
             </div>

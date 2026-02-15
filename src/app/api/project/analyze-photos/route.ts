@@ -1,8 +1,8 @@
 // src/app/api/project/analyze-photos/route.ts
-// POST /api/project/analyze-photos - 다중 사진 → Gemini Vision → 추정 평면도
+// POST /api/project/analyze-photos - 다중 사진 → GPT-4o Vision → 추정 평면도
 
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
+import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
 import type { ParsedFloorPlan, RoomType } from "@/types/floorplan";
 
 export const maxDuration = 60;
@@ -33,7 +33,7 @@ const PHOTO_ANALYSIS_PROMPT = `당신은 한국 아파트 실내 사진 분석 �
 - 면적은 m² 단위
 - 벽, 문, 창문은 추정 가능한 경우에만 포함
 
-반드시 아래 JSON 스키마에 맞춰 출력하세요.`;
+반드시 아래 JSON 스키마에 맞춰 출력하세요. 마크다운 코드 블록 없이 순수 JSON만 출력하세요.`;
 
 const PHOTO_SCHEMA = {
   type: "object" as const,
@@ -192,19 +192,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Gemini 미설정 시 Mock
-    if (!isGeminiConfigured()) {
+    // OpenAI 미설정 시 Mock
+    if (!isOpenAIConfigured()) {
       const floorPlan = getMockPhotoFloorPlan(approximateArea, roomCount);
       return NextResponse.json({
         floorPlan,
         confidence: 0.3,
         method: "mock",
-        warnings: ["Gemini API 키가 설정되지 않아 추정 데이터를 반환합니다"],
+        warnings: ["OpenAI API 키가 설정되지 않아 추정 데이터를 반환합니다"],
         detectedRooms: [],
       });
     }
 
-    const client = getGeminiClient();
+    const client = getOpenAIClient();
     if (!client) {
       return NextResponse.json(
         { error: "AI 클라이언트 초기화 실패" },
@@ -212,22 +212,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 사진 → base64 (최대 1024px 리사이즈는 클라이언트에서 처리)
-    const imageParts = [];
+    // 사진 → base64 image_url 파트
+    type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
+    const imageContentParts: ContentPart[] = [];
     for (const photo of photos) {
       if (photo.size > 10 * 1024 * 1024) continue; // 10MB 초과 스킵
       const buffer = Buffer.from(await photo.arrayBuffer());
       const base64 = buffer.toString("base64");
       const mime = photo.type || "image/jpeg";
-      imageParts.push({
-        inlineData: {
-          mimeType: mime as "image/png" | "image/jpeg",
-          data: base64,
-        },
+      imageContentParts.push({
+        type: "image_url",
+        image_url: { url: `data:${mime};base64,${base64}` },
       });
     }
 
-    if (imageParts.length === 0) {
+    if (imageContentParts.length === 0) {
       return NextResponse.json(
         { error: "유효한 사진이 없습니다." },
         { status: 400 }
@@ -236,32 +235,32 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    const response = await client.models.generateContent({
-      model: "gemini-2.0-flash",
-      contents: [
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        {
+          role: "system",
+          content: PHOTO_ANALYSIS_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(PHOTO_SCHEMA, null, 2),
+        },
         {
           role: "user",
-          parts: [
-            { text: PHOTO_ANALYSIS_PROMPT },
-            ...imageParts,
+          content: [
+            ...imageContentParts,
             {
-              text: `위 ${imageParts.length}장의 실내 사진을 분석하여 추정 평면도를 JSON으로 생성하세요.
+              type: "text",
+              text: `위 ${imageContentParts.length}장의 실내 사진을 분석하여 추정 평면도를 JSON으로 생성하세요.
 대략적 면적: ${approximateArea}㎡, 예상 방 수: ${roomCount}개
 각 사진에서 보이는 공간, 벽, 문, 창문, 설비를 식별하고 공간 배치를 추정하세요.`,
             },
           ],
         },
       ],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: PHOTO_SCHEMA,
-        temperature: 0.2,
-        maxOutputTokens: 8192,
-        thinkingConfig: { thinkingBudget: 0 },
-      },
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+      max_tokens: 8192,
     });
 
-    const text = response.text || "";
+    const text = response.choices[0]?.message?.content || "";
     let parsed: { rooms?: PhotoRoom[]; doors?: PhotoDoor[]; windows?: PhotoWindow[]; detectedRooms?: { name: string; features?: string[] }[] };
 
     try {
@@ -290,7 +289,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 변환: Gemini 응답 → ParsedFloorPlan
+    // 변환: AI 응답 → ParsedFloorPlan
     const round = (v: number) => Math.round(v * 1000) / 1000;
     const rooms = parsed.rooms.map((r: PhotoRoom, i: number) => ({
       id: `room-${i}`,
@@ -337,8 +336,8 @@ export async function POST(request: NextRequest) {
 
     // 신뢰도 (사진 기반은 도면 대비 낮음)
     let confidence = 0.4;
-    if (imageParts.length >= 5) confidence += 0.1;
-    if (imageParts.length >= 10) confidence += 0.1;
+    if (imageContentParts.length >= 5) confidence += 0.1;
+    if (imageContentParts.length >= 10) confidence += 0.1;
     if (rooms.length >= 4) confidence += 0.05;
     if (doors.length > 0) confidence += 0.05;
 
