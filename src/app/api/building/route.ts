@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
+import { findComplexByAddress, type NaverComplexDetail } from "@/lib/services/naver-land-client";
 
 const DATA_API_KEY = process.env.DATA_API_KEY;
 const BUILDING_API_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo";
@@ -10,6 +11,7 @@ export async function GET(request: NextRequest) {
   const bjdongCd = request.nextUrl.searchParams.get("bjdongCd");
   const bun = request.nextUrl.searchParams.get("bun");
   const ji = request.nextUrl.searchParams.get("ji");
+  const bcode = request.nextUrl.searchParams.get("bcode");
   const address = request.nextUrl.searchParams.get("address") || "";
   const buildingName = request.nextUrl.searchParams.get("buildingName");
 
@@ -24,7 +26,25 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // 2. 건축물대장 API (키가 있을 때)
+  // 2. 네이버 부동산 API (실제 평형 데이터)
+  const cortarNo = bcode || (sigunguCd && bjdongCd ? sigunguCd + bjdongCd : "");
+  if (cortarNo && cortarNo.length >= 5) {
+    try {
+      const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
+      if (naverDetail && naverDetail.pyeongList.length > 0) {
+        const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
+        return NextResponse.json({
+          buildings,
+          source: "naver_land",
+          complexName: naverDetail.complex.complexName,
+        });
+      }
+    } catch (err) {
+      console.error("Naver Land API error:", err);
+    }
+  }
+
+  // 3. 건축물대장 API (키가 있을 때)
   if (DATA_API_KEY && sigunguCd && bjdongCd) {
     try {
       const params = new URLSearchParams({
@@ -72,7 +92,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // 3. 시뮬레이션 폴백 (개선됨)
+  // 4. 시뮬레이션 폴백 (개선됨)
   const simulated = generateSimulatedBuilding(address, buildingName || undefined);
   return NextResponse.json({ buildings: simulated, source: "simulated" });
 }
@@ -134,10 +154,94 @@ function generateKnownApartmentBuildings(
 }
 
 /**
- * 시뮬레이션 건물 데이터 (개선: 59/84 면적 일치)
+ * 네이버 부동산 데이터 → BuildingInfo[] 생성
+ */
+function generateNaverBuildings(
+  detail: NaverComplexDetail,
+  address: string,
+  buildingName?: string
+): BuildingInfo[] {
+  const buildings: BuildingInfo[] = [];
+  const { complex, pyeongList } = detail;
+
+  // 동 번호 생성: 단지명 기반 베이스 + 실제 동 수
+  const dongBase = parseDongBase(buildingName || complex.complexName);
+  const dongCount = complex.totalDongCount || 3;
+  const dongs: string[] = [];
+  for (let i = 1; i <= dongCount; i++) {
+    dongs.push(`${dongBase + i}동`);
+  }
+
+  // 대표 샘플 층수
+  const sampleFloors = [3, 7, 11, 15, 19, 23];
+
+  for (const dong of dongs) {
+    for (const pyeong of pyeongList) {
+      const sampleId = matchSampleId(pyeong.exclusiveArea);
+      const typeName = `${pyeong.pyeongName}`;
+      const lineNum = pyeong.pyeongNo || (pyeongList.indexOf(pyeong) + 1);
+
+      for (const floor of sampleFloors) {
+        const hoNum = String(floor).padStart(2, "0") + String(lineNum % 100).padStart(2, "0");
+        buildings.push({
+          id: `naver-${dong}-${floor}-${lineNum}`,
+          address,
+          buildingName: buildingName || complex.complexName,
+          dongName: dong,
+          hoName: `${hoNum}호`,
+          buildingType: "아파트",
+          totalFloor: 25,
+          floor,
+          exclusiveArea: pyeong.exclusiveArea,
+          supplyArea: pyeong.supplyArea,
+          roomCount: pyeong.roomCnt,
+          bathroomCount: pyeong.bathroomCnt,
+          approvalDate: complex.approvalDate || "",
+          floorPlanAvailable: !!sampleId,
+          sampleId,
+          typeName,
+          complexName: complex.complexName,
+        });
+      }
+    }
+  }
+
+  // 동 → 층수 순 정렬
+  buildings.sort((a, b) => {
+    if (a.dongName !== b.dongName) return a.dongName.localeCompare(b.dongName);
+    if (a.floor !== b.floor) return a.floor - b.floor;
+    return (a.typeName || "").localeCompare(b.typeName || "");
+  });
+
+  return buildings;
+}
+
+/**
+ * 전용면적 → 가장 가까운 샘플 도면 ID 매칭
+ */
+function matchSampleId(exclusiveArea: number): string | undefined {
+  if (exclusiveArea >= 55 && exclusiveArea <= 65) return "sample-59";
+  if (exclusiveArea >= 80 && exclusiveArea <= 90) return "sample-84a";
+  return undefined;
+}
+
+/**
+ * 단지명에서 동 번호 베이스 추출
+ * "반석마을2단지" → 200, "3단지" → 300, 기본 100
+ */
+function parseDongBase(buildingName?: string): number {
+  if (!buildingName) return 100;
+  const match = buildingName.match(/(\d+)\s*단지/);
+  if (match) return parseInt(match[1]) * 100;
+  return 100;
+}
+
+/**
+ * 시뮬레이션 건물 데이터 (개선: 단지명 기반 동번호 + 59/84 면적 일치)
  */
 function generateSimulatedBuilding(address: string, buildingName?: string): BuildingInfo[] {
-  const dongs = ["101동", "102동", "103동"];
+  const dongBase = parseDongBase(buildingName);
+  const dongs = [`${dongBase + 1}동`, `${dongBase + 2}동`, `${dongBase + 3}동`];
   const unitTypes = [
     { typeName: "59A", area: 59, supply: 84.8, rooms: 3, baths: 2, lineNum: 1, sampleId: "sample-59" },
     { typeName: "84A", area: 84, supply: 114.5, rooms: 4, baths: 2, lineNum: 2, sampleId: "sample-84a" },

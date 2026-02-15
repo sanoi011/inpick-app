@@ -40,7 +40,7 @@ export default function ProjectHomePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateAddress } = useProjectState(projectId);
+  const { project, updateAddress, setDrawingId } = useProjectState(projectId);
 
   const [step, setStep] = useState<Step>("search");
   const [keyword, setKeyword] = useState("");
@@ -54,6 +54,7 @@ export default function ProjectHomePage() {
   const [showRecent, setShowRecent] = useState(false);
   const [recentAddresses, setRecentAddresses] = useState<AddressSearchResult[]>([]);
   const [showScanOptions, setShowScanOptions] = useState(false);
+  const [buildingSource, setBuildingSource] = useState<string>("");
 
   // 이미 주소가 설정된 프로젝트면 confirm 단계로
   useEffect(() => {
@@ -112,12 +113,14 @@ export default function ProjectHomePage() {
       const p = new URLSearchParams({
         sigunguCd: addr.sigunguCode,
         bjdongCd: addr.bcode ? addr.bcode.slice(5) : "",
+        bcode: addr.bcode || "",
         address: addr.roadAddress,
         buildingName: addr.buildingName || "",
       });
       const res = await fetch(`/api/building?${p}`);
       const data = await res.json();
       setBuildings(data.buildings || []);
+      setBuildingSource(data.source || "");
     } catch {
       setBuildings([]);
     } finally {
@@ -147,6 +150,9 @@ export default function ProjectHomePage() {
         floor: selectedBuilding.floor,
         totalFloor: selectedBuilding.totalFloor,
       });
+      if (selectedBuilding.sampleId) {
+        setDrawingId(selectedBuilding.sampleId);
+      }
       router.push(`/project/${projectId}/design`);
     }
   };
@@ -356,7 +362,29 @@ export default function ProjectHomePage() {
             </div>
 
             <h2 className="text-2xl font-bold text-gray-900 mb-2">동/호를 선택해주세요</h2>
-            <p className="text-gray-500 mb-6 text-sm">건물 정보를 선택하면 면적과 공간 구성을 자동으로 파악합니다</p>
+            <p className="text-gray-500 mb-4 text-sm">건물 정보를 선택하면 면적과 공간 구성을 자동으로 파악합니다</p>
+
+            {buildingSource === "known_apartment" && (
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-xs text-green-700">
+                  <span className="font-semibold">실측 도면 데이터</span> — 실제 건축도면 기반의 정확한 동/호/면적 정보입니다.
+                </p>
+              </div>
+            )}
+            {buildingSource === "naver_land" && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-700">
+                  <span className="font-semibold">네이버 부동산 데이터</span> — 실제 단지의 평형/면적/방수 정보입니다.
+                </p>
+              </div>
+            )}
+            {buildingSource === "simulated" && (
+              <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-700">
+                  <span className="font-semibold">추정 데이터</span> — 실제 건축물대장 데이터가 아닌 추정 데이터입니다. 동/호/면적이 실제와 다를 수 있습니다.
+                </p>
+              </div>
+            )}
 
             {buildingLoading ? (
               <div className="flex items-center justify-center py-16">
@@ -497,6 +525,9 @@ export default function ProjectHomePage() {
                           totalFloor: selectedBuilding.totalFloor,
                         });
                       }
+                      if (selectedBuilding?.sampleId) {
+                        setDrawingId(selectedBuilding.sampleId);
+                      }
                       router.push(`/project/${projectId}/design?mode=lidar`);
                     }}
                     className="p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-violet-400 hover:shadow-sm transition-all text-left"
@@ -522,6 +553,9 @@ export default function ProjectHomePage() {
                           floor: selectedBuilding.floor,
                           totalFloor: selectedBuilding.totalFloor,
                         });
+                      }
+                      if (selectedBuilding?.sampleId) {
+                        setDrawingId(selectedBuilding.sampleId);
                       }
                       router.push(`/project/${projectId}/design?mode=photo`);
                     }}
@@ -549,6 +583,9 @@ export default function ProjectHomePage() {
                           totalFloor: selectedBuilding.totalFloor,
                         });
                       }
+                      if (selectedBuilding?.sampleId) {
+                        setDrawingId(selectedBuilding.sampleId);
+                      }
                       router.push(`/project/${projectId}/design?mode=hand-drawing`);
                     }}
                     className="p-4 rounded-xl border-2 border-gray-200 bg-white hover:border-amber-400 hover:shadow-sm transition-all text-left"
@@ -574,6 +611,9 @@ export default function ProjectHomePage() {
                           floor: selectedBuilding.floor,
                           totalFloor: selectedBuilding.totalFloor,
                         });
+                      }
+                      if (selectedBuilding?.sampleId) {
+                        setDrawingId(selectedBuilding.sampleId);
                       }
                       router.push(`/project/${projectId}/design?mode=draw`);
                     }}
