@@ -54,7 +54,7 @@ export interface Wall {
   height: number; // mm
   material: 'CONCRETE' | 'BLOCK' | 'DRYWALL' | 'WOOD';
   isExterior: boolean;
-  wallType?: 'exterior' | 'interior' | 'partition'; // isExterior 보완
+  wallType?: 'exterior' | 'structural' | 'interior' | 'partition' | 'insulation'; // 건축도면 색상 분류 기준
   constructionStatus: 'EXISTING' | 'DEMOLISH' | 'NEW';
 }
 

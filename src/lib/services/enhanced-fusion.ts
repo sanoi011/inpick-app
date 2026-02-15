@@ -3,7 +3,7 @@
  *
  * 융합 전략:
  * - 방(rooms): Gemini 우선 (시맨틱 정확)
- * - 벽(walls): floorplan-ai 우선 (기하학 정밀)
+ * - 벽(walls): Gemini 우선 (구조화 wallType/isLoadBearing 포함, 렌더링 품질 우수)
  * - 문/창/설비: 합집합 (중복 제거)
  * - 치수(dimensions): floorplan-ai 우선 (OCR 특화)
  */
@@ -188,10 +188,11 @@ export function enhancedFuse(
   // 방: Gemini 우선 (시맨틱: 방 이름, 타입, 폴리곤 추출 정확)
   const rooms = geminiPlan.rooms;
 
-  // 벽: floorplan-ai 우선 (기하학: Hough Transform 정밀)
-  // 단, aiPlan 벽이 0개면 Gemini 사용
-  const walls = aiPlan.walls.length > 0 ? aiPlan.walls : geminiPlan.walls;
-  const wallSource = aiPlan.walls.length > 0 ? 'ai_pipeline' as const : 'gemini' as const;
+  // 벽: Gemini 우선 (구조화된 wallType/isLoadBearing 포함, 렌더링 품질 우수)
+  // floorplan-ai의 Hough Transform은 벽 파편(fragments)이 많아 렌더링에 부적합
+  // Gemini 벽이 0개이면 floorplan-ai 폴백
+  const walls = geminiPlan.walls.length > 0 ? geminiPlan.walls : aiPlan.walls;
+  const wallSource = geminiPlan.walls.length > 0 ? 'gemini' as const : 'ai_pipeline' as const;
 
   // 문: 합집합 (Gemini 우선, ai 보충)
   const doors = mergeDoors(geminiPlan.doors, aiPlan.doors);

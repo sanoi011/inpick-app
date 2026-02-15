@@ -6,6 +6,7 @@ import type {
   ParsedFloorPlan,
   RoomData,
   WallData,
+  WallType,
   DoorData,
   WindowData,
   FixtureData,
@@ -27,6 +28,8 @@ interface GeminiWall {
   end: { x: number; y: number };
   isExterior: boolean;
   thicknessMm?: number;
+  wallType?: string; // exterior | structural | partition | insulation
+  isLoadBearing?: boolean;
 }
 
 interface GeminiDoor {
@@ -95,15 +98,36 @@ const SYSTEM_PROMPT = `당신은 한국 아파트 건축 도면 전문 분석가
   - 복도/Hall/Corridor → CORRIDOR
   - 드레스룸/D.R/W.I.C → DRESSROOM
 
-## 벽체(walls) 인식 규칙
-- 두꺼운 실선 = 외벽 (isExterior: true), 얇은 실선 = 내벽
+## 벽체(walls) 인식 규칙 - 건축도면 색상/두께 분류 기준
 - 모든 벽은 start/end 좌표(픽셀)로 표현
-- 두께는 mm로 추정 (외벽: 180-250mm, 내벽: 100-150mm)
+- 벽체는 반드시 wallType과 isLoadBearing을 함께 분류하세요
+
+### 벽체 4분류 (색상/두께/해칭 기준)
+1. **exterior** (외벽 내력벽): 건물 외곽 벽. 가장 두꺼운 실선 또는 해칭/채움 패턴.
+   - 두께: 200~300mm, isExterior=true, isLoadBearing=true
+   - 세대간 경계벽, 코어 주변 구조벽 포함
+2. **structural** (내부 내력벽): 건물 내부의 구조 벽. 두꺼운 실선 + 해칭.
+   - 두께: 200~250mm, isExterior=false, isLoadBearing=true
+   - 철거 불가 (구조 안전)
+3. **partition** (비내력 칸막이벽): 방과 방 사이 칸막이. 얇은 실선, 채움 없음.
+   - 두께: 100~150mm, isExterior=false, isLoadBearing=false
+   - 철거 가능 (인테리어 리모델링 대상)
+   - 욕실/주방/드레스룸/다용도실 구획벽 대부분
+4. **insulation** (외부 단열재선): 외벽 바깥쪽의 얇은 점선 또는 실선.
+   - 두께: 50~100mm, isExterior=true, isLoadBearing=false
+
+### 벽체 분류 우선순위
+- 두꺼운 실선 + 건물 외곽 = exterior
+- 두꺼운 실선 + 건물 내부 = structural
+- 얇은 실선 + 건물 내부 = partition
+- 외벽 바깥쪽 얇은 선 = insulation
 
 ## 문(doors) 인식 규칙
 - 1/4 원호 = 여닫이(swing), 평행선/화살표 = 미닫이(sliding)
-- 너비는 mm 단위 (일반 문: 800-900mm, 현관문: 900-1000mm, 미닫이: 1200-1800mm)
+- 현관 위치의 방화문 = entrance 타입 (900~1000mm)
+- 너비는 mm 단위 (일반 방문: 800-900mm, 현관문: 900-1000mm, 욕실문: 700-800mm, 발코니 미닫이: 1800-2400mm)
 - 연결된 두 공간의 name을 connectedRooms에 기입
+- type 값: "swing" | "sliding" | "folding" | "entrance"
 
 ## 창(windows) 인식 규칙
 - 외벽의 이중선/삼중선 = 창문
@@ -173,6 +197,8 @@ const JSON_SCHEMA = {
           },
           isExterior: { type: "boolean" as const },
           thicknessMm: { type: "number" as const },
+          wallType: { type: "string" as const },
+          isLoadBearing: { type: "boolean" as const },
         },
         required: ["start", "end", "isExterior"],
       },
@@ -540,14 +566,39 @@ function postProcess(
     }
   }
 
-  // Walls
-  const walls: WallData[] = raw.walls.map((w, i) => ({
-    id: `wall-${i}`,
-    start: { x: toM(w.start.x, calib.offsetX), y: toM(w.start.y, calib.offsetY) },
-    end: { x: toM(w.end.x, calib.offsetX), y: toM(w.end.y, calib.offsetY) },
-    thickness: w.thicknessMm ? w.thicknessMm / 1000 : w.isExterior ? 0.18 : 0.12,
-    isExterior: w.isExterior,
-  }));
+  // Walls - Gemini의 wallType 분류 결과를 직접 사용
+  const walls: WallData[] = raw.walls.map((w, i) => {
+    // Gemini가 wallType을 반환했으면 직접 사용, 아니면 기존 로직으로 추론
+    let wallType: WallType;
+    let isLoadBearing: boolean;
+    if (w.wallType && ['exterior', 'structural', 'partition', 'insulation'].includes(w.wallType)) {
+      wallType = w.wallType as WallType;
+      isLoadBearing = w.isLoadBearing ?? (wallType === 'exterior' || wallType === 'structural');
+    } else {
+      // 폴백: 두께/isExterior 기반 추론
+      const t = w.thicknessMm || (w.isExterior ? 200 : 120);
+      if (w.isExterior && t >= 150) {
+        wallType = 'exterior';
+        isLoadBearing = true;
+      } else if (!w.isExterior && t >= 180) {
+        wallType = 'structural';
+        isLoadBearing = true;
+      } else {
+        wallType = 'partition';
+        isLoadBearing = false;
+      }
+    }
+
+    return {
+      id: `wall-${i}`,
+      start: { x: toM(w.start.x, calib.offsetX), y: toM(w.start.y, calib.offsetY) },
+      end: { x: toM(w.end.x, calib.offsetX), y: toM(w.end.y, calib.offsetY) },
+      thickness: w.thicknessMm ? w.thicknessMm / 1000 : w.isExterior ? 0.2 : 0.12,
+      isExterior: w.isExterior,
+      wallType,
+      isLoadBearing,
+    };
+  });
 
   // 벽 데이터가 없으면 room 폴리곤에서 합성
   if (walls.length === 0 && rooms.length > 0) {
@@ -561,7 +612,7 @@ function postProcess(
     position: { x: toM(d.position.x, calib.offsetX), y: toM(d.position.y, calib.offsetY) },
     width: d.widthMm > 100 ? d.widthMm / 1000 : d.widthMm / ppm, // mm or px
     rotation: d.rotation || 0,
-    type: (d.type === "sliding" ? "sliding" : d.type === "folding" ? "folding" : "swing") as DoorData["type"],
+    type: (d.type === "sliding" ? "sliding" : d.type === "folding" ? "folding" : d.type === "entrance" ? "entrance" : "swing") as DoorData["type"],
     connectedRooms: [
       d.connectedRooms?.[0] || "",
       d.connectedRooms?.[1] || "",
@@ -668,9 +719,11 @@ function postProcess(
     }
   }
 
-  // 벽 타입 매핑
+  // 벽 타입 매핑 (Gemini가 wallType을 주지 않은 벽만 보정)
   for (const wall of validWalls) {
-    wall.wallType = wall.isExterior ? 'exterior' : (wall.thickness <= 0.1 ? 'partition' : 'interior');
+    if (!wall.wallType) {
+      wall.wallType = wall.isExterior ? 'exterior' : (wall.thickness <= 0.1 ? 'partition' : 'interior');
+    }
   }
 
   // 치수선 데이터 보존 (Gemini 인식 결과)

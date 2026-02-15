@@ -79,8 +79,9 @@ function categorizeSymbol(type: string): SymbolCategory {
   return 'ignore'; // wall, column, stairs, elevator
 }
 
-function mapDoorType(symbolType: string): 'swing' | 'sliding' | 'folding' {
+function mapDoorType(symbolType: string): 'swing' | 'sliding' | 'folding' | 'entrance' {
   if (symbolType === 'door_sliding') return 'sliding';
+  if (symbolType === 'door_entrance') return 'entrance';
   return 'swing';
 }
 
@@ -166,11 +167,22 @@ export function convertFloorplanAIResult(
 
   // --- Walls ---
   const walls: WallData[] = vd.walls.map((w, i) => {
-    const thicknessMm = w.thickness || 5;
-    const isExterior = thicknessMm >= 150;
-    const wallType = thicknessMm >= 150 ? 'exterior' as const
-      : thicknessMm >= 100 ? 'interior' as const
-      : 'partition' as const;
+    // 기본 두께: Hough Transform은 두께를 감지 못할 수 있음 → 150mm (내벽 기본)
+    const thicknessMm = w.thickness && w.thickness > 10 ? w.thickness : 150;
+    const isExterior = thicknessMm >= 200;
+    const isLoadBearing = thicknessMm >= 200;
+
+    // 벽 분류: 건축도면 색상 기준 (WALL_CLASSIFICATION_REFERENCE.md)
+    let wallType: 'exterior' | 'structural' | 'interior' | 'partition' | 'insulation';
+    if (isExterior && thicknessMm >= 200) {
+      wallType = 'exterior';
+    } else if (!isExterior && thicknessMm >= 180) {
+      wallType = 'structural';
+    } else if (thicknessMm >= 100) {
+      wallType = 'partition';
+    } else {
+      wallType = 'insulation';
+    }
 
     return {
       id: `wall-${i}`,
@@ -179,6 +191,7 @@ export function convertFloorplanAIResult(
       thickness: mmToM(thicknessMm),
       isExterior,
       wallType,
+      isLoadBearing,
     };
   });
 

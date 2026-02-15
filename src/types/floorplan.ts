@@ -24,7 +24,13 @@ export interface RoomData {
   material?: RoomMaterial;
 }
 
-export type WallType = 'exterior' | 'interior' | 'partition';
+// 벽체 분류 (건축도면 색상 기준)
+// exterior: 외벽 내력벽 (붉은색, 200-300mm, 철거 불가)
+// structural: 내부 내력벽 (붉은색, 200-250mm, 철거 불가)
+// interior: 일반 내벽
+// partition: 비내력 칸막이벽 (초록색, 100-150mm, 철거 가능)
+// insulation: 외부 단열재선 (파란색, 50-100mm)
+export type WallType = 'exterior' | 'structural' | 'interior' | 'partition' | 'insulation';
 
 export interface WallData {
   id: string;
@@ -33,6 +39,7 @@ export interface WallData {
   thickness: number;
   isExterior: boolean;
   wallType?: WallType;
+  isLoadBearing?: boolean; // 내력벽 여부 (true = 철거 불가)
   polygon?: { x: number; y: number }[];
 }
 
@@ -41,7 +48,7 @@ export interface DoorData {
   position: { x: number; y: number };
   width: number;
   rotation: number;
-  type: 'swing' | 'sliding' | 'folding';
+  type: 'swing' | 'sliding' | 'folding' | 'entrance';
   connectedRooms: [string, string];
 }
 
