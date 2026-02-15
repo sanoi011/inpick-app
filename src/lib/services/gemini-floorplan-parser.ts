@@ -13,6 +13,8 @@ import type {
   DimensionData,
   RoomType,
 } from "@/types/floorplan";
+import { repairFloorPlanTopology } from "./polygon-repair";
+import type { RepairMetrics } from "./polygon-repair";
 
 // ─── Gemini 원시 응답 타입 ───
 
@@ -145,6 +147,20 @@ const SYSTEM_PROMPT = `당신은 한국 아파트 건축 도면 전문 분석가
 - 도면 치수 텍스트(예: "3,600" = 3600mm)를 감지하고
 - 해당 치수의 시작점과 끝점 좌표를 기록
 - 이 정보는 좌표 보정에 사용됩니다
+
+## 폴리곤 인접성 규칙 (매우 중요)
+- 인접한 두 공간의 폴리곤은 반드시 공유 변(edge)이 있어야 합니다
+- 공유 변의 좌표는 정확히 동일해야 합니다
+- 예: 거실 오른쪽 변 x=500이면, 주방 왼쪽 변도 x=500
+- 공간 사이에 빈 공간(gap)이 없어야 합니다
+- 모든 공간이 서로 연결된 하나의 덩어리를 형성해야 합니다
+
+## 공간 크기 분포 규칙
+- 거실은 가장 큰 공간 (전체 면적의 25-35%)
+- 침실은 거실의 50-80% 크기
+- 주방은 거실의 40-70% 크기
+- 욕실/현관은 가장 작음 (전체 면적의 3-8%)
+- 모든 방이 비슷한 크기라면 잘못된 인식입니다!
 
 반드시 아래 JSON 스키마에 맞춰 출력하세요. 감지되지 않은 항목은 빈 배열로 두세요.`;
 
@@ -865,6 +881,31 @@ function buildUserPrompt(options: CalibrationOptions): string {
     }
   }
 
+  // 면적 기반 참조 구조 힌트 (한국 아파트 일반 구조)
+  if (options.knownAreaM2) {
+    const a = options.knownAreaM2;
+    if (a >= 55 && a <= 65) {
+      prompt += `\n\n참고: 이 ${a}m² 아파트의 일반적 구조는 다음과 같습니다:`;
+      prompt += `\n- 거실+식당: ~15-18m², 중앙`;
+      prompt += `\n- 안방: ~10-12m², 좌측 또는 우측`;
+      prompt += `\n- 침실2: ~7-9m²`;
+      prompt += `\n- 욕실1: ~3-4m²`;
+      prompt += `\n- 욕실2: ~2-3m²`;
+      prompt += `\n- 주방: ~4-6m², 거실 연결`;
+      prompt += `\n- 현관: ~2-3m², 입구`;
+    } else if (a >= 75 && a <= 90) {
+      prompt += `\n\n참고: 이 ${a}m² 아파트의 일반적 구조는 다음과 같습니다:`;
+      prompt += `\n- 거실+식당: ~25-30m², 중앙 (가장 큰 공간)`;
+      prompt += `\n- 안방: ~12-15m², 좌측 또는 우측`;
+      prompt += `\n- 침실2: ~8-10m², 안방 인접`;
+      prompt += `\n- 침실3: ~6-8m², 가장 작은 침실`;
+      prompt += `\n- 욕실1: ~4-5m², 안방 연결`;
+      prompt += `\n- 욕실2: ~3-4m², 공용`;
+      prompt += `\n- 주방: ~5-7m², 거실 연결`;
+      prompt += `\n- 현관: ~3-5m², 입구`;
+    }
+  }
+
   return prompt;
 }
 
@@ -874,6 +915,7 @@ export interface FloorPlanParseResult {
   warnings: string[];
   processingTimeMs: number;
   method: "gemini_vision" | "mock";
+  repairMetrics?: RepairMetrics;
 }
 
 export async function extractFloorPlanFromImage(
@@ -910,20 +952,25 @@ export async function extractFloorPlanFromImage(
   // 모델 폴백 순서: 2.5-flash → 2.0-flash → 2.0-flash-lite → 2.5-flash-lite
   const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite", "gemini-2.5-flash-lite"];
 
-  try {
+  // Gemini 호출 함수 (재시도용)
+  async function callGemini(extraPrompt?: string, temp: number = 0.1): Promise<GeminiRawResult | null> {
     let text = "";
     let lastError: unknown = null;
 
+    const systemPrompt = SYSTEM_PROMPT +
+      (options.sourceType === "hand_drawing" ? HAND_DRAWING_PROMPT_ADDITION : "") +
+      (extraPrompt || "");
+
     for (const modelName of MODELS) {
       try {
-        console.log(`[floorplan-parser] Trying model: ${modelName}`);
-        const response = await client.models.generateContent({
+        console.log(`[floorplan-parser] Trying model: ${modelName}${extraPrompt ? " (retry)" : ""}`);
+        const response = await client!.models.generateContent({
           model: modelName,
           contents: [
             {
               role: "user",
               parts: [
-                { text: SYSTEM_PROMPT + (options.sourceType === "hand_drawing" ? HAND_DRAWING_PROMPT_ADDITION : "") },
+                { text: systemPrompt },
                 {
                   inlineData: {
                     mimeType: mimeType as "image/png" | "image/jpeg",
@@ -939,14 +986,14 @@ export async function extractFloorPlanFromImage(
           config: {
             responseMimeType: "application/json",
             responseSchema: JSON_SCHEMA,
-            temperature: 0.1,
+            temperature: temp,
             maxOutputTokens: 16384,
             thinkingConfig: { thinkingBudget: 0 },
           },
         });
         text = response.text || "";
         console.log(`[floorplan-parser] Success with model: ${modelName}`);
-        break; // 성공
+        break;
       } catch (modelError) {
         lastError = modelError;
         const errMsg = modelError instanceof Error ? modelError.message : String(modelError);
@@ -956,28 +1003,46 @@ export async function extractFloorPlanFromImage(
           warnings.push(`${modelName} 할당량 초과, 다른 모델로 재시도`);
           continue;
         }
-        throw modelError; // 마지막 모델이거나 rate limit이 아닌 에러
+        throw modelError;
       }
     }
 
-    if (!text && lastError) {
-      throw lastError;
-    }
-
-    console.log(`[floorplan-parser] Response length: ${text.length}`);
-    let rawResult: GeminiRawResult;
+    if (!text && lastError) throw lastError;
+    if (!text) return null;
 
     try {
-      // Gemini가 markdown 코드블록으로 감쌀 수 있음
       let jsonText = text;
       if (jsonText.startsWith("```")) {
         jsonText = jsonText.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
       }
-      rawResult = JSON.parse(jsonText);
-    } catch (parseErr) {
-      console.error("[floorplan-parser] JSON parse error:", parseErr);
-      console.error("[floorplan-parser] Raw text (first 1000):", text.substring(0, 1000));
-      warnings.push("Gemini 응답 JSON 파싱 실패, Mock 폴백");
+      return JSON.parse(jsonText);
+    } catch {
+      return null;
+    }
+  }
+
+  // 격자형 감지 함수: 면적 변동계수(CV) 계산
+  function detectGridPattern(rawResult: GeminiRawResult, calib: { pixelsPerMeter: number; offsetX: number; offsetY: number }): number {
+    if (!rawResult.rooms || rawResult.rooms.length < 3) return 1.0;
+    const areas = rawResult.rooms.map(r => {
+      const poly = r.polygon.map(p => ({
+        x: (p.x - calib.offsetX) / calib.pixelsPerMeter,
+        y: (p.y - calib.offsetY) / calib.pixelsPerMeter,
+      }));
+      return calcPolygonArea(poly);
+    }).filter(a => a > 0.5);
+    if (areas.length < 3) return 1.0;
+    const mean = areas.reduce((s, a) => s + a, 0) / areas.length;
+    const variance = areas.reduce((s, a) => s + (a - mean) ** 2, 0) / areas.length;
+    return mean > 0 ? Math.sqrt(variance) / mean : 0;
+  }
+
+  try {
+    // 1차 시도
+    let rawResult = await callGemini();
+
+    if (!rawResult) {
+      warnings.push("Gemini 응답 파싱 실패, Mock 폴백");
       return {
         floorPlan: getMockFloorPlan(options.knownAreaM2),
         confidence: 0.2,
@@ -985,17 +1050,6 @@ export async function extractFloorPlanFromImage(
         processingTimeMs: Date.now() - startTime,
         method: "mock",
       };
-    }
-
-    // 원시 결과 로깅
-    console.log(`[floorplan-parser] Raw: ${rawResult.rooms?.length || 0} rooms, ${rawResult.walls?.length || 0} walls, ${rawResult.dimensions?.length || 0} dims`);
-    if (rawResult.rooms?.[0]?.polygon?.[0]) {
-      const p = rawResult.rooms[0].polygon[0];
-      console.log(`[floorplan-parser] First room first point: (${p.x}, ${p.y}) - ${rawResult.rooms[0].name}`);
-    }
-    if (rawResult.dimensions?.[0]) {
-      const d = rawResult.dimensions[0];
-      console.log(`[floorplan-parser] First dim: ${d.valueMm}mm, (${d.start.x},${d.start.y})→(${d.end.x},${d.end.y})`);
     }
 
     // 결과 검증
@@ -1008,6 +1062,52 @@ export async function extractFloorPlanFromImage(
         processingTimeMs: Date.now() - startTime,
         method: "mock",
       };
+    }
+
+    // 격자형 감지 → 재시도 (최대 1회)
+    const calib0 = calibrateCoordinates(rawResult, options);
+    const cv0 = detectGridPattern(rawResult, calib0);
+    console.log(`[floorplan-parser] Raw: ${rawResult.rooms.length} rooms, CV=${cv0.toFixed(2)}`);
+
+    if (cv0 < 0.4 && rawResult.rooms.length >= 4) {
+      console.log(`[floorplan-parser] Grid pattern detected (CV=${cv0.toFixed(2)}), retrying with correction prompt...`);
+      warnings.push(`격자형 인식 감지 (CV=${cv0.toFixed(2)}), 보정 프롬프트로 재시도`);
+
+      const CORRECTION_PROMPT = `
+
+## 필수 보정 (이전 인식이 격자형이었습니다!)
+이전 분석에서 모든 방이 비슷한 크기의 격자(grid)로 인식되었습니다. 이것은 잘못된 인식입니다!
+
+반드시 다음을 지키세요:
+- 거실은 가장 큰 공간 (전체의 25-35%, 최소 10m²)
+- 욕실은 가장 작은 공간 (2-5m², 절대 8m² 이상 불가)
+- 현관도 작음 (2-5m²)
+- 안방 > 침실2 > 침실3 순으로 크기 차이
+- 각 공간의 폴리곤은 도면에서 실제 벽 안쪽 선을 정확히 따라야 합니다
+- 벽으로 구획된 실제 공간의 형태와 크기를 반영하세요
+- 모든 방을 같은 크기로 만들지 마세요!`;
+
+      const retryResult = await callGemini(CORRECTION_PROMPT, 0.3);
+      if (retryResult && retryResult.rooms && retryResult.rooms.length > 0) {
+        const calib1 = calibrateCoordinates(retryResult, options);
+        const cv1 = detectGridPattern(retryResult, calib1);
+        console.log(`[floorplan-parser] Retry result: ${retryResult.rooms.length} rooms, CV=${cv1.toFixed(2)}`);
+
+        if (cv1 > cv0) {
+          // 재시도 결과가 더 나으면 교체
+          rawResult = retryResult;
+          warnings.push(`보정 재시도 성공 (CV: ${cv0.toFixed(2)} → ${cv1.toFixed(2)})`);
+        } else {
+          warnings.push(`보정 재시도 미개선 (CV: ${cv0.toFixed(2)} → ${cv1.toFixed(2)}), 원본 유지`);
+        }
+      }
+    }
+
+    // 원시 결과 로깅
+    console.log(`[floorplan-parser] Final: ${rawResult.rooms?.length || 0} rooms, ${rawResult.walls?.length || 0} walls, ${rawResult.dimensions?.length || 0} dims`);
+    if (rawResult.rooms?.[0]?.polygon?.[0]) {
+      const p = rawResult.rooms[0].polygon[0];
+      console.log(`[floorplan-parser] First room first point: (${p.x}, ${p.y}) - ${rawResult.rooms[0].name}`);
     }
 
     // 좌표 보정
@@ -1060,6 +1160,22 @@ export async function extractFloorPlanFromImage(
       }
     }
 
+    // Phase 1: Polygon Topology Repair
+    const repairResult = repairFloorPlanTopology(
+      floorPlan.rooms,
+      floorPlan.walls,
+      options.knownAreaM2
+    );
+    floorPlan.rooms = repairResult.rooms;
+    floorPlan.walls = repairResult.walls;
+
+    // 수리 로그를 warnings에 추가
+    if (repairResult.repairLog.length > 0) {
+      warnings.push(...repairResult.repairLog);
+    }
+
+    console.log(`[floorplan-parser] Repair: snapped=${repairResult.metrics.snappedVertices}, aligned=${repairResult.metrics.alignedEdges}, removed=${repairResult.metrics.removedVertices}, connected=${repairResult.metrics.isConnected}, CV=${repairResult.metrics.sizeCV}`);
+
     // 신뢰도 계산
     let confidence = 0.5;
     if (rawResult.dimensions && rawResult.dimensions.length > 0) confidence += 0.15;
@@ -1094,6 +1210,7 @@ export async function extractFloorPlanFromImage(
       warnings,
       processingTimeMs: Date.now() - startTime,
       method: "gemini_vision",
+      repairMetrics: repairResult.metrics,
     };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);

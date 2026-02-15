@@ -221,6 +221,9 @@ export async function POST(request: NextRequest) {
         aiPipelineStats: fusionResult.stats,
         aiPipelineSources: fusionResult.sources,
       } : {}),
+      ...(result.repairMetrics ? {
+        repairMetrics: result.repairMetrics,
+      } : {}),
     });
   } catch (error) {
     console.error("[parse-drawing] Error:", error);
