@@ -5,14 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Search, Building2, ArrowRight, MapPin, Loader2, Home,
   ArrowLeft, Bath, BedDouble, Maximize, CheckCircle2,
-  Smartphone, Camera, PenTool, ChevronDown, ChevronUp, AlertCircle,
+  Smartphone, Camera, PenTool, ChevronDown, ChevronUp, FileUp,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import type { AddressSearchResult, BuildingInfo } from "@/types/address";
-import type { ParsedFloorPlan } from "@/types/floorplan";
-import { getSampleTypes, loadFloorPlan } from "@/lib/services/drawing-service";
-import type { DrawingCatalogEntry, SampleFloorPlanType } from "@/lib/services/drawing-service";
-import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 
 type Step = "search" | "building" | "confirm";
 
@@ -44,7 +40,7 @@ export default function ProjectHomePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateAddress, setDrawingId } = useProjectState(projectId);
+  const { project, updateAddress } = useProjectState(projectId);
 
   const [step, setStep] = useState<Step>("search");
   const [keyword, setKeyword] = useState("");
@@ -55,14 +51,8 @@ export default function ProjectHomePage() {
   const [loading, setLoading] = useState(false);
   const [buildingLoading, setBuildingLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
-  const [matchedDrawing, setMatchedDrawing] = useState<DrawingCatalogEntry | null>(null);
-  const [matchedFloorPlan, setMatchedFloorPlan] = useState<ParsedFloorPlan | null>(null);
-  const [drawingLoading, setDrawingLoading] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [recentAddresses, setRecentAddresses] = useState<AddressSearchResult[]>([]);
-  const [sampleTypes, setSampleTypes] = useState<SampleFloorPlanType[]>([]);
-  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
-  const [drawingError, setDrawingError] = useState<string | null>(null);
   const [showScanOptions, setShowScanOptions] = useState(false);
 
   // 이미 주소가 설정된 프로젝트면 confirm 단계로
@@ -138,54 +128,6 @@ export default function ProjectHomePage() {
   const handleSelectBuilding = async (building: BuildingInfo) => {
     setSelectedBuilding(building);
     setStep("confirm");
-    setDrawingError(null);
-
-    // 샘플 도면 타입 로드
-    setDrawingLoading(true);
-    try {
-      const samples = await getSampleTypes();
-      setSampleTypes(samples);
-      // sampleId 직접 매칭 → 면적 기준 폴백
-      if (samples.length > 0) {
-        const autoId = building.sampleId
-          ? samples.find(s => s.id === building.sampleId)?.id
-          : building.exclusiveArea <= 70
-            ? samples.find(s => s.id === "sample-59")?.id
-            : samples.find(s => s.id === "sample-84a")?.id;
-        const pickId = autoId || samples[0].id;
-        setSelectedSampleId(pickId);
-        const picked = samples.find(s => s.id === pickId)!;
-        setMatchedDrawing(picked);
-        const plan = await loadFloorPlan(pickId);
-        if (!plan) {
-          setDrawingError("도면 데이터를 불러올 수 없습니다. 다른 타입을 선택하거나 직접 업로드해주세요.");
-        }
-        setMatchedFloorPlan(plan);
-      }
-    } catch {
-      setDrawingError("도면 카탈로그 로딩에 실패했습니다.");
-    } finally {
-      setDrawingLoading(false);
-    }
-  };
-
-  const handleSelectSampleType = async (sample: SampleFloorPlanType) => {
-    setSelectedSampleId(sample.id);
-    setMatchedDrawing(sample);
-    setDrawingLoading(true);
-    setDrawingError(null);
-    try {
-      const plan = await loadFloorPlan(sample.id);
-      if (!plan) {
-        setDrawingError("도면 데이터를 불러올 수 없습니다.");
-      }
-      setMatchedFloorPlan(plan);
-    } catch {
-      setMatchedFloorPlan(null);
-      setDrawingError("도면 로딩 중 오류가 발생했습니다.");
-    } finally {
-      setDrawingLoading(false);
-    }
   };
 
   // 확인 → 프로젝트에 주소 저장 → 디자인 탭 이동
@@ -205,9 +147,6 @@ export default function ProjectHomePage() {
         floor: selectedBuilding.floor,
         totalFloor: selectedBuilding.totalFloor,
       });
-      if (matchedDrawing) {
-        setDrawingId(matchedDrawing.id);
-      }
       router.push(`/project/${projectId}/design`);
     }
   };
@@ -516,7 +455,7 @@ export default function ProjectHomePage() {
                   )}
                 </div>
 
-                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-3 text-center">
+                <div className="mt-4 pt-4 border-t border-gray-100 grid grid-cols-2 text-center">
                   <div>
                     <p className="text-xs text-gray-400">건물유형</p>
                     <p className="text-sm font-medium text-gray-900">{selectedBuilding.buildingType}</p>
@@ -525,90 +464,21 @@ export default function ProjectHomePage() {
                     <p className="text-xs text-gray-400">층수</p>
                     <p className="text-sm font-medium text-gray-900">{selectedBuilding.floor}층 / {selectedBuilding.totalFloor}층</p>
                   </div>
-                  <div>
-                    <p className="text-xs text-gray-400">도면</p>
-                    <p className="text-sm font-medium text-gray-900">{matchedDrawing ? "AI 매칭" : selectedBuilding.floorPlanAvailable ? "있음" : "없음"}</p>
-                  </div>
                 </div>
               </div>
             </div>
 
-            {/* 샘플 도면 타입 선택 */}
-            {sampleTypes.length > 0 && (
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3 text-left">도면 타입을 선택하세요</h3>
-                <div className="grid grid-cols-3 gap-3">
-                  {sampleTypes.map((sample) => (
-                    <button
-                      key={sample.id}
-                      onClick={() => handleSelectSampleType(sample)}
-                      className={`relative p-4 rounded-xl border-2 text-left transition-all ${
-                        selectedSampleId === sample.id
-                          ? "border-blue-500 bg-blue-50 shadow-md"
-                          : "border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm"
-                      }`}
-                    >
-                      {selectedSampleId === sample.id && (
-                        <CheckCircle2 className="absolute top-2 right-2 w-5 h-5 text-blue-600" />
-                      )}
-                      {selectedBuilding?.sampleId === sample.id && selectedSampleId !== sample.id && (
-                        <span className="absolute top-2 right-2 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-bold rounded">추천</span>
-                      )}
-                      <p className="text-lg font-bold text-gray-900">{sample.label}</p>
-                      <p className="text-xs text-gray-500 mt-1">{sample.description}</p>
-                      <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
-                        <span>{sample.totalArea}m²</span>
-                        <span>({(sample.totalArea * 0.3025).toFixed(0)}평)</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* 선택된 도면 미리보기 */}
-            {drawingLoading && (
-              <div className="flex items-center justify-center py-8 bg-white rounded-2xl border border-gray-200 mb-6">
-                <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
-                <span className="text-sm text-gray-500">도면 로딩 중...</span>
-              </div>
-            )}
-            {!drawingLoading && matchedFloorPlan && matchedDrawing && (
-              <div className="mb-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
-                    실시공 건축도면 기반
-                  </span>
-                  <span className="text-xs text-gray-400">
-                    {matchedDrawing.totalArea}m² / {matchedDrawing.roomCount}방 / {matchedDrawing.bathroomCount}욕실
-                  </span>
-                </div>
-                <div className="h-[340px]">
-                  <FloorPlan2D floorPlan={matchedFloorPlan} className="h-full" />
-                </div>
-              </div>
-            )}
-            {!drawingLoading && !matchedFloorPlan && drawingError && (
-              <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-sm text-amber-800">{drawingError}</p>
-                  <p className="text-xs text-amber-600 mt-1">아래 &quot;도면이 없으신가요?&quot;에서 직접 업로드할 수 있습니다.</p>
-                </div>
-              </div>
-            )}
-
-            {/* 도면이 없으신가요? - 대체 입력 방식 */}
+            {/* 도면 입력 방식 선택 */}
             <div className="mb-6">
               <button
                 onClick={() => setShowScanOptions(!showScanOptions)}
                 className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-200 transition-colors"
               >
-                <span className="text-sm font-medium text-gray-700">도면이 없으신가요? 직접 스캔하거나 촬영하세요</span>
+                <span className="text-sm font-medium text-gray-700">도면이 없으신가요? 다른 방법으로 등록하세요</span>
                 {showScanOptions ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
               </button>
               {showScanOptions && (
-                <div className="mt-3 grid grid-cols-3 gap-3">
+                <div className="mt-3 grid grid-cols-2 gap-3">
                   <button
                     onClick={() => {
                       if (selectedAddress && selectedBuilding) {
@@ -633,7 +503,7 @@ export default function ProjectHomePage() {
                   >
                     <Smartphone className="w-7 h-7 text-violet-600 mb-2" />
                     <p className="text-sm font-bold text-gray-900">LiDAR 스캔</p>
-                    <p className="text-xs text-gray-500 mt-1">iPhone/iPad로 직접 스캔 (가장 정확)</p>
+                    <p className="text-xs text-gray-500 mt-1">iPhone/iPad로 직접 스캔</p>
                   </button>
                   <button
                     onClick={() => {
@@ -659,7 +529,7 @@ export default function ProjectHomePage() {
                   >
                     <Camera className="w-7 h-7 text-emerald-600 mb-2" />
                     <p className="text-sm font-bold text-gray-900">사진 촬영</p>
-                    <p className="text-xs text-gray-500 mt-1">방 사진 10~20장으로 AI가 도면 생성</p>
+                    <p className="text-xs text-gray-500 mt-1">방 사진으로 AI 도면 생성</p>
                   </button>
                   <button
                     onClick={() => {
@@ -685,7 +555,7 @@ export default function ProjectHomePage() {
                   >
                     <PenTool className="w-7 h-7 text-amber-600 mb-2" />
                     <p className="text-sm font-bold text-gray-900">손도면 촬영</p>
-                    <p className="text-xs text-gray-500 mt-1">종이에 그린 도면을 사진으로 변환</p>
+                    <p className="text-xs text-gray-500 mt-1">종이 도면을 사진으로 변환</p>
                   </button>
                 </div>
               )}
@@ -702,7 +572,7 @@ export default function ProjectHomePage() {
                 onClick={handleConfirm}
                 className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-blue-700 transition-colors"
               >
-                선택된 도면으로 우리집 꾸미기 시작 <ArrowRight className="w-5 h-5" />
+                <FileUp className="w-5 h-5" /> 도면 업로드하러 가기
               </button>
             </div>
           </div>

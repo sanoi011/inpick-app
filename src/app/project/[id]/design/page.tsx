@@ -529,9 +529,9 @@ export default function FloorPlanPage() {
                       <Upload className="w-8 h-8 text-gray-400" />
                       <div className="text-center">
                         <p className="text-sm font-medium text-gray-700">도면 파일 업로드</p>
-                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG</p>
+                        <p className="text-xs text-gray-400 mt-1">PDF, JPG, PNG, DWG</p>
                       </div>
-                      <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
+                      <input ref={fileInputRef} type="file" accept="image/*,.pdf,.dwg,.dxf" onChange={handleFileUpload} className="hidden" />
                     </label>
 
                     <button onClick={handleCameraScan}
