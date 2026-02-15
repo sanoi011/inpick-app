@@ -1119,6 +1119,30 @@ npm run dev:full
 | 융합 엔진 | `src/lib/services/enhanced-fusion.ts` | 완료 |
 | API 라우트 | `src/app/api/project/parse-drawing/route.ts` | 완료 (3소스 병렬) |
 
+### 버그 수정 (서버 테스트 중 발견)
+- `python/floorplan-ai/src/vectorizer.py` (수정) - `_NumpyEncoder` 추가
+  - `to_json()`에서 numpy int32/float64 → Python native 변환 (JSON 직렬화 실패 수정)
+- `python/floorplan-ai/src/api_server.py` (수정) - `_convert_numpy()` 재귀 변환 + `numpy_json_response()` 헬퍼
+  - `JSONResponse` → 커스텀 `Response`로 교체 (numpy 타입 안전 처리)
+- `python/floorplan-ai/models/floorplan_yolov8n.pt` - 학습된 YOLO 모델 복사
+  - `runs/floorplan-yolo/weights/best.pt` → `models/floorplan_yolov8n.pt` (mAP50: 0.913)
+  - 기존 기본 `yolov8n.pt` (COCO) 사용 시 심볼 감지 0건 → 학습 모델로 교체
+
+### 통합 테스트 결과 (Next.js + floorplan-ai + Gemini)
+| 도면 | 면적 | 방 | 벽 | 문 | 창 | 설비 | 치수 | AI융합 | 시간 |
+|------|------|-----|------|-----|------|------|------|--------|------|
+| 59.png | 53.8m² | 11 | 146 | 9 | 5 | 7 | 47 | Y | 28.8s |
+| 84A.png | 84.0m² | 9 | 158 | 7 | 7 | 12 | 41 | Y | 27.6s |
+| 84d.png | 84.0m² | 12 | 149 | 11 | 3 | 7 | 41 | Y | 28.5s |
+
+- **융합 소스**: rooms=gemini, walls=ai_pipeline, doors/windows=fused
+- **벽 정밀도**: floorplan-ai 146~158개 vs Gemini 23~41개 (약 6배)
+- **치수 OCR**: floorplan-ai EasyOCR로 41~47개 치수 텍스트 추가
+
+### 테스트 스크립트
+- `scripts/test-ai-pipeline.py` - FastAPI 서버 직접 3개 도면 테스트
+- `scripts/test-integration.py` - Next.js `/api/project/parse-drawing` 3소스 융합 통합 테스트
+
 ### 도면 인식 파이프라인 전체 구성 (4소스)
 | 소스 | 역할 | 강점 |
 |------|------|------|
