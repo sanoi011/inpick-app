@@ -44,6 +44,9 @@ async function ensureCookies(): Promise<string> {
     return _cachedCookies;
   }
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
   const res = await fetch(MAIN_PAGE_URL, {
     headers: {
       ...BROWSER_HEADERS,
@@ -51,7 +54,9 @@ async function ensureCookies(): Promise<string> {
         "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
     },
     redirect: "follow",
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   // Parse Set-Cookie headers (with fallback for environments where getSetCookie is unavailable)
   let rawCookies: string[] = [];
@@ -85,6 +90,9 @@ async function ensureCookies(): Promise<string> {
 async function naverFetch(url: string, retries = 1): Promise<Response> {
   const cookie = await ensureCookies();
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
   const res = await fetch(url, {
     headers: {
       ...BROWSER_HEADERS,
@@ -95,7 +103,9 @@ async function naverFetch(url: string, retries = 1): Promise<Response> {
       "sec-fetch-site": "same-origin",
       Cookie: cookie,
     },
+    signal: controller.signal,
   });
+  clearTimeout(timeout);
 
   if (res.status === 429 && retries > 0) {
     // Force cookie refresh and retry
