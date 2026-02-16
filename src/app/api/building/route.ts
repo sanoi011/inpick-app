@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error("Naver Land API error:", err);
+      console.error("Naver Land API error:", err instanceof Error ? err.message : err);
     }
   }
 

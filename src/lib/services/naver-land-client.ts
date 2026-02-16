@@ -53,14 +53,29 @@ async function ensureCookies(): Promise<string> {
     redirect: "follow",
   });
 
-  const rawCookies = res.headers.getSetCookie?.() || [];
-  _cachedCookies = rawCookies.map((c) => c.split(";")[0]).join("; ");
+  // Parse Set-Cookie headers (with fallback for environments where getSetCookie is unavailable)
+  let rawCookies: string[] = [];
+  if (typeof res.headers.getSetCookie === "function") {
+    rawCookies = res.headers.getSetCookie();
+  } else {
+    // Fallback: parse from raw 'set-cookie' header (comma-separated)
+    const setCookieHeader = res.headers.get("set-cookie") || "";
+    if (setCookieHeader) {
+      // Split on comma followed by space + cookie name pattern (not within expires date)
+      rawCookies = setCookieHeader.split(/,(?=\s*[A-Za-z_]+=)/);
+    }
+  }
+  _cachedCookies = rawCookies.map((c) => c.split(";")[0].trim()).join("; ");
 
   // Cache for 10 minutes
   _cookieExpiresAt = now + 10 * 60 * 1000;
 
   // Consume the response body to free the connection
   await res.text();
+
+  console.log(
+    `[naver-land] Cookie fetch: status=${res.status}, cookies=${_cachedCookies ? _cachedCookies.substring(0, 80) + "..." : "(empty)"}`
+  );
 
   return _cachedCookies;
 }
