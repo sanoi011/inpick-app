@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCachedRegions, getCachedComplexes, getCacheFetchedAt } from "@/lib/data/naver-cache";
 
-const ESTIMATED_NATIONWIDE_COMPLEXES = 20000;
+const ESTIMATED_NATIONWIDE_COMPLEXES = 50000;
 
 // 시도 코드 → 이름 매핑 (cortarNo 앞 2자리)
 const SIDO_NAMES: Record<string, string> = {
@@ -22,6 +22,8 @@ const SIDO_NAMES: Record<string, string> = {
   "47": "경상북도",
   "48": "경상남도",
   "50": "제주특별자치도",
+  "51": "강원특별자치도",
+  "52": "전북특별자치도",
 };
 
 export async function GET() {

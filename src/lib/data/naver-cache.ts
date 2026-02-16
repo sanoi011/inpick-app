@@ -20,13 +20,14 @@ interface CachedRegion {
 interface CachedPyeong {
   pyeongNo: number;
   pyeongName: string;
+  pyeongName2?: string;
   exclusiveArea: number;
   supplyArea: number;
   roomCnt?: number;
   bathroomCnt?: number;
   entranceType?: string;
   householdCountByPyeong?: number;
-  grandPlanUrl?: string;
+  grandPlanUrl?: string | null;
 }
 
 interface CachedDong {
@@ -44,6 +45,8 @@ interface CachedComplex {
   address: string;
   highFloor?: number;
   lowFloor?: number;
+  latitude?: number;
+  longitude?: number;
   pyeongList?: CachedPyeong[];
   dongList?: CachedDong[];
 }
@@ -120,7 +123,7 @@ export function findCachedComplexDetail(
     bathroomCnt: p.bathroomCnt || 0,
     entranceType: p.entranceType || "",
     householdCountByPyeong: p.householdCountByPyeong || 0,
-    grandPlanUrl: p.grandPlanUrl,
+    grandPlanUrl: p.grandPlanUrl || undefined,
   }));
 
   const dongList: NaverDong[] = (matched.dongList || []).map((d) => ({

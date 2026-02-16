@@ -2,12 +2,5150 @@
   "version": "1.0",
   "updatedAt": "2026-02-16T00:00:00.000Z",
   "description": "아파트 단지별 도면 매핑. complexNo 또는 면적 범위로 도면 자동 매칭.",
-
   "complexMappings": {
     "comment": "complexNo → 해당 단지 전용 도면 매핑 (추후 확장)",
-    "mappings": {}
+    "mappings": {
+      "6041": {
+        "complexName": "한빛",
+        "types": [
+          {
+            "typeName": "63",
+            "areaMin": 51,
+            "areaMax": 57,
+            "floorPlanId": "naver-6041-1"
+          },
+          {
+            "typeName": "81A",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-6041-2"
+          },
+          {
+            "typeName": "81B",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-6041-9"
+          },
+          {
+            "typeName": "94A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6041-3"
+          },
+          {
+            "typeName": "95D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6041-11"
+          },
+          {
+            "typeName": "96B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6041-4"
+          },
+          {
+            "typeName": "96C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6041-10"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6041-12"
+          },
+          {
+            "typeName": "110B",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6041-5"
+          },
+          {
+            "typeName": "127A",
+            "areaMin": 114,
+            "areaMax": 120,
+            "floorPlanId": "naver-6041-13"
+          },
+          {
+            "typeName": "127B",
+            "areaMin": 114,
+            "areaMax": 120,
+            "floorPlanId": "naver-6041-14"
+          },
+          {
+            "typeName": "129C",
+            "areaMin": 114,
+            "areaMax": 120,
+            "floorPlanId": "naver-6041-6"
+          },
+          {
+            "typeName": "152",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-6041-7"
+          },
+          {
+            "typeName": "154B",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-6041-8"
+          },
+          {
+            "typeName": "154A",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-6041-16"
+          }
+        ]
+      },
+      "6077": {
+        "complexName": "나래",
+        "types": [
+          {
+            "typeName": "72",
+            "areaMin": 50,
+            "areaMax": 56,
+            "floorPlanId": "naver-6077-1"
+          },
+          {
+            "typeName": "90",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-6077-2"
+          },
+          {
+            "typeName": "106",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6077-3"
+          },
+          {
+            "typeName": "120A",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6077-4"
+          },
+          {
+            "typeName": "122B",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6077-6"
+          },
+          {
+            "typeName": "142",
+            "areaMin": 115,
+            "areaMax": 121,
+            "floorPlanId": "naver-6077-5"
+          }
+        ]
+      },
+      "6080": {
+        "complexName": "열매8단지새미래",
+        "types": [
+          {
+            "typeName": "125B",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6080-2"
+          },
+          {
+            "typeName": "127A",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6080-1"
+          },
+          {
+            "typeName": "158",
+            "areaMin": 127,
+            "areaMax": 133,
+            "floorPlanId": "naver-6080-3"
+          },
+          {
+            "typeName": "197",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-6080-4"
+          }
+        ]
+      },
+      "6132": {
+        "complexName": "목련1단지",
+        "types": [
+          {
+            "typeName": "79",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-6132-1"
+          },
+          {
+            "typeName": "106",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6132-2"
+          }
+        ]
+      },
+      "6133": {
+        "complexName": "목련2단지",
+        "types": [
+          {
+            "typeName": "79",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-6133-1"
+          },
+          {
+            "typeName": "106",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6133-2"
+          }
+        ]
+      },
+      "6134": {
+        "complexName": "드림월드",
+        "types": [
+          {
+            "typeName": "112",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6134-1"
+          },
+          {
+            "typeName": "129",
+            "areaMin": 96,
+            "areaMax": 102,
+            "floorPlanId": "naver-6134-2"
+          },
+          {
+            "typeName": "165",
+            "areaMin": 128,
+            "areaMax": 134,
+            "floorPlanId": "naver-6134-3"
+          }
+        ]
+      },
+      "6135": {
+        "complexName": "열매3단지대우",
+        "types": [
+          {
+            "typeName": "95",
+            "areaMin": 73,
+            "areaMax": 79,
+            "floorPlanId": "naver-6135-1"
+          },
+          {
+            "typeName": "106A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-6135-2"
+          },
+          {
+            "typeName": "108C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6135-4"
+          },
+          {
+            "typeName": "108B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6135-3"
+          }
+        ]
+      },
+      "6136": {
+        "complexName": "열매7단지현대",
+        "types": [
+          {
+            "typeName": "97",
+            "areaMin": 74,
+            "areaMax": 80,
+            "floorPlanId": "naver-6136-3"
+          },
+          {
+            "typeName": "104A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6136-4"
+          },
+          {
+            "typeName": "106B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6136-5"
+          }
+        ]
+      },
+      "6137": {
+        "complexName": "열매6단지현대",
+        "types": [
+          {
+            "typeName": "97",
+            "areaMin": 68,
+            "areaMax": 74,
+            "floorPlanId": "naver-6137-1"
+          },
+          {
+            "typeName": "110",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6137-2"
+          }
+        ]
+      },
+      "6140": {
+        "complexName": "송강마을2단지",
+        "types": [
+          {
+            "typeName": "69",
+            "areaMin": 47,
+            "areaMax": 53,
+            "floorPlanId": "naver-6140-1"
+          }
+        ]
+      },
+      "6142": {
+        "complexName": "청솔(뉴서울,신호,태영)",
+        "types": [
+          {
+            "typeName": "77(뉴서울)",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-6142-3"
+          },
+          {
+            "typeName": "77(신호)",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-6142-5"
+          },
+          {
+            "typeName": "77(태영)",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-6142-1"
+          },
+          {
+            "typeName": "102(뉴서울)",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-6142-4"
+          },
+          {
+            "typeName": "102(신호)",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-6142-6"
+          },
+          {
+            "typeName": "102(태영)",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-6142-2"
+          }
+        ]
+      },
+      "6143": {
+        "complexName": "한마을",
+        "types": [
+          {
+            "typeName": "107",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6143-1"
+          },
+          {
+            "typeName": "158",
+            "areaMin": 130,
+            "areaMax": 136,
+            "floorPlanId": "naver-6143-2"
+          }
+        ]
+      },
+      "6144": {
+        "complexName": "청솔(한양)",
+        "types": [
+          {
+            "typeName": "55",
+            "areaMin": 37,
+            "areaMax": 43,
+            "floorPlanId": "naver-6144-1"
+          },
+          {
+            "typeName": "102",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6144-2"
+          }
+        ]
+      },
+      "6147": {
+        "complexName": "대림두레",
+        "types": [
+          {
+            "typeName": "84",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-6147-1"
+          },
+          {
+            "typeName": "97",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6147-2"
+          },
+          {
+            "typeName": "122",
+            "areaMin": 106,
+            "areaMax": 112,
+            "floorPlanId": "naver-6147-3"
+          },
+          {
+            "typeName": "132",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-6147-4"
+          }
+        ]
+      },
+      "6149": {
+        "complexName": "럭키하나",
+        "types": [
+          {
+            "typeName": "88",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-6149-1"
+          },
+          {
+            "typeName": "102",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-6149-2"
+          },
+          {
+            "typeName": "138",
+            "areaMin": 115,
+            "areaMax": 121,
+            "floorPlanId": "naver-6149-3"
+          },
+          {
+            "typeName": "174",
+            "areaMin": 148,
+            "areaMax": 154,
+            "floorPlanId": "naver-6149-4"
+          }
+        ]
+      },
+      "6158": {
+        "complexName": "삼성한울",
+        "types": [
+          {
+            "typeName": "63",
+            "areaMin": 51,
+            "areaMax": 57,
+            "floorPlanId": "naver-6158-1"
+          },
+          {
+            "typeName": "81",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-6158-2"
+          },
+          {
+            "typeName": "95B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6158-7"
+          },
+          {
+            "typeName": "96A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6158-3"
+          },
+          {
+            "typeName": "110",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6158-4"
+          },
+          {
+            "typeName": "129",
+            "areaMin": 114,
+            "areaMax": 120,
+            "floorPlanId": "naver-6158-5"
+          },
+          {
+            "typeName": "153",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-6158-6"
+          }
+        ]
+      },
+      "6165": {
+        "complexName": "샘물타운",
+        "types": [
+          {
+            "typeName": "76",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-6165-1"
+          },
+          {
+            "typeName": "93",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-6165-2"
+          },
+          {
+            "typeName": "105",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6165-3"
+          },
+          {
+            "typeName": "119",
+            "areaMin": 96,
+            "areaMax": 102,
+            "floorPlanId": "naver-6165-4"
+          }
+        ]
+      },
+      "6170": {
+        "complexName": "한아름",
+        "types": [
+          {
+            "typeName": "78",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-6170-1"
+          },
+          {
+            "typeName": "107",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-6170-2"
+          },
+          {
+            "typeName": "121",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-6170-3"
+          }
+        ]
+      },
+      "6172": {
+        "complexName": "진잠타운",
+        "types": [
+          {
+            "typeName": "57",
+            "areaMin": 37,
+            "areaMax": 43,
+            "floorPlanId": "naver-6172-1"
+          },
+          {
+            "typeName": "65",
+            "areaMin": 47,
+            "areaMax": 53,
+            "floorPlanId": "naver-6172-2"
+          },
+          {
+            "typeName": "77",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-6172-3"
+          }
+        ]
+      },
+      "8468": {
+        "complexName": "열매1단지삼부",
+        "types": [
+          {
+            "typeName": "100B",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-8468-2"
+          },
+          {
+            "typeName": "101A",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-8468-1"
+          },
+          {
+            "typeName": "113",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-8468-3"
+          }
+        ]
+      },
+      "8469": {
+        "complexName": "열매2단지한라",
+        "types": [
+          {
+            "typeName": "88A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-8469-1"
+          },
+          {
+            "typeName": "88B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-8469-2"
+          }
+        ]
+      },
+      "8472": {
+        "complexName": "열매4단지현대",
+        "types": [
+          {
+            "typeName": "79B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-8472-2"
+          },
+          {
+            "typeName": "80A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-8472-1"
+          }
+        ]
+      },
+      "8473": {
+        "complexName": "열매5단지운암",
+        "types": [
+          {
+            "typeName": "125A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-8473-1"
+          },
+          {
+            "typeName": "125B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-8473-2"
+          },
+          {
+            "typeName": "161",
+            "areaMin": 128,
+            "areaMax": 134,
+            "floorPlanId": "naver-8473-3"
+          },
+          {
+            "typeName": "199",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-8473-4"
+          }
+        ]
+      },
+      "8475": {
+        "complexName": "열매9단지금성백조",
+        "types": [
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-8475-1"
+          },
+          {
+            "typeName": "116B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-8475-2"
+          }
+        ]
+      },
+      "8477": {
+        "complexName": "열매11단지리슈빌",
+        "types": [
+          {
+            "typeName": "80",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-8477-1"
+          },
+          {
+            "typeName": "125",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-8477-2"
+          },
+          {
+            "typeName": "152",
+            "areaMin": 125,
+            "areaMax": 131,
+            "floorPlanId": "naver-8477-3"
+          },
+          {
+            "typeName": "204",
+            "areaMin": 166,
+            "areaMax": 172,
+            "floorPlanId": "naver-8477-4"
+          }
+        ]
+      },
+      "8766": {
+        "complexName": "월드컵패밀리타운",
+        "types": [
+          {
+            "typeName": "114",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-8766-1"
+          },
+          {
+            "typeName": "157",
+            "areaMin": 123,
+            "areaMax": 129,
+            "floorPlanId": "naver-8766-2"
+          },
+          {
+            "typeName": "199",
+            "areaMin": 158,
+            "areaMax": 164,
+            "floorPlanId": "naver-8766-3"
+          }
+        ]
+      },
+      "10268": {
+        "complexName": "송림2단지이노스빌",
+        "types": [
+          {
+            "typeName": "113",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-10268-1"
+          },
+          {
+            "typeName": "116",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-10268-2"
+          },
+          {
+            "typeName": "122",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-10268-3"
+          }
+        ]
+      },
+      "10351": {
+        "complexName": "반석7단지삼부르네상스",
+        "types": [
+          {
+            "typeName": "103",
+            "areaMin": 74,
+            "areaMax": 80,
+            "floorPlanId": "naver-10351-1"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-10351-3"
+          },
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-10351-2"
+          }
+        ]
+      },
+      "11021": {
+        "complexName": "반석2단지계룡리슈빌",
+        "types": [
+          {
+            "typeName": "130",
+            "areaMin": 94,
+            "areaMax": 100,
+            "floorPlanId": "naver-11021-1"
+          },
+          {
+            "typeName": "162",
+            "areaMin": 129,
+            "areaMax": 135,
+            "floorPlanId": "naver-11021-2"
+          },
+          {
+            "typeName": "189",
+            "areaMin": 147,
+            "areaMax": 153,
+            "floorPlanId": "naver-11021-3"
+          }
+        ]
+      },
+      "11047": {
+        "complexName": "반석6단지삼부르네상스",
+        "types": [
+          {
+            "typeName": "116B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11047-2"
+          },
+          {
+            "typeName": "117A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11047-1"
+          },
+          {
+            "typeName": "122",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11047-3"
+          }
+        ]
+      },
+      "11049": {
+        "complexName": "반석1단지호반리젠시빌",
+        "types": [
+          {
+            "typeName": "98",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-11049-1"
+          },
+          {
+            "typeName": "113B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11049-3"
+          },
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11049-2"
+          }
+        ]
+      },
+      "11051": {
+        "complexName": "송림1단지호반리젠시빌",
+        "types": [
+          {
+            "typeName": "98",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-11051-1"
+          },
+          {
+            "typeName": "114C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11051-3"
+          },
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-11051-2"
+          }
+        ]
+      },
+      "11874": {
+        "complexName": "이지",
+        "types": [
+          {
+            "typeName": "76",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-11874-1"
+          }
+        ]
+      },
+      "12941": {
+        "complexName": "송림3단지이노스빌",
+        "types": [
+          {
+            "typeName": "104",
+            "areaMin": 76,
+            "areaMax": 82,
+            "floorPlanId": "naver-12941-1"
+          },
+          {
+            "typeName": "116",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-12941-2"
+          }
+        ]
+      },
+      "13928": {
+        "complexName": "가나파로스빌1(주상복합)",
+        "types": [
+          {
+            "typeName": "67",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-13928-1"
+          },
+          {
+            "typeName": "74",
+            "areaMin": 51,
+            "areaMax": 57,
+            "floorPlanId": "naver-13928-2"
+          },
+          {
+            "typeName": "80",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-13928-3"
+          },
+          {
+            "typeName": "81C",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-13928-5"
+          },
+          {
+            "typeName": "82B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-13928-4"
+          },
+          {
+            "typeName": "121",
+            "areaMin": 86,
+            "areaMax": 92,
+            "floorPlanId": "naver-13928-6"
+          }
+        ]
+      },
+      "13930": {
+        "complexName": "노은노블레스(주상복합)",
+        "types": [
+          {
+            "typeName": "159",
+            "areaMin": 142,
+            "areaMax": 148,
+            "floorPlanId": "naver-13930-2"
+          }
+        ]
+      },
+      "14105": {
+        "complexName": "노은스타돔(주상복합)",
+        "types": [
+          {
+            "typeName": "65",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-14105-1"
+          },
+          {
+            "typeName": "97",
+            "areaMin": 69,
+            "areaMax": 75,
+            "floorPlanId": "naver-14105-2"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 78,
+            "areaMax": 84,
+            "floorPlanId": "naver-14105-3"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 80,
+            "areaMax": 86,
+            "floorPlanId": "naver-14105-4"
+          },
+          {
+            "typeName": "112A",
+            "areaMin": 80,
+            "areaMax": 86,
+            "floorPlanId": "naver-14105-5"
+          },
+          {
+            "typeName": "115B",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-14105-6"
+          }
+        ]
+      },
+      "15201": {
+        "complexName": "베르디아망(주상복합)",
+        "types": [
+          {
+            "typeName": "72",
+            "areaMin": 52,
+            "areaMax": 58,
+            "floorPlanId": "naver-15201-1"
+          }
+        ]
+      },
+      "16730": {
+        "complexName": "노은시티빌(메가시티,주상복합)",
+        "types": [
+          {
+            "typeName": "112",
+            "areaMin": 109,
+            "areaMax": 115,
+            "floorPlanId": "naver-16730-7"
+          }
+        ]
+      },
+      "17288": {
+        "complexName": "경남아너스빌2차(주상복합)",
+        "types": [
+          {
+            "typeName": "105A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17288-1"
+          },
+          {
+            "typeName": "105B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17288-2"
+          },
+          {
+            "typeName": "147",
+            "areaMin": 116,
+            "areaMax": 122,
+            "floorPlanId": "naver-17288-3"
+          },
+          {
+            "typeName": "153",
+            "areaMin": 118,
+            "areaMax": 124,
+            "floorPlanId": "naver-17288-4"
+          }
+        ]
+      },
+      "17394": {
+        "complexName": "반석5단지예미지",
+        "types": [
+          {
+            "typeName": "129A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-17394-2"
+          },
+          {
+            "typeName": "130B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-17394-3"
+          },
+          {
+            "typeName": "160A",
+            "areaMin": 129,
+            "areaMax": 135,
+            "floorPlanId": "naver-17394-5"
+          },
+          {
+            "typeName": "160B1",
+            "areaMin": 129,
+            "areaMax": 135,
+            "floorPlanId": "naver-17394-7"
+          }
+        ]
+      },
+      "17420": {
+        "complexName": "SK허브(주상복합)",
+        "types": [
+          {
+            "typeName": "109A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-17420-1"
+          },
+          {
+            "typeName": "118B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17420-2"
+          },
+          {
+            "typeName": "145",
+            "areaMin": 108,
+            "areaMax": 114,
+            "floorPlanId": "naver-17420-3"
+          },
+          {
+            "typeName": "155B",
+            "areaMin": 116,
+            "areaMax": 122,
+            "floorPlanId": "naver-17420-4"
+          }
+        ]
+      },
+      "17466": {
+        "complexName": "대덕테크노밸리5단지파밀리에",
+        "types": [
+          {
+            "typeName": "96",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-17466-1"
+          },
+          {
+            "typeName": "110",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17466-2"
+          },
+          {
+            "typeName": "115",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17466-3"
+          },
+          {
+            "typeName": "129",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-17466-4"
+          },
+          {
+            "typeName": "149",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-17466-5"
+          }
+        ]
+      },
+      "17467": {
+        "complexName": "대덕테크노밸리4단지스윗닷홈",
+        "types": [
+          {
+            "typeName": "109",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17467-1"
+          },
+          {
+            "typeName": "115",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17467-2"
+          }
+        ]
+      },
+      "17468": {
+        "complexName": "대덕테크노밸리6단지네오미아",
+        "types": [
+          {
+            "typeName": "116A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-17468-1"
+          },
+          {
+            "typeName": "118B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17468-2"
+          },
+          {
+            "typeName": "135",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-17468-3"
+          },
+          {
+            "typeName": "164",
+            "areaMin": 127,
+            "areaMax": 133,
+            "floorPlanId": "naver-17468-4"
+          }
+        ]
+      },
+      "17470": {
+        "complexName": "대덕테크노밸리2단지푸르지오",
+        "types": [
+          {
+            "typeName": "109B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17470-1"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17470-2"
+          },
+          {
+            "typeName": "132",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-17470-3"
+          },
+          {
+            "typeName": "151",
+            "areaMin": 116,
+            "areaMax": 122,
+            "floorPlanId": "naver-17470-4"
+          }
+        ]
+      },
+      "17471": {
+        "complexName": "대덕테크노밸리1단지꿈에그린",
+        "types": [
+          {
+            "typeName": "87",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-17471-1"
+          },
+          {
+            "typeName": "113",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17471-2"
+          },
+          {
+            "typeName": "118",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17471-3"
+          },
+          {
+            "typeName": "146",
+            "areaMin": 112,
+            "areaMax": 118,
+            "floorPlanId": "naver-17471-4"
+          },
+          {
+            "typeName": "152",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-17471-5"
+          }
+        ]
+      },
+      "17472": {
+        "complexName": "반석3단지호반베르디움",
+        "types": [
+          {
+            "typeName": "145",
+            "areaMin": 111,
+            "areaMax": 117,
+            "floorPlanId": "naver-17472-1"
+          },
+          {
+            "typeName": "177",
+            "areaMin": 139,
+            "areaMax": 145,
+            "floorPlanId": "naver-17472-2"
+          },
+          {
+            "typeName": "211",
+            "areaMin": 172,
+            "areaMax": 178,
+            "floorPlanId": "naver-17472-3"
+          }
+        ]
+      },
+      "17589": {
+        "complexName": "대전드리움2단지",
+        "types": [
+          {
+            "typeName": "93A",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-17589-1"
+          },
+          {
+            "typeName": "94B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-17589-2"
+          },
+          {
+            "typeName": "107",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-17589-3"
+          }
+        ]
+      },
+      "17766": {
+        "complexName": "노은카운티스",
+        "types": [
+          {
+            "typeName": "175",
+            "areaMin": 138,
+            "areaMax": 144,
+            "floorPlanId": "naver-17766-1"
+          },
+          {
+            "typeName": "178B",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-17766-3"
+          },
+          {
+            "typeName": "178A",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-17766-2"
+          },
+          {
+            "typeName": "209",
+            "areaMin": 166,
+            "areaMax": 172,
+            "floorPlanId": "naver-17766-4"
+          }
+        ]
+      },
+      "18568": {
+        "complexName": "더포엠I(주상복합)",
+        "types": [
+          {
+            "typeName": "171A",
+            "areaMin": 138,
+            "areaMax": 144,
+            "floorPlanId": "naver-18568-13"
+          },
+          {
+            "typeName": "173B",
+            "areaMin": 140,
+            "areaMax": 146,
+            "floorPlanId": "naver-18568-14"
+          },
+          {
+            "typeName": "184B",
+            "areaMin": 149,
+            "areaMax": 155,
+            "floorPlanId": "naver-18568-15"
+          },
+          {
+            "typeName": "185A",
+            "areaMin": 150,
+            "areaMax": 156,
+            "floorPlanId": "naver-18568-16"
+          },
+          {
+            "typeName": "197",
+            "areaMin": 159,
+            "areaMax": 165,
+            "floorPlanId": "naver-18568-17"
+          }
+        ]
+      },
+      "19318": {
+        "complexName": "대덕테크노밸리3단지중앙하이츠빌",
+        "types": [
+          {
+            "typeName": "113",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19318-1"
+          },
+          {
+            "typeName": "166A",
+            "areaMin": 128,
+            "areaMax": 134,
+            "floorPlanId": "naver-19318-2"
+          },
+          {
+            "typeName": "166B",
+            "areaMin": 127,
+            "areaMax": 133,
+            "floorPlanId": "naver-19318-3"
+          }
+        ]
+      },
+      "19341": {
+        "complexName": "장대푸르지오",
+        "types": [
+          {
+            "typeName": "117",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19341-1"
+          },
+          {
+            "typeName": "164",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-19341-2"
+          },
+          {
+            "typeName": "190",
+            "areaMin": 148,
+            "areaMax": 154,
+            "floorPlanId": "naver-19341-3"
+          }
+        ]
+      },
+      "19448": {
+        "complexName": "송림6단지풍요로운",
+        "types": [
+          {
+            "typeName": "155",
+            "areaMin": 121,
+            "areaMax": 127,
+            "floorPlanId": "naver-19448-1"
+          },
+          {
+            "typeName": "194",
+            "areaMin": 155,
+            "areaMax": 161,
+            "floorPlanId": "naver-19448-2"
+          }
+        ]
+      },
+      "19449": {
+        "complexName": "송림5단지e-그리운",
+        "types": [
+          {
+            "typeName": "88",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-19449-1"
+          },
+          {
+            "typeName": "118A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19449-2"
+          },
+          {
+            "typeName": "118B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19449-3"
+          }
+        ]
+      },
+      "19623": {
+        "complexName": "미메이드",
+        "types": [
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19623-1"
+          },
+          {
+            "typeName": "113B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19623-2"
+          },
+          {
+            "typeName": "113C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-19623-3"
+          },
+          {
+            "typeName": "151",
+            "areaMin": 118,
+            "areaMax": 124,
+            "floorPlanId": "naver-19623-4"
+          }
+        ]
+      },
+      "22984": {
+        "complexName": "투유2차(주상복합)",
+        "types": [
+          {
+            "typeName": "53",
+            "areaMin": 38,
+            "areaMax": 44,
+            "floorPlanId": "naver-22984-1"
+          },
+          {
+            "typeName": "56",
+            "areaMin": 41,
+            "areaMax": 47,
+            "floorPlanId": "naver-22984-2"
+          }
+        ]
+      },
+      "23002": {
+        "complexName": "투유1차(주상복합)",
+        "types": [
+          {
+            "typeName": "46",
+            "areaMin": 33,
+            "areaMax": 39,
+            "floorPlanId": "naver-23002-1"
+          },
+          {
+            "typeName": "51",
+            "areaMin": 37,
+            "areaMax": 43,
+            "floorPlanId": "naver-23002-2"
+          },
+          {
+            "typeName": "55",
+            "areaMin": 40,
+            "areaMax": 46,
+            "floorPlanId": "naver-23002-3"
+          },
+          {
+            "typeName": "108",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-23002-4"
+          }
+        ]
+      },
+      "23043": {
+        "complexName": "미성샤르망(주상복합)",
+        "types": [
+          {
+            "typeName": "89C",
+            "areaMin": 65,
+            "areaMax": 71,
+            "floorPlanId": "naver-23043-2"
+          },
+          {
+            "typeName": "89B",
+            "areaMin": 65,
+            "areaMax": 71,
+            "floorPlanId": "naver-23043-1"
+          },
+          {
+            "typeName": "89A",
+            "areaMin": 65,
+            "areaMax": 71,
+            "floorPlanId": "naver-23043-5"
+          },
+          {
+            "typeName": "105",
+            "areaMin": 77,
+            "areaMax": 83,
+            "floorPlanId": "naver-23043-6"
+          }
+        ]
+      },
+      "23188": {
+        "complexName": "제이파크",
+        "types": [
+          {
+            "typeName": "113B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23188-2"
+          },
+          {
+            "typeName": "114C1",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23188-1"
+          },
+          {
+            "typeName": "114C3",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23188-3"
+          },
+          {
+            "typeName": "115C2",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23188-4"
+          },
+          {
+            "typeName": "149",
+            "areaMin": 119,
+            "areaMax": 125,
+            "floorPlanId": "naver-23188-5"
+          }
+        ]
+      },
+      "23652": {
+        "complexName": "한일유앤아이",
+        "types": [
+          {
+            "typeName": "151",
+            "areaMin": 120,
+            "areaMax": 126,
+            "floorPlanId": "naver-23652-1"
+          }
+        ]
+      },
+      "23690": {
+        "complexName": "대덕테크노밸리7단지백조예미지",
+        "types": [
+          {
+            "typeName": "119",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23690-1"
+          },
+          {
+            "typeName": "135",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-23690-2"
+          },
+          {
+            "typeName": "166",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-23690-3"
+          }
+        ]
+      },
+      "23707": {
+        "complexName": "대덕테크노밸리8단지백조예미지",
+        "types": [
+          {
+            "typeName": "119",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23707-1"
+          },
+          {
+            "typeName": "135",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-23707-2"
+          },
+          {
+            "typeName": "167",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-23707-3"
+          }
+        ]
+      },
+      "23725": {
+        "complexName": "대덕테크노밸리12단지필유",
+        "types": [
+          {
+            "typeName": "115",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23725-1"
+          },
+          {
+            "typeName": "134A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-23725-2"
+          },
+          {
+            "typeName": "134B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-23725-3"
+          },
+          {
+            "typeName": "174",
+            "areaMin": 137,
+            "areaMax": 143,
+            "floorPlanId": "naver-23725-4"
+          },
+          {
+            "typeName": "214",
+            "areaMin": 170,
+            "areaMax": 176,
+            "floorPlanId": "naver-23725-5"
+          }
+        ]
+      },
+      "23980": {
+        "complexName": "유성온천훼미리타운(주상복합)",
+        "types": [
+          {
+            "typeName": "55B",
+            "areaMin": 37,
+            "areaMax": 43,
+            "floorPlanId": "naver-23980-10"
+          },
+          {
+            "typeName": "61",
+            "areaMin": 41,
+            "areaMax": 47,
+            "floorPlanId": "naver-23980-1"
+          },
+          {
+            "typeName": "65A",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-23980-2"
+          },
+          {
+            "typeName": "104",
+            "areaMin": 73,
+            "areaMax": 79,
+            "floorPlanId": "naver-23980-7"
+          }
+        ]
+      },
+      "23993": {
+        "complexName": "스마트시티5단지(주상복합)",
+        "types": [
+          {
+            "typeName": "112",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-23993-1"
+          },
+          {
+            "typeName": "145",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-23993-2"
+          },
+          {
+            "typeName": "180",
+            "areaMin": 132,
+            "areaMax": 138,
+            "floorPlanId": "naver-23993-3"
+          },
+          {
+            "typeName": "228",
+            "areaMin": 169,
+            "areaMax": 175,
+            "floorPlanId": "naver-23993-4"
+          },
+          {
+            "typeName": "246",
+            "areaMin": 186,
+            "areaMax": 192,
+            "floorPlanId": "naver-23993-5"
+          },
+          {
+            "typeName": "264",
+            "areaMin": 200,
+            "areaMax": 206,
+            "floorPlanId": "naver-23993-6"
+          },
+          {
+            "typeName": "281",
+            "areaMin": 202,
+            "areaMax": 208,
+            "floorPlanId": "naver-23993-7"
+          },
+          {
+            "typeName": "322",
+            "areaMin": 235,
+            "areaMax": 241,
+            "floorPlanId": "naver-23993-8"
+          },
+          {
+            "typeName": "325",
+            "areaMin": 245,
+            "areaMax": 251,
+            "floorPlanId": "naver-23993-9"
+          },
+          {
+            "typeName": "344",
+            "areaMin": 258,
+            "areaMax": 264,
+            "floorPlanId": "naver-23993-10"
+          }
+        ]
+      },
+      "24400": {
+        "complexName": "노블레스2(주상복합)",
+        "types": [
+          {
+            "typeName": "78B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-24400-2"
+          },
+          {
+            "typeName": "79A1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-24400-1"
+          },
+          {
+            "typeName": "100B",
+            "areaMin": 74,
+            "areaMax": 80,
+            "floorPlanId": "naver-24400-3"
+          },
+          {
+            "typeName": "101C",
+            "areaMin": 75,
+            "areaMax": 81,
+            "floorPlanId": "naver-24400-4"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24400-5"
+          },
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24400-6"
+          }
+        ]
+      },
+      "24403": {
+        "complexName": "노블레스타워(주상복합)",
+        "types": [
+          {
+            "typeName": "109",
+            "areaMin": 93,
+            "areaMax": 99,
+            "floorPlanId": "naver-24403-1"
+          },
+          {
+            "typeName": "117",
+            "areaMin": 101,
+            "areaMax": 107,
+            "floorPlanId": "naver-24403-2"
+          },
+          {
+            "typeName": "130",
+            "areaMin": 112,
+            "areaMax": 118,
+            "floorPlanId": "naver-24403-3"
+          },
+          {
+            "typeName": "142",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-24403-4"
+          }
+        ]
+      },
+      "24405": {
+        "complexName": "노블레스3(주상복합)",
+        "types": [
+          {
+            "typeName": "107A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24405-1"
+          },
+          {
+            "typeName": "107B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24405-2"
+          },
+          {
+            "typeName": "108C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24405-3"
+          },
+          {
+            "typeName": "108D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24405-4"
+          }
+        ]
+      },
+      "24761": {
+        "complexName": "한솔",
+        "types": [
+          {
+            "typeName": "77",
+            "areaMin": 56,
+            "areaMax": 62,
+            "floorPlanId": "naver-24761-1"
+          },
+          {
+            "typeName": "103",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24761-2"
+          }
+        ]
+      },
+      "24865": {
+        "complexName": "대덕테크노밸리10단지꿈에그린",
+        "types": [
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24865-1"
+          },
+          {
+            "typeName": "113C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24865-3"
+          },
+          {
+            "typeName": "114B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-24865-2"
+          },
+          {
+            "typeName": "144",
+            "areaMin": 112,
+            "areaMax": 118,
+            "floorPlanId": "naver-24865-4"
+          },
+          {
+            "typeName": "161",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-24865-5"
+          }
+        ]
+      },
+      "24893": {
+        "complexName": "타워코리아나(주상복합)",
+        "types": [
+          {
+            "typeName": "155",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-24893-2"
+          }
+        ]
+      },
+      "25131": {
+        "complexName": "유성CJ나인파크(주상복합)",
+        "types": [
+          {
+            "typeName": "158A",
+            "areaMin": 125,
+            "areaMax": 131,
+            "floorPlanId": "naver-25131-1"
+          },
+          {
+            "typeName": "190",
+            "areaMin": 149,
+            "areaMax": 155,
+            "floorPlanId": "naver-25131-3"
+          },
+          {
+            "typeName": "203",
+            "areaMin": 162,
+            "areaMax": 168,
+            "floorPlanId": "naver-25131-4"
+          },
+          {
+            "typeName": "210A",
+            "areaMin": 168,
+            "areaMax": 174,
+            "floorPlanId": "naver-25131-5"
+          },
+          {
+            "typeName": "220",
+            "areaMin": 176,
+            "areaMax": 182,
+            "floorPlanId": "naver-25131-8"
+          },
+          {
+            "typeName": "255",
+            "areaMin": 201,
+            "areaMax": 207,
+            "floorPlanId": "naver-25131-9"
+          },
+          {
+            "typeName": "272",
+            "areaMin": 214,
+            "areaMax": 220,
+            "floorPlanId": "naver-25131-10"
+          }
+        ]
+      },
+      "25256": {
+        "complexName": "송강그린",
+        "types": [
+          {
+            "typeName": "77B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-25256-2"
+          },
+          {
+            "typeName": "77A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-25256-1"
+          },
+          {
+            "typeName": "105",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-25256-3"
+          }
+        ]
+      },
+      "25397": {
+        "complexName": "성원상떼빌",
+        "types": [
+          {
+            "typeName": "109",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-25397-1"
+          }
+        ]
+      },
+      "25449": {
+        "complexName": "경남아너스빌2단지",
+        "types": [
+          {
+            "typeName": "161",
+            "areaMin": 129,
+            "areaMax": 135,
+            "floorPlanId": "naver-25449-1"
+          },
+          {
+            "typeName": "192B",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-25449-3"
+          },
+          {
+            "typeName": "194A",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-25449-2"
+          },
+          {
+            "typeName": "226",
+            "areaMin": 189,
+            "areaMax": 195,
+            "floorPlanId": "naver-25449-4"
+          },
+          {
+            "typeName": "243",
+            "areaMin": 205,
+            "areaMax": 211,
+            "floorPlanId": "naver-25449-5"
+          }
+        ]
+      },
+      "25450": {
+        "complexName": "경남아너스빌1단지",
+        "types": [
+          {
+            "typeName": "161",
+            "areaMin": 129,
+            "areaMax": 135,
+            "floorPlanId": "naver-25450-1"
+          },
+          {
+            "typeName": "191B",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-25450-4"
+          },
+          {
+            "typeName": "193A",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-25450-3"
+          },
+          {
+            "typeName": "194C",
+            "areaMin": 161,
+            "areaMax": 167,
+            "floorPlanId": "naver-25450-2"
+          },
+          {
+            "typeName": "226",
+            "areaMin": 189,
+            "areaMax": 195,
+            "floorPlanId": "naver-25450-5"
+          },
+          {
+            "typeName": "244",
+            "areaMin": 205,
+            "areaMax": 211,
+            "floorPlanId": "naver-25450-6"
+          }
+        ]
+      },
+      "25453": {
+        "complexName": "경남아너스빌(주상복합)",
+        "types": [
+          {
+            "typeName": "100A",
+            "areaMin": 84,
+            "areaMax": 90,
+            "floorPlanId": "naver-25453-1"
+          },
+          {
+            "typeName": "101B",
+            "areaMin": 84,
+            "areaMax": 90,
+            "floorPlanId": "naver-25453-2"
+          },
+          {
+            "typeName": "106",
+            "areaMin": 88,
+            "areaMax": 94,
+            "floorPlanId": "naver-25453-3"
+          },
+          {
+            "typeName": "108A",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-25453-4"
+          },
+          {
+            "typeName": "110B",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-25453-5"
+          },
+          {
+            "typeName": "114",
+            "areaMin": 95,
+            "areaMax": 101,
+            "floorPlanId": "naver-25453-6"
+          },
+          {
+            "typeName": "118",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-25453-8"
+          }
+        ]
+      },
+      "25636": {
+        "complexName": "그랑펠리체(주상복합)",
+        "types": [
+          {
+            "typeName": "110",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-25636-1"
+          }
+        ]
+      },
+      "25637": {
+        "complexName": "위드리버(주상복합)",
+        "types": [
+          {
+            "typeName": "60",
+            "areaMin": 43,
+            "areaMax": 49,
+            "floorPlanId": "naver-25637-1"
+          },
+          {
+            "typeName": "87B",
+            "areaMin": 63,
+            "areaMax": 69,
+            "floorPlanId": "naver-25637-11"
+          },
+          {
+            "typeName": "98",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-25637-5"
+          },
+          {
+            "typeName": "108",
+            "areaMin": 80,
+            "areaMax": 86,
+            "floorPlanId": "naver-25637-6"
+          },
+          {
+            "typeName": "117A",
+            "areaMin": 87,
+            "areaMax": 93,
+            "floorPlanId": "naver-25637-7"
+          },
+          {
+            "typeName": "139",
+            "areaMin": 104,
+            "areaMax": 110,
+            "floorPlanId": "naver-25637-9"
+          }
+        ]
+      },
+      "26339": {
+        "complexName": "도룡로덴하우스",
+        "types": [
+          {
+            "typeName": "165",
+            "areaMin": 138,
+            "areaMax": 144,
+            "floorPlanId": "naver-26339-1"
+          },
+          {
+            "typeName": "198",
+            "areaMin": 165,
+            "areaMax": 171,
+            "floorPlanId": "naver-26339-2"
+          },
+          {
+            "typeName": "247A",
+            "areaMin": 204,
+            "areaMax": 210,
+            "floorPlanId": "naver-26339-3"
+          },
+          {
+            "typeName": "249B",
+            "areaMin": 207,
+            "areaMax": 213,
+            "floorPlanId": "naver-26339-4"
+          }
+        ]
+      },
+      "26356": {
+        "complexName": "인앤인(주상복합)",
+        "types": [
+          {
+            "typeName": "128",
+            "areaMin": 97,
+            "areaMax": 103,
+            "floorPlanId": "naver-26356-1"
+          },
+          {
+            "typeName": "170",
+            "areaMin": 130,
+            "areaMax": 136,
+            "floorPlanId": "naver-26356-2"
+          },
+          {
+            "typeName": "213",
+            "areaMin": 159,
+            "areaMax": 165,
+            "floorPlanId": "naver-26356-3"
+          }
+        ]
+      },
+      "26407": {
+        "complexName": "운암네오미아",
+        "types": [
+          {
+            "typeName": "111",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-26407-1"
+          },
+          {
+            "typeName": "131",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-26407-2"
+          },
+          {
+            "typeName": "151",
+            "areaMin": 125,
+            "areaMax": 131,
+            "floorPlanId": "naver-26407-3"
+          },
+          {
+            "typeName": "159",
+            "areaMin": 131,
+            "areaMax": 137,
+            "floorPlanId": "naver-26407-4"
+          }
+        ]
+      },
+      "26408": {
+        "complexName": "하우스토리",
+        "types": [
+          {
+            "typeName": "128A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-26408-1"
+          },
+          {
+            "typeName": "129B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-26408-2"
+          },
+          {
+            "typeName": "130C",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-26408-3"
+          },
+          {
+            "typeName": "156A",
+            "areaMin": 124,
+            "areaMax": 130,
+            "floorPlanId": "naver-26408-4"
+          },
+          {
+            "typeName": "157B",
+            "areaMin": 124,
+            "areaMax": 130,
+            "floorPlanId": "naver-26408-5"
+          },
+          {
+            "typeName": "181",
+            "areaMin": 147,
+            "areaMax": 153,
+            "floorPlanId": "naver-26408-6"
+          }
+        ]
+      },
+      "26501": {
+        "complexName": "대전드리움1단지",
+        "types": [
+          {
+            "typeName": "79A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-26501-1"
+          },
+          {
+            "typeName": "79B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-26501-2"
+          },
+          {
+            "typeName": "105",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-26501-3"
+          }
+        ]
+      },
+      "26929": {
+        "complexName": "유성자이(주상복합)",
+        "types": [
+          {
+            "typeName": "137A",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-26929-1"
+          },
+          {
+            "typeName": "138B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-26929-2"
+          },
+          {
+            "typeName": "162A",
+            "areaMin": 118,
+            "areaMax": 124,
+            "floorPlanId": "naver-26929-3"
+          },
+          {
+            "typeName": "164B",
+            "areaMin": 120,
+            "areaMax": 126,
+            "floorPlanId": "naver-26929-4"
+          },
+          {
+            "typeName": "230",
+            "areaMin": 166,
+            "areaMax": 172,
+            "floorPlanId": "naver-26929-5"
+          },
+          {
+            "typeName": "300",
+            "areaMin": 218,
+            "areaMax": 224,
+            "floorPlanId": "naver-26929-6"
+          }
+        ]
+      },
+      "26940": {
+        "complexName": "하늘바람휴먼시아",
+        "types": [
+          {
+            "typeName": "97",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-26940-1"
+          },
+          {
+            "typeName": "108A1",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-26940-2"
+          },
+          {
+            "typeName": "108D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-26940-7"
+          },
+          {
+            "typeName": "109A2",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-26940-8"
+          },
+          {
+            "typeName": "109B1",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-26940-4"
+          },
+          {
+            "typeName": "109B2",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-26940-5"
+          },
+          {
+            "typeName": "109C",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-26940-6"
+          },
+          {
+            "typeName": "110E",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-26940-3"
+          },
+          {
+            "typeName": "139B",
+            "areaMin": 106,
+            "areaMax": 112,
+            "floorPlanId": "naver-26940-11"
+          },
+          {
+            "typeName": "139A1",
+            "areaMin": 106,
+            "areaMax": 112,
+            "floorPlanId": "naver-26940-9"
+          },
+          {
+            "typeName": "139A2",
+            "areaMin": 106,
+            "areaMax": 112,
+            "floorPlanId": "naver-26940-10"
+          }
+        ]
+      },
+      "26942": {
+        "complexName": "대덕테크노밸리푸르지오하임2단지",
+        "types": [
+          {
+            "typeName": "159D",
+            "areaMin": 131,
+            "areaMax": 137,
+            "floorPlanId": "naver-26942-4"
+          },
+          {
+            "typeName": "159E",
+            "areaMin": 131,
+            "areaMax": 137,
+            "floorPlanId": "naver-26942-5"
+          },
+          {
+            "typeName": "160B",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-26942-2"
+          },
+          {
+            "typeName": "160C",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-26942-3"
+          },
+          {
+            "typeName": "160A",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-26942-1"
+          },
+          {
+            "typeName": "186B",
+            "areaMin": 155,
+            "areaMax": 161,
+            "floorPlanId": "naver-26942-7"
+          },
+          {
+            "typeName": "187A",
+            "areaMin": 157,
+            "areaMax": 163,
+            "floorPlanId": "naver-26942-6"
+          },
+          {
+            "typeName": "204B",
+            "areaMin": 170,
+            "areaMax": 176,
+            "floorPlanId": "naver-26942-9"
+          },
+          {
+            "typeName": "204C",
+            "areaMin": 167,
+            "areaMax": 173,
+            "floorPlanId": "naver-26942-10"
+          },
+          {
+            "typeName": "204A",
+            "areaMin": 169,
+            "areaMax": 175,
+            "floorPlanId": "naver-26942-8"
+          }
+        ]
+      },
+      "27629": {
+        "complexName": "도안신도시9BL트리풀시티",
+        "types": [
+          {
+            "typeName": "127A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-27629-1"
+          },
+          {
+            "typeName": "127B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-27629-11"
+          },
+          {
+            "typeName": "127C",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-27629-7"
+          },
+          {
+            "typeName": "148B",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-27629-2"
+          },
+          {
+            "typeName": "148A",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-27629-8"
+          },
+          {
+            "typeName": "148D",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-27629-12"
+          },
+          {
+            "typeName": "148C",
+            "areaMin": 116,
+            "areaMax": 122,
+            "floorPlanId": "naver-27629-10"
+          },
+          {
+            "typeName": "148E",
+            "areaMin": 117,
+            "areaMax": 123,
+            "floorPlanId": "naver-27629-14"
+          },
+          {
+            "typeName": "148F",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-27629-3"
+          },
+          {
+            "typeName": "171",
+            "areaMin": 136,
+            "areaMax": 142,
+            "floorPlanId": "naver-27629-4"
+          },
+          {
+            "typeName": "183B",
+            "areaMin": 145,
+            "areaMax": 151,
+            "floorPlanId": "naver-27629-13"
+          },
+          {
+            "typeName": "183A",
+            "areaMin": 145,
+            "areaMax": 151,
+            "floorPlanId": "naver-27629-5"
+          },
+          {
+            "typeName": "183C",
+            "areaMin": 171,
+            "areaMax": 177,
+            "floorPlanId": "naver-27629-9"
+          },
+          {
+            "typeName": "232",
+            "areaMin": 184,
+            "areaMax": 190,
+            "floorPlanId": "naver-27629-6"
+          }
+        ]
+      },
+      "100350": {
+        "complexName": "학하리슈빌학의뜰",
+        "types": [
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100350-1"
+          },
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100350-2"
+          },
+          {
+            "typeName": "132",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-100350-3"
+          },
+          {
+            "typeName": "158",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-100350-4"
+          }
+        ]
+      },
+      "100352": {
+        "complexName": "대전학하지구오투그란데미학",
+        "types": [
+          {
+            "typeName": "118A1",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-100352-1"
+          },
+          {
+            "typeName": "118B1",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-100352-3"
+          },
+          {
+            "typeName": "118A2",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-100352-2"
+          },
+          {
+            "typeName": "118B2",
+            "areaMin": 90,
+            "areaMax": 96,
+            "floorPlanId": "naver-100352-4"
+          },
+          {
+            "typeName": "130",
+            "areaMin": 100,
+            "areaMax": 106,
+            "floorPlanId": "naver-100352-5"
+          },
+          {
+            "typeName": "150A",
+            "areaMin": 115,
+            "areaMax": 121,
+            "floorPlanId": "naver-100352-6"
+          },
+          {
+            "typeName": "151B",
+            "areaMin": 116,
+            "areaMax": 122,
+            "floorPlanId": "naver-100352-7"
+          }
+        ]
+      },
+      "100360": {
+        "complexName": "도안6단지센트럴시티",
+        "types": [
+          {
+            "typeName": "99A1",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-100360-21"
+          },
+          {
+            "typeName": "99A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-100360-20"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100360-15"
+          },
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100360-16"
+          },
+          {
+            "typeName": "112C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100360-17"
+          },
+          {
+            "typeName": "112E",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100360-19"
+          },
+          {
+            "typeName": "112D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100360-18"
+          }
+        ]
+      },
+      "100519": {
+        "complexName": "대덕테크노밸리11단지필유",
+        "types": [
+          {
+            "typeName": "152B",
+            "areaMin": 120,
+            "areaMax": 126,
+            "floorPlanId": "naver-100519-2"
+          },
+          {
+            "typeName": "154A",
+            "areaMin": 120,
+            "areaMax": 126,
+            "floorPlanId": "naver-100519-1"
+          },
+          {
+            "typeName": "182",
+            "areaMin": 142,
+            "areaMax": 148,
+            "floorPlanId": "naver-100519-3"
+          },
+          {
+            "typeName": "223",
+            "areaMin": 179,
+            "areaMax": 185,
+            "floorPlanId": "naver-100519-4"
+          }
+        ]
+      },
+      "100522": {
+        "complexName": "대덕테크노밸리푸르지오하임1단지",
+        "types": [
+          {
+            "typeName": "159B",
+            "areaMin": 133,
+            "areaMax": 139,
+            "floorPlanId": "naver-100522-3"
+          },
+          {
+            "typeName": "159A",
+            "areaMin": 131,
+            "areaMax": 137,
+            "floorPlanId": "naver-100522-4"
+          },
+          {
+            "typeName": "160",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-100522-1"
+          },
+          {
+            "typeName": "160C",
+            "areaMin": 134,
+            "areaMax": 140,
+            "floorPlanId": "naver-100522-2"
+          },
+          {
+            "typeName": "187A",
+            "areaMin": 155,
+            "areaMax": 161,
+            "floorPlanId": "naver-100522-6"
+          },
+          {
+            "typeName": "187B",
+            "areaMin": 157,
+            "areaMax": 163,
+            "floorPlanId": "naver-100522-5"
+          },
+          {
+            "typeName": "204C",
+            "areaMin": 167,
+            "areaMax": 173,
+            "floorPlanId": "naver-100522-7"
+          },
+          {
+            "typeName": "204B",
+            "areaMin": 170,
+            "areaMax": 176,
+            "floorPlanId": "naver-100522-9"
+          },
+          {
+            "typeName": "204A",
+            "areaMin": 169,
+            "areaMax": 175,
+            "floorPlanId": "naver-100522-8"
+          }
+        ]
+      },
+      "100524": {
+        "complexName": "대덕테크노밸리9단지꿈에그린",
+        "types": [
+          {
+            "typeName": "111",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-100524-1"
+          },
+          {
+            "typeName": "145",
+            "areaMin": 112,
+            "areaMax": 118,
+            "floorPlanId": "naver-100524-2"
+          },
+          {
+            "typeName": "158",
+            "areaMin": 126,
+            "areaMax": 132,
+            "floorPlanId": "naver-100524-3"
+          }
+        ]
+      },
+      "100581": {
+        "complexName": "도안신도시한라비발디",
+        "types": [
+          {
+            "typeName": "132A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-100581-1"
+          },
+          {
+            "typeName": "134B",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-100581-2"
+          },
+          {
+            "typeName": "159A",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-100581-3"
+          },
+          {
+            "typeName": "160B",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-100581-4"
+          },
+          {
+            "typeName": "163",
+            "areaMin": 122,
+            "areaMax": 128,
+            "floorPlanId": "naver-100581-5"
+          }
+        ]
+      },
+      "101298": {
+        "complexName": "스마트시티2단지(주상복합)",
+        "types": [
+          {
+            "typeName": "112",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-101298-1"
+          },
+          {
+            "typeName": "145",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-101298-2"
+          },
+          {
+            "typeName": "180",
+            "areaMin": 132,
+            "areaMax": 138,
+            "floorPlanId": "naver-101298-3"
+          },
+          {
+            "typeName": "228",
+            "areaMin": 169,
+            "areaMax": 175,
+            "floorPlanId": "naver-101298-4"
+          },
+          {
+            "typeName": "246",
+            "areaMin": 186,
+            "areaMax": 192,
+            "floorPlanId": "naver-101298-5"
+          },
+          {
+            "typeName": "264",
+            "areaMin": 200,
+            "areaMax": 206,
+            "floorPlanId": "naver-101298-6"
+          },
+          {
+            "typeName": "281",
+            "areaMin": 202,
+            "areaMax": 208,
+            "floorPlanId": "naver-101298-7"
+          },
+          {
+            "typeName": "322",
+            "areaMin": 235,
+            "areaMax": 241,
+            "floorPlanId": "naver-101298-8"
+          },
+          {
+            "typeName": "325",
+            "areaMin": 245,
+            "areaMax": 251,
+            "floorPlanId": "naver-101298-9"
+          },
+          {
+            "typeName": "344",
+            "areaMin": 258,
+            "areaMax": 264,
+            "floorPlanId": "naver-101298-10"
+          }
+        ]
+      },
+      "102411": {
+        "complexName": "어울림하트",
+        "types": [
+          {
+            "typeName": "101A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-102411-1"
+          },
+          {
+            "typeName": "101C",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-102411-3"
+          },
+          {
+            "typeName": "101B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-102411-2"
+          },
+          {
+            "typeName": "114B",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-102411-5"
+          },
+          {
+            "typeName": "114A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-102411-4"
+          }
+        ]
+      },
+      "102738": {
+        "complexName": "인스빌리베라",
+        "types": [
+          {
+            "typeName": "129",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-102738-1"
+          },
+          {
+            "typeName": "164",
+            "areaMin": 128,
+            "areaMax": 134,
+            "floorPlanId": "naver-102738-2"
+          },
+          {
+            "typeName": "266",
+            "areaMin": 207,
+            "areaMax": 213,
+            "floorPlanId": "naver-102738-3"
+          }
+        ]
+      },
+      "103356": {
+        "complexName": "노은한화꿈에그린1단지",
+        "types": [
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103356-1"
+          },
+          {
+            "typeName": "117B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103356-2"
+          },
+          {
+            "typeName": "133A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-103356-3"
+          },
+          {
+            "typeName": "134B",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-103356-4"
+          },
+          {
+            "typeName": "165",
+            "areaMin": 123,
+            "areaMax": 129,
+            "floorPlanId": "naver-103356-5"
+          }
+        ]
+      },
+      "103357": {
+        "complexName": "노은한화꿈에그린2단지",
+        "types": [
+          {
+            "typeName": "113A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103357-1"
+          },
+          {
+            "typeName": "115B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103357-2"
+          },
+          {
+            "typeName": "130A",
+            "areaMin": 99,
+            "areaMax": 105,
+            "floorPlanId": "naver-103357-3"
+          },
+          {
+            "typeName": "131B",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-103357-4"
+          },
+          {
+            "typeName": "160",
+            "areaMin": 123,
+            "areaMax": 129,
+            "floorPlanId": "naver-103357-5"
+          }
+        ]
+      },
+      "103597": {
+        "complexName": "사이언스타운(주상복합)",
+        "types": [
+          {
+            "typeName": "95",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-103597-1"
+          },
+          {
+            "typeName": "102",
+            "areaMin": 74,
+            "areaMax": 80,
+            "floorPlanId": "naver-103597-2"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103597-3"
+          },
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103597-4"
+          },
+          {
+            "typeName": "113",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103597-5"
+          }
+        ]
+      },
+      "103763": {
+        "complexName": "도안신도시7단지예미지백조의호수",
+        "types": [
+          {
+            "typeName": "117A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103763-1"
+          },
+          {
+            "typeName": "118C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103763-3"
+          },
+          {
+            "typeName": "118B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103763-2"
+          },
+          {
+            "typeName": "118D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103763-4"
+          }
+        ]
+      },
+      "103846": {
+        "complexName": "베르디움",
+        "types": [
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103846-1"
+          },
+          {
+            "typeName": "111B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103846-2"
+          },
+          {
+            "typeName": "111C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103846-3"
+          },
+          {
+            "typeName": "112D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103846-4"
+          }
+        ]
+      },
+      "103949": {
+        "complexName": "도안신도시5블록트리풀시티",
+        "types": [
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103949-1"
+          },
+          {
+            "typeName": "113D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103949-4"
+          },
+          {
+            "typeName": "114C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103949-3"
+          },
+          {
+            "typeName": "114B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-103949-2"
+          }
+        ]
+      },
+      "104227": {
+        "complexName": "유성푸르지오시티(도시형)",
+        "types": [
+          {
+            "typeName": "28B1",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-104227-4"
+          },
+          {
+            "typeName": "28B2",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-104227-5"
+          },
+          {
+            "typeName": "29A1",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-104227-1"
+          },
+          {
+            "typeName": "29A2",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-104227-2"
+          },
+          {
+            "typeName": "29A3",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-104227-3"
+          }
+        ]
+      },
+      "104266": {
+        "complexName": "리베라아이누리(448-5,도시형)",
+        "types": [
+          {
+            "typeName": "42",
+            "areaMin": 26,
+            "areaMax": 32,
+            "floorPlanId": "naver-104266-2"
+          },
+          {
+            "typeName": "50",
+            "areaMin": 32,
+            "areaMax": 38,
+            "floorPlanId": "naver-104266-4"
+          }
+        ]
+      },
+      "104920": {
+        "complexName": "희상원",
+        "types": [
+          {
+            "typeName": "84",
+            "areaMin": 63,
+            "areaMax": 69,
+            "floorPlanId": "naver-104920-1"
+          },
+          {
+            "typeName": "99A",
+            "areaMin": 75,
+            "areaMax": 81,
+            "floorPlanId": "naver-104920-3"
+          },
+          {
+            "typeName": "100B",
+            "areaMin": 76,
+            "areaMax": 82,
+            "floorPlanId": "naver-104920-4"
+          },
+          {
+            "typeName": "106",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-104920-5"
+          }
+        ]
+      },
+      "105329": {
+        "complexName": "유성세움펠리피아(주상복합)",
+        "types": [
+          {
+            "typeName": "76I",
+            "areaMin": 52,
+            "areaMax": 58,
+            "floorPlanId": "naver-105329-10"
+          },
+          {
+            "typeName": "88G",
+            "areaMin": 61,
+            "areaMax": 67,
+            "floorPlanId": "naver-105329-8"
+          },
+          {
+            "typeName": "91E",
+            "areaMin": 62,
+            "areaMax": 68,
+            "floorPlanId": "naver-105329-5"
+          },
+          {
+            "typeName": "91",
+            "areaMin": 62,
+            "areaMax": 68,
+            "floorPlanId": "naver-105329-7"
+          },
+          {
+            "typeName": "92F",
+            "areaMin": 63,
+            "areaMax": 69,
+            "floorPlanId": "naver-105329-6"
+          },
+          {
+            "typeName": "106H",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-105329-9"
+          },
+          {
+            "typeName": "117B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-105329-2"
+          },
+          {
+            "typeName": "117D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-105329-4"
+          },
+          {
+            "typeName": "118C",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-105329-3"
+          },
+          {
+            "typeName": "118L",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-105329-13"
+          },
+          {
+            "typeName": "118J",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-105329-11"
+          },
+          {
+            "typeName": "119A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-105329-1"
+          },
+          {
+            "typeName": "119K",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-105329-12"
+          },
+          {
+            "typeName": "120M",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-105329-14"
+          }
+        ]
+      },
+      "106185": {
+        "complexName": "노은리슈빌3",
+        "types": [
+          {
+            "typeName": "112A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106185-1"
+          },
+          {
+            "typeName": "113B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106185-2"
+          },
+          {
+            "typeName": "132",
+            "areaMin": 100,
+            "areaMax": 106,
+            "floorPlanId": "naver-106185-3"
+          }
+        ]
+      },
+      "106496": {
+        "complexName": "노은해랑숲마을5단지",
+        "types": [
+          {
+            "typeName": "68A",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-106496-1"
+          },
+          {
+            "typeName": "78A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-106496-2"
+          },
+          {
+            "typeName": "98A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-106496-4"
+          },
+          {
+            "typeName": "98B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-106496-6"
+          },
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106496-7"
+          }
+        ]
+      },
+      "106497": {
+        "complexName": "노은해랑숲마을6단지",
+        "types": [
+          {
+            "typeName": "97A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-106497-1"
+          },
+          {
+            "typeName": "97B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-106497-3"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106497-4"
+          }
+        ]
+      },
+      "106692": {
+        "complexName": "죽동푸르지오",
+        "types": [
+          {
+            "typeName": "99",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-106692-1"
+          },
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106692-2"
+          },
+          {
+            "typeName": "111C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106692-3"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-106692-4"
+          }
+        ]
+      },
+      "106771": {
+        "complexName": "레자미3차(도시형)",
+        "types": [
+          {
+            "typeName": "22C",
+            "areaMin": 11,
+            "areaMax": 17,
+            "floorPlanId": "naver-106771-9"
+          },
+          {
+            "typeName": "22C1",
+            "areaMin": 11,
+            "areaMax": 17,
+            "floorPlanId": "naver-106771-10"
+          },
+          {
+            "typeName": "23A",
+            "areaMin": 12,
+            "areaMax": 18,
+            "floorPlanId": "naver-106771-1"
+          },
+          {
+            "typeName": "24B3",
+            "areaMin": 12,
+            "areaMax": 18,
+            "floorPlanId": "naver-106771-7"
+          },
+          {
+            "typeName": "25A2",
+            "areaMin": 13,
+            "areaMax": 19,
+            "floorPlanId": "naver-106771-3"
+          },
+          {
+            "typeName": "49D",
+            "areaMin": 28,
+            "areaMax": 34,
+            "floorPlanId": "naver-106771-11"
+          }
+        ]
+      },
+      "107033": {
+        "complexName": "노은새미래숲2단지",
+        "types": [
+          {
+            "typeName": "73B",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-107033-2"
+          },
+          {
+            "typeName": "73A",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-107033-3"
+          },
+          {
+            "typeName": "73C",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-107033-1"
+          },
+          {
+            "typeName": "84A1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-107033-4"
+          },
+          {
+            "typeName": "84A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-107033-5"
+          },
+          {
+            "typeName": "84B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-107033-6"
+          }
+        ]
+      },
+      "107301": {
+        "complexName": "리베라아이누리(445-4,도시형)",
+        "types": [
+          {
+            "typeName": "31",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-107301-1"
+          },
+          {
+            "typeName": "32A",
+            "areaMin": 18,
+            "areaMax": 24,
+            "floorPlanId": "naver-107301-2"
+          },
+          {
+            "typeName": "34B",
+            "areaMin": 19,
+            "areaMax": 25,
+            "floorPlanId": "naver-107301-3"
+          },
+          {
+            "typeName": "36",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-107301-4"
+          },
+          {
+            "typeName": "41",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-107301-5"
+          },
+          {
+            "typeName": "44",
+            "areaMin": 25,
+            "areaMax": 31,
+            "floorPlanId": "naver-107301-6"
+          },
+          {
+            "typeName": "63",
+            "areaMin": 38,
+            "areaMax": 44,
+            "floorPlanId": "naver-107301-7"
+          }
+        ]
+      },
+      "107306": {
+        "complexName": "좋은하루3차(도시형)",
+        "types": [
+          {
+            "typeName": "26",
+            "areaMin": 11,
+            "areaMax": 17,
+            "floorPlanId": "naver-107306-1"
+          }
+        ]
+      },
+      "107554": {
+        "complexName": "브리젠힐스",
+        "types": [
+          {
+            "typeName": "215",
+            "areaMin": 186,
+            "areaMax": 192,
+            "floorPlanId": "naver-107554-1"
+          }
+        ]
+      },
+      "107638": {
+        "complexName": "K타운(도시형)",
+        "types": [
+          {
+            "typeName": "27HB",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-107638-2"
+          },
+          {
+            "typeName": "28HG",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-107638-7"
+          },
+          {
+            "typeName": "29HA",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-107638-1"
+          },
+          {
+            "typeName": "32HI",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-107638-9"
+          },
+          {
+            "typeName": "34HC",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-107638-3"
+          },
+          {
+            "typeName": "35HF",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-107638-6"
+          },
+          {
+            "typeName": "36HD",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-107638-4"
+          },
+          {
+            "typeName": "39HH",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-107638-8"
+          },
+          {
+            "typeName": "40HE",
+            "areaMin": 24,
+            "areaMax": 30,
+            "floorPlanId": "naver-107638-5"
+          }
+        ]
+      },
+      "107699": {
+        "complexName": "양우내안애레이크힐",
+        "types": [
+          {
+            "typeName": "95A",
+            "areaMin": 68,
+            "areaMax": 74,
+            "floorPlanId": "naver-107699-1"
+          },
+          {
+            "typeName": "96D",
+            "areaMin": 68,
+            "areaMax": 74,
+            "floorPlanId": "naver-107699-3"
+          },
+          {
+            "typeName": "96B",
+            "areaMin": 68,
+            "areaMax": 74,
+            "floorPlanId": "naver-107699-2"
+          },
+          {
+            "typeName": "96C",
+            "areaMin": 68,
+            "areaMax": 74,
+            "floorPlanId": "naver-107699-4"
+          },
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-107699-5"
+          },
+          {
+            "typeName": "111B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-107699-6"
+          }
+        ]
+      },
+      "107708": {
+        "complexName": "죽동금성백조예미지",
+        "types": [
+          {
+            "typeName": "98A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-107708-1"
+          },
+          {
+            "typeName": "112D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-107708-6"
+          },
+          {
+            "typeName": "134A",
+            "areaMin": 98,
+            "areaMax": 104,
+            "floorPlanId": "naver-107708-16"
+          }
+        ]
+      },
+      "107820": {
+        "complexName": "노은에코힐",
+        "types": [
+          {
+            "typeName": "98A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-107820-2"
+          },
+          {
+            "typeName": "98B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-107820-1"
+          },
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-107820-3"
+          }
+        ]
+      },
+      "107872": {
+        "complexName": "힐링타운(도시형)",
+        "types": [
+          {
+            "typeName": "22",
+            "areaMin": 12,
+            "areaMax": 18,
+            "floorPlanId": "naver-107872-1"
+          },
+          {
+            "typeName": "25",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-107872-2"
+          },
+          {
+            "typeName": "36",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-107872-3"
+          },
+          {
+            "typeName": "45",
+            "areaMin": 27,
+            "areaMax": 33,
+            "floorPlanId": "naver-107872-4"
+          }
+        ]
+      },
+      "107996": {
+        "complexName": "하이랜드Ⅲ(도시형)",
+        "types": [
+          {
+            "typeName": "34A",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-107996-6"
+          },
+          {
+            "typeName": "35B",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-107996-7"
+          }
+        ]
+      },
+      "108140": {
+        "complexName": "씨티팰리스(도시형)",
+        "types": [
+          {
+            "typeName": "23",
+            "areaMin": 11,
+            "areaMax": 17,
+            "floorPlanId": "naver-108140-1"
+          },
+          {
+            "typeName": "27B",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-108140-3"
+          },
+          {
+            "typeName": "29",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-108140-5"
+          },
+          {
+            "typeName": "34",
+            "areaMin": 18,
+            "areaMax": 24,
+            "floorPlanId": "naver-108140-6"
+          }
+        ]
+      },
+      "108612": {
+        "complexName": "신영미소랑(도시형)",
+        "types": [
+          {
+            "typeName": "22A",
+            "areaMin": 12,
+            "areaMax": 18,
+            "floorPlanId": "naver-108612-1"
+          },
+          {
+            "typeName": "23B",
+            "areaMin": 13,
+            "areaMax": 19,
+            "floorPlanId": "naver-108612-2"
+          },
+          {
+            "typeName": "25",
+            "areaMin": 14,
+            "areaMax": 20,
+            "floorPlanId": "naver-108612-3"
+          }
+        ]
+      },
+      "108785": {
+        "complexName": "죽동대원칸타빌",
+        "types": [
+          {
+            "typeName": "100A",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-108785-1"
+          },
+          {
+            "typeName": "101B",
+            "areaMin": 72,
+            "areaMax": 78,
+            "floorPlanId": "naver-108785-2"
+          },
+          {
+            "typeName": "113A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-108785-4"
+          },
+          {
+            "typeName": "113B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-108785-3"
+          },
+          {
+            "typeName": "115C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-108785-5"
+          }
+        ]
+      },
+      "108959": {
+        "complexName": "스카이뷰로드(도시형)",
+        "types": [
+          {
+            "typeName": "29B",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-108959-2"
+          },
+          {
+            "typeName": "30A",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-108959-1"
+          },
+          {
+            "typeName": "66D",
+            "areaMin": 41,
+            "areaMax": 47,
+            "floorPlanId": "naver-108959-4"
+          }
+        ]
+      },
+      "109036": {
+        "complexName": "문지효성해링턴플레이스",
+        "types": [
+          {
+            "typeName": "82A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-109036-3"
+          },
+          {
+            "typeName": "82C",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-109036-1"
+          },
+          {
+            "typeName": "82B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-109036-2"
+          },
+          {
+            "typeName": "113A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109036-4"
+          },
+          {
+            "typeName": "113C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109036-5"
+          },
+          {
+            "typeName": "114D",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109036-6"
+          },
+          {
+            "typeName": "114B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109036-8"
+          },
+          {
+            "typeName": "114B-1",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109036-7"
+          }
+        ]
+      },
+      "109444": {
+        "complexName": "스카이뷰",
+        "types": [
+          {
+            "typeName": "30A",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-109444-1"
+          },
+          {
+            "typeName": "34",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-109444-3"
+          },
+          {
+            "typeName": "36",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-109444-4"
+          }
+        ]
+      },
+      "109501": {
+        "complexName": "트리풀시티포레",
+        "types": [
+          {
+            "typeName": "98",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-109501-1"
+          },
+          {
+            "typeName": "111A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-109501-2"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-109501-3"
+          },
+          {
+            "typeName": "117P",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109501-4"
+          }
+        ]
+      },
+      "109617": {
+        "complexName": "레자미멀티홈",
+        "types": [
+          {
+            "typeName": "106A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109617-1"
+          },
+          {
+            "typeName": "116B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109617-2"
+          },
+          {
+            "typeName": "116C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-109617-3"
+          }
+        ]
+      },
+      "111335": {
+        "complexName": "유성오투그란데리빙포레",
+        "types": [
+          {
+            "typeName": "79",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-111335-1"
+          },
+          {
+            "typeName": "101",
+            "areaMin": 75,
+            "areaMax": 81,
+            "floorPlanId": "naver-111335-2"
+          },
+          {
+            "typeName": "104",
+            "areaMin": 76,
+            "areaMax": 82,
+            "floorPlanId": "naver-111335-3"
+          },
+          {
+            "typeName": "111",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-111335-4"
+          }
+        ]
+      },
+      "111498": {
+        "complexName": "봉명나이스타운11차(도시형)",
+        "types": [
+          {
+            "typeName": "67",
+            "areaMin": 47,
+            "areaMax": 53,
+            "floorPlanId": "naver-111498-2"
+          },
+          {
+            "typeName": "67",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-111498-1"
+          }
+        ]
+      },
+      "111800": {
+        "complexName": "스카이뷰리버(도시형)",
+        "types": [
+          {
+            "typeName": "30",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-111800-1"
+          },
+          {
+            "typeName": "40",
+            "areaMin": 24,
+            "areaMax": 30,
+            "floorPlanId": "naver-111800-2"
+          }
+        ]
+      },
+      "112418": {
+        "complexName": "수가(도시형)",
+        "types": [
+          {
+            "typeName": "50B",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-112418-3"
+          },
+          {
+            "typeName": "52C",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-112418-6"
+          }
+        ]
+      },
+      "113124": {
+        "complexName": "노은3지구영무예다음에코타운",
+        "types": [
+          {
+            "typeName": "94",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-113124-1"
+          },
+          {
+            "typeName": "102",
+            "areaMin": 77,
+            "areaMax": 83,
+            "floorPlanId": "naver-113124-2"
+          },
+          {
+            "typeName": "107B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-113124-3"
+          },
+          {
+            "typeName": "107A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-113124-4"
+          },
+          {
+            "typeName": "111",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-113124-5"
+          }
+        ]
+      },
+      "114450": {
+        "complexName": "유성숲오투그란데3차",
+        "types": [
+          {
+            "typeName": "81",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-114450-1"
+          },
+          {
+            "typeName": "93",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-114450-2"
+          },
+          {
+            "typeName": "107",
+            "areaMin": 77,
+            "areaMax": 83,
+            "floorPlanId": "naver-114450-3"
+          }
+        ]
+      },
+      "114502": {
+        "complexName": "나이스팰리스(도시형)",
+        "types": [
+          {
+            "typeName": "30",
+            "areaMin": 18,
+            "areaMax": 24,
+            "floorPlanId": "naver-114502-1"
+          },
+          {
+            "typeName": "34",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-114502-2"
+          },
+          {
+            "typeName": "37",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-114502-3"
+          },
+          {
+            "typeName": "38",
+            "areaMin": 24,
+            "areaMax": 30,
+            "floorPlanId": "naver-114502-4"
+          },
+          {
+            "typeName": "42",
+            "areaMin": 27,
+            "areaMax": 33,
+            "floorPlanId": "naver-114502-5"
+          }
+        ]
+      },
+      "114943": {
+        "complexName": "더그린(도시형)",
+        "types": [
+          {
+            "typeName": "32B",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-114943-2"
+          },
+          {
+            "typeName": "37C",
+            "areaMin": 19,
+            "areaMax": 25,
+            "floorPlanId": "naver-114943-3"
+          },
+          {
+            "typeName": "44A",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-114943-1"
+          },
+          {
+            "typeName": "48E",
+            "areaMin": 26,
+            "areaMax": 32,
+            "floorPlanId": "naver-114943-5"
+          },
+          {
+            "typeName": "49F",
+            "areaMin": 27,
+            "areaMax": 33,
+            "floorPlanId": "naver-114943-10"
+          },
+          {
+            "typeName": "53D",
+            "areaMin": 29,
+            "areaMax": 35,
+            "floorPlanId": "naver-114943-4"
+          }
+        ]
+      },
+      "117898": {
+        "complexName": "대전반석더샵",
+        "types": [
+          {
+            "typeName": "94A",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-117898-2"
+          },
+          {
+            "typeName": "94B",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-117898-1"
+          },
+          {
+            "typeName": "107A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-117898-3"
+          },
+          {
+            "typeName": "108B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-117898-4"
+          },
+          {
+            "typeName": "124",
+            "areaMin": 96,
+            "areaMax": 102,
+            "floorPlanId": "naver-117898-5"
+          }
+        ]
+      },
+      "118089": {
+        "complexName": "엔터팰리스1차(도시형)",
+        "types": [
+          {
+            "typeName": "28E",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-118089-5"
+          },
+          {
+            "typeName": "31A",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-118089-1"
+          },
+          {
+            "typeName": "38B",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-118089-2"
+          },
+          {
+            "typeName": "38D",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-118089-4"
+          },
+          {
+            "typeName": "38C",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-118089-3"
+          }
+        ]
+      },
+      "118090": {
+        "complexName": "엔터팰리스2차(도시형)",
+        "types": [
+          {
+            "typeName": "31F",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-118090-6"
+          },
+          {
+            "typeName": "32A",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-118090-1"
+          },
+          {
+            "typeName": "32C",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-118090-3"
+          },
+          {
+            "typeName": "39B",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-118090-2"
+          },
+          {
+            "typeName": "39E",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-118090-5"
+          },
+          {
+            "typeName": "40D",
+            "areaMin": 23,
+            "areaMax": 29,
+            "floorPlanId": "naver-118090-4"
+          }
+        ]
+      },
+      "119794": {
+        "complexName": "스카이뷰시티(도시형)",
+        "types": [
+          {
+            "typeName": "31",
+            "areaMin": 18,
+            "areaMax": 24,
+            "floorPlanId": "naver-119794-1"
+          },
+          {
+            "typeName": "31B",
+            "areaMin": 19,
+            "areaMax": 25,
+            "floorPlanId": "naver-119794-3"
+          },
+          {
+            "typeName": "32A",
+            "areaMin": 19,
+            "areaMax": 25,
+            "floorPlanId": "naver-119794-2"
+          },
+          {
+            "typeName": "39D",
+            "areaMin": 25,
+            "areaMax": 31,
+            "floorPlanId": "naver-119794-7"
+          },
+          {
+            "typeName": "39A",
+            "areaMin": 25,
+            "areaMax": 31,
+            "floorPlanId": "naver-119794-4"
+          },
+          {
+            "typeName": "39B",
+            "areaMin": 25,
+            "areaMax": 31,
+            "floorPlanId": "naver-119794-5"
+          },
+          {
+            "typeName": "39C",
+            "areaMin": 24,
+            "areaMax": 30,
+            "floorPlanId": "naver-119794-6"
+          },
+          {
+            "typeName": "39E",
+            "areaMin": 24,
+            "areaMax": 30,
+            "floorPlanId": "naver-119794-8"
+          },
+          {
+            "typeName": "51",
+            "areaMin": 33,
+            "areaMax": 39,
+            "floorPlanId": "naver-119794-10"
+          },
+          {
+            "typeName": "51",
+            "areaMin": 33,
+            "areaMax": 39,
+            "floorPlanId": "naver-119794-9"
+          }
+        ]
+      },
+      "119950": {
+        "complexName": "에이스타운4차(주상복합)",
+        "types": [
+          {
+            "typeName": "32",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-119950-1"
+          },
+          {
+            "typeName": "36",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-119950-2"
+          },
+          {
+            "typeName": "39",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-119950-3"
+          },
+          {
+            "typeName": "108",
+            "areaMin": 67,
+            "areaMax": 73,
+            "floorPlanId": "naver-119950-4"
+          }
+        ]
+      },
+      "122872": {
+        "complexName": "도룡포레미소지움",
+        "types": [
+          {
+            "typeName": "80A",
+            "areaMin": 59,
+            "areaMax": 65,
+            "floorPlanId": "naver-122872-1"
+          },
+          {
+            "typeName": "81B",
+            "areaMin": 59,
+            "areaMax": 65,
+            "floorPlanId": "naver-122872-2"
+          },
+          {
+            "typeName": "105",
+            "areaMin": 77,
+            "areaMax": 83,
+            "floorPlanId": "naver-122872-3"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-122872-4"
+          },
+          {
+            "typeName": "110B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-122872-5"
+          },
+          {
+            "typeName": "132",
+            "areaMin": 100,
+            "areaMax": 106,
+            "floorPlanId": "naver-122872-6"
+          }
+        ]
+      },
+      "125316": {
+        "complexName": "대전아이파크시티1단지",
+        "types": [
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-125316-1"
+          },
+          {
+            "typeName": "111B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-125316-2"
+          },
+          {
+            "typeName": "133A",
+            "areaMin": 102,
+            "areaMax": 108,
+            "floorPlanId": "naver-125316-3"
+          }
+        ]
+      },
+      "125317": {
+        "complexName": "대전아이파크시티2단지",
+        "types": [
+          {
+            "typeName": "111A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-125317-1"
+          },
+          {
+            "typeName": "112B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-125317-2"
+          },
+          {
+            "typeName": "134A",
+            "areaMin": 102,
+            "areaMax": 108,
+            "floorPlanId": "naver-125317-3"
+          },
+          {
+            "typeName": "134B",
+            "areaMin": 102,
+            "areaMax": 108,
+            "floorPlanId": "naver-125317-4"
+          },
+          {
+            "typeName": "152",
+            "areaMin": 120,
+            "areaMax": 126,
+            "floorPlanId": "naver-125317-5"
+          },
+          {
+            "typeName": "178",
+            "areaMin": 142,
+            "areaMax": 148,
+            "floorPlanId": "naver-125317-6"
+          },
+          {
+            "typeName": "226P",
+            "areaMin": 175,
+            "areaMax": 181,
+            "floorPlanId": "naver-125317-7"
+          },
+          {
+            "typeName": "295P",
+            "areaMin": 232,
+            "areaMax": 238,
+            "floorPlanId": "naver-125317-8"
+          }
+        ]
+      },
+      "127757": {
+        "complexName": "스카이뷰리브(도시형)",
+        "types": [
+          {
+            "typeName": "68B",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-127757-4"
+          },
+          {
+            "typeName": "68A",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-127757-2"
+          },
+          {
+            "typeName": "69C",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-127757-1"
+          },
+          {
+            "typeName": "69D",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-127757-3"
+          },
+          {
+            "typeName": "71A",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-127757-5"
+          },
+          {
+            "typeName": "71C",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-127757-6"
+          },
+          {
+            "typeName": "71D",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-127757-8"
+          },
+          {
+            "typeName": "71B",
+            "areaMin": 46,
+            "areaMax": 52,
+            "floorPlanId": "naver-127757-7"
+          }
+        ]
+      },
+      "127794": {
+        "complexName": "라온팰리스(도시형)",
+        "types": [
+          {
+            "typeName": "47A",
+            "areaMin": 27,
+            "areaMax": 33,
+            "floorPlanId": "naver-127794-2"
+          },
+          {
+            "typeName": "47B",
+            "areaMin": 27,
+            "areaMax": 33,
+            "floorPlanId": "naver-127794-1"
+          }
+        ]
+      },
+      "128217": {
+        "complexName": "스타빌플러스(도시형)",
+        "types": [
+          {
+            "typeName": "38A",
+            "areaMin": 19,
+            "areaMax": 25,
+            "floorPlanId": "naver-128217-1"
+          },
+          {
+            "typeName": "38C",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-128217-3"
+          },
+          {
+            "typeName": "39B",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-128217-2"
+          }
+        ]
+      },
+      "128632": {
+        "complexName": "해나래(도시형)",
+        "types": [
+          {
+            "typeName": "31E",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-128632-5"
+          },
+          {
+            "typeName": "32A",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-128632-1"
+          },
+          {
+            "typeName": "39B",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-128632-2"
+          },
+          {
+            "typeName": "39C",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-128632-3"
+          },
+          {
+            "typeName": "40D",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-128632-4"
+          }
+        ]
+      },
+      "130350": {
+        "complexName": "레자미리버뷰시티(도시형)",
+        "types": [
+          {
+            "typeName": "26A",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-130350-1"
+          },
+          {
+            "typeName": "27B",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-130350-2"
+          },
+          {
+            "typeName": "27D",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-130350-4"
+          },
+          {
+            "typeName": "27C",
+            "areaMin": 17,
+            "areaMax": 23,
+            "floorPlanId": "naver-130350-3"
+          },
+          {
+            "typeName": "31",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-130350-5"
+          },
+          {
+            "typeName": "44",
+            "areaMin": 30,
+            "areaMax": 36,
+            "floorPlanId": "naver-130350-6"
+          },
+          {
+            "typeName": "55",
+            "areaMin": 39,
+            "areaMax": 45,
+            "floorPlanId": "naver-130350-8"
+          },
+          {
+            "typeName": "64",
+            "areaMin": 45,
+            "areaMax": 51,
+            "floorPlanId": "naver-130350-10"
+          }
+        ]
+      },
+      "131323": {
+        "complexName": "유성둔곡지구서한이다음2단지",
+        "types": [
+          {
+            "typeName": "100",
+            "areaMin": 76,
+            "areaMax": 82,
+            "floorPlanId": "naver-131323-1"
+          },
+          {
+            "typeName": "107",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-131323-2"
+          }
+        ]
+      },
+      "131324": {
+        "complexName": "유성둔곡지구서한이다음1단지",
+        "types": [
+          {
+            "typeName": "79A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-131324-1"
+          },
+          {
+            "typeName": "80B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-131324-2"
+          }
+        ]
+      },
+      "131906": {
+        "complexName": "대전둔곡우미린",
+        "types": [
+          {
+            "typeName": "88A",
+            "areaMin": 62,
+            "areaMax": 68,
+            "floorPlanId": "naver-131906-1"
+          },
+          {
+            "typeName": "92A",
+            "areaMin": 66,
+            "areaMax": 72,
+            "floorPlanId": "naver-131906-2"
+          },
+          {
+            "typeName": "99A",
+            "areaMin": 71,
+            "areaMax": 77,
+            "floorPlanId": "naver-131906-3"
+          },
+          {
+            "typeName": "102A",
+            "areaMin": 74,
+            "areaMax": 80,
+            "floorPlanId": "naver-131906-4"
+          },
+          {
+            "typeName": "113A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-131906-6"
+          },
+          {
+            "typeName": "113C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-131906-5"
+          },
+          {
+            "typeName": "114B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-131906-7"
+          }
+        ]
+      },
+      "131949": {
+        "complexName": "휴안팰리스(도시형)",
+        "types": [
+          {
+            "typeName": "29A",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-131949-1"
+          },
+          {
+            "typeName": "37",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-131949-3"
+          },
+          {
+            "typeName": "57A",
+            "areaMin": 34,
+            "areaMax": 40,
+            "floorPlanId": "naver-131949-4"
+          },
+          {
+            "typeName": "57B",
+            "areaMin": 34,
+            "areaMax": 40,
+            "floorPlanId": "naver-131949-5"
+          },
+          {
+            "typeName": "63A",
+            "areaMin": 39,
+            "areaMax": 45,
+            "floorPlanId": "naver-131949-6"
+          },
+          {
+            "typeName": "63C",
+            "areaMin": 39,
+            "areaMax": 45,
+            "floorPlanId": "naver-131949-8"
+          },
+          {
+            "typeName": "63B",
+            "areaMin": 39,
+            "areaMax": 45,
+            "floorPlanId": "naver-131949-7"
+          }
+        ]
+      },
+      "135825": {
+        "complexName": "호반써밋그랜드파크1BL",
+        "types": [
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-135825-1"
+          },
+          {
+            "typeName": "116B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-135825-2"
+          }
+        ]
+      },
+      "135826": {
+        "complexName": "호반써밋그랜드파크3BL",
+        "types": [
+          {
+            "typeName": "115A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-135826-1"
+          },
+          {
+            "typeName": "116B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-135826-2"
+          }
+        ]
+      },
+      "136785": {
+        "complexName": "갑천1트리풀시티힐스테이트",
+        "types": [
+          {
+            "typeName": "78A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-136785-2"
+          },
+          {
+            "typeName": "78B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-136785-1"
+          },
+          {
+            "typeName": "109C",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-136785-3"
+          },
+          {
+            "typeName": "110A",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-136785-5"
+          },
+          {
+            "typeName": "110B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-136785-4"
+          }
+        ]
+      },
+      "142785": {
+        "complexName": "네이처뷰",
+        "types": [
+          {
+            "typeName": "74A1",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-142785-4"
+          },
+          {
+            "typeName": "74A",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-142785-1"
+          },
+          {
+            "typeName": "85A1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-142785-5"
+          },
+          {
+            "typeName": "85A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-142785-2"
+          },
+          {
+            "typeName": "85B1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-142785-6"
+          },
+          {
+            "typeName": "85B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-142785-3"
+          }
+        ]
+      },
+      "145404": {
+        "complexName": "죽동천년나무5단지",
+        "types": [
+          {
+            "typeName": "73A",
+            "areaMin": 49,
+            "areaMax": 55,
+            "floorPlanId": "naver-145404-1"
+          },
+          {
+            "typeName": "84A1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-145404-5"
+          },
+          {
+            "typeName": "84A",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-145404-2"
+          },
+          {
+            "typeName": "84B",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-145404-3"
+          },
+          {
+            "typeName": "84B1",
+            "areaMin": 57,
+            "areaMax": 63,
+            "floorPlanId": "naver-145404-4"
+          }
+        ]
+      },
+      "146903": {
+        "complexName": "리버스토리(도시형)",
+        "types": [
+          {
+            "typeName": "27",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-146903-1"
+          },
+          {
+            "typeName": "29A",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-146903-2"
+          },
+          {
+            "typeName": "31B",
+            "areaMin": 18,
+            "areaMax": 24,
+            "floorPlanId": "naver-146903-3"
+          },
+          {
+            "typeName": "33",
+            "areaMin": 21,
+            "areaMax": 27,
+            "floorPlanId": "naver-146903-4"
+          },
+          {
+            "typeName": "45",
+            "areaMin": 31,
+            "areaMax": 37,
+            "floorPlanId": "naver-146903-5"
+          },
+          {
+            "typeName": "52",
+            "areaMin": 34,
+            "areaMax": 40,
+            "floorPlanId": "naver-146903-6"
+          }
+        ]
+      },
+      "150777": {
+        "complexName": "시티팰리스(101동,도시형)",
+        "types": [
+          {
+            "typeName": "34A-2",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-150777-5"
+          },
+          {
+            "typeName": "35A",
+            "areaMin": 15,
+            "areaMax": 21,
+            "floorPlanId": "naver-150777-1"
+          },
+          {
+            "typeName": "37B1",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-150777-6"
+          },
+          {
+            "typeName": "37B",
+            "areaMin": 16,
+            "areaMax": 22,
+            "floorPlanId": "naver-150777-3"
+          },
+          {
+            "typeName": "46A-1",
+            "areaMin": 20,
+            "areaMax": 26,
+            "floorPlanId": "naver-150777-2"
+          },
+          {
+            "typeName": "49B-2",
+            "areaMin": 22,
+            "areaMax": 28,
+            "floorPlanId": "naver-150777-4"
+          }
+        ]
+      },
+      "184337": {
+        "complexName": "엑스포",
+        "types": [
+          {
+            "typeName": "106A",
+            "areaMin": 81,
+            "areaMax": 87,
+            "floorPlanId": "naver-184337-6"
+          },
+          {
+            "typeName": "107",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-184337-1"
+          },
+          {
+            "typeName": "107B",
+            "areaMin": 82,
+            "areaMax": 88,
+            "floorPlanId": "naver-184337-7"
+          },
+          {
+            "typeName": "143",
+            "areaMin": 113,
+            "areaMax": 119,
+            "floorPlanId": "naver-184337-3"
+          },
+          {
+            "typeName": "161",
+            "areaMin": 130,
+            "areaMax": 136,
+            "floorPlanId": "naver-184337-4"
+          },
+          {
+            "typeName": "186A",
+            "areaMin": 154,
+            "areaMax": 160,
+            "floorPlanId": "naver-184337-5"
+          },
+          {
+            "typeName": "187B",
+            "areaMin": 155,
+            "areaMax": 161,
+            "floorPlanId": "naver-184337-2"
+          }
+        ]
+      }
+    }
   },
-
   "areaMappings": [
     {
       "id": "type-59",
@@ -40,16 +5178,35 @@
       "description": "중형 B타입, 방 3개, 욕실 2개, 넓은 거실"
     }
   ],
-
   "pendingTypes": [
     {
       "comment": "추후 도면 확보 시 areaMappings에 추가",
       "types": [
-        { "label": "39㎡ (12평형)", "areaRange": "35-45", "status": "도면 미확보" },
-        { "label": "49㎡ (15평형)", "areaRange": "45-55", "status": "도면 미확보" },
-        { "label": "74㎡ (22평형)", "areaRange": "70-80", "status": "도면 미확보" },
-        { "label": "101㎡ (30평형)", "areaRange": "95-110", "status": "도면 미확보" },
-        { "label": "114㎡ (34평형)", "areaRange": "110-120", "status": "도면 미확보" }
+        {
+          "label": "39㎡ (12평형)",
+          "areaRange": "35-45",
+          "status": "도면 미확보"
+        },
+        {
+          "label": "49㎡ (15평형)",
+          "areaRange": "45-55",
+          "status": "도면 미확보"
+        },
+        {
+          "label": "74㎡ (22평형)",
+          "areaRange": "70-80",
+          "status": "도면 미확보"
+        },
+        {
+          "label": "101㎡ (30평형)",
+          "areaRange": "95-110",
+          "status": "도면 미확보"
+        },
+        {
+          "label": "114㎡ (34평형)",
+          "areaRange": "110-120",
+          "status": "도면 미확보"
+        }
       ]
     }
   ]

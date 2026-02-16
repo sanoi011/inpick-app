@@ -76,6 +76,17 @@ export async function getSampleTypes(): Promise<SampleFloorPlanType[]> {
 /** Load a specific floor plan by ID */
 export async function loadFloorPlan(id: string): Promise<ParsedFloorPlan | null> {
   try {
+    // 네이버 도면: naver-{complexNo}-{pyeongNo} → /floorplans/naver/{complexNo}_{pyeongNo}.json
+    if (id.startsWith("naver-")) {
+      const parts = id.replace("naver-", "").split("-");
+      const complexNo = parts[0];
+      const pyeongNo = parts[1];
+      const naverRes = await fetch(`/floorplans/naver/${complexNo}_${pyeongNo}.json`);
+      if (naverRes.ok) return await naverRes.json();
+      // 폴백: 면적 기반 샘플 도면
+      return null;
+    }
+
     const res = await fetch(`/floorplans/${id}.json`);
     if (!res.ok) return null;
     return await res.json();
