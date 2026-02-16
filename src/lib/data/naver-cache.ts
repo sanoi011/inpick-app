@@ -98,8 +98,24 @@ export function findCachedComplex(
   cortarNo: string,
   buildingName?: string
 ): NaverComplex | null {
+  // 1차: 정확한 cortarNo 매칭
   const matched = findCachedComplexRaw(cortarNo, buildingName);
-  return matched ? toNaverComplex(matched) : null;
+  if (matched) return toNaverComplex(matched);
+
+  // 2차: 시군구 범위에서 건물명으로 검색 (cortarNo 앞 5자리)
+  if (buildingName && cortarNo.length >= 5) {
+    const sigungu = cortarNo.substring(0, 5);
+    for (const [key, region] of Object.entries(cache)) {
+      if (!key.startsWith(sigungu)) continue;
+      for (const c of region.complexes || []) {
+        if (matchesComplexName(buildingName, c.complexName)) {
+          return toNaverComplex(c);
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -110,7 +126,24 @@ export function findCachedComplexDetail(
   cortarNo: string,
   buildingName?: string
 ): NaverComplexDetail | null {
-  const matched = findCachedComplexRaw(cortarNo, buildingName);
+  // 1차: 정확한 cortarNo 매칭
+  let matched = findCachedComplexRaw(cortarNo, buildingName);
+
+  // 2차: 시군구 범위에서 건물명으로 검색 (cortarNo 앞 5자리)
+  if (!matched && buildingName && cortarNo.length >= 5) {
+    const sigungu = cortarNo.substring(0, 5);
+    for (const [key, region] of Object.entries(cache)) {
+      if (!key.startsWith(sigungu)) continue;
+      for (const c of region.complexes || []) {
+        if (matchesComplexName(buildingName, c.complexName)) {
+          matched = c;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+  }
+
   if (!matched) return null;
 
   const complex = toNaverComplex(matched);

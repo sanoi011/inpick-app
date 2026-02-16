@@ -19,9 +19,12 @@ export async function GET(request: NextRequest) {
   const address = request.nextUrl.searchParams.get("address") || "";
   const buildingName = request.nextUrl.searchParams.get("buildingName");
 
+  console.log(`[building] bcode=${bcode}, buildingName=${buildingName}, address=${address?.slice(0, 30)}`);
+
   // 1. 알려진 아파트 매칭 시도 (최우선)
   const knownApt = findKnownApartment(address, buildingName || undefined);
   if (knownApt) {
+    console.log(`[building] matched=known_apartment, complexName=${knownApt.complexName}`);
     const buildings = generateKnownApartmentBuildings(knownApt, address);
     return NextResponse.json({
       buildings,
@@ -37,6 +40,7 @@ export async function GET(request: NextRequest) {
     try {
       const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
       if (naverDetail) {
+        console.log(`[building] matched=naver_land, complexName=${naverDetail.complex.complexName}, pyeongCount=${naverDetail.pyeongList.length}`);
         if (naverDetail.pyeongList.length > 0) {
           // Full Naver data: real pyeong types
           const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
@@ -63,6 +67,7 @@ export async function GET(request: NextRequest) {
     try {
       const cachedDetail = findCachedComplexDetail(cortarNo, buildingName || undefined);
       if (cachedDetail) {
+        console.log(`[building] matched=naver_cache, complexName=${cachedDetail.complex.complexName}, pyeongCount=${cachedDetail.pyeongList.length}`);
         if (cachedDetail.pyeongList.length > 0) {
           // Enriched cache: real pyeong types
           const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined);
@@ -135,6 +140,7 @@ export async function GET(request: NextRequest) {
   }
 
   // 4. 시뮬레이션 폴백 (개선됨)
+  console.log(`[building] matched=simulated (no naver/cache/api match)`);
   const simulated = generateSimulatedBuilding(address, buildingName || undefined);
   return NextResponse.json({ buildings: simulated, source: "simulated" });
 }
@@ -334,11 +340,11 @@ function generateNaverPartialBuildings(
 
 /**
  * 최고층 기반 대표 샘플 층수 생성
+ * 대표 1개 층만 반환 (중간층) — 가상 호수 수 최소화
  */
 function generateSampleFloors(maxFloor: number): number[] {
-  if (maxFloor <= 5) return [2, 3, 4];
-  if (maxFloor <= 15) return [3, 7, 11, maxFloor];
-  return [3, 7, 11, 15, 19, Math.min(23, maxFloor)].filter(f => f <= maxFloor);
+  const mid = Math.min(Math.ceil(maxFloor / 2), maxFloor);
+  return [mid];
 }
 
 /**
@@ -371,7 +377,7 @@ function generateSimulatedBuilding(address: string, buildingName?: string): Buil
     { typeName: "84A", area: 84, supply: 114.5, rooms: 4, baths: 2, lineNum: 2, sampleId: "sample-84a" },
     { typeName: "84B", area: 84, supply: 114.5, rooms: 3, baths: 2, lineNum: 3, sampleId: "sample-84b" },
   ];
-  const sampleFloors = [3, 7, 11, 15, 19, 23];
+  const sampleFloors = generateSampleFloors(25);
 
   const buildings: BuildingInfo[] = [];
 

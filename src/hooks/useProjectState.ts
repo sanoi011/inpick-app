@@ -322,6 +322,20 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 주소 + 도면 ID 원자적 저장 (레이스 컨디션 방지)
+  const confirmBuilding = useCallback(
+    (address: ProjectAddress, drawingId?: string) => {
+      if (!project) return;
+      saveProject({
+        ...project,
+        address,
+        status: "FLOOR_PLAN" as ConsumerProjectStatus,
+        ...(drawingId ? { drawingId } : {}),
+      });
+    },
+    [project, saveProject]
+  );
+
   // AI 생성 이미지 추가
   const addGeneratedImage = useCallback(
     (image: GeneratedImage) => {
@@ -458,6 +472,7 @@ export function useProjectState(projectId: string) {
     setActiveImage,
     addDecision,
     setDrawingId,
+    confirmBuilding,
     addGeneratedImage,
     removeGeneratedImage,
     updateRendering,

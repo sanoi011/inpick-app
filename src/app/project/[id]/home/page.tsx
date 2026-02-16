@@ -40,7 +40,7 @@ export default function ProjectHomePage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateAddress, setDrawingId } = useProjectState(projectId);
+  const { project, confirmBuilding } = useProjectState(projectId);
 
   const [step, setStep] = useState<Step>("search");
   const [keyword, setKeyword] = useState("");
@@ -133,26 +133,26 @@ export default function ProjectHomePage() {
     setStep("confirm");
   };
 
-  // 확인 → 프로젝트에 주소 저장 → 디자인 탭 이동
+  // 확인 → 프로젝트에 주소+도면 원자적 저장 → 디자인 탭 이동
   const handleConfirm = () => {
     if (selectedAddress && selectedBuilding) {
-      updateAddress({
-        roadAddress: selectedAddress.roadAddress,
-        zipCode: selectedAddress.zipCode,
-        buildingName: selectedAddress.buildingName,
-        dongName: selectedBuilding.dongName,
-        hoName: selectedBuilding.hoName,
-        exclusiveArea: selectedBuilding.exclusiveArea,
-        supplyArea: selectedBuilding.supplyArea,
-        roomCount: selectedBuilding.roomCount || 3,
-        bathroomCount: selectedBuilding.bathroomCount || 1,
-        buildingType: selectedBuilding.buildingType,
-        floor: selectedBuilding.floor,
-        totalFloor: selectedBuilding.totalFloor,
-      });
-      if (selectedBuilding.sampleId) {
-        setDrawingId(selectedBuilding.sampleId);
-      }
+      confirmBuilding(
+        {
+          roadAddress: selectedAddress.roadAddress,
+          zipCode: selectedAddress.zipCode,
+          buildingName: selectedAddress.buildingName,
+          dongName: selectedBuilding.dongName,
+          hoName: selectedBuilding.hoName,
+          exclusiveArea: selectedBuilding.exclusiveArea,
+          supplyArea: selectedBuilding.supplyArea,
+          roomCount: selectedBuilding.roomCount || 3,
+          bathroomCount: selectedBuilding.bathroomCount || 1,
+          buildingType: selectedBuilding.buildingType,
+          floor: selectedBuilding.floor,
+          totalFloor: selectedBuilding.totalFloor,
+        },
+        selectedBuilding.sampleId
+      );
       router.push(`/project/${projectId}/design`);
     }
   };
@@ -510,23 +510,23 @@ export default function ProjectHomePage() {
                   <button
                     onClick={() => {
                       if (selectedAddress && selectedBuilding) {
-                        updateAddress({
-                          roadAddress: selectedAddress.roadAddress,
-                          zipCode: selectedAddress.zipCode,
-                          buildingName: selectedAddress.buildingName,
-                          dongName: selectedBuilding.dongName,
-                          hoName: selectedBuilding.hoName,
-                          exclusiveArea: selectedBuilding.exclusiveArea,
-                          supplyArea: selectedBuilding.supplyArea,
-                          roomCount: selectedBuilding.roomCount || 3,
-                          bathroomCount: selectedBuilding.bathroomCount || 1,
-                          buildingType: selectedBuilding.buildingType,
-                          floor: selectedBuilding.floor,
-                          totalFloor: selectedBuilding.totalFloor,
-                        });
-                      }
-                      if (selectedBuilding?.sampleId) {
-                        setDrawingId(selectedBuilding.sampleId);
+                        confirmBuilding(
+                          {
+                            roadAddress: selectedAddress.roadAddress,
+                            zipCode: selectedAddress.zipCode,
+                            buildingName: selectedAddress.buildingName,
+                            dongName: selectedBuilding.dongName,
+                            hoName: selectedBuilding.hoName,
+                            exclusiveArea: selectedBuilding.exclusiveArea,
+                            supplyArea: selectedBuilding.supplyArea,
+                            roomCount: selectedBuilding.roomCount || 3,
+                            bathroomCount: selectedBuilding.bathroomCount || 1,
+                            buildingType: selectedBuilding.buildingType,
+                            floor: selectedBuilding.floor,
+                            totalFloor: selectedBuilding.totalFloor,
+                          },
+                          selectedBuilding.sampleId
+                        );
                       }
                       router.push(`/project/${projectId}/design?mode=lidar`);
                     }}
@@ -539,23 +539,23 @@ export default function ProjectHomePage() {
                   <button
                     onClick={() => {
                       if (selectedAddress && selectedBuilding) {
-                        updateAddress({
-                          roadAddress: selectedAddress.roadAddress,
-                          zipCode: selectedAddress.zipCode,
-                          buildingName: selectedAddress.buildingName,
-                          dongName: selectedBuilding.dongName,
-                          hoName: selectedBuilding.hoName,
-                          exclusiveArea: selectedBuilding.exclusiveArea,
-                          supplyArea: selectedBuilding.supplyArea,
-                          roomCount: selectedBuilding.roomCount || 3,
-                          bathroomCount: selectedBuilding.bathroomCount || 1,
-                          buildingType: selectedBuilding.buildingType,
-                          floor: selectedBuilding.floor,
-                          totalFloor: selectedBuilding.totalFloor,
-                        });
-                      }
-                      if (selectedBuilding?.sampleId) {
-                        setDrawingId(selectedBuilding.sampleId);
+                        confirmBuilding(
+                          {
+                            roadAddress: selectedAddress.roadAddress,
+                            zipCode: selectedAddress.zipCode,
+                            buildingName: selectedAddress.buildingName,
+                            dongName: selectedBuilding.dongName,
+                            hoName: selectedBuilding.hoName,
+                            exclusiveArea: selectedBuilding.exclusiveArea,
+                            supplyArea: selectedBuilding.supplyArea,
+                            roomCount: selectedBuilding.roomCount || 3,
+                            bathroomCount: selectedBuilding.bathroomCount || 1,
+                            buildingType: selectedBuilding.buildingType,
+                            floor: selectedBuilding.floor,
+                            totalFloor: selectedBuilding.totalFloor,
+                          },
+                          selectedBuilding.sampleId
+                        );
                       }
                       router.push(`/project/${projectId}/design?mode=photo`);
                     }}
@@ -568,23 +568,23 @@ export default function ProjectHomePage() {
                   <button
                     onClick={() => {
                       if (selectedAddress && selectedBuilding) {
-                        updateAddress({
-                          roadAddress: selectedAddress.roadAddress,
-                          zipCode: selectedAddress.zipCode,
-                          buildingName: selectedAddress.buildingName,
-                          dongName: selectedBuilding.dongName,
-                          hoName: selectedBuilding.hoName,
-                          exclusiveArea: selectedBuilding.exclusiveArea,
-                          supplyArea: selectedBuilding.supplyArea,
-                          roomCount: selectedBuilding.roomCount || 3,
-                          bathroomCount: selectedBuilding.bathroomCount || 1,
-                          buildingType: selectedBuilding.buildingType,
-                          floor: selectedBuilding.floor,
-                          totalFloor: selectedBuilding.totalFloor,
-                        });
-                      }
-                      if (selectedBuilding?.sampleId) {
-                        setDrawingId(selectedBuilding.sampleId);
+                        confirmBuilding(
+                          {
+                            roadAddress: selectedAddress.roadAddress,
+                            zipCode: selectedAddress.zipCode,
+                            buildingName: selectedAddress.buildingName,
+                            dongName: selectedBuilding.dongName,
+                            hoName: selectedBuilding.hoName,
+                            exclusiveArea: selectedBuilding.exclusiveArea,
+                            supplyArea: selectedBuilding.supplyArea,
+                            roomCount: selectedBuilding.roomCount || 3,
+                            bathroomCount: selectedBuilding.bathroomCount || 1,
+                            buildingType: selectedBuilding.buildingType,
+                            floor: selectedBuilding.floor,
+                            totalFloor: selectedBuilding.totalFloor,
+                          },
+                          selectedBuilding.sampleId
+                        );
                       }
                       router.push(`/project/${projectId}/design?mode=hand-drawing`);
                     }}
@@ -597,23 +597,23 @@ export default function ProjectHomePage() {
                   <button
                     onClick={() => {
                       if (selectedAddress && selectedBuilding) {
-                        updateAddress({
-                          roadAddress: selectedAddress.roadAddress,
-                          zipCode: selectedAddress.zipCode,
-                          buildingName: selectedAddress.buildingName,
-                          dongName: selectedBuilding.dongName,
-                          hoName: selectedBuilding.hoName,
-                          exclusiveArea: selectedBuilding.exclusiveArea,
-                          supplyArea: selectedBuilding.supplyArea,
-                          roomCount: selectedBuilding.roomCount || 3,
-                          bathroomCount: selectedBuilding.bathroomCount || 1,
-                          buildingType: selectedBuilding.buildingType,
-                          floor: selectedBuilding.floor,
-                          totalFloor: selectedBuilding.totalFloor,
-                        });
-                      }
-                      if (selectedBuilding?.sampleId) {
-                        setDrawingId(selectedBuilding.sampleId);
+                        confirmBuilding(
+                          {
+                            roadAddress: selectedAddress.roadAddress,
+                            zipCode: selectedAddress.zipCode,
+                            buildingName: selectedAddress.buildingName,
+                            dongName: selectedBuilding.dongName,
+                            hoName: selectedBuilding.hoName,
+                            exclusiveArea: selectedBuilding.exclusiveArea,
+                            supplyArea: selectedBuilding.supplyArea,
+                            roomCount: selectedBuilding.roomCount || 3,
+                            bathroomCount: selectedBuilding.bathroomCount || 1,
+                            buildingType: selectedBuilding.buildingType,
+                            floor: selectedBuilding.floor,
+                            totalFloor: selectedBuilding.totalFloor,
+                          },
+                          selectedBuilding.sampleId
+                        );
                       }
                       router.push(`/project/${projectId}/design?mode=draw`);
                     }}
@@ -638,7 +638,11 @@ export default function ProjectHomePage() {
                 onClick={handleConfirm}
                 className="flex-1 flex items-center justify-center gap-2 bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-medium hover:bg-blue-700 transition-colors"
               >
-                <FileUp className="w-5 h-5" /> 도면 업로드하러 가기
+                {selectedBuilding?.sampleId ? (
+                  <>다음 단계로 <ArrowRight className="w-5 h-5" /></>
+                ) : (
+                  <><FileUp className="w-5 h-5" /> 도면 업로드하러 가기</>
+                )}
               </button>
             </div>
           </div>

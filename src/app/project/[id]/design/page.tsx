@@ -67,6 +67,7 @@ export default function FloorPlanPage() {
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -103,10 +104,20 @@ export default function FloorPlanPage() {
   // 탭1에서 매칭된 도면 자동 로드
   useEffect(() => {
     if (project?.drawingId) {
-      loadFloorPlan(project.drawingId).then((plan) => {
-        if (plan) setFloorPlan(plan);
-        setLoading(false);
-      });
+      setLoadError(false);
+      loadFloorPlan(project.drawingId)
+        .then((plan) => {
+          if (plan) {
+            setFloorPlan(plan);
+          } else {
+            setLoadError(true);
+          }
+          setLoading(false);
+        })
+        .catch(() => {
+          setLoadError(true);
+          setLoading(false);
+        });
     } else {
       setLoading(false);
     }
@@ -388,7 +399,34 @@ export default function FloorPlanPage() {
           /* 도면 없음 → 업로드 UI */
           <div className="h-full flex items-center justify-center bg-gray-50 p-8 overflow-y-auto">
             <div className="max-w-lg w-full">
-              {project?.drawingId ? (
+              {project?.drawingId && loadError ? (
+                <div className="text-center mb-8">
+                  <AlertTriangle className="w-12 h-12 text-amber-500 mx-auto mb-4" />
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">도면을 불러올 수 없습니다</h2>
+                  <p className="text-sm text-gray-500 mb-1">ID: {project.drawingId}</p>
+                  <p className="text-sm text-gray-400 mb-6">도면 파일이 존재하지 않거나 로드에 실패했습니다.</p>
+                  <div className="flex gap-3 justify-center">
+                    <button
+                      onClick={() => {
+                        setLoadError(false);
+                        setLoading(true);
+                        loadFloorPlan(project.drawingId!).then((plan) => {
+                          if (plan) setFloorPlan(plan);
+                          else setLoadError(true);
+                          setLoading(false);
+                        }).catch(() => { setLoadError(true); setLoading(false); });
+                      }}
+                      className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                    >
+                      다시 시도
+                    </button>
+                    <label className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 cursor-pointer">
+                      도면 직접 업로드
+                      <input ref={fileInputRef} type="file" accept="image/*,.pdf" onChange={handleFileUpload} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+              ) : project?.drawingId ? (
                 <div className="text-center mb-8">
                   <Loader2 className="w-12 h-12 animate-spin text-blue-500 mx-auto mb-4" />
                   <p className="text-gray-600">도면을 불러오는 중...</p>

@@ -107,17 +107,29 @@ export function findByArea(
     (m) => exclusiveArea >= m.areaMin && exclusiveArea <= m.areaMax
   );
 
-  if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0].floorPlanId;
 
-  // 여러 매핑이 겹치면 (예: 84A와 84B 모두 80-90) 방수로 구분
-  if (roomCount !== undefined) {
-    const byRoom = candidates.find((c) => c.roomCount === roomCount);
-    if (byRoom) return byRoom.floorPlanId;
+  if (candidates.length > 1) {
+    // 여러 매핑이 겹치면 (예: 84A와 84B 모두 80-90) 방수로 구분
+    if (roomCount !== undefined) {
+      const byRoom = candidates.find((c) => c.roomCount === roomCount);
+      if (byRoom) return byRoom.floorPlanId;
+    }
+    // 기본: 첫 번째 반환 (A타입 우선)
+    return candidates[0].floorPlanId;
   }
 
-  // 기본: 첫 번째 반환 (A타입 우선)
-  return candidates[0].floorPlanId;
+  // 폴백: 가장 가까운 면적의 샘플 반환
+  if (data.areaMappings.length > 0) {
+    const closest = data.areaMappings.reduce((prev, curr) => {
+      const prevDist = Math.min(Math.abs(exclusiveArea - prev.areaMin), Math.abs(exclusiveArea - prev.areaMax));
+      const currDist = Math.min(Math.abs(exclusiveArea - curr.areaMin), Math.abs(exclusiveArea - curr.areaMax));
+      return currDist < prevDist ? curr : prev;
+    });
+    return closest.floorPlanId;
+  }
+
+  return undefined;
 }
 
 /**
