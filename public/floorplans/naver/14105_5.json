@@ -1,0 +1,404 @@
+{
+  "totalArea": 82.71,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 17.25,
+      "position": {
+        "x": 0.25,
+        "y": 0.25,
+        "width": 11.5,
+        "height": 1.5
+      },
+      "polygon": [
+        {
+          "x": 0.25,
+          "y": 0.25
+        },
+        {
+          "x": 11.75,
+          "y": 0.25
+        },
+        {
+          "x": 11.75,
+          "y": 1.75
+        },
+        {
+          "x": 0.25,
+          "y": 1.75
+        }
+      ],
+      "center": {
+        "x": 6,
+        "y": 1
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "MASTER_BED",
+      "name": "침실1",
+      "area": 9,
+      "position": {
+        "x": 0.54,
+        "y": 2.25,
+        "width": 3,
+        "height": 3
+      },
+      "polygon": [
+        {
+          "x": 0.54,
+          "y": 2.25
+        },
+        {
+          "x": 3.54,
+          "y": 2.25
+        },
+        {
+          "x": 3.54,
+          "y": 5.25
+        },
+        {
+          "x": 0.54,
+          "y": 5.25
+        }
+      ],
+      "center": {
+        "x": 2.04,
+        "y": 3.75
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "LIVING",
+      "name": "거실",
+      "area": 21.06,
+      "position": {
+        "x": 3.45,
+        "y": 2.8,
+        "width": 3.9,
+        "height": 5.4
+      },
+      "polygon": [
+        {
+          "x": 3.45,
+          "y": 2.8
+        },
+        {
+          "x": 7.35,
+          "y": 2.8
+        },
+        {
+          "x": 7.35,
+          "y": 8.2
+        },
+        {
+          "x": 3.45,
+          "y": 8.2
+        }
+      ],
+      "center": {
+        "x": 5.4,
+        "y": 5.5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-3",
+      "type": "BED",
+      "name": "침실2",
+      "area": 9.9,
+      "position": {
+        "x": 7.65,
+        "y": 2.25,
+        "width": 3.3,
+        "height": 3
+      },
+      "polygon": [
+        {
+          "x": 7.65,
+          "y": 2.25
+        },
+        {
+          "x": 10.95,
+          "y": 2.25
+        },
+        {
+          "x": 10.95,
+          "y": 5.25
+        },
+        {
+          "x": 7.65,
+          "y": 5.25
+        }
+      ],
+      "center": {
+        "x": 9.3,
+        "y": 3.75
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-4",
+      "type": "BATHROOM",
+      "name": "욕실1",
+      "area": 4.32,
+      "position": {
+        "x": 0.9,
+        "y": 5.3,
+        "width": 1.8,
+        "height": 2.4
+      },
+      "polygon": [
+        {
+          "x": 0.9,
+          "y": 5.3
+        },
+        {
+          "x": 2.7,
+          "y": 5.3
+        },
+        {
+          "x": 2.7,
+          "y": 7.7
+        },
+        {
+          "x": 0.9,
+          "y": 7.7
+        }
+      ],
+      "center": {
+        "x": 1.8,
+        "y": 6.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-5",
+      "type": "BED",
+      "name": "침실3",
+      "area": 8.4,
+      "position": {
+        "x": 0.54,
+        "y": 6.7,
+        "width": 3,
+        "height": 2.8
+      },
+      "polygon": [
+        {
+          "x": 0.54,
+          "y": 6.7
+        },
+        {
+          "x": 3.54,
+          "y": 6.7
+        },
+        {
+          "x": 3.54,
+          "y": 9.5
+        },
+        {
+          "x": 0.54,
+          "y": 9.5
+        }
+      ],
+      "center": {
+        "x": 2.04,
+        "y": 8.1
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-6",
+      "type": "KITCHEN",
+      "name": "주방 및 식당",
+      "area": 14.06,
+      "position": {
+        "x": 4.75,
+        "y": 6.35,
+        "width": 3.7,
+        "height": 3.8
+      },
+      "polygon": [
+        {
+          "x": 4.75,
+          "y": 6.35
+        },
+        {
+          "x": 8.45,
+          "y": 6.35
+        },
+        {
+          "x": 8.45,
+          "y": 10.15
+        },
+        {
+          "x": 4.75,
+          "y": 10.15
+        }
+      ],
+      "center": {
+        "x": 6.6,
+        "y": 8.25
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-7",
+      "type": "BATHROOM",
+      "name": "욕실2",
+      "area": 4.76,
+      "position": {
+        "x": 9.65,
+        "y": 6.85,
+        "width": 1.7,
+        "height": 2.8
+      },
+      "polygon": [
+        {
+          "x": 9.65,
+          "y": 6.85
+        },
+        {
+          "x": 11.35,
+          "y": 6.85
+        },
+        {
+          "x": 11.35,
+          "y": 9.65
+        },
+        {
+          "x": 9.65,
+          "y": 9.65
+        }
+      ],
+      "center": {
+        "x": 10.5,
+        "y": 8.25
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-8",
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 3.24,
+      "position": {
+        "x": 2.1,
+        "y": 8.2,
+        "width": 1.8,
+        "height": 1.8
+      },
+      "polygon": [
+        {
+          "x": 2.1,
+          "y": 8.2
+        },
+        {
+          "x": 3.9,
+          "y": 8.2
+        },
+        {
+          "x": 3.9,
+          "y": 10
+        },
+        {
+          "x": 2.1,
+          "y": 10
+        }
+      ],
+      "center": {
+        "x": 3,
+        "y": 9.1
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-9",
+      "type": "CORRIDOR",
+      "name": "복도",
+      "area": 4.32,
+      "position": {
+        "x": 3.3,
+        "y": 6,
+        "width": 1.8,
+        "height": 2.4
+      },
+      "polygon": [
+        {
+          "x": 3.3,
+          "y": 6
+        },
+        {
+          "x": 5.1,
+          "y": 6
+        },
+        {
+          "x": 5.1,
+          "y": 8.4
+        },
+        {
+          "x": 3.3,
+          "y": 8.4
+        }
+      ],
+      "center": {
+        "x": 4.2,
+        "y": 7.2
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-10",
+      "type": "CORRIDOR",
+      "name": "복도",
+      "area": 4.08,
+      "position": {
+        "x": 8.45,
+        "y": 6,
+        "width": 1.7,
+        "height": 2.4
+      },
+      "polygon": [
+        {
+          "x": 8.45,
+          "y": 6
+        },
+        {
+          "x": 10.15,
+          "y": 6
+        },
+        {
+          "x": 10.15,
+          "y": 8.4
+        },
+        {
+          "x": 8.45,
+          "y": 8.4
+        }
+      ],
+      "center": {
+        "x": 9.3,
+        "y": 7.2
+      },
+      "material": "wood"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "14105",
+    "complexName": "노은스타돔(주상복합)",
+    "pyeongName": "112A",
+    "exclusiveArea": 82.71,
+    "supplyArea": 112.63,
+    "address": "대전시 유성구 노은동",
+    "processedAt": "2026-02-16T09:06:25.837Z"
+  }
+}

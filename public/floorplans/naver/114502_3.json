@@ -1,0 +1,159 @@
+{
+  "totalArea": 26.31,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 7.23,
+      "position": {
+        "x": 0.82,
+        "y": 3.655,
+        "width": 1.96,
+        "height": 3.689
+      },
+      "polygon": [
+        {
+          "x": 0.82,
+          "y": 3.655
+        },
+        {
+          "x": 2.78,
+          "y": 3.655
+        },
+        {
+          "x": 2.78,
+          "y": 7.345
+        },
+        {
+          "x": 0.82,
+          "y": 7.345
+        }
+      ],
+      "center": {
+        "x": 1.8,
+        "y": 5.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 17.86,
+      "position": {
+        "x": 3.579,
+        "y": 3.655,
+        "width": 4.841,
+        "height": 3.689
+      },
+      "polygon": [
+        {
+          "x": 3.579,
+          "y": 3.655
+        },
+        {
+          "x": 8.421,
+          "y": 3.655
+        },
+        {
+          "x": 8.421,
+          "y": 7.345
+        },
+        {
+          "x": 3.579,
+          "y": 7.345
+        }
+      ],
+      "center": {
+        "x": 6,
+        "y": 5.5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "KITCHEN",
+      "name": "주방 식당",
+      "area": 3.99,
+      "position": {
+        "x": 4.871,
+        "y": 1.923,
+        "width": 3.458,
+        "height": 1.153
+      },
+      "polygon": [
+        {
+          "x": 4.871,
+          "y": 1.923
+        },
+        {
+          "x": 8.329,
+          "y": 1.923
+        },
+        {
+          "x": 8.329,
+          "y": 3.077
+        },
+        {
+          "x": 4.871,
+          "y": 3.077
+        }
+      ],
+      "center": {
+        "x": 6.6,
+        "y": 2.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 4.46,
+      "position": {
+        "x": 9.278,
+        "y": 5.29,
+        "width": 1.844,
+        "height": 2.421
+      },
+      "polygon": [
+        {
+          "x": 9.278,
+          "y": 5.29
+        },
+        {
+          "x": 11.122,
+          "y": 5.29
+        },
+        {
+          "x": 11.122,
+          "y": 7.71
+        },
+        {
+          "x": 9.278,
+          "y": 7.71
+        }
+      ],
+      "center": {
+        "x": 10.2,
+        "y": 6.5
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "114502",
+    "complexName": "나이스팰리스(도시형)",
+    "pyeongName": "37",
+    "exclusiveArea": 26.31,
+    "supplyArea": 37.96,
+    "address": "대전시 유성구 봉명동",
+    "processedAt": "2026-02-16T10:21:56.233Z"
+  }
+}

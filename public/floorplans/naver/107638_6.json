@@ -1,0 +1,194 @@
+{
+  "totalArea": 23.09,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 6.68,
+      "position": {
+        "x": 3.721,
+        "y": 1.527,
+        "width": 4.317,
+        "height": 1.547
+      },
+      "polygon": [
+        {
+          "x": 3.721,
+          "y": 1.527
+        },
+        {
+          "x": 8.038,
+          "y": 1.527
+        },
+        {
+          "x": 8.038,
+          "y": 3.074
+        },
+        {
+          "x": 3.721,
+          "y": 3.074
+        }
+      ],
+      "center": {
+        "x": 5.88,
+        "y": 2.3
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 13.01,
+      "position": {
+        "x": 3.841,
+        "y": 4.293,
+        "width": 4.317,
+        "height": 3.013
+      },
+      "polygon": [
+        {
+          "x": 3.841,
+          "y": 4.293
+        },
+        {
+          "x": 8.159,
+          "y": 4.293
+        },
+        {
+          "x": 8.159,
+          "y": 7.306
+        },
+        {
+          "x": 3.841,
+          "y": 7.306
+        }
+      ],
+      "center": {
+        "x": 6,
+        "y": 5.8
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 2.6,
+      "position": {
+        "x": 2.22,
+        "y": 8.03,
+        "width": 2.28,
+        "height": 1.14
+      },
+      "polygon": [
+        {
+          "x": 2.22,
+          "y": 8.03
+        },
+        {
+          "x": 4.5,
+          "y": 8.03
+        },
+        {
+          "x": 4.5,
+          "y": 9.17
+        },
+        {
+          "x": 2.22,
+          "y": 9.17
+        }
+      ],
+      "center": {
+        "x": 3.36,
+        "y": 8.6
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 2.6,
+      "position": {
+        "x": 7.5,
+        "y": 8.03,
+        "width": 2.28,
+        "height": 1.14
+      },
+      "polygon": [
+        {
+          "x": 7.5,
+          "y": 8.03
+        },
+        {
+          "x": 9.78,
+          "y": 8.03
+        },
+        {
+          "x": 9.78,
+          "y": 9.17
+        },
+        {
+          "x": 7.5,
+          "y": 9.17
+        }
+      ],
+      "center": {
+        "x": 8.64,
+        "y": 8.6
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-4",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 3.4,
+      "position": {
+        "x": 5.226,
+        "y": 5.301,
+        "width": 1.547,
+        "height": 2.199
+      },
+      "polygon": [
+        {
+          "x": 5.226,
+          "y": 5.301
+        },
+        {
+          "x": 6.773,
+          "y": 5.301
+        },
+        {
+          "x": 6.773,
+          "y": 7.5
+        },
+        {
+          "x": 5.226,
+          "y": 7.5
+        }
+      ],
+      "center": {
+        "x": 6,
+        "y": 6.4
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "107638",
+    "complexName": "K타운(도시형)",
+    "pyeongName": "35HF",
+    "exclusiveArea": 23.09,
+    "supplyArea": 35.25,
+    "address": "대전시 유성구 봉명동",
+    "processedAt": "2026-02-16T10:10:01.201Z"
+  }
+}

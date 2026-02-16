@@ -1,0 +1,159 @@
+{
+  "totalArea": 18.67,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 10.57,
+      "position": {
+        "x": 5.702,
+        "y": 4.541,
+        "width": 4.197,
+        "height": 2.518
+      },
+      "polygon": [
+        {
+          "x": 5.702,
+          "y": 4.541
+        },
+        {
+          "x": 9.899,
+          "y": 4.541
+        },
+        {
+          "x": 9.899,
+          "y": 7.059
+        },
+        {
+          "x": 5.702,
+          "y": 7.059
+        }
+      ],
+      "center": {
+        "x": 7.8,
+        "y": 5.8
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-1",
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 5.28,
+      "position": {
+        "x": 5.702,
+        "y": 2.171,
+        "width": 4.197,
+        "height": 1.259
+      },
+      "polygon": [
+        {
+          "x": 5.702,
+          "y": 2.171
+        },
+        {
+          "x": 9.899,
+          "y": 2.171
+        },
+        {
+          "x": 9.899,
+          "y": 3.43
+        },
+        {
+          "x": 5.702,
+          "y": 3.43
+        }
+      ],
+      "center": {
+        "x": 7.8,
+        "y": 2.8
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-2",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 2.11,
+      "position": {
+        "x": 2.37,
+        "y": 5.66,
+        "width": 1.259,
+        "height": 1.679
+      },
+      "polygon": [
+        {
+          "x": 2.37,
+          "y": 5.66
+        },
+        {
+          "x": 3.629,
+          "y": 5.66
+        },
+        {
+          "x": 3.629,
+          "y": 7.34
+        },
+        {
+          "x": 2.37,
+          "y": 7.34
+        }
+      ],
+      "center": {
+        "x": 3,
+        "y": 6.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 0.7,
+      "position": {
+        "x": 0.54,
+        "y": 1.581,
+        "width": 0.839,
+        "height": 0.839
+      },
+      "polygon": [
+        {
+          "x": 0.54,
+          "y": 1.581
+        },
+        {
+          "x": 1.379,
+          "y": 1.581
+        },
+        {
+          "x": 1.379,
+          "y": 2.42
+        },
+        {
+          "x": 0.54,
+          "y": 2.42
+        }
+      ],
+      "center": {
+        "x": 0.96,
+        "y": 2
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "150777",
+    "complexName": "시티팰리스(101동,도시형)",
+    "pyeongName": "37B1",
+    "exclusiveArea": 18.67,
+    "supplyArea": 37.3,
+    "address": "대전시 유성구 궁동",
+    "processedAt": "2026-02-16T10:40:40.935Z"
+  }
+}

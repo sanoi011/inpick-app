@@ -1,0 +1,229 @@
+{
+  "totalArea": 30.07,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "KITCHEN",
+      "name": "주방 식당",
+      "area": 7.04,
+      "position": {
+        "x": 1.9,
+        "y": 0.9,
+        "width": 2.2,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 1.9,
+          "y": 0.9
+        },
+        {
+          "x": 4.1,
+          "y": 0.9
+        },
+        {
+          "x": 4.1,
+          "y": 4.1
+        },
+        {
+          "x": 1.9,
+          "y": 4.1
+        }
+      ],
+      "center": {
+        "x": 3,
+        "y": 2.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실",
+      "area": 11.02,
+      "position": {
+        "x": 6.35,
+        "y": 1.6,
+        "width": 2.9,
+        "height": 3.8
+      },
+      "polygon": [
+        {
+          "x": 6.35,
+          "y": 1.6
+        },
+        {
+          "x": 9.25,
+          "y": 1.6
+        },
+        {
+          "x": 9.25,
+          "y": 5.4
+        },
+        {
+          "x": 6.35,
+          "y": 5.4
+        }
+      ],
+      "center": {
+        "x": 7.8,
+        "y": 3.5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 1.8,
+      "position": {
+        "x": 0.6,
+        "y": 3.75,
+        "width": 1.2,
+        "height": 1.5
+      },
+      "polygon": [
+        {
+          "x": 0.6,
+          "y": 3.75
+        },
+        {
+          "x": 1.8,
+          "y": 3.75
+        },
+        {
+          "x": 1.8,
+          "y": 5.25
+        },
+        {
+          "x": 0.6,
+          "y": 5.25
+        }
+      ],
+      "center": {
+        "x": 1.2,
+        "y": 4.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 3,
+      "position": {
+        "x": 2,
+        "y": 6.75,
+        "width": 2,
+        "height": 1.5
+      },
+      "polygon": [
+        {
+          "x": 2,
+          "y": 6.75
+        },
+        {
+          "x": 4,
+          "y": 6.75
+        },
+        {
+          "x": 4,
+          "y": 8.25
+        },
+        {
+          "x": 2,
+          "y": 8.25
+        }
+      ],
+      "center": {
+        "x": 3,
+        "y": 7.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-4",
+      "type": "BED",
+      "name": "침실",
+      "area": 8.41,
+      "position": {
+        "x": 5.75,
+        "y": 5.55,
+        "width": 2.9,
+        "height": 2.9
+      },
+      "polygon": [
+        {
+          "x": 5.75,
+          "y": 5.55
+        },
+        {
+          "x": 8.65,
+          "y": 5.55
+        },
+        {
+          "x": 8.65,
+          "y": 8.45
+        },
+        {
+          "x": 5.75,
+          "y": 8.45
+        }
+      ],
+      "center": {
+        "x": 7.2,
+        "y": 7
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-5",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 2.9,
+      "position": {
+        "x": 10.3,
+        "y": 5.55,
+        "width": 1,
+        "height": 2.9
+      },
+      "polygon": [
+        {
+          "x": 10.3,
+          "y": 5.55
+        },
+        {
+          "x": 11.3,
+          "y": 5.55
+        },
+        {
+          "x": 11.3,
+          "y": 8.45
+        },
+        {
+          "x": 10.3,
+          "y": 8.45
+        }
+      ],
+      "center": {
+        "x": 10.8,
+        "y": 7
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "114943",
+    "complexName": "더그린(도시형)",
+    "pyeongName": "49F",
+    "exclusiveArea": 30.07,
+    "supplyArea": 49.37,
+    "address": "대전시 유성구 봉명동",
+    "processedAt": "2026-02-16T10:22:52.236Z"
+  }
+}

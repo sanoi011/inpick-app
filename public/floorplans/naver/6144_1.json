@@ -1,0 +1,194 @@
+{
+  "totalArea": 40.36,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "BED",
+      "name": "침실",
+      "area": 9.6,
+      "position": {
+        "x": 0.9,
+        "y": 1.4,
+        "width": 3,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 0.9,
+          "y": 1.4
+        },
+        {
+          "x": 3.9,
+          "y": 1.4
+        },
+        {
+          "x": 3.9,
+          "y": 4.6
+        },
+        {
+          "x": 0.9,
+          "y": 4.6
+        }
+      ],
+      "center": {
+        "x": 2.4,
+        "y": 3
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-1",
+      "type": "KITCHEN",
+      "name": "주방 및 식당",
+      "area": 8.96,
+      "position": {
+        "x": 2.6,
+        "y": 6.1,
+        "width": 3.2,
+        "height": 2.8
+      },
+      "polygon": [
+        {
+          "x": 2.6,
+          "y": 6.1
+        },
+        {
+          "x": 5.8,
+          "y": 6.1
+        },
+        {
+          "x": 5.8,
+          "y": 8.9
+        },
+        {
+          "x": 2.6,
+          "y": 8.9
+        }
+      ],
+      "center": {
+        "x": 4.2,
+        "y": 7.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-2",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 4.6,
+      "position": {
+        "x": 4.16,
+        "y": 1.85,
+        "width": 2,
+        "height": 2.3
+      },
+      "polygon": [
+        {
+          "x": 4.16,
+          "y": 1.85
+        },
+        {
+          "x": 6.16,
+          "y": 1.85
+        },
+        {
+          "x": 6.16,
+          "y": 4.15
+        },
+        {
+          "x": 4.16,
+          "y": 4.15
+        }
+      ],
+      "center": {
+        "x": 5.16,
+        "y": 3
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 13.44,
+      "position": {
+        "x": 6.3,
+        "y": 2.9,
+        "width": 4.2,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 6.3,
+          "y": 2.9
+        },
+        {
+          "x": 10.5,
+          "y": 2.9
+        },
+        {
+          "x": 10.5,
+          "y": 6.1
+        },
+        {
+          "x": 6.3,
+          "y": 6.1
+        }
+      ],
+      "center": {
+        "x": 8.4,
+        "y": 4.5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-4",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 4.8,
+      "position": {
+        "x": 10.05,
+        "y": 2.9,
+        "width": 1.5,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 10.05,
+          "y": 2.9
+        },
+        {
+          "x": 11.55,
+          "y": 2.9
+        },
+        {
+          "x": 11.55,
+          "y": 6.1
+        },
+        {
+          "x": 10.05,
+          "y": 6.1
+        }
+      ],
+      "center": {
+        "x": 10.8,
+        "y": 4.5
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "6144",
+    "complexName": "청솔(한양)",
+    "pyeongName": "55",
+    "exclusiveArea": 40.36,
+    "supplyArea": 55.96,
+    "address": "대전시 유성구 송강동",
+    "processedAt": "2026-02-16T08:53:36.138Z"
+  }
+}

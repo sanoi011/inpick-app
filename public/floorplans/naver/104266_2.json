@@ -1,0 +1,229 @@
+{
+  "totalArea": 28.65,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 6.16,
+      "position": {
+        "x": 3.4,
+        "y": 1.1,
+        "width": 2.8,
+        "height": 2.2
+      },
+      "polygon": [
+        {
+          "x": 3.4,
+          "y": 1.1
+        },
+        {
+          "x": 6.2,
+          "y": 1.1
+        },
+        {
+          "x": 6.2,
+          "y": 3.3
+        },
+        {
+          "x": 3.4,
+          "y": 3.3
+        }
+      ],
+      "center": {
+        "x": 4.8,
+        "y": 2.2
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 13.44,
+      "position": {
+        "x": 4.5,
+        "y": 2.9,
+        "width": 4.2,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 4.5,
+          "y": 2.9
+        },
+        {
+          "x": 8.7,
+          "y": 2.9
+        },
+        {
+          "x": 8.7,
+          "y": 6.1
+        },
+        {
+          "x": 4.5,
+          "y": 6.1
+        }
+      ],
+      "center": {
+        "x": 6.6,
+        "y": 4.5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 4.8,
+      "position": {
+        "x": 9.81,
+        "y": 2.9,
+        "width": 1.5,
+        "height": 3.2
+      },
+      "polygon": [
+        {
+          "x": 9.81,
+          "y": 2.9
+        },
+        {
+          "x": 11.31,
+          "y": 2.9
+        },
+        {
+          "x": 11.31,
+          "y": 6.1
+        },
+        {
+          "x": 9.81,
+          "y": 6.1
+        }
+      ],
+      "center": {
+        "x": 10.56,
+        "y": 4.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 2.16,
+      "position": {
+        "x": 1.2,
+        "y": 1.6,
+        "width": 1.2,
+        "height": 1.8
+      },
+      "polygon": [
+        {
+          "x": 1.2,
+          "y": 1.6
+        },
+        {
+          "x": 2.4,
+          "y": 1.6
+        },
+        {
+          "x": 2.4,
+          "y": 3.4
+        },
+        {
+          "x": 1.2,
+          "y": 3.4
+        }
+      ],
+      "center": {
+        "x": 1.8,
+        "y": 2.5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-4",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 3.84,
+      "position": {
+        "x": 2.8,
+        "y": 6.5,
+        "width": 1.6,
+        "height": 2.4
+      },
+      "polygon": [
+        {
+          "x": 2.8,
+          "y": 6.5
+        },
+        {
+          "x": 4.4,
+          "y": 6.5
+        },
+        {
+          "x": 4.4,
+          "y": 8.9
+        },
+        {
+          "x": 2.8,
+          "y": 8.9
+        }
+      ],
+      "center": {
+        "x": 3.6,
+        "y": 7.7
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-5",
+      "type": "UTILITY",
+      "name": "다용도실",
+      "area": 1.44,
+      "position": {
+        "x": 9.96,
+        "y": 7.9,
+        "width": 1.2,
+        "height": 1.2
+      },
+      "polygon": [
+        {
+          "x": 9.96,
+          "y": 7.9
+        },
+        {
+          "x": 11.16,
+          "y": 7.9
+        },
+        {
+          "x": 11.16,
+          "y": 9.1
+        },
+        {
+          "x": 9.96,
+          "y": 9.1
+        }
+      ],
+      "center": {
+        "x": 10.56,
+        "y": 8.5
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "104266",
+    "complexName": "리베라아이누리(448-5,도시형)",
+    "pyeongName": "42",
+    "exclusiveArea": 28.65,
+    "supplyArea": 42.22,
+    "address": "대전시 유성구 봉명동",
+    "processedAt": "2026-02-16T10:00:26.956Z"
+  }
+}

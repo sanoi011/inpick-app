@@ -1,0 +1,159 @@
+{
+  "totalArea": 24.56,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 4.72,
+      "position": {
+        "x": 1.47,
+        "y": 0.991,
+        "width": 2.34,
+        "height": 2.018
+      },
+      "polygon": [
+        {
+          "x": 1.47,
+          "y": 0.991
+        },
+        {
+          "x": 3.81,
+          "y": 0.991
+        },
+        {
+          "x": 3.81,
+          "y": 3.009
+        },
+        {
+          "x": 1.47,
+          "y": 3.009
+        }
+      ],
+      "center": {
+        "x": 2.64,
+        "y": 2
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 15.7,
+      "position": {
+        "x": 4.862,
+        "y": 2.729,
+        "width": 4.196,
+        "height": 3.742
+      },
+      "polygon": [
+        {
+          "x": 4.862,
+          "y": 2.729
+        },
+        {
+          "x": 9.058,
+          "y": 2.729
+        },
+        {
+          "x": 9.058,
+          "y": 6.471
+        },
+        {
+          "x": 4.862,
+          "y": 6.471
+        }
+      ],
+      "center": {
+        "x": 6.96,
+        "y": 4.6
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 4.14,
+      "position": {
+        "x": 1.47,
+        "y": 6.415,
+        "width": 2.34,
+        "height": 1.771
+      },
+      "polygon": [
+        {
+          "x": 1.47,
+          "y": 6.415
+        },
+        {
+          "x": 3.81,
+          "y": 6.415
+        },
+        {
+          "x": 3.81,
+          "y": 8.186
+        },
+        {
+          "x": 1.47,
+          "y": 8.186
+        }
+      ],
+      "center": {
+        "x": 2.64,
+        "y": 7.3
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 3.12,
+      "position": {
+        "x": 10.232,
+        "y": 3.627,
+        "width": 1.137,
+        "height": 2.747
+      },
+      "polygon": [
+        {
+          "x": 10.232,
+          "y": 3.627
+        },
+        {
+          "x": 11.369,
+          "y": 3.627
+        },
+        {
+          "x": 11.369,
+          "y": 6.373
+        },
+        {
+          "x": 10.232,
+          "y": 6.373
+        }
+      ],
+      "center": {
+        "x": 10.8,
+        "y": 5
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "112418",
+    "complexName": "수가(도시형)",
+    "pyeongName": "52C",
+    "exclusiveArea": 24.56,
+    "supplyArea": 52.26,
+    "address": "대전시 유성구 지족동",
+    "processedAt": "2026-02-16T10:20:08.735Z"
+  }
+}

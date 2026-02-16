@@ -1,0 +1,159 @@
+{
+  "totalArea": 14.84,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 3.7,
+      "position": {
+        "x": 1.209,
+        "y": 3.436,
+        "width": 1.182,
+        "height": 3.129
+      },
+      "polygon": [
+        {
+          "x": 1.209,
+          "y": 3.436
+        },
+        {
+          "x": 2.391,
+          "y": 3.436
+        },
+        {
+          "x": 2.391,
+          "y": 6.565
+        },
+        {
+          "x": 1.209,
+          "y": 6.565
+        }
+      ],
+      "center": {
+        "x": 1.8,
+        "y": 5
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "LIVING",
+      "name": "거실/침실",
+      "area": 10.88,
+      "position": {
+        "x": 4.142,
+        "y": 3.436,
+        "width": 3.476,
+        "height": 3.129
+      },
+      "polygon": [
+        {
+          "x": 4.142,
+          "y": 3.436
+        },
+        {
+          "x": 7.618,
+          "y": 3.436
+        },
+        {
+          "x": 7.618,
+          "y": 6.565
+        },
+        {
+          "x": 4.142,
+          "y": 6.565
+        }
+      ],
+      "center": {
+        "x": 5.88,
+        "y": 5
+      },
+      "material": "wood"
+    },
+    {
+      "id": "room-2",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 2.42,
+      "position": {
+        "x": 9.625,
+        "y": 2.131,
+        "width": 1.391,
+        "height": 1.738
+      },
+      "polygon": [
+        {
+          "x": 9.625,
+          "y": 2.131
+        },
+        {
+          "x": 11.016,
+          "y": 2.131
+        },
+        {
+          "x": 11.016,
+          "y": 3.869
+        },
+        {
+          "x": 9.625,
+          "y": 3.869
+        }
+      ],
+      "center": {
+        "x": 10.32,
+        "y": 3
+      },
+      "material": "tile"
+    },
+    {
+      "id": "room-3",
+      "type": "KITCHEN",
+      "name": "주방/식당",
+      "area": 1.55,
+      "position": {
+        "x": 9.625,
+        "y": 7.444,
+        "width": 1.391,
+        "height": 1.112
+      },
+      "polygon": [
+        {
+          "x": 9.625,
+          "y": 7.444
+        },
+        {
+          "x": 11.016,
+          "y": 7.444
+        },
+        {
+          "x": 11.016,
+          "y": 8.556
+        },
+        {
+          "x": 9.625,
+          "y": 8.556
+        }
+      ],
+      "center": {
+        "x": 10.32,
+        "y": 8
+      },
+      "material": "tile"
+    }
+  ],
+  "walls": [],
+  "doors": [],
+  "windows": [],
+  "fixtures": [],
+  "meta": {
+    "source": "naver_land",
+    "complexNo": "106771",
+    "complexName": "레자미3차(도시형)",
+    "pyeongName": "23A",
+    "exclusiveArea": 14.84,
+    "supplyArea": 23.53,
+    "address": "대전시 유성구 봉명동",
+    "processedAt": "2026-02-16T10:06:34.023Z"
+  }
+}
