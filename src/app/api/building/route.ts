@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
-import { findComplexByAddress, type NaverComplexDetail } from "@/lib/services/naver-land-client";
+import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
 
 const DATA_API_KEY = process.env.DATA_API_KEY;
 const BUILDING_API_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo";
@@ -31,13 +31,24 @@ export async function GET(request: NextRequest) {
   if (cortarNo && cortarNo.length >= 5) {
     try {
       const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
-      if (naverDetail && naverDetail.pyeongList.length > 0) {
-        const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
-        return NextResponse.json({
-          buildings,
-          source: "naver_land",
-          complexName: naverDetail.complex.complexName,
-        });
+      if (naverDetail) {
+        if (naverDetail.pyeongList.length > 0) {
+          // Full Naver data: real pyeong types
+          const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
+          return NextResponse.json({
+            buildings,
+            source: "naver_land",
+            complexName: naverDetail.complex.complexName,
+          });
+        } else {
+          // Partial Naver data: real dong count + default pyeong types
+          const buildings = generateNaverPartialBuildings(naverDetail.complex, address, buildingName || undefined);
+          return NextResponse.json({
+            buildings,
+            source: "naver_land",
+            complexName: naverDetail.complex.complexName,
+          });
+        }
       }
     } catch (err) {
       console.error("Naver Land API error:", err);
@@ -173,7 +184,8 @@ function generateNaverBuildings(
   }
 
   // 대표 샘플 층수
-  const sampleFloors = [3, 7, 11, 15, 19, 23];
+  const maxFloor = complex.highFloor || 25;
+  const sampleFloors = generateSampleFloors(maxFloor);
 
   for (const dong of dongs) {
     for (const pyeong of pyeongList) {
@@ -190,7 +202,7 @@ function generateNaverBuildings(
           dongName: dong,
           hoName: `${hoNum}호`,
           buildingType: "아파트",
-          totalFloor: 25,
+          totalFloor: maxFloor,
           floor,
           exclusiveArea: pyeong.exclusiveArea,
           supplyArea: pyeong.supplyArea,
@@ -214,6 +226,77 @@ function generateNaverBuildings(
   });
 
   return buildings;
+}
+
+/**
+ * 네이버 목록 데이터 (pyeong 없음) → 실제 동 수 + 기본 평형 BuildingInfo[]
+ */
+function generateNaverPartialBuildings(
+  complex: NaverComplex,
+  address: string,
+  buildingName?: string
+): BuildingInfo[] {
+  const buildings: BuildingInfo[] = [];
+
+  const dongBase = parseDongBase(buildingName || complex.complexName);
+  const dongCount = complex.totalDongCount || 3;
+  const dongs: string[] = [];
+  for (let i = 1; i <= dongCount; i++) {
+    dongs.push(`${dongBase + i}동`);
+  }
+
+  const defaultTypes = [
+    { typeName: "59A", area: 59, supply: 84.8, rooms: 3, baths: 2, lineNum: 1, sampleId: "sample-59" },
+    { typeName: "84A", area: 84, supply: 114.5, rooms: 4, baths: 2, lineNum: 2, sampleId: "sample-84a" },
+    { typeName: "84B", area: 84, supply: 114.5, rooms: 3, baths: 2, lineNum: 3, sampleId: "sample-84b" },
+  ];
+
+  const maxFloor = complex.highFloor || 25;
+  const sampleFloors = generateSampleFloors(maxFloor);
+
+  for (const dong of dongs) {
+    for (const ut of defaultTypes) {
+      for (const floor of sampleFloors) {
+        const hoNum = String(floor).padStart(2, "0") + String(ut.lineNum).padStart(2, "0");
+        buildings.push({
+          id: `naver-${dong}-${floor}-${ut.lineNum}`,
+          address,
+          buildingName: buildingName || complex.complexName,
+          dongName: dong,
+          hoName: `${hoNum}호`,
+          buildingType: "아파트",
+          totalFloor: maxFloor,
+          floor,
+          exclusiveArea: ut.area,
+          supplyArea: ut.supply,
+          roomCount: ut.rooms,
+          bathroomCount: ut.baths,
+          approvalDate: complex.approvalDate || "",
+          floorPlanAvailable: true,
+          sampleId: ut.sampleId,
+          typeName: ut.typeName,
+          complexName: complex.complexName,
+        });
+      }
+    }
+  }
+
+  buildings.sort((a, b) => {
+    if (a.dongName !== b.dongName) return a.dongName.localeCompare(b.dongName);
+    if (a.floor !== b.floor) return a.floor - b.floor;
+    return (a.typeName || "").localeCompare(b.typeName || "");
+  });
+
+  return buildings;
+}
+
+/**
+ * 최고층 기반 대표 샘플 층수 생성
+ */
+function generateSampleFloors(maxFloor: number): number[] {
+  if (maxFloor <= 5) return [2, 3, 4];
+  if (maxFloor <= 15) return [3, 7, 11, maxFloor];
+  return [3, 7, 11, 15, 19, Math.min(23, maxFloor)].filter(f => f <= maxFloor);
 }
 
 /**
