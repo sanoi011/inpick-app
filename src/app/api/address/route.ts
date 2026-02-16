@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const preferredRegion = "icn1"; // Seoul — JUSO/네이버 API 한국 IP 필요
+
 const JUSO_API_URL = "https://business.juso.go.kr/addrlink/addrLinkApi.do";
 
 export async function GET(request: NextRequest) {

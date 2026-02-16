@@ -3,6 +3,8 @@ import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
 import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
 
+export const preferredRegion = "icn1"; // Seoul — 네이버 API 한국 IP 필요
+
 const DATA_API_KEY = process.env.DATA_API_KEY;
 const BUILDING_API_URL = "http://apis.data.go.kr/1613000/BldRgstHubService/getBrExposPubuseAreaInfo";
 
