@@ -1,5 +1,5 @@
 /**
- * 네이버 부동산 API 연동 테스트
+ * 네이버 부동산 API 연동 테스트 (쿠키 세션 방식)
  * 사용법: node scripts/test-naver-land.mjs [cortarNo] [buildingName]
  * 예시: node scripts/test-naver-land.mjs 3020012000 반석마을
  */
@@ -7,29 +7,65 @@
 const cortarNo = process.argv[2] || "3020012000"; // 대전 유성구 지족동
 const buildingName = process.argv[3] || "반석마을";
 
-const HEADERS = {
+const BROWSER_HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-  Accept: "application/json",
-  Referer: "https://new.land.naver.com/",
+  "Accept-Language": "ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7",
+  "sec-ch-ua": '"Chromium";v="131", "Not_A Brand";v="24"',
+  "sec-ch-ua-mobile": "?0",
+  "sec-ch-ua-platform": '"Windows"',
 };
 
 async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+async function getCookies() {
+  console.log("0. 세션 쿠키 획득...");
+  const res = await fetch("https://new.land.naver.com/", {
+    headers: { ...BROWSER_HEADERS, Accept: "text/html" },
+    redirect: "follow",
+  });
+  const rawCookies = res.headers.getSetCookie?.() || [];
+  const cookieStr = rawCookies.map(c => c.split(";")[0]).join("; ");
+  await res.text();
+  console.log(`   Cookies: ${cookieStr ? cookieStr.substring(0, 120) + "..." : "(없음)"}`);
+  return cookieStr;
+}
+
+async function naverFetch(url, cookie) {
+  return fetch(url, {
+    headers: {
+      ...BROWSER_HEADERS,
+      Accept: "application/json",
+      Referer: "https://new.land.naver.com/",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors",
+      "sec-fetch-site": "same-origin",
+      Cookie: cookie,
+    },
+  });
+}
+
 async function main() {
-  console.log(`\n=== 네이버 부동산 API 테스트 ===`);
+  console.log(`\n=== 네이버 부동산 API 테스트 (쿠키 세션) ===`);
   console.log(`cortarNo: ${cortarNo}, buildingName: ${buildingName}\n`);
 
-  // Step 1: 지역 단지 목록
-  console.log("1. 단지 목록 조회...");
-  const listUrl = `https://new.land.naver.com/api/regions/complexes?cortarNo=${cortarNo}&realEstateType=APT&order=`;
-  const listRes = await fetch(listUrl, { headers: HEADERS });
-  console.log(`   Status: ${listRes.status}`);
-
-  if (listRes.status === 429) {
-    console.log("   ⚠ Rate limit! 5분 후 다시 시도해주세요.");
+  const cookie = await getCookies();
+  if (!cookie) {
+    console.log("   ✗ 쿠키 획득 실패");
     process.exit(1);
   }
 
+  // Step 1: 지역 단지 목록
+  console.log("\n1. 단지 목록 조회...");
+  const listRes = await naverFetch(
+    `https://new.land.naver.com/api/regions/complexes?cortarNo=${cortarNo}&realEstateType=APT&order=`,
+    cookie
+  );
+  console.log(`   Status: ${listRes.status}`);
+
+  if (listRes.status === 429) {
+    console.log("   ✗ Rate limit! 쿠키가 동작하지 않음");
+    process.exit(1);
+  }
   if (!listRes.ok) {
     console.log(`   ✗ Error: ${listRes.statusText}`);
     process.exit(1);
@@ -39,9 +75,10 @@ async function main() {
   const complexes = listData?.complexList || [];
   console.log(`   ✓ ${complexes.length}개 단지 발견\n`);
 
-  for (const c of complexes) {
+  for (const c of complexes.slice(0, 10)) {
     console.log(`   - [${c.complexNo}] ${c.complexName} (${c.totalDongCount}동, ${c.totalHouseholdCount}세대)`);
   }
+  if (complexes.length > 10) console.log(`   ... 외 ${complexes.length - 10}개`);
 
   // Step 2: 이름 매칭
   const name = buildingName.toLowerCase().replace(/\s/g, "");
@@ -52,21 +89,21 @@ async function main() {
 
   if (!matched) {
     console.log(`\n   ✗ "${buildingName}" 매칭 실패`);
+    if (complexes.length > 0) {
+      console.log(`   가능한 단지: ${complexes.map(c => c.complexName).join(", ")}`);
+    }
     process.exit(0);
   }
 
-  console.log(`\n2. 매칭: ${matched.complexName} (${matched.complexNo})`);
+  console.log(`\n2. 매칭 성공: ${matched.complexName} (complexNo: ${matched.complexNo})`);
 
   // Step 3: 상세 조회
   await sleep(1000);
   console.log("\n3. 단지 상세 조회...");
-  const detailUrl = `https://new.land.naver.com/api/complexes/${matched.complexNo}?sameAddressGroup=false`;
-  const detailRes = await fetch(detailUrl, {
-    headers: {
-      ...HEADERS,
-      Referer: `https://new.land.naver.com/complexes/${matched.complexNo}`,
-    },
-  });
+  const detailRes = await naverFetch(
+    `https://new.land.naver.com/api/complexes/${matched.complexNo}?sameAddressGroup=false`,
+    cookie
+  );
   console.log(`   Status: ${detailRes.status}`);
 
   if (!detailRes.ok) {
@@ -98,7 +135,7 @@ async function main() {
     return m ? parseInt(m[1]) * 100 : 100;
   })();
   const dongCount = detail?.totalDongCount || 3;
-  console.log(`   동 번호: ${dongBase+1}동 ~ ${dongBase+dongCount}동`);
+  console.log(`   동 번호: ${dongBase + 1}동 ~ ${dongBase + dongCount}동`);
   console.log(`   평형 타입: ${pyeongList.map(p => `${p.pyeongName}평(${p.exclusiveArea}㎡)`).join(", ")}`);
   console.log(`   총 건물 수: ${dongCount} x ${pyeongList.length} x 6층 = ${dongCount * pyeongList.length * 6}개`);
 

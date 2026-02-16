@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
 import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
-import { findCachedComplex } from "@/lib/data/naver-cache";
+import { findCachedComplexDetail } from "@/lib/data/naver-cache";
 import { findFloorPlanId } from "@/lib/data/floor-plan-map";
 
 export const preferredRegion = "icn1"; // Seoul — 네이버 API 한국 IP 필요
@@ -61,14 +61,25 @@ export async function GET(request: NextRequest) {
 
     // 2b. Fallback to cached Naver data (for Vercel cloud IP blocking)
     try {
-      const cachedComplex = findCachedComplex(cortarNo, buildingName || undefined);
-      if (cachedComplex) {
-        const buildings = generateNaverPartialBuildings(cachedComplex, address, buildingName || undefined);
-        return NextResponse.json({
-          buildings,
-          source: "naver_land_cache",
-          complexName: cachedComplex.complexName,
-        });
+      const cachedDetail = findCachedComplexDetail(cortarNo, buildingName || undefined);
+      if (cachedDetail) {
+        if (cachedDetail.pyeongList.length > 0) {
+          // Enriched cache: real pyeong types
+          const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined);
+          return NextResponse.json({
+            buildings,
+            source: "naver_land_cache",
+            complexName: cachedDetail.complex.complexName,
+          });
+        } else {
+          // Basic cache: only summary, use default types
+          const buildings = generateNaverPartialBuildings(cachedDetail.complex, address, buildingName || undefined, cachedDetail.dongList);
+          return NextResponse.json({
+            buildings,
+            source: "naver_land_cache",
+            complexName: cachedDetail.complex.complexName,
+          });
+        }
       }
     } catch (err) {
       console.error("Naver cache lookup error:", err instanceof Error ? err.message : err);
@@ -195,12 +206,17 @@ function generateNaverBuildings(
   const buildings: BuildingInfo[] = [];
   const { complex, pyeongList } = detail;
 
-  // 동 번호 생성: 단지명 기반 베이스 + 실제 동 수
-  const dongBase = parseDongBase(buildingName || complex.complexName);
-  const dongCount = complex.totalDongCount || 3;
-  const dongs: string[] = [];
-  for (let i = 1; i <= dongCount; i++) {
-    dongs.push(`${dongBase + i}동`);
+  // 동 목록: 실제 동 데이터 → 생성 폴백
+  let dongs: string[];
+  if (detail.dongList && detail.dongList.length > 0) {
+    dongs = detail.dongList.map((d) => `${d.dongName}동`);
+  } else {
+    const dongBase = parseDongBase(buildingName || complex.complexName);
+    const dongCount = complex.totalDongCount || 3;
+    dongs = [];
+    for (let i = 1; i <= dongCount; i++) {
+      dongs.push(`${dongBase + i}동`);
+    }
   }
 
   // 대표 샘플 층수
@@ -254,15 +270,21 @@ function generateNaverBuildings(
 function generateNaverPartialBuildings(
   complex: NaverComplex,
   address: string,
-  buildingName?: string
+  buildingName?: string,
+  dongList?: { dongNo: string; dongName: string }[]
 ): BuildingInfo[] {
   const buildings: BuildingInfo[] = [];
 
-  const dongBase = parseDongBase(buildingName || complex.complexName);
-  const dongCount = complex.totalDongCount || 3;
-  const dongs: string[] = [];
-  for (let i = 1; i <= dongCount; i++) {
-    dongs.push(`${dongBase + i}동`);
+  let dongs: string[];
+  if (dongList && dongList.length > 0) {
+    dongs = dongList.map((d) => `${d.dongName}동`);
+  } else {
+    const dongBase = parseDongBase(buildingName || complex.complexName);
+    const dongCount = complex.totalDongCount || 3;
+    dongs = [];
+    for (let i = 1; i <= dongCount; i++) {
+      dongs.push(`${dongBase + i}동`);
+    }
   }
 
   const defaultTypes = [

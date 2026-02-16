@@ -140,11 +140,18 @@ export interface NaverPyeongDetail {
   bathroomCnt: number;
   entranceType: string;
   householdCountByPyeong: number;
+  grandPlanUrl?: string;
+}
+
+export interface NaverDong {
+  dongNo: string;
+  dongName: string;
 }
 
 export interface NaverComplexDetail {
   complex: NaverComplex;
   pyeongList: NaverPyeongDetail[];
+  dongList?: NaverDong[];
 }
 
 // ─── API Functions ───

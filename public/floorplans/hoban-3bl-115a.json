@@ -1,0 +1,1396 @@
+{
+  "totalArea": 84.8,
+  "rooms": [
+    {
+      "id": "room-0",
+      "type": "KITCHEN",
+      "name": "주방",
+      "area": 6.8,
+      "position": {
+        "x": 0,
+        "y": 0,
+        "width": 3.194,
+        "height": 2.129
+      },
+      "polygon": [
+        {
+          "x": 0,
+          "y": 0
+        },
+        {
+          "x": 3.194,
+          "y": 0
+        },
+        {
+          "x": 3.194,
+          "y": 2.129
+        },
+        {
+          "x": 0,
+          "y": 2.129
+        }
+      ],
+      "material": "tile"
+    },
+    {
+      "id": "room-1",
+      "type": "ENTRANCE",
+      "name": "현관",
+      "area": 3.4,
+      "position": {
+        "x": 0,
+        "y": 2.249,
+        "width": 1.543,
+        "height": 2.204
+      },
+      "polygon": [
+        {
+          "x": 0,
+          "y": 2.249
+        },
+        {
+          "x": 1.543,
+          "y": 2.249
+        },
+        {
+          "x": 1.543,
+          "y": 4.453
+        },
+        {
+          "x": 0,
+          "y": 4.453
+        }
+      ],
+      "material": "tile"
+    },
+    {
+      "id": "room-2",
+      "type": "LIVING",
+      "name": "거실",
+      "area": 22.1,
+      "position": {
+        "x": 1.663,
+        "y": 2.249,
+        "width": 5.36,
+        "height": 4.123
+      },
+      "polygon": [
+        {
+          "x": 1.663,
+          "y": 2.249
+        },
+        {
+          "x": 7.023,
+          "y": 2.249
+        },
+        {
+          "x": 7.023,
+          "y": 6.372
+        },
+        {
+          "x": 1.663,
+          "y": 6.372
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-3",
+      "type": "BED",
+      "name": "침실",
+      "area": 7.6,
+      "position": {
+        "x": 7.143,
+        "y": 2.249,
+        "width": 2.757,
+        "height": 2.757
+      },
+      "polygon": [
+        {
+          "x": 7.143,
+          "y": 2.249
+        },
+        {
+          "x": 9.9,
+          "y": 2.249
+        },
+        {
+          "x": 9.9,
+          "y": 5.006
+        },
+        {
+          "x": 7.143,
+          "y": 5.006
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-4",
+      "type": "DRESSROOM",
+      "name": "드레스룸",
+      "area": 2.5,
+      "position": {
+        "x": 10.02,
+        "y": 2.249,
+        "width": 1.323,
+        "height": 1.89
+      },
+      "polygon": [
+        {
+          "x": 10.02,
+          "y": 2.249
+        },
+        {
+          "x": 11.343,
+          "y": 2.249
+        },
+        {
+          "x": 11.343,
+          "y": 4.139
+        },
+        {
+          "x": 10.02,
+          "y": 4.139
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-5",
+      "type": "UTILITY",
+      "name": "다용도실",
+      "area": 1.7,
+      "position": {
+        "x": 11.463,
+        "y": 2.249,
+        "width": 1.01,
+        "height": 1.683
+      },
+      "polygon": [
+        {
+          "x": 11.463,
+          "y": 2.249
+        },
+        {
+          "x": 12.473,
+          "y": 2.249
+        },
+        {
+          "x": 12.473,
+          "y": 3.932
+        },
+        {
+          "x": 11.463,
+          "y": 3.932
+        }
+      ],
+      "material": "tile"
+    },
+    {
+      "id": "room-6",
+      "type": "CORRIDOR",
+      "name": "복도",
+      "area": 3.4,
+      "position": {
+        "x": 12.593,
+        "y": 2.249,
+        "width": 3.448,
+        "height": 0.986
+      },
+      "polygon": [
+        {
+          "x": 12.593,
+          "y": 2.249
+        },
+        {
+          "x": 16.041,
+          "y": 2.249
+        },
+        {
+          "x": 16.041,
+          "y": 3.235
+        },
+        {
+          "x": 12.593,
+          "y": 3.235
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-7",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 3,
+      "position": {
+        "x": 16.161,
+        "y": 2.249,
+        "width": 1.5,
+        "height": 2
+      },
+      "polygon": [
+        {
+          "x": 16.161,
+          "y": 2.249
+        },
+        {
+          "x": 17.661,
+          "y": 2.249
+        },
+        {
+          "x": 17.661,
+          "y": 4.249
+        },
+        {
+          "x": 16.161,
+          "y": 4.249
+        }
+      ],
+      "material": "tile"
+    },
+    {
+      "id": "room-8",
+      "type": "BATHROOM",
+      "name": "욕실",
+      "area": 3.8,
+      "position": {
+        "x": 0,
+        "y": 6.492,
+        "width": 1.798,
+        "height": 2.114
+      },
+      "polygon": [
+        {
+          "x": 0,
+          "y": 6.492
+        },
+        {
+          "x": 1.798,
+          "y": 6.492
+        },
+        {
+          "x": 1.798,
+          "y": 8.606
+        },
+        {
+          "x": 0,
+          "y": 8.606
+        }
+      ],
+      "material": "tile"
+    },
+    {
+      "id": "room-9",
+      "type": "BED",
+      "name": "침실",
+      "area": 9.3,
+      "position": {
+        "x": 1.918,
+        "y": 6.492,
+        "width": 3.198,
+        "height": 2.908
+      },
+      "polygon": [
+        {
+          "x": 1.918,
+          "y": 6.492
+        },
+        {
+          "x": 5.116,
+          "y": 6.492
+        },
+        {
+          "x": 5.116,
+          "y": 9.4
+        },
+        {
+          "x": 1.918,
+          "y": 9.4
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-10",
+      "type": "BED",
+      "name": "침실",
+      "area": 8.5,
+      "position": {
+        "x": 5.236,
+        "y": 6.492,
+        "width": 2.916,
+        "height": 2.915
+      },
+      "polygon": [
+        {
+          "x": 5.236,
+          "y": 6.492
+        },
+        {
+          "x": 8.152,
+          "y": 6.492
+        },
+        {
+          "x": 8.152,
+          "y": 9.407
+        },
+        {
+          "x": 5.236,
+          "y": 9.407
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-11",
+      "type": "MASTER_BED",
+      "name": "침실",
+      "area": 12.7,
+      "position": {
+        "x": 8.272,
+        "y": 6.492,
+        "width": 3.652,
+        "height": 3.478
+      },
+      "polygon": [
+        {
+          "x": 8.272,
+          "y": 6.492
+        },
+        {
+          "x": 11.924,
+          "y": 6.492
+        },
+        {
+          "x": 11.924,
+          "y": 9.97
+        },
+        {
+          "x": 8.272,
+          "y": 9.97
+        }
+      ],
+      "material": "wood"
+    },
+    {
+      "id": "room-12",
+      "type": "BALCONY",
+      "name": "발코니",
+      "area": 21.2,
+      "position": {
+        "x": 0,
+        "y": 10.09,
+        "width": 17.661,
+        "height": 1.2
+      },
+      "polygon": [
+        {
+          "x": 0,
+          "y": 10.09
+        },
+        {
+          "x": 17.661,
+          "y": 10.09
+        },
+        {
+          "x": 17.661,
+          "y": 11.29
+        },
+        {
+          "x": 0,
+          "y": 11.29
+        }
+      ],
+      "material": "tile"
+    }
+  ],
+  "walls": [
+    {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "end": {
+        "x": 17.661,
+        "y": 0
+      },
+      "thickness": 0.2,
+      "isExterior": true,
+      "wallType": "exterior",
+      "isLoadBearing": true
+    },
+    {
+      "start": {
+        "x": 17.661,
+        "y": 0
+      },
+      "end": {
+        "x": 17.661,
+        "y": 11.29
+      },
+      "thickness": 0.2,
+      "isExterior": true,
+      "wallType": "exterior",
+      "isLoadBearing": true
+    },
+    {
+      "start": {
+        "x": 17.661,
+        "y": 11.29
+      },
+      "end": {
+        "x": 0,
+        "y": 11.29
+      },
+      "thickness": 0.2,
+      "isExterior": true,
+      "wallType": "exterior",
+      "isLoadBearing": true
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 11.29
+      },
+      "end": {
+        "x": 0,
+        "y": 0
+      },
+      "thickness": 0.2,
+      "isExterior": true,
+      "wallType": "exterior",
+      "isLoadBearing": true
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 0
+      },
+      "end": {
+        "x": 3.194,
+        "y": 0
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 3.194,
+        "y": 0
+      },
+      "end": {
+        "x": 3.194,
+        "y": 2.129
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 3.194,
+        "y": 2.129
+      },
+      "end": {
+        "x": 0,
+        "y": 2.129
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 2.129
+      },
+      "end": {
+        "x": 0,
+        "y": 0
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 2.249
+      },
+      "end": {
+        "x": 1.543,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.543,
+        "y": 2.249
+      },
+      "end": {
+        "x": 1.543,
+        "y": 4.453
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.543,
+        "y": 4.453
+      },
+      "end": {
+        "x": 0,
+        "y": 4.453
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 4.453
+      },
+      "end": {
+        "x": 0,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.663,
+        "y": 2.249
+      },
+      "end": {
+        "x": 7.023,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 7.023,
+        "y": 2.249
+      },
+      "end": {
+        "x": 7.023,
+        "y": 6.372
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 7.023,
+        "y": 6.372
+      },
+      "end": {
+        "x": 1.663,
+        "y": 6.372
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.663,
+        "y": 6.372
+      },
+      "end": {
+        "x": 1.663,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 7.143,
+        "y": 2.249
+      },
+      "end": {
+        "x": 9.9,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 9.9,
+        "y": 2.249
+      },
+      "end": {
+        "x": 9.9,
+        "y": 5.006
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 9.9,
+        "y": 5.006
+      },
+      "end": {
+        "x": 7.143,
+        "y": 5.006
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 7.143,
+        "y": 5.006
+      },
+      "end": {
+        "x": 7.143,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 10.02,
+        "y": 2.249
+      },
+      "end": {
+        "x": 11.343,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.343,
+        "y": 2.249
+      },
+      "end": {
+        "x": 11.343,
+        "y": 4.139
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.343,
+        "y": 4.139
+      },
+      "end": {
+        "x": 10.02,
+        "y": 4.139
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 10.02,
+        "y": 4.139
+      },
+      "end": {
+        "x": 10.02,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.463,
+        "y": 2.249
+      },
+      "end": {
+        "x": 12.473,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 12.473,
+        "y": 2.249
+      },
+      "end": {
+        "x": 12.473,
+        "y": 3.932
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 12.473,
+        "y": 3.932
+      },
+      "end": {
+        "x": 11.463,
+        "y": 3.932
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.463,
+        "y": 3.932
+      },
+      "end": {
+        "x": 11.463,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 12.593,
+        "y": 2.249
+      },
+      "end": {
+        "x": 16.041,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 16.041,
+        "y": 2.249
+      },
+      "end": {
+        "x": 16.041,
+        "y": 3.235
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 16.041,
+        "y": 3.235
+      },
+      "end": {
+        "x": 12.593,
+        "y": 3.235
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 12.593,
+        "y": 3.235
+      },
+      "end": {
+        "x": 12.593,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 16.161,
+        "y": 2.249
+      },
+      "end": {
+        "x": 17.661,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 17.661,
+        "y": 2.249
+      },
+      "end": {
+        "x": 17.661,
+        "y": 4.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 17.661,
+        "y": 4.249
+      },
+      "end": {
+        "x": 16.161,
+        "y": 4.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 16.161,
+        "y": 4.249
+      },
+      "end": {
+        "x": 16.161,
+        "y": 2.249
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 6.492
+      },
+      "end": {
+        "x": 1.798,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.798,
+        "y": 6.492
+      },
+      "end": {
+        "x": 1.798,
+        "y": 8.606
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.798,
+        "y": 8.606
+      },
+      "end": {
+        "x": 0,
+        "y": 8.606
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 0,
+        "y": 8.606
+      },
+      "end": {
+        "x": 0,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.918,
+        "y": 6.492
+      },
+      "end": {
+        "x": 5.116,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 5.116,
+        "y": 6.492
+      },
+      "end": {
+        "x": 5.116,
+        "y": 9.4
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 5.116,
+        "y": 9.4
+      },
+      "end": {
+        "x": 1.918,
+        "y": 9.4
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 1.918,
+        "y": 9.4
+      },
+      "end": {
+        "x": 1.918,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 5.236,
+        "y": 6.492
+      },
+      "end": {
+        "x": 8.152,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 8.152,
+        "y": 6.492
+      },
+      "end": {
+        "x": 8.152,
+        "y": 9.407
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 8.152,
+        "y": 9.407
+      },
+      "end": {
+        "x": 5.236,
+        "y": 9.407
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 5.236,
+        "y": 9.407
+      },
+      "end": {
+        "x": 5.236,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 8.272,
+        "y": 6.492
+      },
+      "end": {
+        "x": 11.924,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.924,
+        "y": 6.492
+      },
+      "end": {
+        "x": 11.924,
+        "y": 9.97
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 11.924,
+        "y": 9.97
+      },
+      "end": {
+        "x": 8.272,
+        "y": 9.97
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    },
+    {
+      "start": {
+        "x": 8.272,
+        "y": 9.97
+      },
+      "end": {
+        "x": 8.272,
+        "y": 6.492
+      },
+      "thickness": 0.12,
+      "isExterior": false,
+      "wallType": "interior",
+      "isLoadBearing": false
+    }
+  ],
+  "doors": [
+    {
+      "position": {
+        "x": 1.597,
+        "y": 0
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 0.771,
+        "y": 2.249
+      },
+      "width": 0.95,
+      "rotation": 0,
+      "type": "entrance",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 4.343,
+        "y": 2.249
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 8.521,
+        "y": 2.249
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 10.681,
+        "y": 2.249
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 11.968,
+        "y": 2.249
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 16.911,
+        "y": 2.249
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 0.899,
+        "y": 6.492
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 3.517,
+        "y": 6.492
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 6.694,
+        "y": 6.492
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    },
+    {
+      "position": {
+        "x": 10.098,
+        "y": 6.492
+      },
+      "width": 0.9,
+      "rotation": 0,
+      "type": "swing",
+      "connectedRooms": []
+    }
+  ],
+  "windows": [
+    {
+      "position": {
+        "x": 1.597,
+        "y": 2.129
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 4.343,
+        "y": 6.372
+      },
+      "width": 3,
+      "height": 2.1,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 8.521,
+        "y": 5.006
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 10.681,
+        "y": 4.139
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 16.911,
+        "y": 4.249
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 0.899,
+        "y": 8.606
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 3.517,
+        "y": 9.4
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 6.694,
+        "y": 9.407
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    },
+    {
+      "position": {
+        "x": 10.098,
+        "y": 9.97
+      },
+      "width": 1.5,
+      "height": 1.2,
+      "rotation": 0
+    }
+  ],
+  "fixtures": [
+    {
+      "type": "kitchen_sink",
+      "position": {
+        "x": 0.3,
+        "y": 0.1,
+        "width": 0.6,
+        "height": 0.5
+      },
+      "roomId": "room-0"
+    },
+    {
+      "type": "stove",
+      "position": {
+        "x": 1.2,
+        "y": 0.1,
+        "width": 0.6,
+        "height": 0.5
+      },
+      "roomId": "room-0"
+    },
+    {
+      "type": "toilet",
+      "position": {
+        "x": 16.461,
+        "y": 2.549,
+        "width": 0.4,
+        "height": 0.65
+      },
+      "roomId": "room-7"
+    },
+    {
+      "type": "sink",
+      "position": {
+        "x": 17.061,
+        "y": 2.449,
+        "width": 0.5,
+        "height": 0.45
+      },
+      "roomId": "room-7"
+    },
+    {
+      "type": "toilet",
+      "position": {
+        "x": 0.3,
+        "y": 6.792,
+        "width": 0.4,
+        "height": 0.65
+      },
+      "roomId": "room-8"
+    },
+    {
+      "type": "sink",
+      "position": {
+        "x": 1.198,
+        "y": 6.692,
+        "width": 0.5,
+        "height": 0.45
+      },
+      "roomId": "room-8"
+    }
+  ],
+  "dimensions": []
+}

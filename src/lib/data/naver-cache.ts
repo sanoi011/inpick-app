@@ -7,7 +7,7 @@
  * 캐시 데이터 생성: node scripts/cache-naver-data.mjs <cortarNo>
  */
 
-import type { NaverComplex } from "@/lib/services/naver-land-client";
+import type { NaverComplex, NaverPyeongDetail, NaverDong, NaverComplexDetail } from "@/lib/services/naver-land-client";
 import cacheData from "./naver-cache.json";
 
 // ─── Types ───
@@ -15,6 +15,23 @@ import cacheData from "./naver-cache.json";
 interface CachedRegion {
   complexes: CachedComplex[];
   fetchedAt: string;
+}
+
+interface CachedPyeong {
+  pyeongNo: number;
+  pyeongName: string;
+  exclusiveArea: number;
+  supplyArea: number;
+  roomCnt?: number;
+  bathroomCnt?: number;
+  entranceType?: string;
+  householdCountByPyeong?: number;
+  grandPlanUrl?: string;
+}
+
+interface CachedDong {
+  dongNo: string;
+  dongName: string;
 }
 
 interface CachedComplex {
@@ -27,6 +44,8 @@ interface CachedComplex {
   address: string;
   highFloor?: number;
   lowFloor?: number;
+  pyeongList?: CachedPyeong[];
+  dongList?: CachedDong[];
 }
 
 type CacheStore = Record<string, CachedRegion>;
@@ -76,6 +95,46 @@ export function findCachedComplex(
   cortarNo: string,
   buildingName?: string
 ): NaverComplex | null {
+  const matched = findCachedComplexRaw(cortarNo, buildingName);
+  return matched ? toNaverComplex(matched) : null;
+}
+
+/**
+ * 캐시된 데이터에서 단지 검색 (pyeong 포함 상세)
+ * pyeongList가 있으면 NaverComplexDetail을 반환
+ */
+export function findCachedComplexDetail(
+  cortarNo: string,
+  buildingName?: string
+): NaverComplexDetail | null {
+  const matched = findCachedComplexRaw(cortarNo, buildingName);
+  if (!matched) return null;
+
+  const complex = toNaverComplex(matched);
+  const pyeongList: NaverPyeongDetail[] = (matched.pyeongList || []).map((p) => ({
+    pyeongNo: p.pyeongNo,
+    pyeongName: p.pyeongName,
+    exclusiveArea: p.exclusiveArea,
+    supplyArea: p.supplyArea,
+    roomCnt: p.roomCnt || 0,
+    bathroomCnt: p.bathroomCnt || 0,
+    entranceType: p.entranceType || "",
+    householdCountByPyeong: p.householdCountByPyeong || 0,
+    grandPlanUrl: p.grandPlanUrl,
+  }));
+
+  const dongList: NaverDong[] = (matched.dongList || []).map((d) => ({
+    dongNo: d.dongNo,
+    dongName: d.dongName,
+  }));
+
+  return { complex, pyeongList, dongList };
+}
+
+function findCachedComplexRaw(
+  cortarNo: string,
+  buildingName?: string
+): CachedComplex | null {
   const region = cache[cortarNo];
   if (!region || !region.complexes || region.complexes.length === 0) {
     return null;
@@ -86,7 +145,7 @@ export function findCachedComplex(
   // buildingName이 없으면 단지가 1개인 경우에만 반환
   if (!buildingName) {
     if (complexes.length === 1) {
-      return toNaverComplex(complexes[0]);
+      return complexes[0];
     }
     return null;
   }
@@ -110,7 +169,7 @@ export function findCachedComplex(
     matched = complexes[0];
   }
 
-  return matched ? toNaverComplex(matched) : null;
+  return matched || null;
 }
 
 /**
