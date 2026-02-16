@@ -98,10 +98,10 @@ async function naverFetch(url: string, retries = 1): Promise<Response> {
   });
 
   if (res.status === 429 && retries > 0) {
-    // Force cookie refresh and retry after a delay
+    // Force cookie refresh and retry
     _cachedCookies = null;
     _cookieExpiresAt = 0;
-    await new Promise((r) => setTimeout(r, 2000));
+    await new Promise((r) => setTimeout(r, 500));
     return naverFetch(url, retries - 1);
   }
 
@@ -286,12 +286,8 @@ export async function findComplexByAddress(
 
     if (!matched) return null;
 
-    // 3. 상세 조회 시도 (rate limit 방지 1초 딜레이)
-    await new Promise((r) => setTimeout(r, 1000));
-    const detail = await getComplexDetail(matched.complexNo);
-    if (detail) return detail;
-
-    // 4. 상세 조회 실패 (401 등) → 목록 데이터로 폴백
+    // 3. 목록 데이터로 반환 (상세 API는 네이버 로그인 필요 → 401)
+    // pyeongList는 비어있지만, 실제 동수/세대수/층수 정보를 활용
     return {
       complex: matched,
       pyeongList: [],
