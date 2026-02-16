@@ -76,9 +76,51 @@ export async function getSampleTypes(): Promise<SampleFloorPlanType[]> {
 /** Load a specific floor plan by ID */
 export async function loadFloorPlan(id: string): Promise<ParsedFloorPlan | null> {
   try {
+    // 네이버 도면: naver-{complexNo}-{pyeongNo}
+    if (id.startsWith("naver-")) {
+      const parts = id.replace("naver-", "").split("-");
+      const complexNo = parts[0];
+      const pyeongNo = parts[1];
+      const res = await fetch(`/floorplans/naver/${complexNo}_${pyeongNo}.json`);
+      if (!res.ok) return null;
+      return await res.json();
+    }
+
     const res = await fetch(`/floorplans/${id}.json`);
     if (!res.ok) return null;
     return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+/** 도면 이미지 URL 조회 (네이버 도면 이미지 매니페스트 기반) */
+let manifestCache: FloorPlanImageEntry[] | null = null;
+
+interface FloorPlanImageEntry {
+  complexNo: string;
+  pyeongNo: number;
+  imagePath: string;
+}
+
+export async function getFloorPlanImageUrl(drawingId: string): Promise<string | null> {
+  if (!drawingId.startsWith("naver-")) return null;
+
+  try {
+    if (!manifestCache) {
+      const res = await fetch("/floorplans/images/manifest.json");
+      if (!res.ok) return null;
+      manifestCache = await res.json();
+    }
+
+    const parts = drawingId.replace("naver-", "").split("-");
+    const complexNo = parts[0];
+    const pyeongNo = parseInt(parts[1]);
+
+    const entry = manifestCache!.find(
+      (e) => e.complexNo === complexNo && e.pyeongNo === pyeongNo
+    );
+    return entry?.imagePath || null;
   } catch {
     return null;
   }

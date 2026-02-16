@@ -10,7 +10,7 @@ import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
 import ViewerToolbar from "@/components/viewer/ViewerToolbar";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import type { CameraMode } from "@/components/project/FloorPlan3D";
-import { loadFloorPlan } from "@/lib/services/drawing-service";
+import { loadFloorPlan, getFloorPlanImageUrl } from "@/lib/services/drawing-service";
 import type { RoomType } from "@/types/floorplan";
 import dynamic from "next/dynamic";
 
@@ -66,6 +66,7 @@ export default function FloorPlanPage() {
   const uploadMode = searchParams.get("mode") as "lidar" | "photo" | "hand-drawing" | "draw" | null;
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
+  const [floorPlanImageUrl, setFloorPlanImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
@@ -105,12 +106,19 @@ export default function FloorPlanPage() {
   useEffect(() => {
     if (project?.drawingId) {
       setLoadError(false);
-      loadFloorPlan(project.drawingId)
-        .then((plan) => {
+      // 도면 JSON + 이미지 URL 병렬 로드
+      Promise.all([
+        loadFloorPlan(project.drawingId),
+        getFloorPlanImageUrl(project.drawingId),
+      ])
+        .then(([plan, imageUrl]) => {
           if (plan) {
             setFloorPlan(plan);
           } else {
             setLoadError(true);
+          }
+          if (imageUrl) {
+            setFloorPlanImageUrl(imageUrl);
           }
           setLoading(false);
         })
@@ -631,13 +639,22 @@ export default function FloorPlanPage() {
             <div className="flex-1 min-h-0">
               {viewMode === "2d" ? (
                 <div className="h-full p-4 bg-gray-50">
-                  <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden">
-                    <FloorPlan2D
-                      ref={floorPlan2DRef}
-                      floorPlan={floorPlan!}
-                      className="h-full"
-                      showDimensions={showDimensions}
-                    />
+                  <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center">
+                    {floorPlanImageUrl ? (
+                      /* 네이버 도면 이미지 직접 표시 */
+                      <img
+                        src={floorPlanImageUrl}
+                        alt="평면도"
+                        className="max-w-full max-h-full object-contain"
+                      />
+                    ) : (
+                      <FloorPlan2D
+                        ref={floorPlan2DRef}
+                        floorPlan={floorPlan!}
+                        className="h-full w-full"
+                        showDimensions={showDimensions}
+                      />
+                    )}
                   </div>
                 </div>
               ) : (
