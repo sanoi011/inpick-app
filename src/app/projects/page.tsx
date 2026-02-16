@@ -262,7 +262,7 @@ export default function ProjectsPage() {
               return (
                 <button
                   key={p.id}
-                  onClick={() => router.push(`/project/${p.id}/home`)}
+                  onClick={() => router.push(`/project/${p.id}/design`)}
                   className="w-full text-left bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-sm transition-all"
                 >
                   <div className="flex items-start justify-between mb-2">

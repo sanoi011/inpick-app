@@ -8,7 +8,7 @@ export default function NewProjectPage() {
 
   useEffect(() => {
     const id = crypto.randomUUID();
-    router.replace(`/project/${id}/home`);
+    router.replace(`/project/${id}/design`);
   }, [router]);
 
   return (

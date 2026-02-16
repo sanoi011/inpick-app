@@ -9,7 +9,7 @@ export default function ProjectRedirect() {
   const projectId = params.id as string;
 
   useEffect(() => {
-    router.replace(`/project/${projectId}/home`);
+    router.replace(`/project/${projectId}/design`);
   }, [projectId, router]);
 
   return (

@@ -141,7 +141,7 @@ export async function GET(request: NextRequest) {
 
   // 4. 시뮬레이션 폴백 (개선됨)
   console.log(`[building] matched=simulated (no naver/cache/api match)`);
-  const simulated = generateSimulatedBuilding(address, buildingName || undefined);
+  const simulated = generateSimulatedBuilding();
   return NextResponse.json({ buildings: simulated, source: "simulated" });
 }
 
@@ -370,45 +370,10 @@ function parseDongBase(buildingName?: string): number {
 }
 
 /**
- * 시뮬레이션 건물 데이터 (개선: 단지명 기반 동번호 + 59/84 면적 일치)
+ * 시뮬레이션 건물 데이터 — 가상 호수 생성 제거
+ * 정확한 동/호수 정보 없이는 빈 배열 반환
  */
-function generateSimulatedBuilding(address: string, buildingName?: string): BuildingInfo[] {
-  const dongBase = parseDongBase(buildingName);
-  const dongs = [`${dongBase + 1}동`, `${dongBase + 2}동`, `${dongBase + 3}동`];
-  const unitTypes = [
-    { typeName: "59A", area: 59, supply: 84.8, rooms: 3, baths: 2, lineNum: 1, sampleId: "sample-59" },
-    { typeName: "84A", area: 84, supply: 114.5, rooms: 4, baths: 2, lineNum: 2, sampleId: "sample-84a" },
-    { typeName: "84B", area: 84, supply: 114.5, rooms: 3, baths: 2, lineNum: 3, sampleId: "sample-84b" },
-  ];
-  const sampleFloors = generateSampleFloors(25);
-
-  const buildings: BuildingInfo[] = [];
-
-  for (const dong of dongs) {
-    for (const ut of unitTypes) {
-      for (const floor of sampleFloors) {
-        const hoNum = String(floor).padStart(2, "0") + String(ut.lineNum).padStart(2, "0");
-        buildings.push({
-          id: `sim-${dong}-${floor}-${ut.lineNum}`,
-          address,
-          buildingName,
-          dongName: dong,
-          hoName: `${hoNum}호`,
-          buildingType: "아파트",
-          totalFloor: 25,
-          floor,
-          exclusiveArea: ut.area,
-          supplyArea: ut.supply,
-          roomCount: ut.rooms,
-          bathroomCount: ut.baths,
-          approvalDate: "2024-01-01",
-          floorPlanAvailable: true,
-          sampleId: ut.sampleId,
-          typeName: ut.typeName,
-        });
-      }
-    }
-  }
-
-  return buildings;
+function generateSimulatedBuilding(): BuildingInfo[] {
+  // 가상 호수 제거: 정확한 데이터 없으면 빈 배열 반환
+  return [];
 }

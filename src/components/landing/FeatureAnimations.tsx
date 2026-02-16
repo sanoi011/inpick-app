@@ -37,24 +37,24 @@ export function AIConsultAnimation() {
         const prompt = AI_PROMPTS[msgIdx % AI_PROMPTS.length];
         if (charIdx < prompt.length) {
           setCharIdx((c) => c + 1);
-          timerRef.current = setTimeout(tick, 40 + Math.random() * 30);
+          timerRef.current = setTimeout(tick, 20 + Math.random() * 15);
         } else {
           // Finish typing → add message
           setMessages((prev) => [...prev, { role: "user", text: prompt, visible: true }]);
           setCharIdx(0);
           setPhase(1);
-          timerRef.current = setTimeout(tick, 600);
+          timerRef.current = setTimeout(tick, 400);
         }
       } else if (phase === 1) {
         // AI responds one by one
         if (msgIdx < AI_RESPONSES.length) {
           setMessages((prev) => [...prev, { role: "ai", text: AI_RESPONSES[msgIdx], visible: true }]);
           setMsgIdx((i) => i + 1);
-          timerRef.current = setTimeout(tick, 700);
+          timerRef.current = setTimeout(tick, 500);
         } else {
           setPhase(2);
           setShowDesign(true);
-          timerRef.current = setTimeout(tick, 3000);
+          timerRef.current = setTimeout(tick, 2000);
         }
       } else if (phase === 2) {
         // Show design, then reset
@@ -67,10 +67,10 @@ export function AIConsultAnimation() {
         setMsgIdx(0);
         setShowDesign(false);
         setPhase(0);
-        timerRef.current = setTimeout(tick, 500);
+        timerRef.current = setTimeout(tick, 300);
       }
     };
-    timerRef.current = setTimeout(tick, 800);
+    timerRef.current = setTimeout(tick, 500);
     return () => clearTimeout(timerRef.current);
   }, [phase, charIdx, msgIdx]);
 
