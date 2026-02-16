@@ -88,7 +88,7 @@ export const KNOWN_APARTMENTS: KnownApartment[] = [
         },
       },
     ],
-    matchKeywords: ["용산4블럭", "용산4블록", "용산4BL", "대전용산", "용산동"],
+    matchKeywords: ["용산4블럭", "용산4블록", "용산4BL", "대전용산4"],
   },
 ];
 
