@@ -225,7 +225,7 @@ function generateNaverBuildings(
 
   for (const dong of dongs) {
     for (const pyeong of pyeongList) {
-      const sampleId = matchSampleId(pyeong.exclusiveArea, pyeong.roomCnt, complex.complexNo);
+      const sampleId = matchSampleId(pyeong.exclusiveArea, pyeong.roomCnt, complex.complexNo, pyeong.pyeongNo);
       const typeName = `${pyeong.pyeongName}`;
       const lineNum = pyeong.pyeongNo || (pyeongList.indexOf(pyeong) + 1);
 
@@ -343,9 +343,10 @@ function generateSampleFloors(maxFloor: number): number[] {
 
 /**
  * 전용면적 → 도면 ID 매칭 (floor-plan-map.json 기반)
+ * pyeongNo가 있으면 직접 매칭 (같은 면적 타입 구분)
  */
-function matchSampleId(exclusiveArea: number, roomCount?: number, complexNo?: string): string | undefined {
-  return findFloorPlanId(complexNo, exclusiveArea, roomCount);
+function matchSampleId(exclusiveArea: number, roomCount?: number, complexNo?: string, pyeongNo?: number): string | undefined {
+  return findFloorPlanId(complexNo, exclusiveArea, roomCount, pyeongNo);
 }
 
 /**

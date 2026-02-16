@@ -58,15 +58,31 @@ export function getComplexMapping(complexNo: string): ComplexMapping | null {
 }
 
 /**
- * complexNo + 면적으로 도면 ID 조회 (단지 전용 매핑 우선)
+ * complexNo + pyeongNo (또는 면적)으로 도면 ID 조회
+ *
+ * 매칭 우선순위:
+ *   1. complexNo + pyeongNo 직접 매칭 (가장 정확, 100% 일치)
+ *   2. complexNo + 면적 범위 매핑 (동일 면적 타입 다수 시 오차 가능)
+ *   3. 면적 범위 범용 매핑 (폴백)
  */
 export function findFloorPlanId(
   complexNo: string | undefined,
   exclusiveArea: number,
-  roomCount?: number
+  roomCount?: number,
+  pyeongNo?: number
 ): string | undefined {
-  // 1. 단지 전용 매핑 (최우선)
   if (complexNo) {
+    // 1. pyeongNo 직접 매칭 (최우선 — 같은 면적이라도 정확한 타입 구분)
+    if (pyeongNo !== undefined) {
+      const directId = `naver-${complexNo}-${pyeongNo}`;
+      const complexMap = getComplexMapping(complexNo);
+      if (complexMap) {
+        const exact = complexMap.types.find((t) => t.floorPlanId === directId);
+        if (exact) return directId;
+      }
+    }
+
+    // 2. 면적 범위 매핑 (complexNo 존재, pyeongNo 없거나 직접 매칭 실패)
     const complexMap = getComplexMapping(complexNo);
     if (complexMap) {
       const matched = complexMap.types.find(
@@ -76,7 +92,7 @@ export function findFloorPlanId(
     }
   }
 
-  // 2. 면적 범위 매핑 (범용)
+  // 3. 면적 범위 범용 매핑 (폴백)
   return findByArea(exclusiveArea, roomCount);
 }
 
