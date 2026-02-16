@@ -1,0 +1,315 @@
+{
+  "3020012000": {
+    "complexes": [
+      {
+        "complexNo": "17420",
+        "complexName": "SK허브(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 182,
+        "approvalDate": "20060103",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "13928",
+        "complexName": "가나파로스빌1(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 251,
+        "approvalDate": "20041026",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "13929",
+        "complexName": "가나파로스빌2(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 91,
+        "approvalDate": "20050310",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "25453",
+        "complexName": "경남아너스빌(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 80,
+        "approvalDate": "20050915",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17288",
+        "complexName": "경남아너스빌2차(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 104,
+        "approvalDate": "20051228",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "142785",
+        "complexName": "네이처뷰",
+        "cortarNo": "3020012000",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 687,
+        "approvalDate": "20150625",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 19,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "113124",
+        "complexName": "노은3지구영무예다음에코타운",
+        "cortarNo": "3020012000",
+        "totalDongCount": 17,
+        "totalHouseholdCount": 615,
+        "approvalDate": "20170428",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 9,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "106185",
+        "complexName": "노은리슈빌3",
+        "cortarNo": "3020012000",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 502,
+        "approvalDate": "20150521",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 31,
+        "lowFloor": 21
+      },
+      {
+        "complexNo": "107033",
+        "complexName": "노은새미래숲2단지",
+        "cortarNo": "3020012000",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 655,
+        "approvalDate": "20150804",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 19,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "107820",
+        "complexName": "노은에코힐",
+        "cortarNo": "3020012000",
+        "totalDongCount": 5,
+        "totalHouseholdCount": 356,
+        "approvalDate": "20150122",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 19,
+        "lowFloor": 17
+      },
+      {
+        "complexNo": "103356",
+        "complexName": "노은한화꿈에그린1단지",
+        "cortarNo": "3020012000",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 887,
+        "approvalDate": "20140220",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 35,
+        "lowFloor": 22
+      },
+      {
+        "complexNo": "103357",
+        "complexName": "노은한화꿈에그린2단지",
+        "cortarNo": "3020012000",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 998,
+        "approvalDate": "20140218",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 35,
+        "lowFloor": 24
+      },
+      {
+        "complexNo": "106496",
+        "complexName": "노은해랑숲마을5단지",
+        "cortarNo": "3020012000",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 518,
+        "approvalDate": "20140602",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "106497",
+        "complexName": "노은해랑숲마을6단지",
+        "cortarNo": "3020012000",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 342,
+        "approvalDate": "20140602",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "11049",
+        "complexName": "반석1단지호반리젠시빌",
+        "cortarNo": "3020012000",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 536,
+        "approvalDate": "20050218",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 25,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "11021",
+        "complexName": "반석2단지계룡리슈빌",
+        "cortarNo": "3020012000",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 561,
+        "approvalDate": "20051111",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 25,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "17472",
+        "complexName": "반석3단지호반베르디움",
+        "cortarNo": "3020012000",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 607,
+        "approvalDate": "20060224",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "112418",
+        "complexName": "수가(도시형)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 44,
+        "approvalDate": "20150129",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 6,
+        "lowFloor": 6
+      },
+      {
+        "complexNo": "108140",
+        "complexName": "씨티팰리스(도시형)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 72,
+        "approvalDate": "20131212",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 11,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "8468",
+        "complexName": "열매1단지삼부",
+        "cortarNo": "3020012000",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 516,
+        "approvalDate": "20011017",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 22,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "8469",
+        "complexName": "열매2단지한라",
+        "cortarNo": "3020012000",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 312,
+        "approvalDate": "20011224",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "6135",
+        "complexName": "열매3단지대우",
+        "cortarNo": "3020012000",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 588,
+        "approvalDate": "20001122",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "8472",
+        "complexName": "열매4단지현대",
+        "cortarNo": "3020012000",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 1084,
+        "approvalDate": "20011224",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 21,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "8473",
+        "complexName": "열매5단지운암",
+        "cortarNo": "3020012000",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 500,
+        "approvalDate": "20010602",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 22,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "6137",
+        "complexName": "열매6단지현대",
+        "cortarNo": "3020012000",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 582,
+        "approvalDate": "20001211",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "6136",
+        "complexName": "열매7단지현대",
+        "cortarNo": "3020012000",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 887,
+        "approvalDate": "20001211",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 23,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "26356",
+        "complexName": "인앤인(주상복합)",
+        "cortarNo": "3020012000",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 120,
+        "approvalDate": "20071214",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 15,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "109501",
+        "complexName": "트리풀시티포레",
+        "cortarNo": "3020012000",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 439,
+        "approvalDate": "20170626",
+        "address": "대전시 유성구 지족동",
+        "highFloor": 20,
+        "lowFloor": 15
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:02:20.969Z"
+  }
+}

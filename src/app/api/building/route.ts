@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
 import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
+import { findCachedComplex } from "@/lib/data/naver-cache";
 
 export const preferredRegion = "icn1"; // Seoul — 네이버 API 한국 IP 필요
 
@@ -28,9 +29,10 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // 2. 네이버 부동산 API (실제 평형 데이터)
+  // 2. 네이버 부동산 API (실제 평형 데이터) → 실패 시 캐시 폴백
   const cortarNo = bcode || (sigunguCd && bjdongCd ? sigunguCd + bjdongCd : "");
   if (cortarNo && cortarNo.length >= 5) {
+    // 2a. Try live Naver API first
     try {
       const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
       if (naverDetail) {
@@ -53,7 +55,22 @@ export async function GET(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error("Naver Land API error:", err instanceof Error ? err.message : err);
+      console.error("Naver Land API error (will try cache):", err instanceof Error ? err.message : err);
+    }
+
+    // 2b. Fallback to cached Naver data (for Vercel cloud IP blocking)
+    try {
+      const cachedComplex = findCachedComplex(cortarNo, buildingName || undefined);
+      if (cachedComplex) {
+        const buildings = generateNaverPartialBuildings(cachedComplex, address, buildingName || undefined);
+        return NextResponse.json({
+          buildings,
+          source: "naver_land_cache",
+          complexName: cachedComplex.complexName,
+        });
+      }
+    } catch (err) {
+      console.error("Naver cache lookup error:", err instanceof Error ? err.message : err);
     }
   }
 
