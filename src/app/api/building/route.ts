@@ -339,12 +339,15 @@ function generateNaverPartialBuildings(
 }
 
 /**
- * 최고층 기반 대표 샘플 층수 생성
- * 대표 1개 층만 반환 (중간층) — 가상 호수 수 최소화
+ * 최고층 기반 대표 샘플 층수 생성 (저/중/고 3개층)
  */
 function generateSampleFloors(maxFloor: number): number[] {
-  const mid = Math.min(Math.ceil(maxFloor / 2), maxFloor);
-  return [mid];
+  if (maxFloor <= 3) return [2];
+  if (maxFloor <= 10) return [3, Math.ceil(maxFloor / 2), maxFloor - 1];
+  const low = Math.max(3, Math.ceil(maxFloor * 0.15));
+  const mid = Math.ceil(maxFloor / 2);
+  const high = Math.min(maxFloor - 1, Math.floor(maxFloor * 0.85));
+  return [low, mid, high];
 }
 
 /**

@@ -82,8 +82,18 @@ export async function loadFloorPlan(id: string): Promise<ParsedFloorPlan | null>
       const complexNo = parts[0];
       const pyeongNo = parts[1];
       const naverRes = await fetch(`/floorplans/naver/${complexNo}_${pyeongNo}.json`);
-      if (naverRes.ok) return await naverRes.json();
-      // 폴백: 면적 기반 샘플 도면
+      if (naverRes.ok) {
+        const plan: ParsedFloorPlan = await naverRes.json();
+        // 벽 데이터가 있으면 그대로 사용 (고품질 도면)
+        if (plan.walls && plan.walls.length > 0) return plan;
+        // 벽 데이터 없으면 면적 기반 샘플 도면으로 폴백 (건축도면 품질)
+        const area = plan.totalArea || 84;
+        const sampleId = area <= 70 ? "sample-59" : "sample-84a";
+        const sampleRes = await fetch(`/floorplans/${sampleId}.json`);
+        if (sampleRes.ok) return await sampleRes.json();
+        // 샘플도 실패하면 naver 원본이라도 사용
+        return plan;
+      }
       return null;
     }
 
