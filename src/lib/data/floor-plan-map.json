@@ -1,0 +1,56 @@
+{
+  "version": "1.0",
+  "updatedAt": "2026-02-16T00:00:00.000Z",
+  "description": "아파트 단지별 도면 매핑. complexNo 또는 면적 범위로 도면 자동 매칭.",
+
+  "complexMappings": {
+    "comment": "complexNo → 해당 단지 전용 도면 매핑 (추후 확장)",
+    "mappings": {}
+  },
+
+  "areaMappings": [
+    {
+      "id": "type-59",
+      "label": "59㎡ (18평형)",
+      "areaMin": 55,
+      "areaMax": 65,
+      "floorPlanId": "sample-59",
+      "roomCount": 3,
+      "bathroomCount": 2,
+      "description": "소형 확장형, 방 3개, 욕실 2개"
+    },
+    {
+      "id": "type-84a",
+      "label": "84A㎡ (25평형)",
+      "areaMin": 80,
+      "areaMax": 90,
+      "floorPlanId": "sample-84a",
+      "roomCount": 4,
+      "bathroomCount": 2,
+      "description": "중형 A타입, 방 4개, 욕실 2개, 드레스룸"
+    },
+    {
+      "id": "type-84b",
+      "label": "84B㎡ (25평형)",
+      "areaMin": 80,
+      "areaMax": 90,
+      "floorPlanId": "sample-84b",
+      "roomCount": 3,
+      "bathroomCount": 2,
+      "description": "중형 B타입, 방 3개, 욕실 2개, 넓은 거실"
+    }
+  ],
+
+  "pendingTypes": [
+    {
+      "comment": "추후 도면 확보 시 areaMappings에 추가",
+      "types": [
+        { "label": "39㎡ (12평형)", "areaRange": "35-45", "status": "도면 미확보" },
+        { "label": "49㎡ (15평형)", "areaRange": "45-55", "status": "도면 미확보" },
+        { "label": "74㎡ (22평형)", "areaRange": "70-80", "status": "도면 미확보" },
+        { "label": "101㎡ (30평형)", "areaRange": "95-110", "status": "도면 미확보" },
+        { "label": "114㎡ (34평형)", "areaRange": "110-120", "status": "도면 미확보" }
+      ]
+    }
+  ]
+}

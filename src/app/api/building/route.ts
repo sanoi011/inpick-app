@@ -3,6 +3,7 @@ import type { BuildingInfo } from "@/types/address";
 import { findKnownApartment, type KnownApartment } from "@/lib/data/apartment-seed";
 import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
 import { findCachedComplex } from "@/lib/data/naver-cache";
+import { findFloorPlanId } from "@/lib/data/floor-plan-map";
 
 export const preferredRegion = "icn1"; // Seoul — 네이버 API 한국 IP 필요
 
@@ -208,7 +209,7 @@ function generateNaverBuildings(
 
   for (const dong of dongs) {
     for (const pyeong of pyeongList) {
-      const sampleId = matchSampleId(pyeong.exclusiveArea);
+      const sampleId = matchSampleId(pyeong.exclusiveArea, pyeong.roomCnt, complex.complexNo);
       const typeName = `${pyeong.pyeongName}`;
       const lineNum = pyeong.pyeongNo || (pyeongList.indexOf(pyeong) + 1);
 
@@ -319,12 +320,10 @@ function generateSampleFloors(maxFloor: number): number[] {
 }
 
 /**
- * 전용면적 → 가장 가까운 샘플 도면 ID 매칭
+ * 전용면적 → 도면 ID 매칭 (floor-plan-map.json 기반)
  */
-function matchSampleId(exclusiveArea: number): string | undefined {
-  if (exclusiveArea >= 55 && exclusiveArea <= 65) return "sample-59";
-  if (exclusiveArea >= 80 && exclusiveArea <= 90) return "sample-84a";
-  return undefined;
+function matchSampleId(exclusiveArea: number, roomCount?: number, complexNo?: string): string | undefined {
+  return findFloorPlanId(complexNo, exclusiveArea, roomCount);
 }
 
 /**
