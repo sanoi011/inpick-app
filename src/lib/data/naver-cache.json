@@ -1,4 +1,1664 @@
 {
+  "3020010100": {
+    "complexes": [
+      {
+        "complexNo": "139483",
+        "complexName": "도시형(도시형)",
+        "cortarNo": "3020010100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20110601",
+        "address": "대전시 유성구 원내동",
+        "highFloor": 5,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "136103",
+        "complexName": "동양팰리스",
+        "cortarNo": "3020010100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 8,
+        "approvalDate": "20150102",
+        "address": "대전시 유성구 원내동",
+        "highFloor": 5,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "6165",
+        "complexName": "샘물타운",
+        "cortarNo": "3020010100",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 784,
+        "approvalDate": "19961207",
+        "address": "대전시 유성구 원내동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "6172",
+        "complexName": "진잠타운",
+        "cortarNo": "3020010100",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 1320,
+        "approvalDate": "19951029",
+        "address": "대전시 유성구 원내동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6170",
+        "complexName": "한아름",
+        "cortarNo": "3020010100",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 864,
+        "approvalDate": "19981030",
+        "address": "대전시 유성구 원내동",
+        "highFloor": 15,
+        "lowFloor": 14
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:41.057Z"
+  },
+  "3020010200": {
+    "complexes": [
+      {
+        "complexNo": "19623",
+        "complexName": "미메이드",
+        "cortarNo": "3020010200",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 737,
+        "approvalDate": "20061130",
+        "address": "대전시 유성구 교촌동",
+        "highFloor": 20,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "23188",
+        "complexName": "제이파크",
+        "cortarNo": "3020010200",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 405,
+        "approvalDate": "20050818",
+        "address": "대전시 유성구 교촌동",
+        "highFloor": 15,
+        "lowFloor": 9
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:44.332Z"
+  },
+  "3020010300": {
+    "complexes": [
+      {
+        "complexNo": "26501",
+        "complexName": "대전드리움1단지",
+        "cortarNo": "3020010300",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 676,
+        "approvalDate": "20040809",
+        "address": "대전시 유성구 대정동",
+        "highFloor": 15,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17589",
+        "complexName": "대전드리움2단지",
+        "cortarNo": "3020010300",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 600,
+        "approvalDate": "20060314",
+        "address": "대전시 유성구 대정동",
+        "highFloor": 15,
+        "lowFloor": 10
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:58.875Z"
+  },
+  "3020010400": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:37.917Z"
+  },
+  "3020010500": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:59.785Z"
+  },
+  "3020010600": {
+    "complexes": [
+      {
+        "complexNo": "100352",
+        "complexName": "대전학하지구오투그란데미학",
+        "cortarNo": "3020010600",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 1000,
+        "approvalDate": "20111017",
+        "address": "대전시 유성구 계산동",
+        "highFloor": 25,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "111335",
+        "complexName": "유성오투그란데리빙포레",
+        "cortarNo": "3020010600",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 778,
+        "approvalDate": "20180628",
+        "address": "대전시 유성구 계산동",
+        "highFloor": 29,
+        "lowFloor": 24
+      },
+      {
+        "complexNo": "100350",
+        "complexName": "학하리슈빌학의뜰",
+        "cortarNo": "3020010600",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 704,
+        "approvalDate": "20110829",
+        "address": "대전시 유성구 계산동",
+        "highFloor": 25,
+        "lowFloor": 19
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:41.129Z"
+  },
+  "3020010700": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:19.602Z"
+  },
+  "3020010800": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:21.130Z"
+  },
+  "3020010900": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:24.885Z"
+  },
+  "3020011000": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:09.798Z"
+  },
+  "3020011100": {
+    "complexes": [
+      {
+        "complexNo": "107638",
+        "complexName": "K타운(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 299,
+        "approvalDate": "20150115",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "25636",
+        "complexName": "그랑펠리체(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 65,
+        "approvalDate": "20061201",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "161590",
+        "complexName": "글램타워",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 1,
+        "approvalDate": "20121211",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "107689",
+        "complexName": "글램타워(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20121211",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "123589",
+        "complexName": "까사보니타(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 11,
+        "approvalDate": "20160504",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "117009",
+        "complexName": "나이스타운12차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 84,
+        "approvalDate": "20170317",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "114502",
+        "complexName": "나이스팰리스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 160,
+        "approvalDate": "20161130",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "24400",
+        "complexName": "노블레스2(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 88,
+        "approvalDate": "20051118",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 12,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "24405",
+        "complexName": "노블레스3(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 88,
+        "approvalDate": "20060329",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "24403",
+        "complexName": "노블레스타워(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 168,
+        "approvalDate": "20060605",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 24,
+        "lowFloor": 24
+      },
+      {
+        "complexNo": "136623",
+        "complexName": "다온스테이(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20191114",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "114943",
+        "complexName": "더그린(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 96,
+        "approvalDate": "20170221",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "100360",
+        "complexName": "도안6단지센트럴시티",
+        "cortarNo": "3020011100",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 854,
+        "approvalDate": "20101011",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 25,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "103763",
+        "complexName": "도안신도시7단지예미지백조의호수",
+        "cortarNo": "3020011100",
+        "totalDongCount": 15,
+        "totalHouseholdCount": 1102,
+        "approvalDate": "20140612",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 25,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "127794",
+        "complexName": "라온팰리스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 80,
+        "approvalDate": "20191025",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 12,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "106771",
+        "complexName": "레자미3차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 299,
+        "approvalDate": "20130516",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "130350",
+        "complexName": "레자미리버뷰시티(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 131,
+        "approvalDate": "20200407",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "109617",
+        "complexName": "레자미멀티홈",
+        "cortarNo": "3020011100",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 159,
+        "approvalDate": "20161201",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 20,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "148509",
+        "complexName": "레자미탐앤탐(민간임대,도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 156,
+        "approvalDate": "20220516",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 16,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "107301",
+        "complexName": "리베라아이누리(445-4,도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 293,
+        "approvalDate": "20131031",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "104266",
+        "complexName": "리베라아이누리(448-5,도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 254,
+        "approvalDate": "20111229",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "111588",
+        "complexName": "모나빌(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 64,
+        "approvalDate": "20150812",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 12,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "131497",
+        "complexName": "모나빌3(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 112,
+        "approvalDate": "20200409",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "121172",
+        "complexName": "모나빌Ⅱ(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 72,
+        "approvalDate": "20171212",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "23043",
+        "complexName": "미성샤르망(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 210,
+        "approvalDate": "20060427",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "103846",
+        "complexName": "베르디움",
+        "cortarNo": "3020011100",
+        "totalDongCount": 16,
+        "totalHouseholdCount": 970,
+        "approvalDate": "20140210",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 25,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "109356",
+        "complexName": "벨포스3차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 25,
+        "approvalDate": "20141117",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "111663",
+        "complexName": "벨포스토2차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 16,
+        "approvalDate": "20140109",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "169940",
+        "complexName": "벨포스토6(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 15,
+        "approvalDate": "20171227",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "183239",
+        "complexName": "벨포스토7차(도시형,민간임대)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 10,
+        "approvalDate": "20180725",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "183240",
+        "complexName": "벨포스토7차(민간임대,주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 1,
+        "approvalDate": "20180725",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "119871",
+        "complexName": "벨포스토Ⅴ(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 20,
+        "approvalDate": "20170524",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "122112",
+        "complexName": "벨포스토네번째이야기(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 35,
+        "approvalDate": "20160819",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "111693",
+        "complexName": "벨포스토아름다운곳(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 14,
+        "approvalDate": "20130829",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "111498",
+        "complexName": "봉명나이스타운11차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20151221",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "22594",
+        "complexName": "봉명시티빌(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 160,
+        "approvalDate": "20040702",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "105956",
+        "complexName": "봉명정한드리미아(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 240,
+        "approvalDate": "20121107",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "142190",
+        "complexName": "비타민하우스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20120202",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "103597",
+        "complexName": "사이언스타운(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 180,
+        "approvalDate": "20130924",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 35,
+        "lowFloor": 27
+      },
+      {
+        "complexNo": "123431",
+        "complexName": "세종타운(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 42,
+        "approvalDate": "20120223",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "107265",
+        "complexName": "솔리안(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 146,
+        "approvalDate": "20130208",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "109444",
+        "complexName": "스카이뷰",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 112,
+        "approvalDate": "20131115",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "108959",
+        "complexName": "스카이뷰로드(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 198,
+        "approvalDate": "20150213",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "111800",
+        "complexName": "스카이뷰리버(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 143,
+        "approvalDate": "20160128",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "119794",
+        "complexName": "스카이뷰시티(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 299,
+        "approvalDate": "20180201",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "111354",
+        "complexName": "스톤빌(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 54,
+        "approvalDate": "20151127",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "108612",
+        "complexName": "신영미소랑(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 112,
+        "approvalDate": "20120110",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "110033",
+        "complexName": "아트하우스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 41,
+        "approvalDate": "20110902",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "118832",
+        "complexName": "에이스타운3차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 68,
+        "approvalDate": "20161125",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "119950",
+        "complexName": "에이스타운4차(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 162,
+        "approvalDate": "20180213",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "110530",
+        "complexName": "에이스타운Ⅱ(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 54,
+        "approvalDate": "20150225",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "111694",
+        "complexName": "에코빌1차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 24,
+        "approvalDate": "20140116",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "111695",
+        "complexName": "에코빌2차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 21,
+        "approvalDate": "20150102",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "123432",
+        "complexName": "엔젤타운(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 42,
+        "approvalDate": "20130207",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "118089",
+        "complexName": "엔터팰리스1차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 299,
+        "approvalDate": "20190724",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 20,
+        "lowFloor": 20
+      },
+      {
+        "complexNo": "118090",
+        "complexName": "엔터팰리스2차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 130,
+        "approvalDate": "20180710",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "111700",
+        "complexName": "엘도라도(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 42,
+        "approvalDate": "20120613",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "164358",
+        "complexName": "원플러스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 65,
+        "approvalDate": "20240102",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "25637",
+        "complexName": "위드리버(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 66,
+        "approvalDate": "20041117",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 3
+      },
+      {
+        "complexNo": "25131",
+        "complexName": "유성CJ나인파크(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 168,
+        "approvalDate": "20080111",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 27,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "105329",
+        "complexName": "유성세움펠리피아(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 298,
+        "approvalDate": "20140728",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 24,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "23980",
+        "complexName": "유성온천훼미리타운(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 110,
+        "approvalDate": "20050228",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "26929",
+        "complexName": "유성자이(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 350,
+        "approvalDate": "20101028",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 39,
+        "lowFloor": 31
+      },
+      {
+        "complexNo": "108063",
+        "complexName": "유성캠퍼스타워(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 99,
+        "approvalDate": "20100712",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 12,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "104227",
+        "complexName": "유성푸르지오시티(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 299,
+        "approvalDate": "20140807",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 29,
+        "lowFloor": 24
+      },
+      {
+        "complexNo": "108599",
+        "complexName": "이신팰리스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 96,
+        "approvalDate": "20140619",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "107306",
+        "complexName": "좋은하루3차(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 140,
+        "approvalDate": "20130510",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "23002",
+        "complexName": "투유1차(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 132,
+        "approvalDate": "20041116",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 13,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "22984",
+        "complexName": "투유2차(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 138,
+        "approvalDate": "20041117",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 11,
+        "lowFloor": 3
+      },
+      {
+        "complexNo": "139566",
+        "complexName": "트리플타운(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 19,
+        "approvalDate": "20160414",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "127038",
+        "complexName": "플러스빌리지(주상복합)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 8,
+        "approvalDate": "20100913",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 5,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "144968",
+        "complexName": "하늘빛하우스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 22,
+        "approvalDate": "20130201",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "104789",
+        "complexName": "하이랜드2(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 149,
+        "approvalDate": "20111017",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "108629",
+        "complexName": "하이랜드Ⅰ(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 143,
+        "approvalDate": "20110419",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "107996",
+        "complexName": "하이랜드Ⅲ(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 63,
+        "approvalDate": "20120515",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 8,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "108446",
+        "complexName": "한솔타운",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 28,
+        "approvalDate": "20140605",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "166717",
+        "complexName": "해나래",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 1,
+        "approvalDate": "20200204",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "128632",
+        "complexName": "해나래(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 143,
+        "approvalDate": "20200204",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "131949",
+        "complexName": "휴안팰리스(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 83,
+        "approvalDate": "20200515",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 6
+      },
+      {
+        "complexNo": "107872",
+        "complexName": "힐링타운(도시형)",
+        "cortarNo": "3020011100",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 56,
+        "approvalDate": "20140116",
+        "address": "대전시 유성구 봉명동",
+        "highFloor": 9,
+        "lowFloor": 9
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:14.343Z"
+  },
+  "3020011200": {
+    "complexes": [
+      {
+        "complexNo": "11876",
+        "complexName": "구암",
+        "cortarNo": "3020011200",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 38,
+        "approvalDate": "19940719",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 6,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "11351",
+        "complexName": "구암조선",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 79,
+        "approvalDate": "19970523",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 9,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "145356",
+        "complexName": "벨포스토(도시형)",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 24,
+        "approvalDate": "20120326",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "128784",
+        "complexName": "삼영아트빌",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 17,
+        "approvalDate": "20031229",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 10,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "188238",
+        "complexName": "삼오",
+        "cortarNo": "3020011200",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 24,
+        "approvalDate": "19790828",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 3,
+        "lowFloor": 3
+      },
+      {
+        "complexNo": "13169",
+        "complexName": "삼정하이츠",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 150,
+        "approvalDate": "19911217",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "12822",
+        "complexName": "세원",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 19,
+        "approvalDate": "19980624",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 5,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "127757",
+        "complexName": "스카이뷰리브(도시형)",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 99,
+        "approvalDate": "20191014",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 9,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "6091",
+        "complexName": "우성햇살",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 136,
+        "approvalDate": "19930424",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 18,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "13382",
+        "complexName": "유성타워(주상복합)",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 59,
+        "approvalDate": "19961227",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "6092",
+        "complexName": "초롱마을",
+        "cortarNo": "3020011200",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 205,
+        "approvalDate": "199502",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 15,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "120561",
+        "complexName": "현대아트빌",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 18,
+        "approvalDate": "20001223",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "104920",
+        "complexName": "희상원",
+        "cortarNo": "3020011200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 19,
+        "approvalDate": "20091030",
+        "address": "대전시 유성구 구암동",
+        "highFloor": 8,
+        "lowFloor": 7
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:48.760Z"
+  },
+  "3020011300": {
+    "complexes": [
+      {
+        "complexNo": "26407",
+        "complexName": "운암네오미아",
+        "cortarNo": "3020011300",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 544,
+        "approvalDate": "20100528",
+        "address": "대전시 유성구 덕명동",
+        "highFloor": 23,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "114450",
+        "complexName": "유성숲오투그란데3차",
+        "cortarNo": "3020011300",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 662,
+        "approvalDate": "20191022",
+        "address": "대전시 유성구 덕명동",
+        "highFloor": 29,
+        "lowFloor": 25
+      },
+      {
+        "complexNo": "26408",
+        "complexName": "하우스토리",
+        "cortarNo": "3020011300",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 474,
+        "approvalDate": "20100528",
+        "address": "대전시 유성구 덕명동",
+        "highFloor": 23,
+        "lowFloor": 15
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:00.654Z"
+  },
+  "3020011400": {
+    "complexes": [
+      {
+        "complexNo": "136785",
+        "complexName": "갑천1트리풀시티힐스테이트",
+        "cortarNo": "3020011400",
+        "totalDongCount": 18,
+        "totalHouseholdCount": 1116,
+        "approvalDate": "20231006",
+        "address": "대전시 유성구 원신흥동",
+        "highFloor": 20,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "153818",
+        "complexName": "갑천2트리풀시티엘리프",
+        "cortarNo": "3020011400",
+        "totalDongCount": 15,
+        "totalHouseholdCount": 936,
+        "approvalDate": "20251030",
+        "address": "대전시 유성구 원신흥동",
+        "highFloor": 20,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "107699",
+        "complexName": "양우내안애레이크힐",
+        "cortarNo": "3020011400",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 500,
+        "approvalDate": "20151012",
+        "address": "대전시 유성구 원신흥동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "102411",
+        "complexName": "어울림하트",
+        "cortarNo": "3020011400",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 1056,
+        "approvalDate": "20111019",
+        "address": "대전시 유성구 원신흥동",
+        "highFloor": 25,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "102738",
+        "complexName": "인스빌리베라",
+        "cortarNo": "3020011400",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 540,
+        "approvalDate": "20120717",
+        "address": "대전시 유성구 원신흥동",
+        "highFloor": 30,
+        "lowFloor": 20
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:43.025Z"
+  },
+  "3020011500": {
+    "complexes": [
+      {
+        "complexNo": "125316",
+        "complexName": "대전아이파크시티1단지",
+        "cortarNo": "3020011500",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 1254,
+        "approvalDate": "20211029",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 34,
+        "lowFloor": 20
+      },
+      {
+        "complexNo": "125317",
+        "complexName": "대전아이파크시티2단지",
+        "cortarNo": "3020011500",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 1306,
+        "approvalDate": "20211029",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 35,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "103949",
+        "complexName": "도안신도시5블록트리풀시티",
+        "cortarNo": "3020011500",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 1220,
+        "approvalDate": "20140627",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 25,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "27629",
+        "complexName": "도안신도시9BL트리풀시티",
+        "cortarNo": "3020011500",
+        "totalDongCount": 24,
+        "totalHouseholdCount": 1828,
+        "approvalDate": "20111117",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 30,
+        "lowFloor": 1
+      },
+      {
+        "complexNo": "100581",
+        "complexName": "도안신도시한라비발디",
+        "cortarNo": "3020011500",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 752,
+        "approvalDate": "20110615",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 28,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6132",
+        "complexName": "목련1단지",
+        "cortarNo": "3020011500",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 255,
+        "approvalDate": "20001124",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 19,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "6133",
+        "complexName": "목련2단지",
+        "cortarNo": "3020011500",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 222,
+        "approvalDate": "20001124",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 19,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "11874",
+        "complexName": "이지",
+        "cortarNo": "3020011500",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 119,
+        "approvalDate": "20021220",
+        "address": "대전시 유성구 상대동",
+        "highFloor": 15,
+        "lowFloor": 14
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:17.957Z"
+  },
+  "3020011600": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:12.973Z"
+  },
+  "3020011700": {
+    "complexes": [
+      {
+        "complexNo": "17424",
+        "complexName": "갤러리빌II(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 147,
+        "approvalDate": "20040130",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 14,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "19011",
+        "complexName": "갤러리빌III(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 33,
+        "approvalDate": "20040603",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 8,
+        "lowFloor": 6
+      },
+      {
+        "complexNo": "6134",
+        "complexName": "드림월드",
+        "cortarNo": "3020011700",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 592,
+        "approvalDate": "20020419",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 15,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "107441",
+        "complexName": "머니빌(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 19,
+        "approvalDate": "20071205",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 11,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "25397",
+        "complexName": "성원상떼빌",
+        "cortarNo": "3020011700",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 136,
+        "approvalDate": "20041228",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "102674",
+        "complexName": "세이빌",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 6,
+        "approvalDate": "20061011",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 7,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "106171",
+        "complexName": "아름",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 70,
+        "approvalDate": "20020724",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "17421",
+        "complexName": "아이빌(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 131,
+        "approvalDate": "20031128",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 13,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "103162",
+        "complexName": "아인스빌(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 19,
+        "approvalDate": "20060629",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 12,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "8766",
+        "complexName": "월드컵패밀리타운",
+        "cortarNo": "3020011700",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 556,
+        "approvalDate": "20020419",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 22,
+        "lowFloor": 19
+      },
+      {
+        "complexNo": "116934",
+        "complexName": "장대(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 8,
+        "approvalDate": "20050927",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "118232",
+        "complexName": "장대시티빌(주상복합)",
+        "cortarNo": "3020011700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 24,
+        "approvalDate": "20031125",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 7,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "19341",
+        "complexName": "장대푸르지오",
+        "cortarNo": "3020011700",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 562,
+        "approvalDate": "20061227",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 15,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "23652",
+        "complexName": "한일유앤아이",
+        "cortarNo": "3020011700",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 111,
+        "approvalDate": "20050826",
+        "address": "대전시 유성구 장대동",
+        "highFloor": 15,
+        "lowFloor": 11
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:48.794Z"
+  },
+  "3020011800": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:39.225Z"
+  },
+  "3020011900": {
+    "complexes": [
+      {
+        "complexNo": "13930",
+        "complexName": "노은노블레스(주상복합)",
+        "cortarNo": "3020011900",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 48,
+        "approvalDate": "20040715",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "14105",
+        "complexName": "노은스타돔(주상복합)",
+        "cortarNo": "3020011900",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 247,
+        "approvalDate": "20051124",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "16730",
+        "complexName": "노은시티빌(메가시티,주상복합)",
+        "cortarNo": "3020011900",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 196,
+        "approvalDate": "",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "17766",
+        "complexName": "노은카운티스",
+        "cortarNo": "3020011900",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 112,
+        "approvalDate": "20040730",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 4,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "15201",
+        "complexName": "베르디아망(주상복합)",
+        "cortarNo": "3020011900",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 40,
+        "approvalDate": "20031013",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 14,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "8477",
+        "complexName": "열매11단지리슈빌",
+        "cortarNo": "3020011900",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 635,
+        "approvalDate": "20030925",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 18,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "6080",
+        "complexName": "열매8단지새미래",
+        "cortarNo": "3020011900",
+        "totalDongCount": 16,
+        "totalHouseholdCount": 814,
+        "approvalDate": "20010522",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 25,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "8475",
+        "complexName": "열매9단지금성백조",
+        "cortarNo": "3020011900",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 646,
+        "approvalDate": "20020821",
+        "address": "대전시 유성구 노은동",
+        "highFloor": 20,
+        "lowFloor": 16
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:55.583Z"
+  },
   "3020012000": {
     "complexes": [
       {
@@ -311,5 +1971,967 @@
       }
     ],
     "fetchedAt": "2026-02-16T02:02:20.969Z"
+  },
+  "3020012100": {
+    "complexes": [
+      {
+        "complexNo": "107708",
+        "complexName": "죽동금성백조예미지",
+        "cortarNo": "3020012100",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 998,
+        "approvalDate": "20160519",
+        "address": "대전시 유성구 죽동",
+        "highFloor": 30,
+        "lowFloor": 17
+      },
+      {
+        "complexNo": "108785",
+        "complexName": "죽동대원칸타빌",
+        "cortarNo": "3020012100",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 1132,
+        "approvalDate": "20170426",
+        "address": "대전시 유성구 죽동",
+        "highFloor": 33,
+        "lowFloor": 16
+      },
+      {
+        "complexNo": "145404",
+        "complexName": "죽동천년나무5단지",
+        "cortarNo": "3020012100",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 492,
+        "approvalDate": "20160509",
+        "address": "대전시 유성구 죽동",
+        "highFloor": 21,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "106692",
+        "complexName": "죽동푸르지오",
+        "cortarNo": "3020012100",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 638,
+        "approvalDate": "20150608",
+        "address": "대전시 유성구 죽동",
+        "highFloor": 26,
+        "lowFloor": 19
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:53.385Z"
+  },
+  "3020012200": {
+    "complexes": [
+      {
+        "complexNo": "6138",
+        "complexName": "다솔",
+        "cortarNo": "3020012200",
+        "totalDongCount": 4,
+        "totalHouseholdCount": 172,
+        "approvalDate": "19950113",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 12,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "104949",
+        "complexName": "래자미(도시형)",
+        "cortarNo": "3020012200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 100,
+        "approvalDate": "20111129",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 9,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "146903",
+        "complexName": "리버스토리(도시형)",
+        "cortarNo": "3020012200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 76,
+        "approvalDate": "20220210",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 11,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "150777",
+        "complexName": "시티팰리스(101동,도시형)",
+        "cortarNo": "3020012200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 146,
+        "approvalDate": "20220728",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 11,
+        "lowFloor": 3
+      },
+      {
+        "complexNo": "157323",
+        "complexName": "와이즈빌(도시형)",
+        "cortarNo": "3020012200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 30,
+        "approvalDate": "20091023",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 8,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "6139",
+        "complexName": "자연",
+        "cortarNo": "3020012200",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 199,
+        "approvalDate": "19981022",
+        "address": "대전시 유성구 궁동",
+        "highFloor": 18,
+        "lowFloor": 13
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:50.635Z"
+  },
+  "3020012300": {
+    "complexes": [
+      {
+        "complexNo": "6041",
+        "complexName": "한빛",
+        "cortarNo": "3020012300",
+        "totalDongCount": 34,
+        "totalHouseholdCount": 3144,
+        "approvalDate": "19921219",
+        "address": "대전시 유성구 어은동",
+        "highFloor": 18,
+        "lowFloor": 10
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:34.442Z"
+  },
+  "3020012400": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:46.902Z"
+  },
+  "3020012500": {
+    "complexes": [
+      {
+        "complexNo": "6147",
+        "complexName": "대림두레",
+        "cortarNo": "3020012500",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 840,
+        "approvalDate": "19930327",
+        "address": "대전시 유성구 신성동",
+        "highFloor": 15,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "6149",
+        "complexName": "럭키하나",
+        "cortarNo": "3020012500",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 720,
+        "approvalDate": "19930115",
+        "address": "대전시 유성구 신성동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6158",
+        "complexName": "삼성한울",
+        "cortarNo": "3020012500",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 814,
+        "approvalDate": "19921219",
+        "address": "대전시 유성구 신성동",
+        "highFloor": 18,
+        "lowFloor": 13
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:31.917Z"
+  },
+  "3020012600": {
+    "complexes": [
+      {
+        "complexNo": "122872",
+        "complexName": "도룡포레미소지움",
+        "cortarNo": "3020012600",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 232,
+        "approvalDate": "20200804",
+        "address": "대전시 유성구 가정동",
+        "highFloor": 12,
+        "lowFloor": 9
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:37.846Z"
+  },
+  "3020012700": {
+    "complexes": [
+      {
+        "complexNo": "114281",
+        "complexName": "가온하이츠빌(도시형)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 24,
+        "approvalDate": "20140718",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 2
+      },
+      {
+        "complexNo": "109716",
+        "complexName": "더포엠2(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 24,
+        "approvalDate": "20051112",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "18568",
+        "complexName": "더포엠I(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 42,
+        "approvalDate": "20051112",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 8,
+        "lowFloor": 8
+      },
+      {
+        "complexNo": "114293",
+        "complexName": "도룡SK뷰",
+        "cortarNo": "3020012700",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 383,
+        "approvalDate": "20180827",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 12,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "26339",
+        "complexName": "도룡로덴하우스",
+        "cortarNo": "3020012700",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 68,
+        "approvalDate": "20091026",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 6
+      },
+      {
+        "complexNo": "13870",
+        "complexName": "로얄밸리(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 53,
+        "approvalDate": "20040923",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "101298",
+        "complexName": "스마트시티2단지(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 357,
+        "approvalDate": "20081226",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 39,
+        "lowFloor": 20
+      },
+      {
+        "complexNo": "23993",
+        "complexName": "스마트시티5단지(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 351,
+        "approvalDate": "20081226",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 39,
+        "lowFloor": 20
+      },
+      {
+        "complexNo": "128217",
+        "complexName": "스타빌플러스(도시형)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 150,
+        "approvalDate": "20191213",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 12,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "9343",
+        "complexName": "연구원현대",
+        "cortarNo": "3020012700",
+        "totalDongCount": 3,
+        "totalHouseholdCount": 150,
+        "approvalDate": "19891012",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 9
+      },
+      {
+        "complexNo": "10948",
+        "complexName": "우성",
+        "cortarNo": "3020012700",
+        "totalDongCount": 2,
+        "totalHouseholdCount": 55,
+        "approvalDate": "19890613",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 5,
+        "lowFloor": 5
+      },
+      {
+        "complexNo": "24893",
+        "complexName": "타워코리아나(주상복합)",
+        "cortarNo": "3020012700",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 42,
+        "approvalDate": "20051216",
+        "address": "대전시 유성구 도룡동",
+        "highFloor": 10,
+        "lowFloor": 10
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:03.589Z"
+  },
+  "3020012800": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:49.969Z"
+  },
+  "3020012900": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:11.202Z"
+  },
+  "3020013000": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:21:01.662Z"
+  },
+  "3020013100": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:01.942Z"
+  },
+  "3020013200": {
+    "complexes": [
+      {
+        "complexNo": "107554",
+        "complexName": "브리젠힐스",
+        "cortarNo": "3020013200",
+        "totalDongCount": 4,
+        "totalHouseholdCount": 64,
+        "approvalDate": "20091224",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 4,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "11051",
+        "complexName": "송림1단지호반리젠시빌",
+        "cortarNo": "3020013200",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 452,
+        "approvalDate": "20050218",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 25,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "10268",
+        "complexName": "송림2단지이노스빌",
+        "cortarNo": "3020013200",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 477,
+        "approvalDate": "20040908",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 23,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "12941",
+        "complexName": "송림3단지이노스빌",
+        "cortarNo": "3020013200",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 713,
+        "approvalDate": "20050602",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 23,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "19449",
+        "complexName": "송림5단지e-그리운",
+        "cortarNo": "3020013200",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 613,
+        "approvalDate": "20060725",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 18,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "19448",
+        "complexName": "송림6단지풍요로운",
+        "cortarNo": "3020013200",
+        "totalDongCount": 5,
+        "totalHouseholdCount": 201,
+        "approvalDate": "20060628",
+        "address": "대전시 유성구 하기동",
+        "highFloor": 18,
+        "lowFloor": 14
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:58.417Z"
+  },
+  "3020013300": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:55.203Z"
+  },
+  "3020013400": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:46.782Z"
+  },
+  "3020013500": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:30.352Z"
+  },
+  "3020013600": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:26.984Z"
+  },
+  "3020013700": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:33.334Z"
+  },
+  "3020013800": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:36.099Z"
+  },
+  "3020013900": {
+    "complexes": [
+      {
+        "complexNo": "117898",
+        "complexName": "대전반석더샵",
+        "cortarNo": "3020013900",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 650,
+        "approvalDate": "20200413",
+        "address": "대전시 유성구 반석동",
+        "highFloor": 29,
+        "lowFloor": 17
+      },
+      {
+        "complexNo": "17394",
+        "complexName": "반석5단지예미지",
+        "cortarNo": "3020013900",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 536,
+        "approvalDate": "20050812",
+        "address": "대전시 유성구 반석동",
+        "highFloor": 25,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "11047",
+        "complexName": "반석6단지삼부르네상스",
+        "cortarNo": "3020013900",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 642,
+        "approvalDate": "20050428",
+        "address": "대전시 유성구 반석동",
+        "highFloor": 25,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "10351",
+        "complexName": "반석7단지삼부르네상스",
+        "cortarNo": "3020013900",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 834,
+        "approvalDate": "20041110",
+        "address": "대전시 유성구 반석동",
+        "highFloor": 25,
+        "lowFloor": 16
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:08.333Z"
+  },
+  "3020014000": {
+    "complexes": [
+      {
+        "complexNo": "109036",
+        "complexName": "문지효성해링턴플레이스",
+        "cortarNo": "3020014000",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 1142,
+        "approvalDate": "20170426",
+        "address": "대전시 유성구 문지동",
+        "highFloor": 29,
+        "lowFloor": 13
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:06.930Z"
+  },
+  "3020014100": {
+    "complexes": [
+      {
+        "complexNo": "6077",
+        "complexName": "나래",
+        "cortarNo": "3020014100",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 894,
+        "approvalDate": "19941128",
+        "address": "대전시 유성구 전민동",
+        "highFloor": 18,
+        "lowFloor": 13
+      },
+      {
+        "complexNo": "6051",
+        "complexName": "세종",
+        "cortarNo": "3020014100",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 980,
+        "approvalDate": "19940913",
+        "address": "대전시 유성구 전민동",
+        "highFloor": 15,
+        "lowFloor": 11
+      },
+      {
+        "complexNo": "184337",
+        "complexName": "엑스포",
+        "cortarNo": "3020014100",
+        "totalDongCount": 51,
+        "totalHouseholdCount": 3958,
+        "approvalDate": "19940530",
+        "address": "대전시 유성구 전민동",
+        "highFloor": 17,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6046",
+        "complexName": "푸른",
+        "cortarNo": "3020014100",
+        "totalDongCount": 12,
+        "totalHouseholdCount": 672,
+        "approvalDate": "19930511",
+        "address": "대전시 유성구 전민동",
+        "highFloor": 15,
+        "lowFloor": 10
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:51.411Z"
+  },
+  "3020014200": {
+    "complexes": [
+      {
+        "complexNo": "104749",
+        "complexName": "싸이언스빌",
+        "cortarNo": "3020014200",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 152,
+        "approvalDate": "20070604",
+        "address": "대전시 유성구 원촌동",
+        "highFloor": 4,
+        "lowFloor": 4
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:44.939Z"
+  },
+  "3020014300": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:57.034Z"
+  },
+  "3020014400": {
+    "complexes": [
+      {
+        "complexNo": "25450",
+        "complexName": "경남아너스빌1단지",
+        "cortarNo": "3020014400",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 159,
+        "approvalDate": "20080115",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 7,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "25449",
+        "complexName": "경남아너스빌2단지",
+        "cortarNo": "3020014400",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 156,
+        "approvalDate": "20080115",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 7,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "100519",
+        "complexName": "대덕테크노밸리11단지필유",
+        "cortarNo": "3020014400",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 324,
+        "approvalDate": "20080108",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 15,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "23725",
+        "complexName": "대덕테크노밸리12단지필유",
+        "cortarNo": "3020014400",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 464,
+        "approvalDate": "20070528",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 15,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "100522",
+        "complexName": "대덕테크노밸리푸르지오하임1단지",
+        "cortarNo": "3020014400",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 150,
+        "approvalDate": "20080625",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 7,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "26942",
+        "complexName": "대덕테크노밸리푸르지오하임2단지",
+        "cortarNo": "3020014400",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 152,
+        "approvalDate": "20080625",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 7,
+        "lowFloor": 4
+      },
+      {
+        "complexNo": "152420",
+        "complexName": "더클래식(민간임대,도시형)",
+        "cortarNo": "3020014400",
+        "totalDongCount": 1,
+        "totalHouseholdCount": 51,
+        "approvalDate": "20120620",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 7,
+        "lowFloor": 2
+      },
+      {
+        "complexNo": "135825",
+        "complexName": "호반써밋그랜드파크1BL",
+        "cortarNo": "3020014400",
+        "totalDongCount": 9,
+        "totalHouseholdCount": 1059,
+        "approvalDate": "20230331",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 35,
+        "lowFloor": 27
+      },
+      {
+        "complexNo": "135826",
+        "complexName": "호반써밋그랜드파크3BL",
+        "cortarNo": "3020014400",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 688,
+        "approvalDate": "20230331",
+        "address": "대전시 유성구 용산동",
+        "highFloor": 31,
+        "lowFloor": 22
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:39.748Z"
+  },
+  "3020014500": {
+    "complexes": [
+      {
+        "complexNo": "127122",
+        "complexName": "유성대광로제비앙",
+        "cortarNo": "3020014500",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 816,
+        "approvalDate": "20220330",
+        "address": "대전시 유성구 봉산동",
+        "highFloor": 25,
+        "lowFloor": 18
+      },
+      {
+        "complexNo": "26940",
+        "complexName": "하늘바람휴먼시아",
+        "cortarNo": "3020014500",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 990,
+        "approvalDate": "20090918",
+        "address": "대전시 유성구 봉산동",
+        "highFloor": 25,
+        "lowFloor": 19
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:16.166Z"
+  },
+  "3020014600": {
+    "complexes": [
+      {
+        "complexNo": "24865",
+        "complexName": "대덕테크노밸리10단지꿈에그린",
+        "cortarNo": "3020014600",
+        "totalDongCount": 16,
+        "totalHouseholdCount": 1001,
+        "approvalDate": "20080123",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 22,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "17471",
+        "complexName": "대덕테크노밸리1단지꿈에그린",
+        "cortarNo": "3020014600",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 666,
+        "approvalDate": "20060222",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17470",
+        "complexName": "대덕테크노밸리2단지푸르지오",
+        "cortarNo": "3020014600",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 684,
+        "approvalDate": "20060222",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "19318",
+        "complexName": "대덕테크노밸리3단지중앙하이츠빌",
+        "cortarNo": "3020014600",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 535,
+        "approvalDate": "20060222",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 24,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17467",
+        "complexName": "대덕테크노밸리4단지스윗닷홈",
+        "cortarNo": "3020014600",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 498,
+        "approvalDate": "20060221",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 24,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17466",
+        "complexName": "대덕테크노밸리5단지파밀리에",
+        "cortarNo": "3020014600",
+        "totalDongCount": 16,
+        "totalHouseholdCount": 922,
+        "approvalDate": "20060222",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "17468",
+        "complexName": "대덕테크노밸리6단지네오미아",
+        "cortarNo": "3020014600",
+        "totalDongCount": 13,
+        "totalHouseholdCount": 703,
+        "approvalDate": "20060222",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 10
+      },
+      {
+        "complexNo": "23690",
+        "complexName": "대덕테크노밸리7단지백조예미지",
+        "cortarNo": "3020014600",
+        "totalDongCount": 11,
+        "totalHouseholdCount": 493,
+        "approvalDate": "20071205",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 12
+      },
+      {
+        "complexNo": "23707",
+        "complexName": "대덕테크노밸리8단지백조예미지",
+        "cortarNo": "3020014600",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 426,
+        "approvalDate": "20071205",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 25,
+        "lowFloor": 7
+      },
+      {
+        "complexNo": "100524",
+        "complexName": "대덕테크노밸리9단지꿈에그린",
+        "cortarNo": "3020014600",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 357,
+        "approvalDate": "20080123",
+        "address": "대전시 유성구 관평동",
+        "highFloor": 22,
+        "lowFloor": 9
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:19:42.970Z"
+  },
+  "3020014700": {
+    "complexes": [
+      {
+        "complexNo": "25256",
+        "complexName": "송강그린",
+        "cortarNo": "3020014700",
+        "totalDongCount": 19,
+        "totalHouseholdCount": 1830,
+        "approvalDate": "19961030",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "17274",
+        "complexName": "송강마을1단지",
+        "cortarNo": "3020014700",
+        "totalDongCount": 4,
+        "totalHouseholdCount": 660,
+        "approvalDate": "19940715",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6140",
+        "complexName": "송강마을2단지",
+        "cortarNo": "3020014700",
+        "totalDongCount": 5,
+        "totalHouseholdCount": 675,
+        "approvalDate": "19941028",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 15
+      },
+      {
+        "complexNo": "6142",
+        "complexName": "청솔(뉴서울,신호,태영)",
+        "cortarNo": "3020014700",
+        "totalDongCount": 10,
+        "totalHouseholdCount": 1446,
+        "approvalDate": "19950830",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "6144",
+        "complexName": "청솔(한양)",
+        "cortarNo": "3020014700",
+        "totalDongCount": 4,
+        "totalHouseholdCount": 520,
+        "approvalDate": "19961115",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "6143",
+        "complexName": "한마을",
+        "cortarNo": "3020014700",
+        "totalDongCount": 15,
+        "totalHouseholdCount": 1206,
+        "approvalDate": "19990429",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 14
+      },
+      {
+        "complexNo": "24761",
+        "complexName": "한솔",
+        "cortarNo": "3020014700",
+        "totalDongCount": 8,
+        "totalHouseholdCount": 744,
+        "approvalDate": "19950525",
+        "address": "대전시 유성구 송강동",
+        "highFloor": 15,
+        "lowFloor": 12
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:23.048Z"
+  },
+  "3020014800": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:52.631Z"
+  },
+  "3020014900": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:57.181Z"
+  },
+  "3020015000": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:54.196Z"
+  },
+  "3020015100": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:20:28.519Z"
+  },
+  "3020015200": {
+    "complexes": [
+      {
+        "complexNo": "131906",
+        "complexName": "대전둔곡우미린",
+        "cortarNo": "3020015200",
+        "totalDongCount": 7,
+        "totalHouseholdCount": 760,
+        "approvalDate": "20221021",
+        "address": "대전시 유성구 둔곡동",
+        "highFloor": 28,
+        "lowFloor": 22
+      },
+      {
+        "complexNo": "131324",
+        "complexName": "유성둔곡지구서한이다음1단지",
+        "cortarNo": "3020015200",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 816,
+        "approvalDate": "20221104",
+        "address": "대전시 유성구 둔곡동",
+        "highFloor": 28,
+        "lowFloor": 22
+      },
+      {
+        "complexNo": "131323",
+        "complexName": "유성둔곡지구서한이다음2단지",
+        "cortarNo": "3020015200",
+        "totalDongCount": 6,
+        "totalHouseholdCount": 685,
+        "approvalDate": "20221107",
+        "address": "대전시 유성구 둔곡동",
+        "highFloor": 28,
+        "lowFloor": 22
+      }
+    ],
+    "fetchedAt": "2026-02-16T02:20:05.429Z"
+  },
+  "3020015300": {
+    "complexes": [],
+    "fetchedAt": "2026-02-16T02:19:45.681Z"
   }
 }

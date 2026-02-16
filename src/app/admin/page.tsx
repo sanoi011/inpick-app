@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   BarChart3, FileText, Users, RefreshCw, Loader2,
   TrendingUp, Package, FolderKanban, DollarSign, Bot,
+  MapPin, Building2, Database,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
@@ -26,6 +27,15 @@ interface CrawlLog {
   status: string;
   records_updated: number;
   started_at: string;
+}
+
+interface CoverageData {
+  totalRegions: number;
+  totalComplexes: number;
+  totalHouseholds: number;
+  coveragePercent: number;
+  sidoStats: { name: string; regions: number; complexes: number; households: number }[];
+  regions: { cortarNo: string; complexCount: number; householdCount: number; fetchedAt: string; address: string }[];
 }
 
 function StatCard({ icon: Icon, label, value, sub, color }: {
@@ -51,9 +61,13 @@ export default function AdminDashboardPage() {
   });
   const [recentCrawls, setRecentCrawls] = useState<CrawlLog[]>([]);
   const [crawling, setCrawling] = useState(false);
+  const [coverage, setCoverage] = useState<CoverageData | null>(null);
 
   useEffect(() => {
-    if (authChecked) loadStats();
+    if (authChecked) {
+      loadStats();
+      loadCoverage();
+    }
   }, [authChecked]);
 
   async function loadStats() {
@@ -66,6 +80,13 @@ export default function AdminDashboardPage() {
         setStats(data.stats);
         setRecentCrawls(data.recentCrawls || []);
       }
+    } catch { /* ignore */ }
+  }
+
+  async function loadCoverage() {
+    try {
+      const res = await fetch("/api/admin/coverage");
+      if (res.ok) setCoverage(await res.json());
     } catch { /* ignore */ }
   }
 
@@ -110,6 +131,81 @@ export default function AdminDashboardPage() {
         <StatCard icon={TrendingUp} label="크롤 로그" value={`${stats.crawlLogs}건`} color="text-amber-600" />
         <StatCard icon={BarChart3} label="활성 계약" value={`${stats.contracts}건`} color="text-red-600" />
       </div>
+
+      {/* 데이터 커버리지 */}
+      {coverage && coverage.totalComplexes > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+              <Database className="w-5 h-5 text-blue-600" />
+              아파트 데이터 커버리지
+            </h3>
+            <span className="text-xs px-2 py-1 bg-blue-50 text-blue-700 rounded-full font-medium">
+              {coverage.coveragePercent}% 전국
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <MapPin className="w-4 h-4 text-emerald-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{coverage.totalRegions}</p>
+              <p className="text-xs text-gray-500">수집 지역</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <Building2 className="w-4 h-4 text-blue-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">{coverage.totalComplexes.toLocaleString()}</p>
+              <p className="text-xs text-gray-500">아파트 단지</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-3 text-center">
+              <Users className="w-4 h-4 text-purple-500 mx-auto mb-1" />
+              <p className="text-lg font-bold text-gray-900">
+                {coverage.totalHouseholds >= 10000
+                  ? `${(coverage.totalHouseholds / 10000).toFixed(1)}만`
+                  : coverage.totalHouseholds.toLocaleString()}
+              </p>
+              <p className="text-xs text-gray-500">총 세대수</p>
+            </div>
+          </div>
+
+          {/* 시도별 바 */}
+          {coverage.sidoStats.length > 0 && (
+            <div className="space-y-1.5">
+              {coverage.sidoStats.slice(0, 8).map((sido) => {
+                const maxC = coverage.sidoStats[0].complexes || 1;
+                return (
+                  <div key={sido.name} className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-500 w-16 text-right text-xs flex-shrink-0">
+                      {sido.name.replace(/(특별|광역)(시|자치시|자치도)/, "").replace("도", "")}
+                    </span>
+                    <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-blue-500 rounded-full flex items-center justify-end px-2"
+                        style={{ width: `${Math.max(10, (sido.complexes / maxC) * 100)}%` }}
+                      >
+                        <span className="text-[10px] text-white font-medium">{sido.complexes}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* 커버리지 프로그레스 바 */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span>전국 커버리지</span>
+              <span>{coverage.totalComplexes.toLocaleString()} / ~20,000 단지</span>
+            </div>
+            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all"
+                style={{ width: `${Math.max(1, coverage.coveragePercent)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 빠른 작업 */}
