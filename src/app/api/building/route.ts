@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { BuildingInfo } from "@/types/address";
-import { findComplexByAddress, type NaverComplexDetail, type NaverComplex } from "@/lib/services/naver-land-client";
+import { findComplexByAddress, type NaverComplexDetail } from "@/lib/services/naver-land-client";
 import { findCachedComplexDetail } from "@/lib/data/naver-cache";
 
 export const preferredRegion = "icn1"; // Seoul — 네이버 API 한국 IP 필요
@@ -60,55 +60,34 @@ export async function GET(request: NextRequest) {
   // 모든 아파트 동일 파이프라인: grandPlanUrl → Gemini Pro 실시간 도면 생성
   const cortarNo = bcode || (sigunguCd && bjdongCd ? sigunguCd + bjdongCd : "");
   if (cortarNo && cortarNo.length >= 5) {
-    // 2a. Try live Naver API first
+    // 2a. Try live Naver API first (pyeongList 있을 때만 사용)
     try {
       const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
-      if (naverDetail) {
+      if (naverDetail && naverDetail.pyeongList.length > 0) {
         console.log(`[building] matched=naver_land, complexName=${naverDetail.complex.complexName}, pyeongCount=${naverDetail.pyeongList.length}`);
-        if (naverDetail.pyeongList.length > 0) {
-          // Full Naver data: real pyeong types
-          const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
-          return NextResponse.json({
-            buildings,
-            source: "naver_land",
-            complexName: naverDetail.complex.complexName,
-          });
-        } else {
-          // Partial Naver data: real dong count + default pyeong types
-          const buildings = generateNaverPartialBuildings(naverDetail.complex, address, buildingName || undefined);
-          return NextResponse.json({
-            buildings,
-            source: "naver_land",
-            complexName: naverDetail.complex.complexName,
-          });
-        }
+        const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
+        return NextResponse.json({
+          buildings,
+          source: "naver_land",
+          complexName: naverDetail.complex.complexName,
+        });
       }
+      // pyeongList 없으면 캐시로 폴백
     } catch (err) {
       console.error("Naver Land API error (will try cache):", err instanceof Error ? err.message : err);
     }
 
-    // 2b. Fallback to cached Naver data (for Vercel cloud IP blocking)
+    // 2b. 캐시 폴백 (Live API 실패/부분 데이터/Vercel IP 차단 등)
     try {
       const cachedDetail = findCachedComplexDetail(cortarNo, buildingName || undefined);
-      if (cachedDetail) {
+      if (cachedDetail && cachedDetail.pyeongList.length > 0) {
         console.log(`[building] matched=naver_cache, complexName=${cachedDetail.complex.complexName}, pyeongCount=${cachedDetail.pyeongList.length}`);
-        if (cachedDetail.pyeongList.length > 0) {
-          // Enriched cache: real pyeong types
-          const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined);
-          return NextResponse.json({
-            buildings,
-            source: "naver_land_cache",
-            complexName: cachedDetail.complex.complexName,
-          });
-        } else {
-          // Basic cache: only summary, use default types
-          const buildings = generateNaverPartialBuildings(cachedDetail.complex, address, buildingName || undefined, cachedDetail.dongList);
-          return NextResponse.json({
-            buildings,
-            source: "naver_land_cache",
-            complexName: cachedDetail.complex.complexName,
-          });
-        }
+        const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined);
+        return NextResponse.json({
+          buildings,
+          source: "naver_land_cache",
+          complexName: cachedDetail.complex.complexName,
+        });
       }
     } catch (err) {
       console.error("Naver cache lookup error:", err instanceof Error ? err.message : err);
@@ -244,42 +223,6 @@ function generateNaverBuildings(
   }
 
   // 동 → 층수 순 정렬
-  buildings.sort((a, b) => {
-    if (a.dongName !== b.dongName) return a.dongName.localeCompare(b.dongName);
-    if (a.floor !== b.floor) return a.floor - b.floor;
-    return (a.typeName || "").localeCompare(b.typeName || "");
-  });
-
-  return buildings;
-}
-
-/**
- * 네이버 목록 데이터 (pyeong 없음) → 실제 동 수 + 기본 평형 BuildingInfo[]
- */
-function generateNaverPartialBuildings(
-  complex: NaverComplex,
-  address: string,
-  buildingName?: string,
-  dongList?: { dongNo: string; dongName: string }[]
-): BuildingInfo[] {
-  const buildings: BuildingInfo[] = [];
-
-  let dongs: string[];
-  if (dongList && dongList.length > 0) {
-    dongs = dongList.map((d) => `${d.dongName}동`);
-  } else {
-    const dongBase = parseDongBase(buildingName || complex.complexName);
-    const dongCount = complex.totalDongCount || 3;
-    dongs = [];
-    for (let i = 1; i <= dongCount; i++) {
-      dongs.push(`${dongBase + i}동`);
-    }
-  }
-
-  // pyeong 데이터 없는 네이버 부분 데이터 → 빈 배열 반환 (도면 매칭 불가)
-  // 사용자가 수동 동/호 입력으로 평형 검색하도록 유도
-  // (기존 하드코딩 샘플 제거)
-
   buildings.sort((a, b) => {
     if (a.dongName !== b.dongName) return a.dongName.localeCompare(b.dongName);
     if (a.floor !== b.floor) return a.floor - b.floor;
