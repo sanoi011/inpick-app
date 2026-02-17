@@ -13,7 +13,7 @@ export const CONSUMER_PROJECT_STATUS_LABELS: Record<ConsumerProjectStatus, strin
   ADDRESS_SELECTION: "주소 선택",
   FLOOR_PLAN: "도면/3D 매스",
   AI_DESIGN: "AI 디자인",
-  RENDERING: "3D 렌더링",
+  RENDERING: "자재 선택",
   ESTIMATING: "물량 산출",
   RFQ: "견적 요청",
   CONTRACTED: "계약 완료",
@@ -108,12 +108,18 @@ export interface SelectedMaterial {
   roomId: string;
   roomName: string;
   category: string; // 바닥, 벽, 천장, 가구 등
+  categoryCode?: string; // v2 카테고리 코드 (FLOORING, WALLPAPER 등)
   part: string; // 부위명
   materialName: string;
   specification: string;
   unitPrice: number;
+  laborPrice?: number; // 시공비 단가
   unit: string; // m², EA, SET 등
   quantity?: number;
+  brand?: string; // 브랜드명
+  productId?: string; // v2 카탈로그 제품 ID
+  priceGrade?: "economy" | "standard" | "premium";
+  priceSource?: string; // 가격 출처 (물가협회 2025 등)
   subMaterials?: SubMaterial[];
   confirmed: boolean;
 }

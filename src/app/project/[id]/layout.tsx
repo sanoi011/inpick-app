@@ -2,14 +2,14 @@
 
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Box, Image, Calculator, FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Box, Package, Calculator, FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { SaveButton } from "@/components/ui/SaveIndicator";
 import type { ConsumerProjectStatus } from "@/types/consumer-project";
 
 const TABS = [
   { label: "디자인하기", segment: "design", icon: Box },
-  { label: "3D 렌더링", segment: "rendering", icon: Image },
+  { label: "자재 선택", segment: "rendering", icon: Package },
   { label: "물량산출", segment: "estimate", icon: Calculator },
   { label: "견적요청", segment: "rfq", icon: FileText },
 ];

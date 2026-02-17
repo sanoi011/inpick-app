@@ -67,7 +67,7 @@ function generateMockImage(): { imageData: string; description: string } {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { prompt, roomContext, floorPlanContext } = body;
+    const { prompt, roomContext, floorPlanContext, floorPlanImageUrl } = body;
 
     if (!prompt) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
@@ -78,9 +78,29 @@ export async function POST(request: NextRequest) {
       try {
         const client = getGeminiClient()!;
 
+        // 도면 이미지 가져오기
+        let floorPlanParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+        if (floorPlanImageUrl) {
+          try {
+            const imgRes = await fetch(floorPlanImageUrl);
+            if (imgRes.ok) {
+              const buffer = Buffer.from(await imgRes.arrayBuffer());
+              const mimeType = imgRes.headers.get("content-type") || "image/png";
+              floorPlanParts = [
+                { inlineData: { mimeType, data: buffer.toString("base64") } },
+              ];
+            }
+          } catch (err) {
+            console.warn("[generate-image] Failed to fetch floor plan:", err);
+          }
+        }
+
         const fullPrompt = [
           "Generate a photorealistic interior design image of a Korean apartment room.",
           "The image should look like a professional interior design photograph with realistic lighting, materials, and furnishings.",
+          floorPlanParts.length > 0
+            ? "첨부된 평면도를 반드시 참고하세요. 이 도면의 공간 구조(방 배치, 크기, 동선)를 정확히 반영하여 디자인하세요."
+            : "",
           roomContext ? `Room info: ${roomContext}` : "",
           floorPlanContext ? `Floor plan context: ${floorPlanContext}` : "",
           `Design request: ${prompt}`,
@@ -89,7 +109,7 @@ export async function POST(request: NextRequest) {
 
         const response = await client.models.generateContent({
           model: "gemini-3-pro-image-preview",
-          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+          contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
           config: {
             responseModalities: ["TEXT", "IMAGE"],
           },

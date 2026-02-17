@@ -75,7 +75,7 @@ export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences } = useProjectState(projectId);
+  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences, addGeneratedImage } = useProjectState(projectId);
 
   // === Sidebar state ===
   const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
@@ -428,6 +428,25 @@ export default function FloorPlanPage() {
         const successImages = data.images.filter((img: { imageData: string | null }) => img.imageData !== null);
         setGeneratedDesigns(data.images);
         setDesignSlideIndex(0);
+        // project state에 저장 (Tab 2 렌더링 페이지 연동)
+        const roomKeyToType: Record<string, string[]> = {
+          living: ["LIVING"], kitchen: ["KITCHEN"],
+          bedroom: ["BED", "MASTER_BED"], bathroom: ["BATHROOM"],
+        };
+        for (const img of data.images) {
+          if (!img.imageData) continue;
+          const matchTypes = roomKeyToType[img.room] || [];
+          const matchRoom = floorPlan?.rooms.find((r: { type: string }) => matchTypes.includes(r.type));
+          addGeneratedImage({
+            id: crypto.randomUUID(),
+            prompt: img.description || `${img.label} 디자인`,
+            imageData: img.imageData,
+            roomId: matchRoom?.id,
+            roomName: img.label,
+            description: img.description,
+            createdAt: new Date().toISOString(),
+          });
+        }
         // AI 채팅에 결과 메시지 추가
         const successCount = successImages.length;
         const totalCount = data.images.length;
@@ -450,7 +469,7 @@ export default function FloorPlanPage() {
     } finally {
       setGeneratingDesign(false);
     }
-  }, [generatingDesign, aiMessages, designPrefs, floorPlanImageUrl, floorPlan]);
+  }, [generatingDesign, aiMessages, designPrefs, floorPlanImageUrl, floorPlan, addGeneratedImage]);
 
   // === YOLO model load ===
   useEffect(() => {

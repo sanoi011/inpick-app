@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       designPreferences,
       floorPlanImageUrl,
       floorPlanContext,
+      materialContext,
     } = await request.json();
 
     if (!isGeminiConfigured()) {
@@ -87,6 +88,9 @@ export async function POST(request: NextRequest) {
         prefsText ? `[디자인 옵션]\n${prefsText}` : "",
         conversationSummary
           ? `[사용자와의 대화 요약]\n${conversationSummary}`
+          : "",
+        materialContext
+          ? `[선택된 자재]\n${materialContext}`
           : "",
         "",
         "요구사항:",

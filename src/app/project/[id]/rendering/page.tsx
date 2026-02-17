@@ -1,236 +1,199 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowRight,
-  Loader2,
   CheckCircle2,
-  Image as ImageIcon,
-  X,
-  Maximize2,
-  RefreshCw,
-  Coins,
+  Package,
   ChevronDown,
-  ChevronUp,
-  Palette,
+  ChevronRight,
+  Check,
+  X,
+  Sparkles,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
-import { useCredits } from "@/hooks/useCredits";
-import { useMaterialCatalog } from "@/hooks/useMaterialCatalog";
-import type { RenderView, SelectedMaterial, SubMaterial } from "@/types/consumer-project";
-import type { ParsedFloorPlan, RoomData } from "@/types/floorplan";
+import { useMaterialCatalogV2 } from "@/hooks/useMaterialCatalogV2";
+import type { SelectedMaterial } from "@/types/consumer-project";
+import type { ParsedFloorPlan, RoomData, RoomType } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { ROOM_TYPE_LABELS } from "@/types/floorplan";
+import type { MaterialCategory, MaterialProduct } from "@/lib/data/material-catalog-v2";
 import FloorPlan2D from "@/components/viewer/FloorPlan2D";
-import dynamic from "next/dynamic";
 
-const CreditChargeModal = dynamic(() => import("@/components/project/CreditChargeModal"), {
-  ssr: false,
-});
+// 등급 배지 색상
+const GRADE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  economy: { bg: "bg-green-50 border-green-200", text: "text-green-700", label: "경제형" },
+  standard: { bg: "bg-blue-50 border-blue-200", text: "text-blue-700", label: "표준형" },
+  premium: { bg: "bg-amber-50 border-amber-200", text: "text-amber-700", label: "프리미엄" },
+};
 
 export default function RenderingPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
+  const { project, updateRendering, updateMaterial, updateStatus } =
+    useProjectState(projectId);
+
   const {
-    project,
-    updateRendering,
-    addRenderView,
-    updateMaterial,
-    updateStatus,
-  } = useProjectState(projectId);
-  const { credits, canGenerate, spendCredits } = useCredits();
-  const { getMaterialsForRoom } = useMaterialCatalog();
+    allCategories,
+    categoriesForRoom,
+    selectedProducts,
+    toggleProduct,
+    getSelectedProduct,
+    selectedCount,
+    totalCategories,
+    totalMaterialCost,
+    loadSelections,
+  } = useMaterialCatalogV2();
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
-  const [renderViews, setRenderViews] = useState<RenderView[]>([]);
-  const [materials, setMaterials] = useState<SelectedMaterial[]>([]);
   const [selectedRoom, setSelectedRoom] = useState<RoomData | null>(null);
-  const [isRendering, setIsRendering] = useState(false);
-  const [renderingRoomId, setRenderingRoomId] = useState<string | null>(null);
-  const [expandedImage, setExpandedImage] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
-  const [showMaterialPanel, setShowMaterialPanel] = useState(false);
-  const [showChargeModal, setShowChargeModal] = useState(false);
+  const [filterRoom, setFilterRoom] = useState<string | null>(null); // null = 전체
+  const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // 데이터 로드
+  // 도면 로드
   useEffect(() => {
-    if (project?.rendering?.views) setRenderViews(project.rendering.views);
-    if (project?.rendering?.materials) setMaterials(project.rendering.materials);
     if (project?.drawingId) {
       loadFloorPlan(project.drawingId).then((plan) => {
-        if (plan) {
-          setFloorPlan(plan);
-          // 첫 번째 방 자동 선택
-          if (plan.rooms.length > 0 && !selectedRoom) {
-            setSelectedRoom(plan.rooms[0]);
-          }
-        }
+        if (plan) setFloorPlan(plan);
         setLoading(false);
       });
     } else {
       setLoading(false);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project?.drawingId, project?.rendering?.views, project?.rendering?.materials]);
+  }, [project?.drawingId]);
 
-  // 방 선택
-  const handleRoomClick = (room: RoomData) => {
-    setSelectedRoom(room);
-    setExpandedCategories({});
-  };
-
-  // 렌더링 생성 (개별 방)
-  const handleRenderRoom = useCallback(async (room: RoomData) => {
-    if (isRendering) return;
-
-    if (!canGenerate()) {
-      setShowChargeModal(true);
-      return;
-    }
-
-    setIsRendering(true);
-    setRenderingRoomId(room.id);
-
-    try {
-      await spendCredits();
-
-      const roomLabel = ROOM_TYPE_LABELS[room.type] || room.name;
-      const roomMaterials = materials.filter((m) => m.roomId === room.id);
-      const materialContext = roomMaterials.length > 0
-        ? roomMaterials.map((m) => `${m.part}: ${m.materialName} (${m.specification})`).join(", ")
-        : "";
-
-      const designImages = project?.design?.generatedImages || [];
-      const roomDesign = designImages.find((img) => img.roomId === room.id);
-
-      // 디자인 선호도 컨텍스트
-      const prefs = project?.designPreferences;
-      const prefsContext = prefs ? [
-        prefs.style ? `스타일: ${prefs.style}` : "",
-        prefs.budget ? `예산: ${prefs.budget === "economy" ? "경제형" : prefs.budget === "standard" ? "표준형" : "프리미엄"}` : "",
-        prefs.priorities.length > 0 ? `우선순위: ${prefs.priorities.join(", ")}` : "",
-        prefs.specialNotes.length > 0 ? `특기사항: ${prefs.specialNotes.join(", ")}` : "",
-      ].filter(Boolean).join(". ") : "";
-
-      const prompt = `포토리얼리스틱 인테리어 렌더링: ${roomLabel} ${room.area}m². ${
-        prefsContext ? `${prefsContext}.` : ""
-      } ${roomDesign ? `디자인 컨셉: ${roomDesign.prompt}.` : ""
-      } ${materialContext ? `자재: ${materialContext}.` : ""} 고화질 실사급 3D 렌더링.`;
-
-      const res = await fetch("/api/project/generate-image", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          roomContext: `${roomLabel} ${room.area}m²`,
-          floorPlanContext: floorPlan
-            ? floorPlan.rooms.map((r) => `${r.name}(${r.area}m²)`).join(", ")
-            : "",
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        const newView: RenderView = {
-          id: crypto.randomUUID(),
-          roomId: room.id,
-          roomName: roomLabel,
-          imageData: data.imageData,
-          prompt,
-          confirmed: false,
-          createdAt: new Date().toISOString(),
-        };
-
-        setRenderViews((prev) => {
-          // 같은 방 이전 렌더 교체
-          const filtered = prev.filter((v) => v.roomId !== room.id);
-          return [...filtered, newView];
-        });
-        addRenderView(newView);
+  // 프로젝트 저장된 자재 데이터에서 선택 복원
+  useEffect(() => {
+    if (!project?.rendering?.materials?.length) return;
+    const selections: Record<string, string> = {};
+    for (const mat of project.rendering.materials) {
+      if (mat.categoryCode && mat.productId) {
+        selections[mat.categoryCode] = mat.productId;
       }
-    } catch {
-      // 에러 무시
     }
-
-    setIsRendering(false);
-    setRenderingRoomId(null);
-  }, [isRendering, canGenerate, spendCredits, materials, project?.design?.generatedImages, floorPlan, addRenderView]);
-
-  // 전체 방 렌더링
-  const handleRenderAll = useCallback(async () => {
-    if (!floorPlan || isRendering) return;
-    for (const room of floorPlan.rooms) {
-      await handleRenderRoom(room);
+    if (Object.keys(selections).length > 0) {
+      loadSelections(selections);
     }
-  }, [floorPlan, isRendering, handleRenderRoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 렌더링 확인 토글
-  const handleConfirmView = (viewId: string) => {
-    setRenderViews((prev) =>
-      prev.map((v) => (v.id === viewId ? { ...v, confirmed: !v.confirmed } : v))
-    );
-    const view = renderViews.find((v) => v.id === viewId);
-    if (view) {
-      const updatedViews = renderViews.map((v) =>
-        v.id === viewId ? { ...v, confirmed: !v.confirmed } : v
-      );
-      const allConfirmed = updatedViews.length > 0 && updatedViews.every((v) => v.confirmed);
-      updateRendering({ views: updatedViews, allConfirmed });
+  // AI 디자인 이미지 (Tab 1에서 생성된 것)
+  const designImages = project?.design?.generatedImages || [];
+
+  // 방 클릭 → 필터
+  const handleRoomClick = useCallback((room: RoomData) => {
+    setSelectedRoom(room);
+    setFilterRoom(room.type);
+    setExpandedCategories({});
+  }, []);
+
+  // 카테고리 토글
+  const handleToggleCategory = useCallback((code: string) => {
+    setExpandedCategories((prev) => ({ ...prev, [code]: !prev[code] }));
+  }, []);
+
+  // 제품 선택/해제
+  const handleProductSelect = useCallback(
+    (category: MaterialCategory, product: MaterialProduct) => {
+      toggleProduct(category.code, product.id);
+
+      // SelectedMaterial로 변환하여 프로젝트 상태에도 반영
+      const isCurrentlySelected = selectedProducts[category.code] === product.id;
+      if (!isCurrentlySelected) {
+        // 선택
+        const mat: SelectedMaterial = {
+          id: product.id,
+          roomId: "",
+          roomName: "",
+          category: category.nameKr,
+          categoryCode: category.code,
+          part: category.nameKr,
+          materialName: `${product.brand} ${product.productName}`,
+          specification: product.spec,
+          unitPrice: product.unitPrice,
+          laborPrice: product.laborPrice,
+          unit: product.unit,
+          brand: product.brand,
+          productId: product.id,
+          priceGrade: product.priceGrade,
+          priceSource: product.priceSource,
+          subMaterials: product.subItems,
+          confirmed: true,
+        };
+        updateMaterial(mat);
+      }
+    },
+    [toggleProduct, selectedProducts, updateMaterial]
+  );
+
+  // 표시할 카테고리 (필터 적용)
+  const displayCategories = useMemo(() => {
+    if (!filterRoom) return allCategories;
+    return categoriesForRoom(filterRoom);
+  }, [filterRoom, allCategories, categoriesForRoom]);
+
+  // 선택된 자재 요약 목록
+  const selectedSummary = useMemo(() => {
+    const items: { category: string; product: MaterialProduct; categoryCode: string }[] = [];
+    for (const cat of allCategories) {
+      const pid = selectedProducts[cat.code];
+      if (pid) {
+        const prod = cat.products.find((p) => p.id === pid);
+        if (prod) items.push({ category: cat.nameKr, product: prod, categoryCode: cat.code });
+      }
     }
-  };
+    return items;
+  }, [allCategories, selectedProducts]);
 
-  // 자재 변경
-  const handleMaterialChange = (
-    roomId: string,
-    roomName: string,
-    category: string,
-    part: string,
-    option: { name: string; spec: string; price: number; unit: string; subMaterials: SubMaterial[] }
-  ) => {
-    const existingIdx = materials.findIndex((m) => m.roomId === roomId && m.category === category);
-    const newMaterial: SelectedMaterial = {
-      id: existingIdx >= 0 ? materials[existingIdx].id : crypto.randomUUID(),
-      roomId,
-      roomName,
-      category,
-      part,
-      materialName: option.name,
-      specification: option.spec,
-      unitPrice: option.price,
-      unit: option.unit,
-      subMaterials: option.subMaterials,
-      confirmed: false,
-    };
+  // 프로젝트 저장
+  const handleSaveAndNext = useCallback(() => {
+    // 선택된 자재를 rendering.materials에 저장
+    const materials: SelectedMaterial[] = selectedSummary.map((item) => ({
+      id: item.product.id,
+      roomId: "",
+      roomName: "",
+      category: item.category,
+      categoryCode: item.categoryCode,
+      part: item.category,
+      materialName: `${item.product.brand} ${item.product.productName}`,
+      specification: item.product.spec,
+      unitPrice: item.product.unitPrice,
+      laborPrice: item.product.laborPrice,
+      unit: item.product.unit,
+      brand: item.product.brand,
+      productId: item.product.id,
+      priceGrade: item.product.priceGrade,
+      priceSource: item.product.priceSource,
+      subMaterials: item.product.subItems,
+      confirmed: true,
+    }));
 
-    if (existingIdx >= 0) {
-      setMaterials((prev) => prev.map((m, i) => (i === existingIdx ? newMaterial : m)));
-    } else {
-      setMaterials((prev) => [...prev, newMaterial]);
-    }
-    updateMaterial(newMaterial);
-  };
+    updateRendering({
+      views: project?.rendering?.views || [],
+      materials,
+      allConfirmed: selectedCount > 0,
+    });
 
-  // 카테고리 접기/펼치기
-  const toggleCategory = (key: string) => {
-    setExpandedCategories((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  // 다음 단계
-  const handleNext = () => {
     updateStatus("ESTIMATING");
     router.push(`/project/${projectId}/estimate`);
-  };
-
-  // 모든 렌더링 확인됐는지 체크
-  const allConfirmed = renderViews.length > 0 && renderViews.every((v) => v.confirmed);
+  }, [selectedSummary, updateRendering, project?.rendering?.views, selectedCount, updateStatus, router, projectId]);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <div className="text-center">
+          <div className="relative mx-auto w-16 h-16 mb-4">
+            <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl opacity-20 animate-pulse" />
+            <div className="absolute inset-2 bg-white rounded-xl flex items-center justify-center">
+              <Package className="w-6 h-6 text-blue-500 animate-pulse" />
+            </div>
+          </div>
+          <p className="text-sm text-gray-500 font-medium">자재 카탈로그 로딩 중</p>
+        </div>
       </div>
     );
   }
@@ -238,374 +201,416 @@ export default function RenderingPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-3 sm:px-4 py-2 bg-white border-b border-gray-200 gap-2">
+      <div className="flex items-center justify-between px-3 sm:px-4 py-2.5 bg-white border-b border-gray-200 gap-2">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-          <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">3D 렌더링</h2>
-          {allConfirmed && (
-            <span className="hidden sm:flex px-2 py-0.5 bg-green-50 text-green-700 text-xs font-medium rounded-full items-center gap-1">
-              <CheckCircle2 className="w-3 h-3" /> 모든 공간 확인 완료
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+              <Package className="w-3.5 h-3.5 text-white" />
+            </div>
+            <h2 className="text-sm font-bold text-gray-900 whitespace-nowrap">자재 선택</h2>
+          </div>
+          {floorPlan && (
+            <span className="hidden sm:inline-flex px-2 py-0.5 bg-gray-100 text-gray-600 text-[11px] font-medium rounded-full">
+              {floorPlan.totalArea}m² · {floorPlan.rooms.length}개 공간
             </span>
           )}
+          <span className={`inline-flex px-2 py-0.5 text-[11px] font-medium rounded-full items-center gap-1 ${
+            selectedCount === totalCategories
+              ? "bg-green-50 text-green-700"
+              : "bg-blue-50 text-blue-700"
+          }`}>
+            <CheckCircle2 className="w-3 h-3" />
+            {selectedCount}/{totalCategories} 선택
+          </span>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* 크레딧 */}
-          <span className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-700 text-xs rounded-full border border-amber-200">
-            <Coins className="w-3 h-3" />
-            {credits ? `${credits.balance} 크레딧` : "로그인 필요"}
-          </span>
-
-          {floorPlan && renderViews.length === 0 && (
-            <button
-              onClick={handleRenderAll}
-              disabled={isRendering}
-              className="flex items-center gap-1 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-            >
-              {isRendering ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" />}
-              전체 렌더링
-            </button>
-          )}
-
-          {allConfirmed && (
-            <button
-              onClick={handleNext}
-              className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              물량산출 <ArrowRight className="w-4 h-4" />
-            </button>
-          )}
+          <button
+            onClick={handleSaveAndNext}
+            className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            물량산출 <ArrowRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
       {/* 메인 */}
-      <div className="flex-1 flex min-h-0">
-        {/* 좌측: 평면도 + 렌더링 갤러리 */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+      <div className="flex-1 flex min-h-0 flex-col md:flex-row">
+        {/* 좌측 패널 */}
+        <div className="w-full md:w-[360px] md:min-w-[320px] flex-shrink-0 border-b md:border-b-0 md:border-r border-gray-200 bg-white flex flex-col overflow-hidden">
+          {/* AI 디자인 참조 */}
+          {designImages.length > 0 && (
+            <div className="border-b border-gray-200">
+              <div className="px-3 py-2 bg-gradient-to-r from-indigo-50 to-purple-50">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-700">AI 디자인 참조</span>
+                  <span className="text-[10px] text-indigo-400 ml-1">이 디자인을 위한 자재를 선택하세요</span>
+                </div>
+              </div>
+              <div className="flex gap-2 p-3 overflow-x-auto">
+                {designImages.slice(0, 4).map((img) => (
+                  <div key={img.id} className="flex-shrink-0 w-[120px]">
+                    <div className="relative rounded-lg overflow-hidden border border-gray-200">
+                      <img
+                        src={img.imageData}
+                        alt={img.roomName || "디자인"}
+                        className="w-full aspect-[4/3] object-cover"
+                      />
+                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/60 to-transparent p-1.5">
+                        <span className="text-[10px] text-white font-medium">
+                          {img.roomName || "디자인"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 평면도 미니맵 */}
           {floorPlan && (
-            <div className="border-b border-gray-200 bg-white">
-              <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100">
-                <span className="text-xs font-medium text-gray-600">
-                  공간 선택 (클릭하여 렌더링/자재 수정)
-                </span>
+            <div className="border-b border-gray-200">
+              <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-600">공간 선택</span>
+                {filterRoom && (
+                  <button
+                    onClick={() => { setFilterRoom(null); setSelectedRoom(null); }}
+                    className="text-[10px] text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5"
+                  >
+                    <X className="w-3 h-3" /> 필터 해제
+                  </button>
+                )}
               </div>
               <FloorPlan2D
                 floorPlan={floorPlan}
                 onRoomClick={handleRoomClick}
                 selectedRoomId={selectedRoom?.id}
-                className="max-h-[160px] border-0 rounded-none"
+                className="max-h-[140px] md:max-h-[160px] border-0 rounded-none"
               />
             </div>
           )}
 
-          {/* 렌더링 갤러리 */}
-          <div className="flex-1 overflow-y-auto p-4">
-            {renderViews.length === 0 ? (
-              <div className="h-full flex items-center justify-center">
-                <div className="text-center text-gray-400">
-                  <ImageIcon className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                  <p className="text-sm font-medium">렌더링 이미지가 없습니다</p>
-                  <p className="text-xs mt-1 mb-4">상단의 &quot;전체 렌더링&quot; 버튼을 클릭하거나<br />오른쪽 패널에서 개별 공간을 렌더링하세요</p>
-                  {floorPlan && (
-                    <button
-                      onClick={handleRenderAll}
-                      disabled={isRendering}
-                      className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                    >
-                      전체 렌더링 시작
-                    </button>
-                  )}
-                </div>
+          {/* 선택 요약 */}
+          <div className="flex-1 overflow-y-auto hidden md:block">
+            <div className="p-3">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-bold text-gray-700">선택된 자재</span>
+                <span className="text-xs text-gray-400">{selectedSummary.length}개</span>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {renderViews.map((view) => (
-                  <div
-                    key={view.id}
-                    className={`relative group bg-white rounded-xl border overflow-hidden shadow-sm transition-colors ${
-                      view.confirmed ? "border-green-300" : "border-gray-200"
-                    } ${selectedRoom?.id === view.roomId ? "ring-2 ring-blue-400" : ""}`}
-                  >
-                    {/* 이미지 */}
-                    <div className="relative">
-                      <img
-                        src={view.imageData}
-                        alt={view.roomName}
-                        className="w-full aspect-[4/3] object-cover cursor-pointer"
-                        onClick={() => setExpandedImage(view.id)}
-                      />
-                      {/* 오버레이 버튼 */}
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => setExpandedImage(view.id)}
-                          className="p-1.5 bg-white/90 rounded-lg shadow-sm hover:bg-white"
-                        >
-                          <Maximize2 className="w-3.5 h-3.5 text-gray-600" />
-                        </button>
-                        <button
-                          onClick={() => handleRenderRoom(floorPlan!.rooms.find((r) => r.id === view.roomId)!)}
-                          className="p-1.5 bg-white/90 rounded-lg shadow-sm hover:bg-white"
-                          title="재렌더링"
-                        >
-                          <RefreshCw className="w-3.5 h-3.5 text-gray-600" />
-                        </button>
-                      </div>
-                      {/* 확인 뱃지 */}
-                      {view.confirmed && (
-                        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                          <CheckCircle2 className="w-3 h-3" /> 확인됨
-                        </div>
-                      )}
-                      {/* 렌더링 중 오버레이 */}
-                      {isRendering && renderingRoomId === view.roomId && (
-                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <Loader2 className="w-8 h-8 animate-spin text-white" />
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 정보 + 확인 버튼 */}
-                    <div className="p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{view.roomName}</p>
-                        <p className="text-xs text-gray-400">
-                          {materials.filter((m) => m.roomId === view.roomId).length}개 자재 선택됨
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => handleConfirmView(view.id)}
-                        className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                          view.confirmed
-                            ? "bg-green-100 text-green-700 hover:bg-green-200"
-                            : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                        }`}
+              {selectedSummary.length === 0 ? (
+                <div className="text-center py-8 text-gray-400">
+                  <Package className="w-8 h-8 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">우측에서 자재를 선택하세요</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedSummary.map((item) => {
+                    const grade = GRADE_STYLES[item.product.priceGrade];
+                    return (
+                      <div
+                        key={item.categoryCode}
+                        className="flex items-start gap-2 p-2 rounded-lg bg-gray-50 border border-gray-100"
                       >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {view.confirmed ? "확인됨" : "확인"}
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                        {item.product.colorHex && (
+                          <div
+                            className="w-6 h-6 rounded border border-gray-200 flex-shrink-0 mt-0.5"
+                            style={{ backgroundColor: item.product.colorHex }}
+                          />
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] text-gray-400">{item.category}</span>
+                            <span className={`px-1 py-0 text-[9px] font-medium rounded border ${grade.bg} ${grade.text}`}>
+                              {grade.label}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium text-gray-800 truncate">
+                            {item.product.brand} {item.product.productName}
+                          </p>
+                          <p className="text-[10px] text-gray-400">
+                            {(item.product.unitPrice + item.product.laborPrice).toLocaleString()}원/{item.product.unit}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 총 자재비 */}
+            {selectedSummary.length > 0 && (
+              <div className="p-3 border-t border-gray-200 bg-blue-50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-blue-700">예상 단가 합계</span>
+                  <span className="text-sm font-bold text-blue-800">
+                    {totalMaterialCost.toLocaleString()}원
+                  </span>
+                </div>
+                <p className="text-[10px] text-blue-500 mt-1">
+                  * 실제 비용은 면적·수량 적용 후 물량산출에서 확인
+                </p>
               </div>
             )}
           </div>
         </div>
 
-        {/* 모바일 자재 패널 버튼 */}
-        {selectedRoom && (
-          <button
-            onClick={() => setShowMaterialPanel(true)}
-            className="md:hidden fixed bottom-4 right-4 z-30 flex items-center gap-2 px-4 py-3 bg-indigo-600 text-white text-sm font-medium rounded-full shadow-lg hover:bg-indigo-700 transition-colors"
-          >
-            <Palette className="w-4 h-4" />
-            자재 선택
-          </button>
-        )}
-
-        {/* 모바일 자재 오버레이 배경 */}
-        {showMaterialPanel && (
-          <div
-            className="md:hidden fixed inset-0 z-40 bg-black/50"
-            onClick={() => setShowMaterialPanel(false)}
-          />
-        )}
-
-        {/* 우측: 자재 수정 패널 */}
-        <div className={`
-          fixed inset-0 z-50 md:static md:z-auto
-          w-full md:w-[340px] md:min-w-[300px] flex-shrink-0 border-l border-gray-200 flex-col bg-white overflow-hidden
-          ${showMaterialPanel ? "flex" : "hidden md:flex"}
-        `}>
-          {/* 모바일 닫기 헤더 */}
-          <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-gray-200">
-            <span className="text-sm font-bold text-gray-900">자재 선택</span>
-            <button onClick={() => setShowMaterialPanel(false)}>
-              <X className="w-5 h-5 text-gray-500" />
-            </button>
-          </div>
-          {selectedRoom ? (
-            <>
-              {/* 방 정보 헤더 */}
-              <div className="p-4 border-b border-gray-200 bg-gradient-to-r from-indigo-50 to-blue-50">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h3 className="text-sm font-bold text-gray-900">
-                      {ROOM_TYPE_LABELS[selectedRoom.type] || selectedRoom.name}
-                    </h3>
-                    <p className="text-xs text-gray-500">{selectedRoom.area}m²</p>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleRenderRoom(selectedRoom)}
-                      disabled={isRendering}
-                      className="flex items-center gap-1 px-2.5 py-1 bg-indigo-600 text-white text-xs rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
-                    >
-                      {isRendering && renderingRoomId === selectedRoom.id ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <ImageIcon className="w-3 h-3" />
-                      )}
-                      렌더링
-                    </button>
-                  </div>
-                </div>
+        {/* 우측: 카테고리 브라우저 */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="p-3 sm:p-4">
+            {/* 필터 상태 표시 */}
+            {filterRoom && (
+              <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-blue-50 rounded-lg border border-blue-100">
+                <span className="text-xs text-blue-700">
+                  <strong>{ROOM_TYPE_LABELS[filterRoom as RoomType] || filterRoom}</strong> 공간에 적용 가능한 자재만 표시 중
+                </span>
               </div>
+            )}
 
-              {/* 자재 목록 */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="p-3">
-                  <div className="flex items-center gap-1.5 mb-3">
-                    <Palette className="w-4 h-4 text-indigo-500" />
-                    <span className="text-xs font-bold text-gray-700">자재 선택</span>
-                  </div>
+            {/* 카테고리 아코디언 */}
+            <div className="space-y-2">
+              {displayCategories.map((category) => {
+                const isExpanded = expandedCategories[category.code] ?? false;
+                const selectedProd = getSelectedProduct(category.code);
+                const hasSelection = !!selectedProd;
 
-                  {getMaterialsForRoom(selectedRoom.type).map((matGroup) => {
-                    const key = `${selectedRoom.id}-${matGroup.category}`;
-                    const isExpanded = expandedCategories[key] !== false; // 기본 펼침
-                    const currentMat = materials.find(
-                      (m) => m.roomId === selectedRoom.id && m.category === matGroup.category
-                    );
-
-                    return (
-                      <div key={key} className="mb-3 border border-gray-200 rounded-lg overflow-hidden">
-                        {/* 카테고리 헤더 */}
-                        <button
-                          onClick={() => toggleCategory(key)}
-                          className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
-                        >
+                return (
+                  <div
+                    key={category.code}
+                    className={`bg-white rounded-xl border overflow-hidden transition-all ${
+                      hasSelection ? "border-blue-200 shadow-sm" : "border-gray-200"
+                    }`}
+                  >
+                    {/* 카테고리 헤더 */}
+                    <button
+                      onClick={() => handleToggleCategory(category.code)}
+                      className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-gray-400" />
+                        )}
+                        <div className="text-left">
                           <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold text-gray-700">{matGroup.category}</span>
-                            <span className="text-[10px] text-gray-400">{matGroup.part}</span>
+                            <span className="text-sm font-bold text-gray-800">{category.nameKr}</span>
+                            <span className="text-[10px] text-gray-400">{category.products.length}개 제품</span>
                           </div>
-                          <div className="flex items-center gap-2">
-                            {currentMat && (
-                              <span className="text-[10px] text-blue-600 font-medium">
-                                {currentMat.materialName}
-                              </span>
-                            )}
-                            {isExpanded ? (
-                              <ChevronUp className="w-3.5 h-3.5 text-gray-400" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
-                            )}
-                          </div>
-                        </button>
-
-                        {/* 자재 옵션 */}
-                        {isExpanded && (
-                          <div className="p-2 space-y-1.5">
-                            {matGroup.options.map((option) => {
-                              const isSelected = currentMat?.materialName === option.name;
-                              return (
-                                <button
-                                  key={option.name}
-                                  onClick={() =>
-                                    handleMaterialChange(
-                                      selectedRoom.id,
-                                      ROOM_TYPE_LABELS[selectedRoom.type] || selectedRoom.name,
-                                      matGroup.category,
-                                      matGroup.part,
-                                      option
-                                    )
-                                  }
-                                  className={`w-full text-left p-2 rounded-lg border transition-colors ${
-                                    isSelected
-                                      ? "border-blue-400 bg-blue-50"
-                                      : "border-gray-100 hover:border-gray-300 hover:bg-gray-50"
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className={`text-xs font-medium ${isSelected ? "text-blue-700" : "text-gray-700"}`}>
-                                      {option.name}
-                                    </span>
-                                    <span className="text-xs text-gray-500">
-                                      {option.price.toLocaleString()}원/{option.unit}
-                                    </span>
-                                  </div>
-                                  <p className="text-[10px] text-gray-400 mt-0.5">{option.spec}</p>
-
-                                  {/* 부자재 표시 (선택 시) */}
-                                  {isSelected && option.subMaterials.length > 0 && (
-                                    <div className="mt-1.5 pt-1.5 border-t border-blue-200">
-                                      <p className="text-[10px] text-blue-500 font-medium mb-1">연동 부자재:</p>
-                                      {option.subMaterials.map((sub) => (
-                                        <div key={sub.name} className="flex items-center justify-between">
-                                          <span className="text-[10px] text-gray-500">
-                                            {sub.name} ({sub.specification})
-                                          </span>
-                                          <span className="text-[10px] text-gray-400">
-                                            {sub.unitPrice.toLocaleString()}원/{sub.unit}
-                                          </span>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
+                          {selectedProd && (
+                            <p className="text-xs text-blue-600 mt-0.5">
+                              {selectedProd.brand} {selectedProd.productName}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {hasSelection ? (
+                          <span className="flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded-full">
+                            <Check className="w-3 h-3" /> 선택됨
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-400 text-[10px] font-medium rounded-full">
+                            미선택
+                          </span>
                         )}
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* 선택된 자재 요약 */}
-              <div className="p-3 border-t border-gray-200 bg-gray-50">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-500">
-                    선택된 자재: <strong className="text-gray-900">{materials.filter((m) => m.roomId === selectedRoom.id).length}개</strong>
-                  </span>
-                  {renderViews.find((v) => v.roomId === selectedRoom.id) && (
-                    <button
-                      onClick={() => handleRenderRoom(selectedRoom)}
-                      disabled={isRendering}
-                      className="flex items-center gap-1 text-indigo-600 hover:text-indigo-700 font-medium"
-                    >
-                      <RefreshCw className="w-3 h-3" /> 자재 반영 재렌더링
                     </button>
-                  )}
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex-1 flex items-center justify-center p-6">
-              <div className="text-center text-gray-400">
-                <Palette className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                <p className="text-sm">평면도에서 공간을 선택하면<br />자재를 수정할 수 있습니다</p>
-              </div>
+
+                    {/* 제품 카드 그리드 */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-1">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                          {category.products.map((product) => {
+                            const isSelected = selectedProducts[category.code] === product.id;
+                            const grade = GRADE_STYLES[product.priceGrade];
+
+                            return (
+                              <button
+                                key={product.id}
+                                onClick={() => handleProductSelect(category, product)}
+                                className={`text-left p-3 rounded-xl border-2 transition-all ${
+                                  isSelected
+                                    ? "border-blue-500 bg-blue-50/50 shadow-sm"
+                                    : "border-gray-100 hover:border-gray-300 hover:bg-gray-50"
+                                }`}
+                              >
+                                {/* 컬러 스와치 + 등급 */}
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    {product.colorHex ? (
+                                      <div
+                                        className="w-8 h-8 rounded-lg border border-gray-200"
+                                        style={{ backgroundColor: product.colorHex }}
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200" />
+                                    )}
+                                    <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded border ${grade.bg} ${grade.text}`}>
+                                      {grade.label}
+                                    </span>
+                                  </div>
+                                  {isSelected && (
+                                    <div className="w-5 h-5 rounded-full bg-blue-500 flex items-center justify-center">
+                                      <Check className="w-3 h-3 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* 브랜드 + 제품명 */}
+                                <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                                <p className={`text-xs font-medium mb-1 ${isSelected ? "text-blue-800" : "text-gray-800"}`}>
+                                  {product.productName}
+                                </p>
+
+                                {/* 규격 */}
+                                <p className="text-[10px] text-gray-400 mb-2 line-clamp-1">{product.spec}</p>
+
+                                {/* 가격 */}
+                                <div className="flex items-baseline justify-between">
+                                  <div>
+                                    <span className="text-sm font-bold text-gray-900">
+                                      {product.unitPrice.toLocaleString()}
+                                    </span>
+                                    <span className="text-[10px] text-gray-400">원/{product.unit}</span>
+                                  </div>
+                                  <span className="text-[10px] text-gray-400">
+                                    +시공 {product.laborPrice.toLocaleString()}
+                                  </span>
+                                </div>
+
+                                {/* 태그 */}
+                                {product.tags.length > 0 && (
+                                  <div className="flex flex-wrap gap-1 mt-2">
+                                    {product.tags.map((tag) => (
+                                      <span
+                                        key={tag}
+                                        className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded"
+                                      >
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* 부자재 (선택 시 표시) */}
+                                {isSelected && product.subItems.length > 0 && (
+                                  <div className="mt-2 pt-2 border-t border-blue-200">
+                                    <p className="text-[10px] text-blue-500 font-medium mb-1">포함 부자재:</p>
+                                    {product.subItems.map((sub) => (
+                                      <div key={sub.name} className="flex items-center justify-between">
+                                        <span className="text-[10px] text-gray-500">
+                                          {sub.name} ({sub.specification})
+                                        </span>
+                                        <span className="text-[10px] text-gray-400">
+                                          {sub.unitPrice.toLocaleString()}원/{sub.unit}
+                                        </span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* 이미지 확대 모달 */}
-      {expandedImage && (
-        <div
-          className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-8"
-          onClick={() => setExpandedImage(null)}
+      {/* 모바일 하단 고정 바 */}
+      <div className="md:hidden sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-30">
+        <button
+          onClick={() => setShowMobileSummary(!showMobileSummary)}
+          className="flex items-center gap-2"
         >
-          <div className="relative max-w-4xl w-full" onClick={(e) => e.stopPropagation()}>
-            <button
-              onClick={() => setExpandedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300"
-            >
-              <X className="w-6 h-6" />
-            </button>
-            <img
-              src={renderViews.find((v) => v.id === expandedImage)?.imageData}
-              alt="확대 보기"
-              className="w-full rounded-xl"
-            />
-            <div className="text-white text-sm mt-3 text-center">
-              <p className="font-medium">{renderViews.find((v) => v.id === expandedImage)?.roomName}</p>
-            </div>
-          </div>
-        </div>
-      )}
+          <span className="text-xs text-gray-500">
+            {selectedCount}/{totalCategories} 선택
+          </span>
+          {totalMaterialCost > 0 && (
+            <span className="text-sm font-bold text-gray-900">
+              {totalMaterialCost.toLocaleString()}원
+            </span>
+          )}
+          <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${showMobileSummary ? "rotate-180" : ""}`} />
+        </button>
+        <button
+          onClick={handleSaveAndNext}
+          className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+        >
+          물량산출 <ArrowRight className="w-4 h-4" />
+        </button>
+      </div>
 
-      {/* 크레딧 충전 모달 */}
-      <CreditChargeModal open={showChargeModal} onClose={() => setShowChargeModal(false)} />
+      {/* 모바일 선택 요약 시트 */}
+      {showMobileSummary && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 z-40 bg-black/50"
+            onClick={() => setShowMobileSummary(false)}
+          />
+          <div className="md:hidden fixed bottom-0 inset-x-0 z-50 bg-white rounded-t-2xl max-h-[60vh] flex flex-col">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+              <span className="text-sm font-bold text-gray-900">선택된 자재</span>
+              <button onClick={() => setShowMobileSummary(false)}>
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {selectedSummary.length === 0 ? (
+                <p className="text-xs text-gray-400 text-center py-6">선택된 자재가 없습니다</p>
+              ) : (
+                selectedSummary.map((item) => {
+                  const grade = GRADE_STYLES[item.product.priceGrade];
+                  return (
+                    <div
+                      key={item.categoryCode}
+                      className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50"
+                    >
+                      {item.product.colorHex && (
+                        <div
+                          className="w-6 h-6 rounded border border-gray-200 flex-shrink-0"
+                          style={{ backgroundColor: item.product.colorHex }}
+                        />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-gray-400">{item.category}</span>
+                          <span className={`px-1 py-0 text-[9px] font-medium rounded border ${grade.bg} ${grade.text}`}>
+                            {grade.label}
+                          </span>
+                        </div>
+                        <p className="text-xs font-medium text-gray-800 truncate">
+                          {item.product.brand} {item.product.productName}
+                        </p>
+                      </div>
+                      <span className="text-xs font-medium text-gray-600 flex-shrink-0">
+                        {(item.product.unitPrice + item.product.laborPrice).toLocaleString()}원
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            {totalMaterialCost > 0 && (
+              <div className="p-4 border-t border-gray-200 bg-blue-50">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-blue-700">예상 단가 합계</span>
+                  <span className="text-sm font-bold text-blue-800">
+                    {totalMaterialCost.toLocaleString()}원
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
