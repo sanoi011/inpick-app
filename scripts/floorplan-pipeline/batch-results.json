@@ -1,0 +1,3606 @@
+{
+  "total": 719,
+  "processed": 719,
+  "cleanOk": 672,
+  "cleanFail": 0,
+  "dimOk": 697,
+  "dimFail": 22,
+  "elapsed_min": "552.6",
+  "results": [
+    {
+      "label": "K타운(도시형)/27HB_18.23m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/28HG_18.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/29HA_19.4m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/32HI_20.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/34HC_23.34m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/35HF_23.09m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/36HD_24.48m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/39HH_25.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "K타운(도시형)/40HE_27.32m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "SK허브(주상복합)/109A_83.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "SK허브(주상복합)/118B_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "SK허브(주상복합)/145_111.18m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "SK허브(주상복합)/155B_118.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/121_89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/67_49.4m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/74_54.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/80_58.62m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/81C_59.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "가나파로스빌1(주상복합)/82B_59.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "갑천1트리풀시티힐스테이트/109C_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "갑천1트리풀시티힐스테이트/110A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "갑천1트리풀시티힐스테이트/110B_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "갑천1트리풀시티힐스테이트/78A_59.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "갑천1트리풀시티힐스테이트/78B_59.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/100A_86.57m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/101B_86.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/106_90.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/108A_93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/110B_93.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/114_98.08m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌(주상복합)/118_101.28m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/161_132.35m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/191B_163.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/193A_163.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/194C_164.22m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/226_192.17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌1단지/244_208.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2단지/161_132.35m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2단지/192B_163.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2단지/194A_163.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2단지/226_192.17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2단지/243_208.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2차(주상복합)/105A_84.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2차(주상복합)/105B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2차(주상복합)/147_118.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "경남아너스빌2차(주상복합)/153_120.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "그랑펠리체(주상복합)/110_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/106_84.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/120A_99.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/122B_99.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/142_117.54m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/72_53.13m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나래/90_70.2m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나이스팰리스(도시형)/30_20.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나이스팰리스(도시형)/34_23.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나이스팰리스(도시형)/37_26.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나이스팰리스(도시형)/38_26.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "나이스팰리스(도시형)/42_29.52m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/74A1_51.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/74A_51.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/85A1_59.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/85A_59.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/85B1_59.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "네이처뷰/85B_59.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/100B_77.1m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/101C_78.23m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/110A_84.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/112A_84.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/78B_59.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스2(주상복합)/79A1_59.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스3(주상복합)/107A_84.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스3(주상복합)/107B_84.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스3(주상복합)/108C_84.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스3(주상복합)/108D_84.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스타워(주상복합)/109_96.04m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스타워(주상복합)/117_103.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스타워(주상복합)/130_114.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노블레스타워(주상복합)/142_124.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은3지구영무예다음에코타운/102_79.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은3지구영무예다음에코타운/107A_84.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은3지구영무예다음에코타운/107B_84.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은3지구영무예다음에코타운/111_84.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은3지구영무예다음에코타운/94_74.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은노블레스(주상복합)/159_144.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은리슈빌3/112A_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은리슈빌3/113B_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은리슈빌3/132_102.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/73A_51.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/73B_51.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/73C_51.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/84A1_59.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/84A_59.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은새미래숲2단지/84B_59.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/110A_81.07m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/112A_82.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/112B_82.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/115B_84.11m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/65_47.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은스타돔(주상복합)/97_71.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은시티빌(메가시티,주상복합)/112_112.3m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은에코힐/111A_84.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은에코힐/98A_74.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은에코힐/98B_74.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은카운티스/175_141.02m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은카운티스/178A_142.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은카운티스/178B_142.61m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "노은카운티스/209_169.04m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린1단지/115A_84.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린1단지/117B_84.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린1단지/133A_101.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린1단지/134B_101.18m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린1단지/165_125.62m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린2단지/113A_84.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린2단지/115B_84.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린2단지/130A_101.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린2단지/131B_101.18m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은한화꿈에그린2단지/160_125.62m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을5단지/111A_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을5단지/68A_51.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을5단지/78A_59.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을5단지/98A_74.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을5단지/98B_74.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을6단지/110A_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을6단지/97A_74.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "노은해랑숲마을6단지/97B_74.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리10단지꿈에그린/112A_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리10단지꿈에그린/113C_84.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리10단지꿈에그린/114B_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리10단지꿈에그린/144_114.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리10단지꿈에그린/161_129.46m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리11단지필유/152B_122.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리11단지필유/154A_123.12m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리11단지필유/182_144.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리11단지필유/223_181.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리12단지필유/115_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리12단지필유/134A_101.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리12단지필유/134B_101.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리12단지필유/174_140.04m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리12단지필유/214_173.06m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리1단지꿈에그린/113_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리1단지꿈에그린/118_84.93m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "대덕테크노밸리1단지꿈에그린/146_114.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리1단지꿈에그린/152_125.06m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리1단지꿈에그린/87_59.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리2단지푸르지오/109B_84.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리2단지푸르지오/110A_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리2단지푸르지오/132_101.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리2단지푸르지오/151_118.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리3단지중앙하이츠빌/113_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리3단지중앙하이츠빌/166A_130.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리3단지중앙하이츠빌/166B_130.3m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리4단지스윗닷홈/109_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리4단지스윗닷홈/115_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리5단지파밀리에/110_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리5단지파밀리에/115_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리5단지파밀리에/129_100.44m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리5단지파밀리에/149_120.01m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리5단지파밀리에/96_69.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리6단지네오미아/116A_84.45m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "대덕테크노밸리6단지네오미아/118B_84.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리6단지네오미아/135_100m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리6단지네오미아/164_129.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리7단지백조예미지/119_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리7단지백조예미지/135_101.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리7단지백조예미지/166_128.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리8단지백조예미지/119_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리8단지백조예미지/135_101.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리8단지백조예미지/167_128.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리9단지꿈에그린/111_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리9단지꿈에그린/145_114.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리9단지꿈에그린/158_128.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/159A_133.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/159B_136.03m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/160C_137.34m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/160_136.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/187A_158.17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/187B_159.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/204A_172.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/204B_172.52m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임1단지/204C_170.46m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/159D_133.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/159E_133.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/160A_137.34m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/160B_136.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/160C_136.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/186B_158.17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/187A_159.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/204A_172.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/204B_172.52m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대덕테크노밸리푸르지오하임2단지/204C_170.46m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대림두레/122_108.63m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대림두레/132_119.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대림두레/84_71.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대림두레/97_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/102A_76.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/113A_84.94m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "대전둔곡우미린/113C_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/114B_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/88A_65.35m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/92A_68.52m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전둔곡우미린/99A_73.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움1단지/105_84.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움1단지/79A_59.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움1단지/79B_59.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움2단지/107_84.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움2단지/93A_74.16m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전드리움2단지/94B_74.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전반석더샵/107A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전반석더샵/108B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전반석더샵/124_98.53m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전반석더샵/94A_73.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전반석더샵/94B_73.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티1단지/111A_84.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티1단지/111B_84.82m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티1단지/133A_104.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/111A_84.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/112B_84.82m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/134A_104.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/134B_104.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/152_122.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/178_145.4m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/226P_177.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전아이파크시티2단지/295P_234.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/118A1_92.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/118A2_92.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/118B1_92.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/118B2_92.89m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "대전학하지구오투그란데미학/130_103.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/150A_118.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "대전학하지구오투그란데미학/151B_119.33m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/32B_19.35m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/37C_22.21m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/44A_26.1m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/48E_28.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/49F_30.07m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더그린(도시형)/53D_32.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더포엠I(주상복합)/171A_141.08m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더포엠I(주상복합)/173B_142.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더포엠I(주상복합)/184B_151.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더포엠I(주상복합)/185A_152.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "더포엠I(주상복합)/197_162.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡로덴하우스/165_140.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡로덴하우스/198_167.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡로덴하우스/247A_207.3m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡로덴하우스/249B_210.27m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/105_79.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/110A_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/110B_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/132_102.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/80A_61.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도룡포레미소지움/81B_61.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/112A_84.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/112B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/112C_84.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/112D_84.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/112E_84.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/99A1_74.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안6단지센트럴시티/99A_74.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시5블록트리풀시티/112A_84.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시5블록트리풀시티/113D_84.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시5블록트리풀시티/114B_84.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시5블록트리풀시티/114C_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시7단지예미지백조의호수/117A_84.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시7단지예미지백조의호수/118B_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시7단지예미지백조의호수/118C_84.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시7단지예미지백조의호수/118D_84.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/127A_101.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/127B_101.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/127C_101.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148A_119.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148B_119.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148C_119.03m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148D_119.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148E_119.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/148F_136.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/171_139.09m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/183A_148.32m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/183B_148.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/183C_173.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시9BL트리풀시티/232_186.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시한라비발디/132A_101.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시한라비발디/134B_101.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시한라비발디/159A_124.93m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "도안신도시한라비발디/160B_124.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "도안신도시한라비발디/163_124.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "드림월드/112_84.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "드림월드/129_99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "드림월드/165_131.02m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "라온팰리스(도시형)/47A_29.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "라온팰리스(도시형)/47B_29.96m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "럭키하나/102_84.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "럭키하나/138_117.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "럭키하나/174_151.42m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "럭키하나/88_72.47m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/22C1_14.13m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/22C_14.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/23A_14.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/24B3_15.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/25A2_15.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미3차(도시형)/49D_31.07m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/26A_18.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/27B_20.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/27C_20.2m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/27D_20.09m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/31_23m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/44_32.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/55_41.56m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미리버뷰시티(도시형)/64_48.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미멀티홈/106A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미멀티홈/116B_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "레자미멀티홈/116C_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/27_19.08m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/29A_19.06m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/31B_21.28m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/33_23.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/45_33.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리버스토리(도시형)/52_36.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/31_19.8m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/32A_21.08m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/34B_22.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/36_23.65m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/41_26.42m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/44_28.2m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(445-4,도시형)/63_41.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(448-5,도시형)/42_28.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "리베라아이누리(448-5,도시형)/50_34.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "목련1단지/106_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "목련1단지/79_59.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "목련2단지/106_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "목련2단지/79_59.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/113A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/113C_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/114B-1_84.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/114B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/114D_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/82A_59.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/82B_59.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "문지효성해링턴플레이스/82C_59.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미메이드/112A_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미메이드/113B_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미메이드/113C_84.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미메이드/151_121.38m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미성샤르망(주상복합)/105_80m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미성샤르망(주상복합)/89A_67.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미성샤르망(주상복합)/89B_68.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "미성샤르망(주상복합)/89C_68.3m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석1단지호반리젠시빌/113B_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석1단지호반리젠시빌/115A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석1단지호반리젠시빌/98_69.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석2단지계룡리슈빌/130_97.36m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "반석2단지계룡리슈빌/162_132.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석2단지계룡리슈빌/189_150.01m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석3단지호반베르디움/145_113.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석3단지호반베르디움/177_142.13m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석3단지호반베르디움/211_175.11m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석5단지예미지/129A_101.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석5단지예미지/130B_101.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석5단지예미지/160A_132.05m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석5단지예미지/160B1_132.05m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석6단지삼부르네상스/116B_84.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석6단지삼부르네상스/117A_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석6단지삼부르네상스/122_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석7단지삼부르네상스/103_76.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석7단지삼부르네상스/112A_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "반석7단지삼부르네상스/112B_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "베르디아망(주상복합)/72_55.18m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "베르디움/111A_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "베르디움/111B_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "베르디움/111C_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "베르디움/112D_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "봉명나이스타운11차(도시형)/67_49.19m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "봉명나이스타운11차(도시형)/67_49.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "브리젠힐스/215_188.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "사이언스타운(주상복합)/102_76.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "사이언스타운(주상복합)/112A_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "사이언스타운(주상복합)/112B_84.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "사이언스타운(주상복합)/113_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "사이언스타운(주상복합)/95_70.33m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/110_99.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/129_117.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/153_142.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/63_54.48m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/81_71.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/95B_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "삼성한울/96A_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "샘물타운/105_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "샘물타운/119_99.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "샘물타운/76_60m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "샘물타운/93_74.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "성원상떼빌/109_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송강그린/105_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송강그린/77A_59.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송강그린/77B_59.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송강마을2단지/69_49.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림1단지호반리젠시빌/114C_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림1단지호반리젠시빌/115A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림1단지호반리젠시빌/98_69.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림2단지이노스빌/113_84.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림2단지이노스빌/116_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림2단지이노스빌/122_84.82m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림3단지이노스빌/104_78.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림3단지이노스빌/116_84.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림5단지e-그리운/118A_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림5단지e-그리운/118B_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림5단지e-그리운/88_59.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림6단지풍요로운/155_123.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "송림6단지풍요로운/194_157.63m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "수가(도시형)/50B_23.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "수가(도시형)/52C_24.56m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/112_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/145_101.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/180_134.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/228_171.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/246_189.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/264_203.28m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/281_205.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/322_237.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/325_247.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티2단지(주상복합)/344_260.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/112_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/145_101.98m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/180_134.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/228_171.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/246_189.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/264_203.28m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/281_205.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/322_237.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/325_247.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스마트시티5단지(주상복합)/344_260.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰/30A_20.16m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰/34_23.09m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰/36_24.62m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰로드(도시형)/29B_18.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰로드(도시형)/30A_19.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰로드(도시형)/66D_43.76m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리버(도시형)/30_19.21m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리버(도시형)/40_26.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/68A_47.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/68B_48.15m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/69C_48.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/69D_48.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/71A_48.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/71B_48.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/71C_48.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰리브(도시형)/71D_48.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/31B_21.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/31_21.45m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/32A_22.22m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/39A_27.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/39B_27.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/39C_27.16m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/39D_28.07m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/39E_27.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/51_35.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스카이뷰시티(도시형)/51_35.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스타빌플러스(도시형)/38A_22.41m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스타빌플러스(도시형)/38C_22.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "스타빌플러스(도시형)/39B_23.3m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/34A-2_17.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/35A_17.82m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/37B1_18.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/37B_18.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/46A-1_23.15m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "시티팰리스(101동,도시형)/49B-2_24.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "신영미소랑(도시형)/22A_15.33m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "신영미소랑(도시형)/23B_15.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "신영미소랑(도시형)/25_17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "씨티팰리스(도시형)/23_14.46m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "씨티팰리스(도시형)/27B_17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "씨티팰리스(도시형)/29_17.46m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "씨티팰리스(도시형)/34_21.26m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/111A_84.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/111B_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/95A_70.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/96B_70.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/96C_70.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "양우내안애레이크힐/96D_70.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "어울림하트/101A_74.82m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "어울림하트/101B_74.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "어울림하트/101C_74.48m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "어울림하트/114A_84.47m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "어울림하트/114B_84.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "에이스타운4차(주상복합)/108_69.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "에이스타운4차(주상복합)/32_20.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "에이스타운4차(주상복합)/36_22.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "에이스타운4차(주상복합)/39_25.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/106A_84.17m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/107B_84.62m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/107_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/143_116.37m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/161_133.11m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/186A_157.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엑스포/187B_157.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스1차(도시형)/28E_18.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스1차(도시형)/31A_20.13m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스1차(도시형)/38B_25.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스1차(도시형)/38C_24.49m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스1차(도시형)/38D_24.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/31F_19.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/32A_20.28m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/32C_20.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/39B_25.6m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/39E_25.44m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "엔터팰리스2차(도시형)/40D_26.01m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매11단지리슈빌/125_102m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매11단지리슈빌/152_128.34m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매11단지리슈빌/204_169.13m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매11단지리슈빌/80_59.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매1단지삼부/100B_73.54m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매1단지삼부/101A_73.54m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매1단지삼부/113_84.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매2단지한라/88A_59.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매2단지한라/88B_59.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매3단지대우/106A_84.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매3단지대우/108B_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매3단지대우/108C_84.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매3단지대우/95_75.79m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매4단지현대/79B_59.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매4단지현대/80A_59.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매5단지운암/125A_101.58m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매5단지운암/125B_101.63m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매5단지운암/161_130.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매5단지운암/199_163.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매6단지현대/110_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매6단지현대/97_71.34m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매7단지현대/104A_84.71m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매7단지현대/106B_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매7단지현대/97_77.04m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매8단지새미래/125B_99.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매8단지새미래/127A_99.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매8단지새미래/158_129.77m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매8단지새미래/197_163.73m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "열매9단지금성백조/115A_84.97m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "열매9단지금성백조/116B_84.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "운암네오미아/111_83.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "운암네오미아/131_101.4m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "운암네오미아/151_127.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "운암네오미아/159_134.42m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "월드컵패밀리타운/114_84.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "월드컵패밀리타운/157_125.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "월드컵패밀리타운/199_161.25m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/108_82.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/117A_89.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/139_106.6m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/60_45.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/87B_66.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "위드리버(주상복합)/98_75.19m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/158A_127.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/190_151.9m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/203_165.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/210A_170.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/220_179.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/255_203.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성CJ나인파크(주상복합)/272_216.75m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "유성둔곡지구서한이다음1단지/79A_59.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성둔곡지구서한이다음1단지/80B_59.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성둔곡지구서한이다음2단지/100_78.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성둔곡지구서한이다음2단지/107_84.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/106H_75.39m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/117B_84.91m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/117D_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/118C_84.2m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/118J_84.86m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/118L_84.66m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/119A_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/119K_84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/120M_84.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/76I_54.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/88G_64.11m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/91E_65.19m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/91_65.16m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성세움펠리피아(주상복합)/92F_65.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성숲오투그란데3차/107_79.99m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "유성숲오투그란데3차/81_59.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성숲오투그란데3차/93_69.6m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성오투그란데리빙포레/101_77.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성오투그란데리빙포레/104_79.47m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성오투그란데리빙포레/111_84.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성오투그란데리빙포레/79_59.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성온천훼미리타운(주상복합)/104_75.51m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성온천훼미리타운(주상복합)/55B_40.21m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성온천훼미리타운(주상복합)/61_44.45m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성온천훼미리타운(주상복합)/65A_47.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/137A_100.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/138B_102.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/162A_121.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/164B_122.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/230_168.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성자이(주상복합)/300_221.12m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성푸르지오시티(도시형)/28B1_17.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성푸르지오시티(도시형)/28B2_17.43m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성푸르지오시티(도시형)/29A1_17.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성푸르지오시티(도시형)/29A2_17.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "유성푸르지오시티(도시형)/29A3_17.55m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "이지/76_59.3m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "인스빌리베라/129_101.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "인스빌리베라/164_130.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "인스빌리베라/266_209.72m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "인앤인(주상복합)/128_99.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "인앤인(주상복합)/170_132.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "인앤인(주상복합)/213_162.48m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "장대푸르지오/117_84.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "장대푸르지오/164_128.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "장대푸르지오/190_150.58m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "제이파크/113B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "제이파크/114C1_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "제이파크/114C3_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "제이파크/115C2_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "제이파크/149_122.31m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "좋은하루3차(도시형)/26_14.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동금성백조예미지/112D_84.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동금성백조예미지/134A_101.41m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동금성백조예미지/98A_74.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동대원칸타빌/100A_74.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동대원칸타빌/101B_74.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동대원칸타빌/113A_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동대원칸타빌/113B_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동대원칸타빌/115C_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동천년나무5단지/73A_51.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동천년나무5단지/84A1_59.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동천년나무5단지/84A_59.89m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동천년나무5단지/84B1_59.95m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "죽동천년나무5단지/84B_59.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동푸르지오/111A_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동푸르지오/111C_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동푸르지오/112B_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "죽동푸르지오/99_75.32m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "진잠타운/57_39.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "진잠타운/65_49.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "진잠타운/77_59.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/102(뉴서울)_84.44m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/102(신호)_84.44m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/102(태영)_84.44m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/77(뉴서울)_59.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/77(신호)_59.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(뉴서울,신호,태영)/77(태영)_59.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(한양)/102_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "청솔(한양)/55_40.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "타워코리아나(주상복합)/155_124.99m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "투유1차(주상복합)/108_84.45m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "투유1차(주상복합)/46_35.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "투유1차(주상복합)/51_40.2m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "투유1차(주상복합)/55_43.38m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "투유2차(주상복합)/53_41.45m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "투유2차(주상복합)/56_44.03m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "트리풀시티포레/111A_84.11m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "트리풀시티포레/112B_84.21m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "트리풀시티포레/117P_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "트리풀시티포레/98_74.16m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/108A1_84.91m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "하늘바람휴먼시아/108D_84.81m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/109A2_84.92m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/109B1_84.18m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/109B2_84.14m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/109C_84.36m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/110E_84.91m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/139A1_108.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/139A2_108.83m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/139B_108.7m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하늘바람휴먼시아/97_74.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/128A_101.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/129B_101.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/130C_101.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/156A_126.85m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/157B_126.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하우스토리/181_149.5m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하이랜드Ⅲ(도시형)/34A_24.48m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "하이랜드Ⅲ(도시형)/35B_25.05m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "학하리슈빌학의뜰/112B_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "학하리슈빌학의뜰/115A_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "학하리슈빌학의뜰/132_100.61m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "학하리슈빌학의뜰/158_128.54m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한마을/107_84.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한마을/158_132.67m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/110A_99.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/110B_99.84m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/127A_117.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/127B_117.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/129C_117.29m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/152_142.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/154A_142.68m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/154B_142.69m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/63_54.48m2",
+      "step": "dim",
+      "success": false
+    },
+    {
+      "label": "한빛/81A_71.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/81B_71.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/94A_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/95D_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/96B_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한빛/96C_84.93m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한솔/103_84.94m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한솔/77_58.74m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한아름/107_84.99m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한아름/121_99.96m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한아름/78_60m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "한일유앤아이/151_122.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "해나래(도시형)/31E_18.45m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "해나래(도시형)/32A_18.88m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "해나래(도시형)/39B_24.27m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "해나래(도시형)/39C_23.78m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "해나래(도시형)/40D_24.01m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "호반써밋그랜드파크1BL/115A_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "호반써밋그랜드파크1BL/116B_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "호반써밋그랜드파크3BL/115A_84.97m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "호반써밋그랜드파크3BL/116B_84.98m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/29A_18.95m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/37_24.46m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/57A_37.47m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/57B_37.47m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/63A_41.53m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/63B_41.64m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "휴안팰리스(도시형)/63C_41.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "희상원/100B_78.6m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "희상원/106_84.08m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "희상원/84_66.12m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "희상원/99A_77.75m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "힐링타운(도시형)/22_14.65m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "힐링타운(도시형)/25_16.87m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "힐링타운(도시형)/36_24.06m2",
+      "step": "done",
+      "success": true
+    },
+    {
+      "label": "힐링타운(도시형)/45_30.23m2",
+      "step": "done",
+      "success": true
+    }
+  ]
+}
