@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import {
-  MessageSquare, Sparkles, Bot, Send,
+  Sparkles, Bot, Send,
   Building2, Shield, Star, FileCheck, Award, ChevronRight,
   Database, ArrowRight, RefreshCw, TrendingUp,
   Maximize, Layers, PaintBucket,
@@ -37,29 +37,29 @@ export function AIConsultAnimation() {
         const prompt = AI_PROMPTS[msgIdx % AI_PROMPTS.length];
         if (charIdx < prompt.length) {
           setCharIdx((c) => c + 1);
-          timerRef.current = setTimeout(tick, 20 + Math.random() * 15);
+          timerRef.current = setTimeout(tick, 8 + Math.random() * 8);
         } else {
           // Finish typing → add message
           setMessages((prev) => [...prev, { role: "user", text: prompt, visible: true }]);
           setCharIdx(0);
           setPhase(1);
-          timerRef.current = setTimeout(tick, 400);
+          timerRef.current = setTimeout(tick, 250);
         }
       } else if (phase === 1) {
         // AI responds one by one
         if (msgIdx < AI_RESPONSES.length) {
           setMessages((prev) => [...prev, { role: "ai", text: AI_RESPONSES[msgIdx], visible: true }]);
           setMsgIdx((i) => i + 1);
-          timerRef.current = setTimeout(tick, 500);
+          timerRef.current = setTimeout(tick, 350);
         } else {
           setPhase(2);
           setShowDesign(true);
-          timerRef.current = setTimeout(tick, 2000);
+          timerRef.current = setTimeout(tick, 1500);
         }
       } else if (phase === 2) {
         // Show design, then reset
         setPhase(3);
-        timerRef.current = setTimeout(tick, 1000);
+        timerRef.current = setTimeout(tick, 600);
       } else {
         // Reset
         setMessages([]);
@@ -67,10 +67,10 @@ export function AIConsultAnimation() {
         setMsgIdx(0);
         setShowDesign(false);
         setPhase(0);
-        timerRef.current = setTimeout(tick, 300);
+        timerRef.current = setTimeout(tick, 200);
       }
     };
-    timerRef.current = setTimeout(tick, 500);
+    timerRef.current = setTimeout(tick, 300);
     return () => clearTimeout(timerRef.current);
   }, [phase, charIdx, msgIdx]);
 
@@ -133,15 +133,36 @@ export function AIConsultAnimation() {
         )}
       </div>
 
-      {/* Input area */}
-      <div className="mt-2 flex items-center gap-2 bg-white/10 rounded-xl px-3 py-2">
-        <MessageSquare className="w-4 h-4 text-white/40" />
-        <span className="flex-1 text-xs text-white/60">
-          {currentTyping}
-          {phase === 0 && <span className="animate-blink text-white/80">|</span>}
-          {phase !== 0 && "메시지를 입력하세요..."}
-        </span>
-        <Send className="w-4 h-4 text-blue-400" />
+      {/* Suggested prompts */}
+      {messages.length === 0 && phase === 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5 animate-fadeIn">
+          {["모던 거실 리모델링", "욕실 타일 추천", "25평 전체 견적"].map((tag) => (
+            <span
+              key={tag}
+              className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-gradient-to-r from-blue-500/20 to-violet-500/20 text-blue-300 border border-blue-400/20 backdrop-blur-sm"
+            >
+              <Sparkles className="w-2.5 h-2.5 inline mr-0.5 -mt-px" />
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Input area — gradient border wrapper */}
+      <div className="mt-3 p-[1px] rounded-xl bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 animate-gradientShift">
+        <div className="flex items-center gap-3 bg-slate-800/95 backdrop-blur-sm rounded-[11px] px-4 py-3.5">
+          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-3.5 h-3.5 text-white" />
+          </div>
+          <span className="flex-1 text-sm text-white/70 min-h-[20px] leading-relaxed">
+            {currentTyping}
+            {phase === 0 && <span className="animate-blink text-white/90">|</span>}
+            {phase !== 0 && "어떤 인테리어를 원하세요?"}
+          </span>
+          <button className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/25">
+            <Send className="w-4 h-4 text-white" />
+          </button>
+        </div>
       </div>
 
       <style jsx>{`
@@ -161,10 +182,15 @@ export function AIConsultAnimation() {
           0%, 100% { opacity: 1; }
           50% { opacity: 0; }
         }
+        @keyframes gradientShift {
+          0%, 100% { background-position: 0% 50%; }
+          50% { background-position: 100% 50%; }
+        }
         .animate-slideUp { animation: slideUp 0.3s ease-out; }
         .animate-fadeIn { animation: fadeIn 0.6s ease-out; }
         .animate-scaleIn { animation: scaleIn 0.4s ease-out both; }
         .animate-blink { animation: blink 0.8s infinite; }
+        .animate-gradientShift { background-size: 200% 200%; animation: gradientShift 3s ease infinite; }
       `}</style>
     </div>
   );

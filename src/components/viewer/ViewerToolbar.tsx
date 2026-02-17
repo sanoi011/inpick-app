@@ -1,6 +1,6 @@
 "use client";
 
-import { ZoomIn, ZoomOut, Maximize, Ruler, Tag, PencilRuler } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Ruler, Tag, PencilRuler, FlipHorizontal2 } from "lucide-react";
 
 interface ViewerToolbarProps {
   // 줌
@@ -16,6 +16,9 @@ interface ViewerToolbarProps {
   // 치수 편집
   editingDimensions?: boolean;
   onToggleEditDimensions?: () => void;
+  // 좌우 대칭
+  mirrored?: boolean;
+  onToggleMirror?: () => void;
 }
 
 export default function ViewerToolbar({
@@ -28,11 +31,27 @@ export default function ViewerToolbar({
   onToggleEngInfo,
   editingDimensions = false,
   onToggleEditDimensions,
+  mirrored = false,
+  onToggleMirror,
 }: ViewerToolbarProps) {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-white/95 backdrop-blur-sm border-t border-gray-200">
       {/* 좌: 치수 편집 */}
       <div className="flex items-center gap-2">
+        {onToggleMirror && (
+          <button
+            onClick={onToggleMirror}
+            className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+              mirrored
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
+            }`}
+            title="좌우 대칭"
+          >
+            <FlipHorizontal2 className="w-3.5 h-3.5" />
+            좌우 대칭
+          </button>
+        )}
         {onToggleEditDimensions && (
           <button
             onClick={onToggleEditDimensions}

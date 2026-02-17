@@ -1420,3 +1420,53 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   건물 정보 없음 → "동/호수 직접 입력" → 동/호 입력 → 평형 검색
   → naver-cache에서 pyeongList 반환 → 평형 선택 → BuildingInfo 생성
 ```
+
+## 완료된 작업 (2026-02-17) - 84B E2E 워크플로우 검증
+
+### 84B 도면 데이터 수정
+- `public/floorplans/sample-84b.json` (수정) - 4건 fixture roomId + 3건 door connectedRooms 오류 수정
+  - fixture-2 (bathtub): roomId "" → "room-1" (욕실1)
+  - fixture-5 (toilet): roomId "room-10" → "room-9" (욕실2)
+  - fixture-6 (sink): roomId "room-10" → "room-9" (욕실2)
+  - fixture-7 (bathtub): roomId "" → "room-9" (욕실2)
+  - door-5: connectedRooms DRESSROOM → BATHROOM
+  - door-6: connectedRooms DRESSROOM → BATHROOM
+  - door-8: connectedRooms UTILITY → LIVING
+
+### E2E 검증 결과 (자동화 스크립트)
+- `scripts/verify-84b-e2e.mjs` - 데이터 무결성 + 렌더링 + 엔진 데이터 검증
+- `scripts/verify-84b-qty.ts` - 실제 물량산출 + 견적 엔진 실행 검증
+
+### 검증 통과 항목
+| 검증 항목 | 결과 | 상세 |
+|----------|------|------|
+| 데이터 무결성 | ✅ PASS | 11방, 39벽, 9문, 5창, 8설비, 모든 필드 유효 |
+| 면적 정합성 | ✅ PASS | 11개 방 폴리곤 면적 = 기재 면적 (오차 0.1% 이내) |
+| 2D 뷰어 | ✅ PASS | 11/11 폴리곤, 12.07m × 10.29m 바운딩 |
+| 3D 뷰어 | ✅ PASS | ~83 메쉬 (22 floor/ceiling + 39 wall + 22 opening/fixture) |
+| adaptParsedFloorPlan | ✅ PASS | 11방, 39벽, 14개구부, 8설비, 습식 2개 |
+| calculateAllQuantities | ✅ PASS | 100개 아이템, 16/17 공종 산출 (조적 0 = 정상) |
+| calculateEstimate | ✅ PASS | 100개 라인, 미매칭 0건 |
+| 견적 합리성 | ✅ PASS | 4,597만원 (54.7만원/m², 180.9만원/평) |
+| RFQ 데이터 구조 | ✅ PASS | 페이로드 유효 |
+| 빌드 | ✅ PASS | `npx next build` 성공 |
+
+### 견적 결과 상세 (84B 84m²)
+- **직접 재료비**: 1,751만원
+- **직접 노무비**: 2,004만원
+- **관리비 (6%)**: 225만원
+- **이윤 (5%)**: 199만원
+- **부가세 (10%)**: 418만원
+- **총합계**: 4,597만원
+
+### 공종별 금액
+| 공종 | 금액 | 공종 | 금액 |
+|------|------|------|------|
+| 철거 | 366만원 | 바닥재 | 504만원 |
+| 미장 | 19만원 | 도배/도장 | 456만원 |
+| 방수 | 101만원 | 천장 | 407만원 |
+| 타일 | 302만원 | 창호 | 252만원 |
+| 목공 | 36만원 | 전기 | 203만원 |
+| 배관 | 304만원 | 위생도기 | 248만원 |
+| 잡철 | 107만원 | 걸레받이 | 342만원 |
+| 고정설비 | 63만원 | 정리 | 45만원 |

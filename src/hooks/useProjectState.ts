@@ -17,6 +17,7 @@ import type {
   ProjectEstimate,
   ProjectRfq,
   EditedDimension,
+  DesignPreferences,
 } from "@/types/consumer-project";
 import { createNewProject } from "@/types/consumer-project";
 
@@ -449,6 +450,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 디자인 선호도 설정
+  const setDesignPreferences = useCallback(
+    (prefs: DesignPreferences) => {
+      if (!project) return;
+      saveProject({ ...project, designPreferences: prefs });
+    },
+    [project, saveProject]
+  );
+
   // 치수 편집 데이터 저장
   const setEditedDimensions = useCallback(
     (dims: EditedDimension[]) => {
@@ -491,6 +501,7 @@ export function useProjectState(projectId: string) {
     setEstimate,
     setEstimateId,
     updateRfq,
+    setDesignPreferences,
     setEditedDimensions,
     saveProject: () => project && saveProject(project),
     forceSave,

@@ -63,105 +63,8 @@ const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 단위�
 - 고해상도, 정밀한 스케일, 선명한 벽선
 - 고급 분양 카탈로그에 들어가는 단위세대 평면도 수준`;
 
-const DIM_PROMPT = `이 깨끗한 아파트 평면도에 내부 치수선만 추가해줘:
-
-【벽체 두께 기준】
-- 외벽(구조벽): 250mm
-- 내벽(칸막이벽): 150mm
-- 치수는 벽체 안쪽 면(내면) 사이의 순수 내부 거리를 측정해. 벽 두께는 포함하지 마.
-
-【각 실 치수 표시】
-- 거실, 안방, 침실, 주방, 욕실, 현관, 드레스룸 등 모든 실
-- 각 방 내부에 가로/세로 치수선을 표시
-- 내벽 안쪽 면 사이의 거리를 mm 단위로 표시 (예: 3,600)
-- 치수선은 방 내부 벽면 가장자리에 가늘고 얇은 선으로 표시
-- 양 끝에 작은 틱마크(|)
-- 숫자는 얇고 세련된 폰트, 회색(#555) 또는 진한 회색
-
-【면적 치수 정확도】
-- 외벽 250mm, 내벽 150mm를 고려하여 각 실의 내부 치수를 계산해
-- 예: 전용면적 84㎡ 아파트의 거실은 보통 가로 4,500~5,500mm × 세로 4,000~5,000mm 정도
-- 안방은 보통 3,600~4,200mm × 3,300~3,900mm 정도
-- 욕실은 보통 1,500~2,000mm × 2,000~2,500mm 정도
-- 원본 도면의 비례를 참고하여 현실적인 치수를 넣어줘
-
-【중요 규칙】
-- 벽선, 문 아크, 창문 표시는 절대 변경하지 마
-- 공간 이름은 표시하지 마. 치수만 표시해.
-- 레이아웃을 절대 변경하지 마. 벽을 추가하거나 제거하지 마.`;
-
-const DIM_EXTRACT_PROMPT = `이 아파트 평면도 이미지에서 치수선에 표시된 모든 치수값을 추출해줘.
-
-각 치수선에 대해 다음 정보를 JSON 배열로 반환해:
-- roomName: 이 치수가 속한 방 이름 (거실, 안방, 침실1, 침실2, 주방, 욕실1, 욕실2, 현관, 드레스룸 등)
-- valueMm: 치수값 (mm 단위 정수, 예: 3600)
-- direction: "width" (가로) 또는 "height" (세로)
-- centerX: 치수선 중심의 이미지 X좌표 (0~1 정규화, 이미지 왼쪽=0 오른쪽=1)
-- centerY: 치수선 중심의 이미지 Y좌표 (0~1 정규화, 이미지 상단=0 하단=1)
-- startX, startY, endX, endY: 치수선 시작/끝점의 정규화 좌표 (0~1)
-
-JSON 형식만 반환하고 다른 텍스트는 포함하지 마:
-[
-  { "roomName": "거실", "valueMm": 4500, "direction": "width", "centerX": 0.5, "centerY": 0.3, "startX": 0.3, "startY": 0.3, "endX": 0.7, "endY": 0.3 },
-  ...
-]`;
-
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
-}
-
-/** Gemini Pro로 치수 이미지에서 치수값 추출 (JSON) - 벽 두께(외벽250/내벽150mm) 고려 필요 */
-async function extractDimensionsFromImage(
-  ai: GoogleGenAI,
-  imageBuffer: Buffer,
-  mimeType: string
-): Promise<Array<{
-  roomName: string;
-  valueMm: number;
-  direction: "width" | "height";
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-}>> {
-  try {
-    const base64Image = imageBuffer.toString("base64");
-    const response = await ai.models.generateContent({
-      model: MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { inlineData: { mimeType, data: base64Image } },
-            { text: DIM_EXTRACT_PROMPT },
-          ],
-        },
-      ],
-    });
-
-    const text = response.text || "";
-    // Extract JSON from response
-    const jsonMatch = text.match(/\[[\s\S]*\]/);
-    if (!jsonMatch) return [];
-
-    const parsed = JSON.parse(jsonMatch[0]);
-    if (!Array.isArray(parsed)) return [];
-
-    return parsed
-      .filter((d: Record<string, unknown>) => d.roomName && d.valueMm && d.direction)
-      .map((d: Record<string, unknown>) => ({
-        roomName: String(d.roomName),
-        valueMm: Number(d.valueMm),
-        direction: d.direction === "height" ? "height" as const : "width" as const,
-        startX: Number(d.startX) || 0,
-        startY: Number(d.startY) || 0,
-        endX: Number(d.endX) || 0,
-        endY: Number(d.endY) || 0,
-      }));
-  } catch (err) {
-    console.error("[generate-floorplan] Dimension extraction failed:", (err as Error).message);
-    return [];
-  }
 }
 
 async function callGeminiPro(
@@ -227,27 +130,18 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (data && data.status === "completed") {
-    let extractedDimensions = [];
-    try {
-      if (data.extracted_dimensions) {
-        extractedDimensions = typeof data.extracted_dimensions === "string"
-          ? JSON.parse(data.extracted_dimensions)
-          : data.extracted_dimensions;
-      }
-    } catch { /* ignore */ }
     return NextResponse.json({
       exists: true,
-      finalUrl: data.final_url,
+      finalUrl: data.final_url || data.clean_url,
       finalMirrorUrl: data.final_mirror_url,
       cleanUrl: data.clean_url,
-      extractedDimensions,
     });
   }
 
   return NextResponse.json({ exists: false });
 }
 
-// POST: SSE 4-step pipeline
+// POST: SSE 3-step pipeline (다운로드 → AI 클린 → 미러)
 export async function POST(request: NextRequest) {
   const body = await request.json();
   const { complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea } = body;
@@ -277,7 +171,7 @@ export async function POST(request: NextRequest) {
   if (existing?.status === "completed") {
     return NextResponse.json({
       cached: true,
-      finalUrl: existing.final_url,
+      finalUrl: existing.final_url || existing.clean_url,
       finalMirrorUrl: existing.final_mirror_url,
     });
   }
@@ -322,58 +216,30 @@ export async function POST(request: NextRequest) {
         const originalBuffer = Buffer.from(await imgRes.arrayBuffer());
         const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
 
-        send("progress", { step: 0, progress: 10, message: "원본 도면 다운로드 완료" });
+        send("progress", { step: 0, progress: 15, message: "원본 도면 다운로드 완료" });
 
         // ── Step 1: Gemini Pro Clean ──
-        send("progress", { step: 1, progress: 15, message: "AI 클린 처리 중... (약 60초)" });
+        send("progress", { step: 1, progress: 20, message: "AI 클린 처리 중... (약 60초)" });
 
         const cleanBuffer = await callGeminiPro(ai, originalBuffer, mimeType, CLEAN_PROMPT);
         if (!cleanBuffer) throw new Error("클린 처리 실패 (Gemini Pro 응답 없음)");
 
-        send("progress", { step: 1, progress: 35, message: "클린 처리 완료" });
+        send("progress", { step: 1, progress: 70, message: "클린 처리 완료" });
 
         // ── Step 2: Mirror (sharp.flop) ──
-        send("progress", { step: 2, progress: 40, message: "미러 이미지 생성 중..." });
+        send("progress", { step: 2, progress: 75, message: "미러 이미지 생성 중..." });
 
         const cleanMirrorBuffer = await sharp(cleanBuffer).flop().png().toBuffer();
 
-        send("progress", { step: 2, progress: 45, message: "미러 이미지 생성 완료" });
-
-        // Wait between Gemini calls
-        await sleep(5000);
-
-        // ── Step 3: Gemini Pro Dim on clean ──
-        send("progress", { step: 3, progress: 50, message: "치수선 추가 중... (약 60초)" });
-
-        const finalBuffer = await callGeminiPro(ai, cleanBuffer, "image/png", DIM_PROMPT);
-        if (!finalBuffer) throw new Error("치수선 추가 실패 (기본형)");
-
-        send("progress", { step: 3, progress: 70, message: "기본형 치수선 완료" });
-
-        // ── Step 3b: 치수값 추출 (Gemini Flash, 병렬 가능) ──
-        send("progress", { step: 3, progress: 72, message: "치수 데이터 추출 중..." });
-        const extractedDimensions = await extractDimensionsFromImage(ai, finalBuffer, "image/png");
-        send("progress", { step: 3, progress: 74, message: `치수 ${extractedDimensions.length}개 추출 완료` });
-
-        // Wait between Gemini calls
-        await sleep(5000);
-
-        // ── Step 4: Gemini Pro Dim on clean_mirror ──
-        send("progress", { step: 4, progress: 75, message: "미러형 치수선 추가 중... (약 60초)" });
-
-        const finalMirrorBuffer = await callGeminiPro(ai, cleanMirrorBuffer, "image/png", DIM_PROMPT);
-        if (!finalMirrorBuffer) throw new Error("치수선 추가 실패 (미러형)");
-
-        send("progress", { step: 4, progress: 95, message: "미러형 치수선 완료" });
+        send("progress", { step: 2, progress: 80, message: "미러 이미지 생성 완료" });
 
         // ── Upload to Supabase Storage ──
-        send("progress", { step: 4, progress: 96, message: "이미지 저장 중..." });
+        send("progress", { step: 2, progress: 85, message: "이미지 저장 중..." });
 
         const basePath = `floorplans/${complexNo}/${pyeongNo}`;
         const uploads = [
           { path: `${basePath}/clean.png`, buffer: cleanBuffer },
-          { path: `${basePath}/final.png`, buffer: finalBuffer },
-          { path: `${basePath}/final_mirror.png`, buffer: finalMirrorBuffer },
+          { path: `${basePath}/clean_mirror.png`, buffer: cleanMirrorBuffer },
         ];
 
         const urls: Record<string, string> = {};
@@ -398,11 +264,10 @@ export async function POST(request: NextRequest) {
           .update({
             status: "completed",
             progress: 100,
-            final_url: urls["final"],
-            final_mirror_url: urls["final_mirror"],
+            final_url: urls["clean"],
+            final_mirror_url: urls["clean_mirror"],
             clean_url: urls["clean"],
             processing_time_ms: processingTime,
-            extracted_dimensions: extractedDimensions.length > 0 ? JSON.stringify(extractedDimensions) : null,
             updated_at: new Date().toISOString(),
           })
           .eq("complex_no", complexNo)
@@ -411,10 +276,9 @@ export async function POST(request: NextRequest) {
         send("complete", {
           progress: 100,
           message: "도면 생성 완료!",
-          finalUrl: urls["final"],
-          finalMirrorUrl: urls["final_mirror"],
+          finalUrl: urls["clean"],
+          finalMirrorUrl: urls["clean_mirror"],
           processingTimeMs: processingTime,
-          extractedDimensions,
         });
       } catch (err: unknown) {
         const msg = (err as Error).message || "알 수 없는 오류";

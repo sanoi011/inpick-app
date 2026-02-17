@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenAIClient } from "@/lib/openai-client";
+import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 
 // ─── Mock 이미지 생성 ───
 
@@ -73,40 +73,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "prompt is required" }, { status: 400 });
     }
 
-    const client = getOpenAIClient();
-
-    if (client) {
+    // Gemini 이미지 생성 시도
+    if (isGeminiConfigured()) {
       try {
+        const client = getGeminiClient()!;
+
         const fullPrompt = [
-          "Photorealistic interior design image of a Korean apartment.",
+          "Generate a photorealistic interior design image of a Korean apartment room.",
+          "The image should look like a professional interior design photograph with realistic lighting, materials, and furnishings.",
           roomContext ? `Room info: ${roomContext}` : "",
-          floorPlanContext ? `Floor plan: ${floorPlanContext}` : "",
-          `User request: ${prompt}`,
+          floorPlanContext ? `Floor plan context: ${floorPlanContext}` : "",
+          `Design request: ${prompt}`,
+          "Style: High-quality architectural photography, natural lighting, realistic materials and textures.",
         ].filter(Boolean).join("\n");
 
-        const response = await client.images.generate({
-          model: "dall-e-3",
-          prompt: fullPrompt,
-          n: 1,
-          size: "1024x1024",
-          quality: "standard",
-          response_format: "b64_json",
+        const response = await client.models.generateContent({
+          model: "gemini-2.0-flash-exp",
+          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+          config: {
+            responseModalities: ["TEXT", "IMAGE"],
+          },
         });
 
-        const imageB64 = response.data?.[0]?.b64_json;
-        const revisedPrompt = response.data?.[0]?.revised_prompt || "";
+        // 응답에서 이미지 데이터 추출
+        const parts = response.candidates?.[0]?.content?.parts || [];
+        let imageData: string | null = null;
+        let description = "";
 
-        if (imageB64) {
+        for (const part of parts) {
+          if (part.inlineData?.mimeType?.startsWith("image/")) {
+            const mimeType = part.inlineData.mimeType;
+            imageData = `data:${mimeType};base64,${part.inlineData.data}`;
+          } else if (part.text) {
+            description += part.text;
+          }
+        }
+
+        if (imageData) {
           return NextResponse.json({
-            imageData: `data:image/png;base64,${imageB64}`,
-            description: revisedPrompt,
+            imageData,
+            description: description || prompt,
             isMock: false,
           });
         }
-        // 이미지 없으면 Mock 폴백
+
+        // Gemini가 이미지를 생성하지 않은 경우 Imagen 시도
       } catch (err: unknown) {
         const error = err as { status?: number; message?: string };
-        console.error("DALL-E image generation error:", error.message);
+        console.error("Gemini image generation error:", error.message);
 
         if (error.status === 429) {
           return NextResponse.json(

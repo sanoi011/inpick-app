@@ -193,6 +193,14 @@ export interface ProjectRfq {
   selectedBidId?: string;
 }
 
+// 디자인 선호도 (좌측 옵션 패널)
+export interface DesignPreferences {
+  style: string;           // 모던 | 북유럽 | 클래식 | 미니멀 | 내추럴
+  budget: string;          // economy | standard | premium
+  priorities: string[];    // 채광, 수납, 동선, 개방감, 방음, 청소용이
+  specialNotes: string[];  // 반려동물, 어린이, 노약자, 홈오피스, 홈카페, 확장형
+}
+
 // 편집 가능 치수선 (이미지 오버레이)
 export interface EditedDimension {
   id: string;
@@ -214,6 +222,7 @@ export interface ConsumerProject {
   rendering?: ProjectRendering;
   estimate?: ProjectEstimate;
   rfq?: ProjectRfq;
+  designPreferences?: DesignPreferences;
   estimateId?: string;
   drawingId?: string;
   editedDimensions?: EditedDimension[];

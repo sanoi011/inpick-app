@@ -106,8 +106,18 @@ export default function RenderingPage() {
       const designImages = project?.design?.generatedImages || [];
       const roomDesign = designImages.find((img) => img.roomId === room.id);
 
+      // 디자인 선호도 컨텍스트
+      const prefs = project?.designPreferences;
+      const prefsContext = prefs ? [
+        prefs.style ? `스타일: ${prefs.style}` : "",
+        prefs.budget ? `예산: ${prefs.budget === "economy" ? "경제형" : prefs.budget === "standard" ? "표준형" : "프리미엄"}` : "",
+        prefs.priorities.length > 0 ? `우선순위: ${prefs.priorities.join(", ")}` : "",
+        prefs.specialNotes.length > 0 ? `특기사항: ${prefs.specialNotes.join(", ")}` : "",
+      ].filter(Boolean).join(". ") : "";
+
       const prompt = `포토리얼리스틱 인테리어 렌더링: ${roomLabel} ${room.area}m². ${
-        roomDesign ? `디자인 컨셉: ${roomDesign.prompt}.` : ""
+        prefsContext ? `${prefsContext}.` : ""
+      } ${roomDesign ? `디자인 컨셉: ${roomDesign.prompt}.` : ""
       } ${materialContext ? `자재: ${materialContext}.` : ""} 고화질 실사급 3D 렌더링.`;
 
       const res = await fetch("/api/project/generate-image", {

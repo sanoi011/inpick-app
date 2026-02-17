@@ -1025,11 +1025,11 @@
         "y": 7.122
       },
       "width": 0.8,
-      "rotation": 0,
+      "rotation": 90,
       "type": "swing",
       "connectedRooms": [
         "MASTER_BED",
-        "DRESSROOM"
+        "BATHROOM"
       ]
     },
     {
@@ -1039,10 +1039,10 @@
         "y": 8.705
       },
       "width": 0.8,
-      "rotation": 0,
+      "rotation": 90,
       "type": "swing",
       "connectedRooms": [
-        "DRESSROOM",
+        "MASTER_BED",
         "BATHROOM"
       ]
     },
@@ -1067,11 +1067,11 @@
         "y": 0.79
       },
       "width": 0.8,
-      "rotation": 0,
+      "rotation": 90,
       "type": "swing",
       "connectedRooms": [
         "BALCONY",
-        "UTILITY"
+        "LIVING"
       ]
     }
   ],
@@ -1158,7 +1158,7 @@
     {
       "id": "fixture-2",
       "type": "bathtub",
-      "roomId": "",
+      "roomId": "room-1",
       "position": {
         "x": 7.223,
         "y": 2.276,
@@ -1191,7 +1191,7 @@
     {
       "id": "fixture-5",
       "type": "toilet",
-      "roomId": "room-10",
+      "roomId": "room-9",
       "position": {
         "x": 11.179,
         "y": 9.201,
@@ -1202,7 +1202,7 @@
     {
       "id": "fixture-6",
       "type": "sink",
-      "roomId": "room-10",
+      "roomId": "room-9",
       "position": {
         "x": 11.08,
         "y": 8.013,
@@ -1213,7 +1213,7 @@
     {
       "id": "fixture-7",
       "type": "bathtub",
-      "roomId": "",
+      "roomId": "room-9",
       "position": {
         "x": 10.882,
         "y": 6.628,

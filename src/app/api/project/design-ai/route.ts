@@ -1,7 +1,6 @@
 import { NextRequest } from "next/server";
-import { getOpenAIClient } from "@/lib/openai-client";
+import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
-import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -18,12 +17,13 @@ const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전�
 - 비용 언급 시 "대략적인 참고 금액"임을 명시하세요.
 - 답변은 전문적이면서도 이해하기 쉽게, 구조화하여 작성하세요.
 - 마감재 추천 시 제품명, 규격, 평당 단가를 함께 안내하세요.
-- 공간의 넓이, 채광, 동선을 고려하여 실용적인 제안을 하세요.`;
+- 공간의 넓이, 채광, 동선을 고려하여 실용적인 제안을 하세요.
+- 이전 대화 내용을 기억하고, 사용자가 이전에 언급한 선호도나 결정사항을 반영하세요.`;
 
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, image, annotations } = await request.json();
+    const { messages, floorPlanContext, annotations } = await request.json();
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(
@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const client = getOpenAIClient();
+    // Gemini 클라이언트 확인
+    const client = getGeminiClient();
 
-    // API 키 없으면 Mock 응답
-    if (!client) {
+    if (!client || !isGeminiConfigured()) {
       return createMockResponse(messages);
     }
 
@@ -43,25 +43,53 @@ export async function POST(request: NextRequest) {
     const lastUserMsg = messages[messages.length - 1]?.content || "";
     const knowledgeContext = await searchKnowledgeSemantic(lastUserMsg);
 
-    // OpenAI API 요청 구성
-    const openaiMessages = buildOpenAIMessages(messages, image, annotations, knowledgeContext);
-
     try {
-      const stream = await client.chat.completions.create({
-        model: "gpt-4o",
-        messages: openaiMessages,
-        max_tokens: 2048,
-        temperature: 0.7,
-        stream: true,
+      // Gemini 멀티턴 대화 구성
+      const systemInstruction = [
+        DESIGN_SYSTEM_PROMPT,
+        knowledgeContext ? `\n\n[참고 지식]\n${knowledgeContext}` : "",
+        floorPlanContext ? `\n\n[도면 정보]\n공간 구성: ${floorPlanContext}` : "",
+      ].filter(Boolean).join("");
+
+      // 대화 이력을 Gemini 형식으로 변환
+      const geminiContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
+
+      for (const msg of messages) {
+        const role = msg.role === "assistant" ? "model" as const : "user" as const;
+        const parts: Array<{ text: string }> = [{ text: msg.content }];
+
+        // 마지막 user 메시지에 이미지/주석 컨텍스트 추가
+        if (msg === messages[messages.length - 1] && role === "user") {
+          if (annotations && annotations.length > 0) {
+            const annotationDesc = annotations
+              .map((a: { type: string; label?: string }, idx: number) =>
+                `주석 ${idx + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`)
+              .join("\n");
+            parts.push({ text: `\n[사용자 주석]\n${annotationDesc}` });
+          }
+        }
+
+        geminiContents.push({ role, parts });
+      }
+
+      // Gemini 스트리밍 호출
+      const response = await client.models.generateContentStream({
+        model: "gemini-2.0-flash",
+        contents: geminiContents,
+        config: {
+          systemInstruction,
+          maxOutputTokens: 2048,
+          temperature: 0.7,
+        },
       });
 
-      // OpenAI 스트림 → SSE 변환
+      // Gemini 스트림 → SSE 변환
       const encoder = new TextEncoder();
       const readableStream = new ReadableStream({
         async start(controller) {
           try {
-            for await (const chunk of stream) {
-              const text = chunk.choices[0]?.delta?.content;
+            for await (const chunk of response) {
+              const text = chunk.text;
               if (text) {
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
@@ -70,7 +98,7 @@ export async function POST(request: NextRequest) {
             }
           } catch (err: unknown) {
             const error = err as { message?: string };
-            console.error("OpenAI stream error:", error.message);
+            console.error("Gemini stream error:", error.message);
           } finally {
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
@@ -87,7 +115,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (err: unknown) {
       const error = err as { status?: number; message?: string };
-      console.error("OpenAI API error:", error.status, error.message);
+      console.error("Gemini API error:", error.status, error.message);
       return createMockResponse(messages);
     }
   } catch (err) {
@@ -97,62 +125,6 @@ export async function POST(request: NextRequest) {
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
-}
-
-// OpenAI messages 구성
-function buildOpenAIMessages(
-  messages: { role: string; content: string }[],
-  image?: string,
-  annotations?: { type: string; label?: string; color: string }[],
-  knowledgeContext?: string
-) {
-  type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
-
-  const openaiMessages: ChatCompletionMessageParam[] = [];
-
-  // System message
-  openaiMessages.push({
-    role: "system",
-    content: DESIGN_SYSTEM_PROMPT + (knowledgeContext || ""),
-  });
-
-  // 대화 이력
-  for (let i = 0; i < messages.length; i++) {
-    const msg = messages[i];
-    const role = msg.role === "assistant" ? "assistant" as const : "user" as const;
-
-    // 마지막 user 메시지에 이미지/주석 추가
-    if (i === messages.length - 1 && role === "user") {
-      const contentParts: ContentPart[] = [];
-
-      // 이미지 (base64 data URL)
-      if (image && image.startsWith("data:image")) {
-        contentParts.push({
-          type: "image_url",
-          image_url: { url: image },
-        });
-      }
-
-      contentParts.push({ type: "text", text: msg.content });
-
-      // 주석 컨텍스트
-      if (annotations && annotations.length > 0) {
-        const annotationDesc = annotations
-          .map((a: { type: string; label?: string }, idx: number) => `주석 ${idx + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`)
-          .join("\n");
-        contentParts.push({
-          type: "text",
-          text: `\n\n[사용자가 도면/사진에 표시한 주석]\n${annotationDesc}`,
-        });
-      }
-
-      openaiMessages.push({ role: "user", content: contentParts });
-    } else {
-      openaiMessages.push({ role, content: msg.content });
-    }
-  }
-
-  return openaiMessages;
 }
 
 // Mock 응답 생성
@@ -188,23 +160,33 @@ function createMockResponse(messages: { role: string; content: string }[]) {
 - 합지 벽지: 평당 약 8,000원~10,000원
 - 포인트 벽지(수입): 평당 약 25,000원~40,000원
 
-현재 공간의 채광과 크기를 고려하면 **1번 베이지 톤**을 추천드립니다.
-가구와의 조화를 위해 포인트 벽면 1면을 다른 색상으로 구성하면 더욱 세련된 느낌을 줄 수 있습니다.`;
+현재 공간의 채광과 크기를 고려하면 **1번 베이지 톤**을 추천드립니다.`;
   } else if (lastMsg.includes("수납") || lastMsg.includes("정리") || lastMsg.includes("붙박이")) {
     mockText = `수납 공간 활용도를 높이는 솔루션을 제안드립니다.
 
 **수납 확장 방안:**
 - **붙박이장 설치** (벽면 활용) - 약 120만원~200만원
-  - 폭 2.4m 기준 / 슬라이딩 도어 포함
 - **시스템 행거** (드레스룸 구성) - 약 80만원~150만원
-  - 폭 1.8m / 선반+행거봉+서랍 조합
 - **키큰수납장** (주방/거실 벽면) - 약 60만원~100만원
-  - 폭 0.8m / 전체 높이 활용
 
-표시하신 영역에 맞춤형 붙박이장을 설치하면 수납량을 약 3배 늘릴 수 있습니다.
-공간 효율을 극대화하려면 시스템 수납을 추천드립니다.`;
+표시하신 영역에 맞춤형 붙박이장을 설치하면 수납량을 약 3배 늘릴 수 있습니다.`;
   } else {
-    mockText = `안녕하세요! 해당 공간을 분석해 보겠습니다.
+    // 대화 이력이 있으면 이전 대화 참조 응답
+    const prevMessages = messages.filter((m: { role: string }) => m.role === "assistant");
+    if (prevMessages.length > 0) {
+      mockText = `네, 이전 대화를 참고하여 답변드리겠습니다.
+
+**${lastMsg}**에 대해 분석해 보겠습니다.
+
+이전에 논의했던 내용을 바탕으로:
+- 선택하신 스타일과 예산에 맞는 옵션을 제안드립니다
+- 공간 특성을 고려한 맞춤 추천을 드립니다
+
+더 구체적인 부분이 궁금하시면 말씀해 주세요!
+
+*이 응답은 Mock 모드입니다. Gemini API 키가 설정되면 실제 AI 대화가 가능합니다.*`;
+    } else {
+      mockText = `안녕하세요! 해당 공간을 분석해 보겠습니다.
 
 도면이나 사진을 보면서 궁금한 부분을 표시해주시면 더 정확한 답변을 드릴 수 있습니다.
 
@@ -216,7 +198,10 @@ function createMockResponse(messages: { role: string; content: string }[]) {
 - 수납 솔루션 및 공간 활용
 - 공종별 예상 비용 안내
 
-오른쪽 캔버스에서 도면이나 사진의 특정 부위를 표시하고 질문해 주시면, 해당 영역에 맞춤화된 디자인 제안을 드리겠습니다!`;
+궁금한 점을 자유롭게 물어봐 주세요!
+
+*이 응답은 Mock 모드입니다. Gemini API 키가 설정되면 실시간 AI 대화가 가능합니다.*`;
+    }
   }
 
   // Mock 스트리밍 응답

@@ -17,13 +17,14 @@ import type { ParsedFloorPlan } from "@/types/floorplan";
 import { loadFloorPlan, getFloorPlanImageUrl } from "@/lib/services/drawing-service";
 import type { RoomType } from "@/types/floorplan";
 import type { AddressSearchResult, BuildingInfo } from "@/types/address";
-import type { ProjectAddress } from "@/types/consumer-project";
+import type { ProjectAddress, DesignPreferences } from "@/types/consumer-project";
 import dynamic from "next/dynamic";
 
 // Sidebar components
 import AddressSearchPanel from "@/components/workspace/AddressSearchPanel";
 import BuildingInfoPanel from "@/components/workspace/BuildingInfoPanel";
 import UploadOptionsPanel from "@/components/workspace/UploadOptionsPanel";
+import DesignOptionsPanel from "@/components/workspace/DesignOptionsPanel";
 // DesignPromptBar removed - AI chat integrated inline
 
 const FloorPlanGenerationProgress = dynamic(
@@ -74,7 +75,7 @@ export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateStatus, confirmBuilding, setEditedDimensions } = useProjectState(projectId);
+  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences } = useProjectState(projectId);
 
   // === Sidebar state ===
   const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
@@ -82,10 +83,16 @@ export default function FloorPlanPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadMode, setUploadMode] = useState<"upload" | "lidar" | "photo" | "hand-drawing" | "draw" | null>(null);
   // AI 채팅 상태
-  const [aiMessages, setAiMessages] = useState<{ id: string; role: "user" | "assistant"; content: string }[]>([]);
+  const [aiMessages, setAiMessages] = useState<{ id: string; role: "user" | "assistant"; content: string; images?: string[] }[]>([]);
   const [aiInput, setAiInput] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  // AI 디자인 이미지 생성 상태
+  const [generatedDesignUrl, setGeneratedDesignUrl] = useState<string | null>(null);
+  const [generatingDesign, setGeneratingDesign] = useState(false);
+  const [designPrefs, setDesignPrefs] = useState<DesignPreferences>(
+    project?.designPreferences || { style: "", budget: "", priorities: [], specialNotes: [] }
+  );
 
   // === Viewer state ===
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
@@ -125,6 +132,8 @@ export default function FloorPlanPage() {
   const [showEngInfo, setShowEngInfo] = useState(true);
   const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
 
+  // 좌우 대칭 상태
+  const [mirrored, setMirrored] = useState(false);
   // 치수 편집 상태
   const [editingDimensions, setEditingDimensions] = useState(false);
   const [editableDimensions, setEditableDimensions] = useState<EditableDimension[]>([]);
@@ -136,6 +145,13 @@ export default function FloorPlanPage() {
       setEditableDimensions(project.editedDimensions as EditableDimension[]);
     }
   }, [project?.editedDimensions]);
+
+  // Sync design preferences from project
+  useEffect(() => {
+    if (project?.designPreferences) {
+      setDesignPrefs(project.designPreferences);
+    }
+  }, [project?.designPreferences]);
 
   // Save dimensions to project state when they change
   const handleDimensionsChange = useCallback((dims: EditableDimension[]) => {
@@ -234,21 +250,7 @@ export default function FloorPlanPage() {
           .then(data => {
             if (data.exists) {
               setFloorPlanImageUrl(data.finalUrl);
-              // Load cached extracted dimensions
-              if (data.extractedDimensions && data.extractedDimensions.length > 0) {
-                const dims: EditableDimension[] = data.extractedDimensions.map((d: { startX: number; startY: number; endX: number; endY: number; valueMm: number; roomName: string; direction: "width" | "height" }, i: number) => ({
-                  id: `ext-${i}-${Date.now()}`,
-                  x1: d.startX, y1: d.startY,
-                  x2: d.endX, y2: d.endY,
-                  valueMm: d.valueMm,
-                  roomName: d.roomName,
-                  direction: d.direction,
-                }));
-                handleDimensionsChange(dims);
-                toast({ type: "success", title: "도면 로드 완료", message: `캐시된 도면 + 치수 ${dims.length}개` });
-              } else {
-                toast({ type: "success", title: "도면 로드 완료", message: "캐시된 도면을 불러왔습니다" });
-              }
+              toast({ type: "success", title: "도면 로드 완료", message: "캐시된 도면을 불러왔습니다" });
             } else {
               // ③ Gemini Pro 실시간 생성
               setGeneratingFloorPlan({
@@ -282,6 +284,12 @@ export default function FloorPlanPage() {
     setSidebarOpen(false);
   }, []);
 
+  // 디자인 옵션 변경
+  const handlePrefsChange = useCallback((prefs: DesignPreferences) => {
+    setDesignPrefs(prefs);
+    setDesignPreferences(prefs);
+  }, [setDesignPreferences]);
+
   // === AI 채팅 (SSE 스트리밍) ===
   const AI_QUICK_PROMPTS = [
     "모던 미니멀 스타일로 추천해줘",
@@ -307,11 +315,25 @@ export default function FloorPlanPage() {
     setAiMessages((prev) => [...prev, { id: assistantId, role: "assistant", content: "" }]);
 
     try {
+      // 디자인 옵션 컨텍스트 구성
+      const prefsContext = [
+        designPrefs.style ? `스타일: ${designPrefs.style}` : "",
+        designPrefs.budget ? `예산: ${designPrefs.budget === "economy" ? "경제형 1,500만원" : designPrefs.budget === "standard" ? "표준형 3,000만원" : "프리미엄 5,000만원+"}` : "",
+        designPrefs.priorities.length > 0 ? `우선순위: ${designPrefs.priorities.join(", ")}` : "",
+        designPrefs.specialNotes.length > 0 ? `특기사항: ${designPrefs.specialNotes.join(", ")}` : "",
+      ].filter(Boolean).join(". ");
+
+      // 전체 대화 이력 구성 (멀티턴 대화)
+      const fullMessages = [
+        ...aiMessages.map(m => ({ role: m.role, content: m.content })),
+        { role: "user" as const, content: prefsContext ? `[디자인 옵션: ${prefsContext}]\n\n${userContent}` : userContent },
+      ];
+
       const res = await fetch("/api/project/design-ai", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          messages: [{ role: "user", content: userContent }],
+          messages: fullMessages,
           floorPlanContext: floorPlan
             ? floorPlan.rooms.map((r) => `${r.name}(${r.area}m²)`).join(", ")
             : "",
@@ -367,7 +389,63 @@ export default function FloorPlanPage() {
     }
 
     setAiGenerating(false);
-  }, [aiInput, aiGenerating, floorPlan]);
+  }, [aiInput, aiGenerating, floorPlan, designPrefs, aiMessages]);
+
+  // === AI 디자인 이미지 생성 ===
+  const handleGenerateDesign = useCallback(async () => {
+    if (generatingDesign) return;
+    setGeneratingDesign(true);
+
+    try {
+      // 대화 이력 요약
+      const conversationSummary = aiMessages
+        .map((m) =>
+          `${m.role === "user" ? "사용자" : "AI"}: ${m.content.slice(0, 300)}`
+        )
+        .join("\n");
+
+      const res = await fetch("/api/project/design-ai-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          conversationSummary,
+          designPreferences: designPrefs,
+          floorPlanImageUrl,
+          floorPlanContext: floorPlan
+            ? floorPlan.rooms.map((r) => `${r.name}(${r.area}m²)`).join(", ")
+            : "",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "서버 오류" }));
+        throw new Error(err.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      if (data.imageData) {
+        setGeneratedDesignUrl(data.imageData);
+        // AI 채팅에 결과 메시지 추가
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: data.description || "디자인 이미지가 생성되었습니다.",
+            images: data.imageData ? [data.imageData] : undefined,
+          },
+        ]);
+        toast({ type: "success", title: "디자인 완성", message: "AI 디자인 이미지가 생성되었습니다" });
+      } else {
+        toast({ type: "error", title: "생성 실패", message: data.description || "이미지 생성에 실패했습니다" });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+      toast({ type: "error", title: "디자인 생성 실패", message: msg });
+    } finally {
+      setGeneratingDesign(false);
+    }
+  }, [generatingDesign, aiMessages, designPrefs, floorPlanImageUrl, floorPlan]);
 
   // === YOLO model load ===
   useEffect(() => {
@@ -598,11 +676,11 @@ export default function FloorPlanPage() {
     setPendingFloorPlan(updated);
   }, [pendingFloorPlan]);
 
-  // Next step → 물량산출 (3D 렌더링 건너뛰기)
+  // Next step → 3D 렌더링
   const handleNext = () => {
     if (floorPlan || floorPlanImageUrl) {
-      updateStatus("ESTIMATING");
-      router.push(`/project/${projectId}/estimate`);
+      updateStatus("RENDERING");
+      router.push(`/project/${projectId}/rendering`);
     }
   };
 
@@ -913,6 +991,13 @@ export default function FloorPlanPage() {
         )}
 
         <UploadOptionsPanel onSelectMode={handleSelectUploadMode} />
+
+        {(floorPlan || floorPlanImageUrl) && (
+          <DesignOptionsPanel
+            preferences={designPrefs}
+            onChange={handlePrefsChange}
+          />
+        )}
       </aside>
 
       {/* Right canvas area */}
@@ -933,7 +1018,7 @@ export default function FloorPlanPage() {
                 onClick={handleNext}
                 className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
               >
-                물량산출 <ArrowRight className="w-4 h-4" />
+                3D 렌더링 <ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
@@ -952,32 +1037,13 @@ export default function FloorPlanPage() {
               onComplete={(result) => {
                 setFloorPlanImageUrl(result.finalUrl);
                 setGeneratingFloorPlan(null);
-
-                // Gemini에서 추출된 치수 데이터 → 편집 가능 치수로 변환
-                if (result.extractedDimensions && result.extractedDimensions.length > 0) {
-                  const dims: EditableDimension[] = result.extractedDimensions.map((d, i) => ({
-                    id: `ext-${i}-${Date.now()}`,
-                    x1: d.startX,
-                    y1: d.startY,
-                    x2: d.endX,
-                    y2: d.endY,
-                    valueMm: d.valueMm,
-                    roomName: d.roomName,
-                    direction: d.direction,
-                  }));
-                  handleDimensionsChange(dims);
-                  toast({
-                    type: "success",
-                    title: "도면 생성 완료",
-                    message: `${Math.round(result.processingTimeMs / 1000)}초 소요, 치수 ${dims.length}개 추출`,
-                  });
-                } else {
-                  toast({
-                    type: "success",
-                    title: "도면 생성 완료",
-                    message: `${Math.round(result.processingTimeMs / 1000)}초 소요`,
-                  });
-                }
+                toast({
+                  type: "success",
+                  title: "도면 생성 완료",
+                  message: result.processingTimeMs > 0
+                    ? `${Math.round(result.processingTimeMs / 1000)}초 소요`
+                    : "캐시된 도면 로드 완료",
+                });
               }}
               onCancel={() => setGeneratingFloorPlan(null)}
             />
@@ -986,14 +1052,71 @@ export default function FloorPlanPage() {
           ) : !floorPlan && !floorPlanImageUrl && !uploadMode ? (
             renderUploadContent()
           ) : (floorPlan || floorPlanImageUrl) ? (
-            /* 도면 2D 뷰어 */
+            /* 도면 2D 뷰어 또는 AI 디자인 이미지 */
             <div className="h-full flex flex-col">
               <div className="flex-1 min-h-0">
                 <div className="h-full p-4 bg-gray-50">
                   <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center relative" ref={imageContainerRef}>
-                    {floorPlanImageUrl ? (
+                    {/* AI 디자인 생성 중 로딩 */}
+                    {generatingDesign && (
+                      <div className="absolute inset-0 bg-white/90 backdrop-blur-sm z-30 flex flex-col items-center justify-center">
+                        <Loader2 className="w-12 h-12 animate-spin text-blue-500 mb-4" />
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">AI 디자인 생성 중</h3>
+                        <p className="text-sm text-gray-500">대화 내용과 옵션을 분석하여 디자인을 생성합니다...</p>
+                        <p className="text-xs text-gray-400 mt-2">약 30초~1분 소요</p>
+                      </div>
+                    )}
+
+                    {/* AI 생성 디자인 이미지 (메인) */}
+                    {generatedDesignUrl ? (
                       <>
-                        <img src={floorPlanImageUrl} alt="평면도" className="max-w-full max-h-full object-contain" />
+                        <img
+                          src={generatedDesignUrl}
+                          alt="AI 생성 디자인"
+                          className="max-w-full max-h-full object-contain"
+                        />
+                        {/* 도면 썸네일 (우측 상단) */}
+                        {floorPlanImageUrl && (
+                          <button
+                            onClick={() => setGeneratedDesignUrl(null)}
+                            className="absolute top-3 right-3 z-20 group"
+                            title="도면 보기로 전환"
+                          >
+                            <div className="w-28 h-28 rounded-lg border-2 border-white shadow-lg overflow-hidden bg-white group-hover:border-blue-400 transition-colors">
+                              <img
+                                src={floorPlanImageUrl}
+                                alt="도면"
+                                className="w-full h-full object-contain"
+                                style={mirrored ? { transform: "scaleX(-1)" } : undefined}
+                              />
+                            </div>
+                            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 text-[9px] bg-gray-800 text-white px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                              도면 보기
+                            </span>
+                          </button>
+                        )}
+                        {!floorPlanImageUrl && floorPlan && (
+                          <button
+                            onClick={() => setGeneratedDesignUrl(null)}
+                            className="absolute top-3 right-3 z-20 w-28 h-28 rounded-lg border-2 border-white shadow-lg overflow-hidden bg-white hover:border-blue-400 transition-colors"
+                            title="도면 보기로 전환"
+                          >
+                            <FloorPlan2D
+                              floorPlan={floorPlan}
+                              className="w-full h-full"
+                              showDimensions={false}
+                            />
+                          </button>
+                        )}
+                      </>
+                    ) : floorPlanImageUrl ? (
+                      <>
+                        <img
+                          src={floorPlanImageUrl}
+                          alt="평면도"
+                          className="max-w-full max-h-full object-contain transition-transform duration-300"
+                          style={mirrored ? { transform: "scaleX(-1)" } : undefined}
+                        />
                         <DimensionEditorOverlay
                           containerRef={imageContainerRef}
                           dimensions={editableDimensions}
@@ -1002,12 +1125,17 @@ export default function FloorPlanPage() {
                         />
                       </>
                     ) : floorPlan ? (
-                      <FloorPlan2D
-                        ref={floorPlan2DRef}
-                        floorPlan={floorPlan}
-                        className="h-full w-full"
-                        showDimensions={showDimensions}
-                      />
+                      <div
+                        className="h-full w-full transition-transform duration-300"
+                        style={mirrored ? { transform: "scaleX(-1)" } : undefined}
+                      >
+                        <FloorPlan2D
+                          ref={floorPlan2DRef}
+                          floorPlan={floorPlan}
+                          className="h-full w-full"
+                          showDimensions={showDimensions}
+                        />
+                      </div>
                     ) : null}
                   </div>
                 </div>
@@ -1022,6 +1150,8 @@ export default function FloorPlanPage() {
                 onToggleEngInfo={floorPlan ? () => setShowEngInfo((v) => !v) : undefined}
                 editingDimensions={editingDimensions}
                 onToggleEditDimensions={floorPlanImageUrl ? () => setEditingDimensions((v) => !v) : undefined}
+                mirrored={mirrored}
+                onToggleMirror={() => setMirrored((v) => !v)}
               />
             </div>
           ) : (
@@ -1089,6 +1219,15 @@ export default function FloorPlanPage() {
                       }`}
                     >
                       <p className="whitespace-pre-wrap">{msg.content || "..."}</p>
+                      {msg.images && msg.images.map((imgSrc, i) => (
+                        <img
+                          key={i}
+                          src={imgSrc}
+                          alt="AI 생성 디자인"
+                          className="mt-2 rounded-lg max-w-full cursor-pointer hover:opacity-90 transition-opacity"
+                          onClick={() => setGeneratedDesignUrl(imgSrc)}
+                        />
+                      ))}
                     </div>
                   </div>
                 ))}
@@ -1105,13 +1244,31 @@ export default function FloorPlanPage() {
 
             {/* AI Prompt input */}
             <div className="bg-white border-t border-gray-200 px-4 py-2">
+              {/* 디자인 완성 버튼 */}
+              <button
+                onClick={handleGenerateDesign}
+                disabled={generatingDesign || aiGenerating}
+                className="w-full mb-2 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-sm font-semibold rounded-xl hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-sm"
+              >
+                {generatingDesign ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    AI 디자인 생성 중...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    대화 내용 기반으로 우리집 디자인 완성하기
+                  </>
+                )}
+              </button>
               {/* Quick prompts */}
               <div className="flex gap-1.5 mb-2 overflow-x-auto pb-0.5">
                 {AI_QUICK_PROMPTS.map((qp) => (
                   <button
                     key={qp}
                     onClick={() => setAiInput(qp)}
-                    disabled={aiGenerating}
+                    disabled={aiGenerating || generatingDesign}
                     className="flex-shrink-0 px-2.5 py-1 text-[11px] font-medium rounded-full border border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors disabled:opacity-50"
                   >
                     <Sparkles className="w-3 h-3 inline mr-0.5" />{qp}
