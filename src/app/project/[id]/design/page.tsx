@@ -12,7 +12,7 @@ import FloorPlan2D from "@/components/viewer/FloorPlan2D";
 import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
 import ViewerToolbar from "@/components/viewer/ViewerToolbar";
 import type { ParsedFloorPlan } from "@/types/floorplan";
-import type { CameraMode } from "@/components/project/FloorPlan3D";
+// CameraMode import removed - 3D viewer disabled
 import { loadFloorPlan, getFloorPlanImageUrl } from "@/lib/services/drawing-service";
 import type { RoomType } from "@/types/floorplan";
 import type { AddressSearchResult, BuildingInfo } from "@/types/address";
@@ -30,15 +30,7 @@ const FloorPlanGenerationProgress = dynamic(
   { ssr: false }
 );
 
-// Three.js SSR 불가 → dynamic import
-const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
-  ssr: false,
-  loading: () => (
-    <div className="flex items-center justify-center h-full bg-gray-100">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-    </div>
-  ),
-});
+// 3D viewer disabled - 2D only
 
 const DrawingParseResult = dynamic(() => import("@/components/project/DrawingParseResult"));
 const WallDrawingCanvas = dynamic(() => import("@/components/wall-drawing/WallDrawingCanvas"), { ssr: false });
@@ -91,7 +83,7 @@ export default function FloorPlanPage() {
   const [floorPlanImageUrl, setFloorPlanImageUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
-  const [viewMode, setViewMode] = useState<"2d" | "3d">("2d");
+  // viewMode removed - 2D only
   const [uploadedFile, setUploadedFile] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [parseWarnings, setParseWarnings] = useState<string[]>([]);
@@ -120,8 +112,6 @@ export default function FloorPlanPage() {
   const uploadedImageRef = useRef<HTMLImageElement | null>(null);
 
   // 뷰어 제어 상태
-  const [cameraMode, setCameraMode] = useState<CameraMode>("free");
-  const [showCeiling, setShowCeiling] = useState(false);
   const [showDimensions, setShowDimensions] = useState(true);
   const [showEngInfo, setShowEngInfo] = useState(true);
   const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
@@ -504,7 +494,7 @@ export default function FloorPlanPage() {
 
   // Next step
   const handleNext = () => {
-    if (floorPlan) {
+    if (floorPlan || floorPlanImageUrl) {
       updateStatus("AI_DESIGN");
       router.push(`/project/${projectId}/ai-design`);
     }
@@ -832,7 +822,7 @@ export default function FloorPlanPage() {
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {floorPlan && (
+            {(floorPlan || floorPlanImageUrl) && (
               <button
                 onClick={handleNext}
                 className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
@@ -869,44 +859,25 @@ export default function FloorPlanPage() {
           ) : !floorPlan && !floorPlanImageUrl && !uploadMode ? (
             renderUploadContent()
           ) : (floorPlan || floorPlanImageUrl) ? (
-            /* 도면/3D 뷰어 */
+            /* 도면 2D 뷰어 */
             <div className="h-full flex flex-col">
               <div className="flex-1 min-h-0">
-                {viewMode === "2d" ? (
-                  <div className="h-full p-4 bg-gray-50">
-                    <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center">
-                      {floorPlanImageUrl ? (
-                        <img src={floorPlanImageUrl} alt="평면도" className="max-w-full max-h-full object-contain" />
-                      ) : floorPlan ? (
-                        <FloorPlan2D
-                          ref={floorPlan2DRef}
-                          floorPlan={floorPlan}
-                          className="h-full w-full"
-                          showDimensions={showDimensions}
-                        />
-                      ) : null}
-                    </div>
+                <div className="h-full p-4 bg-gray-50">
+                  <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center">
+                    {floorPlanImageUrl ? (
+                      <img src={floorPlanImageUrl} alt="평면도" className="max-w-full max-h-full object-contain" />
+                    ) : floorPlan ? (
+                      <FloorPlan2D
+                        ref={floorPlan2DRef}
+                        floorPlan={floorPlan}
+                        className="h-full w-full"
+                        showDimensions={showDimensions}
+                      />
+                    ) : null}
                   </div>
-                ) : floorPlan ? (
-                  <FloorPlan3D
-                    floorPlan={floorPlan}
-                    className="h-full"
-                    cameraMode={cameraMode}
-                    showCeiling={showCeiling}
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center bg-gray-50">
-                    <p className="text-sm text-gray-400">3D 뷰는 도면 데이터가 필요합니다</p>
-                  </div>
-                )}
+                </div>
               </div>
               <ViewerToolbar
-                viewMode={viewMode}
-                onViewModeChange={setViewMode}
-                cameraMode={cameraMode}
-                onCameraModeChange={setCameraMode}
-                showCeiling={showCeiling}
-                onToggleCeiling={() => setShowCeiling((v) => !v)}
                 onZoomIn={() => floorPlan2DRef.current?.zoomIn()}
                 onZoomOut={() => floorPlan2DRef.current?.zoomOut()}
                 onFitToScreen={() => floorPlan2DRef.current?.resetView()}
