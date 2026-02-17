@@ -395,6 +395,14 @@ export default function FloorPlanPage() {
   // === AI 디자인 이미지 생성 (4컷 병렬) ===
   const handleGenerateDesign = useCallback(async () => {
     if (generatingDesign) return;
+
+    // 대화 내용 없으면 생성 차단 (크레딧 소모 방지)
+    const userMessages = aiMessages.filter((m) => m.role === "user");
+    if (userMessages.length === 0) {
+      toast({ type: "error", title: "입력 필요", message: "먼저 AI와 대화하여 원하는 디자인 방향을 알려주세요" });
+      return;
+    }
+
     setGeneratingDesign(true);
 
     try {
@@ -700,7 +708,7 @@ export default function FloorPlanPage() {
     setPendingFloorPlan(updated);
   }, [pendingFloorPlan]);
 
-  // Next step → 3D 렌더링
+  // Next step → 자재 선택
   const handleNext = () => {
     if (floorPlan || floorPlanImageUrl) {
       updateStatus("RENDERING");
@@ -1066,7 +1074,7 @@ export default function FloorPlanPage() {
                 onClick={handleNext}
                 className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-semibold rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm"
               >
-                3D 렌더링 <ChevronRight className="w-4 h-4" />
+                자재 선택 <ChevronRight className="w-4 h-4" />
               </button>
             )}
           </div>

@@ -336,7 +336,7 @@ export default function EstimatePage() {
             onClick={() => router.push(`/project/${projectId}/rendering`)}
             className="hidden sm:flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
           >
-            <ArrowLeft className="w-3.5 h-3.5" /> 3D 렌더링
+            <ArrowLeft className="w-3.5 h-3.5" /> 자재 선택
           </button>
           <div className="hidden sm:block w-px h-4 bg-gray-300" />
           <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5 whitespace-nowrap">
@@ -532,13 +532,13 @@ export default function EstimatePage() {
                 <Calculator className="w-12 h-12 mx-auto mb-3 opacity-30" />
                 <p className="text-sm font-medium">견적 데이터가 없습니다</p>
                 <p className="text-xs mt-1">
-                  이전 단계에서 자재를 선택하고 렌더링을 확인해주세요
+                  이전 단계에서 자재를 선택해주세요
                 </p>
                 <button
                   onClick={() => router.push(`/project/${projectId}/rendering`)}
                   className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
                 >
-                  3D 렌더링으로 이동
+                  자재 선택으로 이동
                 </button>
               </div>
             </div>
