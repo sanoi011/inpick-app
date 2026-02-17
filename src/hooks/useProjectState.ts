@@ -16,6 +16,7 @@ import type {
   SelectedMaterial,
   ProjectEstimate,
   ProjectRfq,
+  EditedDimension,
 } from "@/types/consumer-project";
 import { createNewProject } from "@/types/consumer-project";
 
@@ -448,6 +449,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 치수 편집 데이터 저장
+  const setEditedDimensions = useCallback(
+    (dims: EditedDimension[]) => {
+      if (!project) return;
+      saveProject({ ...project, editedDimensions: dims });
+    },
+    [project, saveProject]
+  );
+
   const forceSave = useCallback(() => {
     if (!project || !user) return;
     if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
@@ -481,6 +491,7 @@ export function useProjectState(projectId: string) {
     setEstimate,
     setEstimateId,
     updateRfq,
+    setEditedDimensions,
     saveProject: () => project && saveProject(project),
     forceSave,
   };

@@ -1,6 +1,6 @@
 "use client";
 
-import { ZoomIn, ZoomOut, Maximize, Ruler, Tag } from "lucide-react";
+import { ZoomIn, ZoomOut, Maximize, Ruler, Tag, PencilRuler } from "lucide-react";
 
 interface ViewerToolbarProps {
   // 줌
@@ -13,6 +13,9 @@ interface ViewerToolbarProps {
   // 구조 정보
   showEngInfo?: boolean;
   onToggleEngInfo?: () => void;
+  // 치수 편집
+  editingDimensions?: boolean;
+  onToggleEditDimensions?: () => void;
 }
 
 export default function ViewerToolbar({
@@ -23,11 +26,28 @@ export default function ViewerToolbar({
   onToggleDimensions,
   showEngInfo = true,
   onToggleEngInfo,
+  editingDimensions = false,
+  onToggleEditDimensions,
 }: ViewerToolbarProps) {
   return (
     <div className="flex items-center justify-between px-3 py-1.5 bg-white/95 backdrop-blur-sm border-t border-gray-200">
-      {/* 좌: 빈 공간 (균형 맞추기용) */}
-      <div className="flex items-center gap-2" />
+      {/* 좌: 치수 편집 */}
+      <div className="flex items-center gap-2">
+        {onToggleEditDimensions && (
+          <button
+            onClick={onToggleEditDimensions}
+            className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+              editingDimensions
+                ? "bg-red-600 text-white"
+                : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
+            }`}
+            title="치수 편집"
+          >
+            <PencilRuler className="w-3.5 h-3.5" />
+            {editingDimensions ? "편집 완료" : "치수 편집"}
+          </button>
+        )}
+      </div>
 
       {/* 중앙: 줌 */}
       <div className="flex items-center gap-1">

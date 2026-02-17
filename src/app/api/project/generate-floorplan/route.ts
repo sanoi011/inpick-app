@@ -90,8 +90,78 @@ const DIM_PROMPT = `이 깨끗한 아파트 평면도에 내부 치수선만 추
 - 공간 이름은 표시하지 마. 치수만 표시해.
 - 레이아웃을 절대 변경하지 마. 벽을 추가하거나 제거하지 마.`;
 
+const DIM_EXTRACT_PROMPT = `이 아파트 평면도 이미지에서 치수선에 표시된 모든 치수값을 추출해줘.
+
+각 치수선에 대해 다음 정보를 JSON 배열로 반환해:
+- roomName: 이 치수가 속한 방 이름 (거실, 안방, 침실1, 침실2, 주방, 욕실1, 욕실2, 현관, 드레스룸 등)
+- valueMm: 치수값 (mm 단위 정수, 예: 3600)
+- direction: "width" (가로) 또는 "height" (세로)
+- centerX: 치수선 중심의 이미지 X좌표 (0~1 정규화, 이미지 왼쪽=0 오른쪽=1)
+- centerY: 치수선 중심의 이미지 Y좌표 (0~1 정규화, 이미지 상단=0 하단=1)
+- startX, startY, endX, endY: 치수선 시작/끝점의 정규화 좌표 (0~1)
+
+JSON 형식만 반환하고 다른 텍스트는 포함하지 마:
+[
+  { "roomName": "거실", "valueMm": 4500, "direction": "width", "centerX": 0.5, "centerY": 0.3, "startX": 0.3, "startY": 0.3, "endX": 0.7, "endY": 0.3 },
+  ...
+]`;
+
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Gemini Pro로 치수 이미지에서 치수값 추출 (JSON) - 벽 두께(외벽250/내벽150mm) 고려 필요 */
+async function extractDimensionsFromImage(
+  ai: GoogleGenAI,
+  imageBuffer: Buffer,
+  mimeType: string
+): Promise<Array<{
+  roomName: string;
+  valueMm: number;
+  direction: "width" | "height";
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}>> {
+  try {
+    const base64Image = imageBuffer.toString("base64");
+    const response = await ai.models.generateContent({
+      model: MODEL,
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { inlineData: { mimeType, data: base64Image } },
+            { text: DIM_EXTRACT_PROMPT },
+          ],
+        },
+      ],
+    });
+
+    const text = response.text || "";
+    // Extract JSON from response
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (!jsonMatch) return [];
+
+    const parsed = JSON.parse(jsonMatch[0]);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter((d: Record<string, unknown>) => d.roomName && d.valueMm && d.direction)
+      .map((d: Record<string, unknown>) => ({
+        roomName: String(d.roomName),
+        valueMm: Number(d.valueMm),
+        direction: d.direction === "height" ? "height" as const : "width" as const,
+        startX: Number(d.startX) || 0,
+        startY: Number(d.startY) || 0,
+        endX: Number(d.endX) || 0,
+        endY: Number(d.endY) || 0,
+      }));
+  } catch (err) {
+    console.error("[generate-floorplan] Dimension extraction failed:", (err as Error).message);
+    return [];
+  }
 }
 
 async function callGeminiPro(
@@ -157,11 +227,20 @@ export async function GET(request: NextRequest) {
     .single();
 
   if (data && data.status === "completed") {
+    let extractedDimensions = [];
+    try {
+      if (data.extracted_dimensions) {
+        extractedDimensions = typeof data.extracted_dimensions === "string"
+          ? JSON.parse(data.extracted_dimensions)
+          : data.extracted_dimensions;
+      }
+    } catch { /* ignore */ }
     return NextResponse.json({
       exists: true,
       finalUrl: data.final_url,
       finalMirrorUrl: data.final_mirror_url,
       cleanUrl: data.clean_url,
+      extractedDimensions,
     });
   }
 
@@ -271,6 +350,11 @@ export async function POST(request: NextRequest) {
 
         send("progress", { step: 3, progress: 70, message: "기본형 치수선 완료" });
 
+        // ── Step 3b: 치수값 추출 (Gemini Flash, 병렬 가능) ──
+        send("progress", { step: 3, progress: 72, message: "치수 데이터 추출 중..." });
+        const extractedDimensions = await extractDimensionsFromImage(ai, finalBuffer, "image/png");
+        send("progress", { step: 3, progress: 74, message: `치수 ${extractedDimensions.length}개 추출 완료` });
+
         // Wait between Gemini calls
         await sleep(5000);
 
@@ -318,6 +402,7 @@ export async function POST(request: NextRequest) {
             final_mirror_url: urls["final_mirror"],
             clean_url: urls["clean"],
             processing_time_ms: processingTime,
+            extracted_dimensions: extractedDimensions.length > 0 ? JSON.stringify(extractedDimensions) : null,
             updated_at: new Date().toISOString(),
           })
           .eq("complex_no", complexNo)
@@ -329,6 +414,7 @@ export async function POST(request: NextRequest) {
           finalUrl: urls["final"],
           finalMirrorUrl: urls["final_mirror"],
           processingTimeMs: processingTime,
+          extractedDimensions,
         });
       } catch (err: unknown) {
         const msg = (err as Error).message || "알 수 없는 오류";

@@ -3,10 +3,21 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, CheckCircle2, XCircle, RefreshCw, Download, FlipHorizontal, Ruler, Sparkles } from "lucide-react";
 
+export interface ExtractedDimension {
+  roomName: string;
+  valueMm: number;
+  direction: "width" | "height";
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+}
+
 interface GenerationResult {
   finalUrl: string;
   finalMirrorUrl: string;
   processingTimeMs: number;
+  extractedDimensions?: ExtractedDimension[];
 }
 
 interface Props {
@@ -70,6 +81,7 @@ export default function FloorPlanGenerationProgress({
             finalUrl: checkData.finalUrl,
             finalMirrorUrl: checkData.finalMirrorUrl,
             processingTimeMs: 0,
+            extractedDimensions: checkData.extractedDimensions || [],
           });
           return;
         }
@@ -107,6 +119,7 @@ export default function FloorPlanGenerationProgress({
               finalUrl: data.finalUrl,
               finalMirrorUrl: data.finalMirrorUrl,
               processingTimeMs: 0,
+              extractedDimensions: data.extractedDimensions || [],
             });
             return;
           }
@@ -148,6 +161,7 @@ export default function FloorPlanGenerationProgress({
                   finalUrl: data.finalUrl,
                   finalMirrorUrl: data.finalMirrorUrl,
                   processingTimeMs: data.processingTimeMs,
+                  extractedDimensions: data.extractedDimensions || [],
                 });
               } else if (data.event === "error") {
                 setError(data.message || "알 수 없는 오류");

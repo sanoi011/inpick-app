@@ -2,14 +2,13 @@
 
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Box, Palette, Image, Calculator, FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Box, Image, Calculator, FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { SaveButton } from "@/components/ui/SaveIndicator";
 import type { ConsumerProjectStatus } from "@/types/consumer-project";
 
 const TABS = [
   { label: "디자인하기", segment: "design", icon: Box },
-  { label: "AI 디자인", segment: "ai-design", icon: Palette },
   { label: "3D 렌더링", segment: "rendering", icon: Image },
   { label: "물량산출", segment: "estimate", icon: Calculator },
   { label: "견적요청", segment: "rfq", icon: FileText },
@@ -17,12 +16,12 @@ const TABS = [
 
 const STATUS_TO_STEP: Record<ConsumerProjectStatus, number> = {
   ADDRESS_SELECTION: 1,
-  FLOOR_PLAN: 2,
-  AI_DESIGN: 3,
-  RENDERING: 4,
-  ESTIMATING: 5,
-  RFQ: 6,
-  CONTRACTED: 7,
+  FLOOR_PLAN: 1,
+  AI_DESIGN: 2,
+  RENDERING: 2,
+  ESTIMATING: 3,
+  RFQ: 4,
+  CONTRACTED: 5,
 };
 
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {

@@ -193,6 +193,18 @@ export interface ProjectRfq {
   selectedBidId?: string;
 }
 
+// 편집 가능 치수선 (이미지 오버레이)
+export interface EditedDimension {
+  id: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  valueMm: number;
+  roomName: string;
+  direction: "width" | "height";
+}
+
 // 통합 프로젝트 상태
 export interface ConsumerProject {
   id: string;
@@ -204,6 +216,7 @@ export interface ConsumerProject {
   rfq?: ProjectRfq;
   estimateId?: string;
   drawingId?: string;
+  editedDimensions?: EditedDimension[];
   createdAt: string;
   updatedAt: string;
 }
