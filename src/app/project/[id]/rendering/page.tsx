@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   ArrowRight,
@@ -9,23 +9,33 @@ import {
   Check,
   X,
   ImageIcon,
+  MapPin,
+  Palette,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useMaterialCatalogV2 } from "@/hooks/useMaterialCatalogV2";
 import type { SelectedMaterial } from "@/types/consumer-project";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
-import type { MaterialCategory, MaterialProduct } from "@/lib/data/material-catalog-v2";
+import {
+  getCategoriesForRoom,
+  type MaterialCategory,
+  type MaterialProduct,
+} from "@/lib/data/material-catalog-v2";
+import dynamic from "next/dynamic";
+import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
+
+const FloorPlan2D = dynamic(() => import("@/components/viewer/FloorPlan2D"), { ssr: false });
 
 // 등급 스타일
-const GRADE = {
+const GRADE: Record<string, { label: string; color: string; bg: string; border: string }> = {
   economy: { label: "경제형", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" },
   standard: { label: "표준형", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" },
   premium: { label: "프리미엄", color: "text-amber-600", bg: "bg-amber-50", border: "border-amber-200" },
 };
 
-// 공종 그룹
-const GROUPS = [
+// 공종 그룹 (도면 없을 때 폴백용)
+const FALLBACK_GROUPS = [
   { id: "finish", label: "기본 마감", codes: ["FLOORING", "WALLPAPER", "PAINT", "CEILING", "BASEBOARD"] },
   { id: "door", label: "문/창호", codes: ["DOOR_ROOM", "SLIDING_PARTITION", "ENTRY_DOOR", "WINDOW"] },
   { id: "light", label: "조명", codes: ["LIGHTING"] },
@@ -51,9 +61,11 @@ export default function RenderingPage() {
   } = useMaterialCatalogV2();
 
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
-  const [activeGroup, setActiveGroup] = useState("finish");
+  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [activeGroup, setActiveGroup] = useState("finish"); // 폴백 모드용
+  const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
 
   // 도면 로드
   useEffect(() => {
@@ -78,43 +90,66 @@ export default function RenderingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 제품 선택
-  const handleSelect = useCallback(
-    (cat: MaterialCategory, prod: MaterialProduct) => {
-      toggleProduct(cat.code, prod.id);
-      const isSelected = selectedProducts[cat.code] === prod.id;
-      if (!isSelected) {
-        updateMaterial({
-          id: prod.id, roomId: "", roomName: "",
-          category: cat.nameKr, categoryCode: cat.code, part: cat.nameKr,
-          materialName: `${prod.brand} ${prod.productName}`,
-          specification: prod.spec,
-          unitPrice: prod.unitPrice, laborPrice: prod.laborPrice, unit: prod.unit,
-          brand: prod.brand, productId: prod.id,
-          priceGrade: prod.priceGrade, priceSource: prod.priceSource,
-          subMaterials: prod.subItems, confirmed: true,
-        });
-      }
-    },
-    [toggleProduct, selectedProducts, updateMaterial]
+  // ─── 방 관련 계산 ──────────────────────────────────
+
+  // 자재 선택 가능한 방만 필터 (발코니/다용도실 제외)
+  const materialRooms = useMemo(() => {
+    if (!floorPlan) return [];
+    return floorPlan.rooms.filter((r) => getCategoriesForRoom(r.type).length > 0);
+  }, [floorPlan]);
+
+  // 선택된 방 객체
+  const selectedRoom = useMemo(
+    () => floorPlan?.rooms.find((r) => r.id === selectedRoomId) ?? null,
+    [floorPlan, selectedRoomId]
   );
 
-  // 현재 그룹 카테고리
-  const groupCategories = useMemo(() => {
-    const g = GROUPS.find((g) => g.id === activeGroup);
-    if (!g) return [];
-    return allCategories.filter((c) => g.codes.includes(c.code));
-  }, [activeGroup, allCategories]);
+  // 선택된 방의 카테고리
+  const roomCategories = useMemo(() => {
+    if (!selectedRoom) return [];
+    return getCategoriesForRoom(selectedRoom.type);
+  }, [selectedRoom]);
 
-  // 그룹별 진행률
-  const groupProgress = useMemo(() => {
-    const map: Record<string, { done: number; total: number }> = {};
-    for (const g of GROUPS) {
-      const cats = allCategories.filter((c) => g.codes.includes(c.code));
-      map[g.id] = { total: cats.length, done: cats.filter((c) => selectedProducts[c.code]).length };
+  // 방별 완성도
+  const roomCompletionStatus = useMemo(() => {
+    if (!floorPlan) return {};
+    const status: Record<string, "none" | "partial" | "complete"> = {};
+    for (const room of floorPlan.rooms) {
+      const cats = getCategoriesForRoom(room.type);
+      if (cats.length === 0) {
+        status[room.id] = "none";
+        continue;
+      }
+      const done = cats.filter((c) => selectedProducts[c.code]).length;
+      status[room.id] =
+        done === 0 ? "none" : done === cats.length ? "complete" : "partial";
     }
-    return map;
-  }, [allCategories, selectedProducts]);
+    return status;
+  }, [floorPlan, selectedProducts]);
+
+  // 완성된 방 수
+  const completedRoomCount = useMemo(() => {
+    return materialRooms.filter((r) => roomCompletionStatus[r.id] === "complete").length;
+  }, [materialRooms, roomCompletionStatus]);
+
+  // AI 디자인 이미지 (선택된 방)
+  const roomDesignImages = useMemo(() => {
+    if (!selectedRoom || !project?.design?.generatedImages) return [];
+    return project.design.generatedImages.filter(
+      (img) =>
+        img.roomId === selectedRoomId ||
+        img.roomName === selectedRoom.name ||
+        (img.description && img.description.includes(selectedRoom.name))
+    );
+  }, [selectedRoomId, selectedRoom, project?.design?.generatedImages]);
+
+  // 방별 선택 진행률
+  const roomProgress = useMemo(() => {
+    if (!selectedRoom) return { done: 0, total: 0 };
+    const total = roomCategories.length;
+    const done = roomCategories.filter((c) => selectedProducts[c.code]).length;
+    return { done, total };
+  }, [selectedRoom, roomCategories, selectedProducts]);
 
   // 선택 요약
   const selectedSummary = useMemo(() => {
@@ -123,322 +158,736 @@ export default function RenderingPage() {
       const pid = selectedProducts[cat.code];
       if (pid) {
         const prod = cat.products.find((p) => p.id === pid);
-        if (prod) items.push({ category: cat.nameKr, product: prod, categoryCode: cat.code });
+        if (prod)
+          items.push({ category: cat.nameKr, product: prod, categoryCode: cat.code });
       }
     }
     return items;
   }, [allCategories, selectedProducts]);
 
-  // 컨펌 → 물량산출
+  // ─── 핸들러 ────────────────────────────────────────
+
+  const handleRoomClick = useCallback(
+    (room: { id: string }) => {
+      setSelectedRoomId(room.id);
+    },
+    []
+  );
+
+  const handleSelect = useCallback(
+    (cat: MaterialCategory, prod: MaterialProduct) => {
+      toggleProduct(cat.code, prod.id);
+      const isDeselecting = selectedProducts[cat.code] === prod.id;
+      if (!isDeselecting) {
+        updateMaterial({
+          id: prod.id,
+          roomId: selectedRoom?.id || "",
+          roomName: selectedRoom?.name || "",
+          category: cat.nameKr,
+          categoryCode: cat.code,
+          part: cat.nameKr,
+          materialName: `${prod.brand} ${prod.productName}`,
+          specification: prod.spec,
+          unitPrice: prod.unitPrice,
+          laborPrice: prod.laborPrice,
+          unit: prod.unit,
+          brand: prod.brand,
+          productId: prod.id,
+          priceGrade: prod.priceGrade,
+          priceSource: prod.priceSource,
+          subMaterials: prod.subItems,
+          confirmed: true,
+        });
+      }
+    },
+    [toggleProduct, selectedProducts, updateMaterial, selectedRoom]
+  );
+
   const handleConfirm = useCallback(() => {
     const materials: SelectedMaterial[] = selectedSummary.map((item) => ({
-      id: item.product.id, roomId: "", roomName: "",
-      category: item.category, categoryCode: item.categoryCode, part: item.category,
+      id: item.product.id,
+      roomId: "",
+      roomName: "",
+      category: item.category,
+      categoryCode: item.categoryCode,
+      part: item.category,
       materialName: `${item.product.brand} ${item.product.productName}`,
       specification: item.product.spec,
-      unitPrice: item.product.unitPrice, laborPrice: item.product.laborPrice,
-      unit: item.product.unit, brand: item.product.brand, productId: item.product.id,
-      priceGrade: item.product.priceGrade, priceSource: item.product.priceSource,
-      subMaterials: item.product.subItems, confirmed: true,
+      unitPrice: item.product.unitPrice,
+      laborPrice: item.product.laborPrice,
+      unit: item.product.unit,
+      brand: item.product.brand,
+      productId: item.product.id,
+      priceGrade: item.product.priceGrade,
+      priceSource: item.product.priceSource,
+      subMaterials: item.product.subItems,
+      confirmed: true,
     }));
-    updateRendering({ views: project?.rendering?.views || [], materials, allConfirmed: true });
+    updateRendering({
+      views: project?.rendering?.views || [],
+      materials,
+      allConfirmed: true,
+    });
     updateStatus("ESTIMATING");
     router.push(`/project/${projectId}/estimate`);
-  }, [selectedSummary, updateRendering, project?.rendering?.views, updateStatus, router, projectId]);
+  }, [
+    selectedSummary,
+    updateRendering,
+    project?.rendering?.views,
+    updateStatus,
+    router,
+    projectId,
+  ]);
 
-  // 등급순 정렬
   const sorted = (prods: MaterialProduct[]) => {
-    const o = { economy: 0, standard: 1, premium: 2 };
-    return [...prods].sort((a, b) => o[a.priceGrade] - o[b.priceGrade]);
+    const o: Record<string, number> = { economy: 0, standard: 1, premium: 2 };
+    return [...prods].sort((a, b) => (o[a.priceGrade] ?? 0) - (o[b.priceGrade] ?? 0));
   };
+
+  // ─── 폴백: 도면 없을 때 기존 공종 탭 ───────────────
+
+  const fallbackCategories = useMemo(() => {
+    const g = FALLBACK_GROUPS.find((g) => g.id === activeGroup);
+    if (!g) return [];
+    return allCategories.filter((c) => g.codes.includes(c.code));
+  }, [activeGroup, allCategories]);
+
+  const fallbackGroupProgress = useMemo(() => {
+    const map: Record<string, { done: number; total: number }> = {};
+    for (const g of FALLBACK_GROUPS) {
+      const cats = allCategories.filter((c) => g.codes.includes(c.code));
+      map[g.id] = {
+        total: cats.length,
+        done: cats.filter((c) => selectedProducts[c.code]).length,
+      };
+    }
+    return map;
+  }, [allCategories, selectedProducts]);
+
+  // ─── 로딩 ──────────────────────────────────────────
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
         <div className="text-center">
           <Package className="w-10 h-10 mx-auto mb-3 text-blue-400 animate-pulse" />
-          <p className="text-sm text-gray-500">자재 추천 로딩 중</p>
+          <p className="text-sm text-gray-500">자재 정보 로딩 중</p>
         </div>
       </div>
     );
   }
 
+  // ─── 카테고리 선택 카드 (공통 렌더러) ───────────────
+
+  const renderCategoryCards = (categories: MaterialCategory[]) => (
+    <div className="space-y-8">
+      {categories.map((category) => {
+        const products = sorted(category.products);
+        const selectedId = selectedProducts[category.code];
+
+        return (
+          <section key={category.code}>
+            <div className="flex items-center gap-2 mb-3">
+              <h3 className="text-sm font-bold text-gray-900">{category.nameKr}</h3>
+              {selectedId && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {products.map((product) => {
+                const isSelected = selectedId === product.id;
+                const grade = GRADE[product.priceGrade];
+
+                return (
+                  <button
+                    key={product.id}
+                    onClick={() => handleSelect(category, product)}
+                    className={`group relative text-left rounded-xl border-2 transition-all ${
+                      isSelected
+                        ? "border-blue-500 bg-white shadow-md"
+                        : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                    }`}
+                  >
+                    {/* 이미지 placeholder */}
+                    <div
+                      className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${
+                        isSelected ? "bg-blue-50" : "bg-gray-50"
+                      }`}
+                    >
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <ImageIcon
+                          className={`w-8 h-8 ${isSelected ? "text-blue-200" : "text-gray-200"}`}
+                        />
+                        <span className="text-[10px] text-gray-300 mt-1">자재 이미지</span>
+                      </div>
+                      <div
+                        className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}
+                      >
+                        {grade.label}
+                      </div>
+                      {isSelected && (
+                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow">
+                          <Check className="w-4 h-4 text-white" />
+                        </div>
+                      )}
+                      {product.colorHex && (
+                        <div className="absolute bottom-2 left-2">
+                          <div
+                            className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                            style={{ backgroundColor: product.colorHex }}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3">
+                      <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                      <p
+                        className={`text-sm font-bold mb-1 leading-snug ${
+                          isSelected ? "text-blue-800" : "text-gray-800"
+                        }`}
+                      >
+                        {product.productName}
+                      </p>
+                      <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">
+                        {product.spec}
+                      </p>
+
+                      <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
+                        <div>
+                          <span className="text-base font-extrabold text-gray-900">
+                            {product.unitPrice.toLocaleString()}
+                          </span>
+                          <span className="text-[10px] text-gray-400 ml-0.5">
+                            원/{product.unit}
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-gray-400">
+                          시공 {product.laborPrice.toLocaleString()}
+                        </span>
+                      </div>
+
+                      {product.tags.length > 0 && (
+                        <div className="flex flex-wrap gap-1 mt-2">
+                          {product.tags.map((tag) => (
+                            <span
+                              key={tag}
+                              className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded"
+                            >
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {isSelected && product.subItems.length > 0 && (
+                        <div className="mt-2 pt-2 border-t border-blue-100 space-y-0.5">
+                          <p className="text-[10px] text-blue-500 font-bold">포함 부자재</p>
+                          {product.subItems.map((sub) => (
+                            <div key={sub.name} className="flex justify-between">
+                              <span className="text-[10px] text-gray-500">{sub.name}</span>
+                              <span className="text-[10px] text-gray-400">
+                                {sub.unitPrice.toLocaleString()}원
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+
+  // ─── 컨펌 모달 ──────────────────────────────────────
+
+  const confirmModal = showConfirm && (
+    <div
+      className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4"
+      onClick={() => setShowConfirm(false)}
+    >
+      <div
+        className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-5 pt-5 pb-3 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-bold text-gray-900">자재 선택 확인</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {selectedSummary.length}개 부위 선택 · 물량산출로 이동합니다
+            </p>
+          </div>
+          <button
+            onClick={() => setShowConfirm(false)}
+            className="p-1 hover:bg-gray-100 rounded-lg"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-5 pb-3 space-y-1.5">
+          {selectedSummary.map((item) => {
+            const grade = GRADE[item.product.priceGrade];
+            return (
+              <div
+                key={item.categoryCode}
+                className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50"
+              >
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
+                  {item.product.colorHex ? (
+                    <div
+                      className="w-6 h-6 rounded"
+                      style={{ backgroundColor: item.product.colorHex }}
+                    />
+                  ) : (
+                    <ImageIcon className="w-4 h-4 text-gray-300" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] text-gray-400">{item.category}</span>
+                    <span
+                      className={`px-1 text-[9px] font-medium rounded ${grade.bg} ${grade.color}`}
+                    >
+                      {grade.label}
+                    </span>
+                  </div>
+                  <p className="text-xs font-medium text-gray-800 truncate">
+                    {item.product.brand} {item.product.productName}
+                  </p>
+                </div>
+                <span className="text-xs font-bold text-gray-700 flex-shrink-0">
+                  {item.product.unitPrice.toLocaleString()}원
+                </span>
+              </div>
+            );
+          })}
+
+          {selectedCount < totalCategories && (
+            <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 mt-2">
+              <p className="text-xs text-amber-700">
+                <strong>{totalCategories - selectedCount}개 부위</strong> 미선택 — 기본 단가로
+                산출됩니다
+              </p>
+            </div>
+          )}
+        </div>
+
+        <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-600">예상 단가 합계</span>
+            <span className="text-xl font-extrabold text-gray-900">
+              {totalMaterialCost.toLocaleString()}
+              <span className="text-sm font-normal text-gray-400 ml-0.5">원</span>
+            </span>
+          </div>
+          <button
+            onClick={handleConfirm}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors"
+          >
+            <CheckCircle2 className="w-5 h-5" />
+            확인 완료 · 물량산출로 이동
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ═══════════════════════════════════════════════════
+  // 도면 없을 때: 기존 공종 탭 모드 (폴백)
+  // ═══════════════════════════════════════════════════
+  if (!floorPlan) {
+    return (
+      <div className="flex flex-col h-[calc(100vh-56px)]">
+        {/* 상단 */}
+        <div className="bg-white border-b border-gray-200">
+          <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+                <Package className="w-3.5 h-3.5 text-white" />
+              </div>
+              <h2 className="text-sm font-bold text-gray-900">자재 선택</h2>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[11px] font-medium text-gray-500">
+                  {selectedCount}/{totalCategories}
+                </span>
+              </div>
+              {selectedCount > 0 && (
+                <button
+                  onClick={() => setShowConfirm(true)}
+                  className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+                >
+                  확인 <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-0.5 px-4 pb-0 overflow-x-auto scrollbar-hide">
+            {FALLBACK_GROUPS.map((g) => {
+              const p = fallbackGroupProgress[g.id];
+              const isActive = activeGroup === g.id;
+              const isDone = p && p.done === p.total;
+              return (
+                <button
+                  key={g.id}
+                  onClick={() => setActiveGroup(g.id)}
+                  className={`relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+                    isActive ? "text-blue-700" : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                  {g.label}
+                  {p && !isDone && (
+                    <span className="text-[10px] text-gray-400">
+                      {p.done}/{p.total}
+                    </span>
+                  )}
+                  {isActive && (
+                    <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          <div className="max-w-4xl mx-auto px-4 py-6">
+            {renderCategoryCards(fallbackCategories)}
+          </div>
+        </div>
+
+        {/* 모바일 하단 */}
+        <div className="md:hidden sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-30">
+          <div className="flex items-center gap-2">
+            <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-blue-500 rounded-full"
+                style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
+              />
+            </div>
+            <span className="text-[11px] text-gray-500">
+              {selectedCount}/{totalCategories}
+            </span>
+          </div>
+          {selectedCount > 0 && (
+            <button
+              onClick={() => setShowConfirm(true)}
+              className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
+            >
+              확인 <ArrowRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        {confirmModal}
+      </div>
+    );
+  }
+
+  // ═══════════════════════════════════════════════════
+  // 도면 있을 때: 방 클릭 기반 자재 선택 (메인 모드)
+  // ═══════════════════════════════════════════════════
   return (
     <div className="flex flex-col h-[calc(100vh-56px)]">
-      {/* 상단 바 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between px-4 py-2.5 gap-2">
+      {/* ── 상단 바 ── */}
+      <div className="bg-white border-b border-gray-200 px-4 py-2.5">
+        <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
               <Package className="w-3.5 h-3.5 text-white" />
             </div>
             <h2 className="text-sm font-bold text-gray-900">자재 선택</h2>
-            {floorPlan && (
-              <span className="hidden sm:inline text-[11px] text-gray-400">
-                {floorPlan.totalArea}m²
-              </span>
-            )}
+            <span className="hidden sm:inline text-[11px] text-gray-400">
+              {floorPlan.totalArea}m²
+            </span>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
-            {/* 진행률 */}
+            <div className="hidden sm:flex items-center gap-1.5">
+              <span className="text-[11px] text-gray-500">
+                {completedRoomCount}/{materialRooms.length} 공간 완료
+              </span>
+              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-green-500 rounded-full transition-all duration-500"
+                  style={{
+                    width: `${materialRooms.length > 0 ? (completedRoomCount / materialRooms.length) * 100 : 0}%`,
+                  }}
+                />
+              </div>
+            </div>
             <div className="flex items-center gap-2">
-              <div className="w-20 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-blue-500 rounded-full transition-all duration-500"
                   style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
                 />
               </div>
-              <span className="text-[11px] font-medium text-gray-500">{selectedCount}/{totalCategories}</span>
+              <span className="text-[11px] font-medium text-gray-500">
+                {selectedCount}/{totalCategories}
+              </span>
             </div>
             {selectedCount > 0 && (
               <button
                 onClick={() => setShowConfirm(true)}
-                className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                className="hidden sm:flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
               >
-                확인 <ArrowRight className="w-4 h-4" />
+                선택 완료 <ArrowRight className="w-4 h-4" />
               </button>
             )}
           </div>
         </div>
-
-        {/* 공종 탭 바 */}
-        <div className="flex items-center gap-0.5 px-4 pb-0 overflow-x-auto scrollbar-hide">
-          {GROUPS.map((g) => {
-            const p = groupProgress[g.id];
-            const isActive = activeGroup === g.id;
-            const isDone = p && p.done === p.total;
-            return (
-              <button
-                key={g.id}
-                onClick={() => setActiveGroup(g.id)}
-                className={`relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
-                  isActive
-                    ? "text-blue-700"
-                    : "text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
-                {g.label}
-                {p && !isDone && (
-                  <span className="text-[10px] text-gray-400">{p.done}/{p.total}</span>
-                )}
-                {isActive && (
-                  <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* 메인 컨텐츠 - 스크롤 */}
-      <div className="flex-1 overflow-y-auto bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-6 space-y-10">
-          {groupCategories.map((category) => {
-            const products = sorted(category.products);
-            const selectedId = selectedProducts[category.code];
+      {/* ── 메인 ── */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* 좌측: 평면도 + AI 참조 + 방 목록 */}
+        <div className="md:w-[420px] md:border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
+          {/* 평면도 */}
+          <div className="p-3 flex-shrink-0">
+            <div className="h-[250px] md:h-[300px]">
+              <FloorPlan2D
+                ref={floorPlan2DRef}
+                floorPlan={floorPlan}
+                selectedRoomId={selectedRoomId || undefined}
+                onRoomClick={handleRoomClick}
+                roomCompletionStatus={roomCompletionStatus}
+                className="h-full"
+                showDimensions={false}
+                showFixtures={true}
+              />
+            </div>
+          </div>
 
-            return (
-              <section key={category.code} id={`cat-${category.code}`}>
-                {/* 부위 타이틀 */}
-                <div className="flex items-center gap-2 mb-4">
-                  <h3 className="text-base font-bold text-gray-900">{category.nameKr}</h3>
-                  {selectedId && (
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
-                  )}
+          {/* AI 디자인 참조 */}
+          {selectedRoom && (
+            <div className="px-3 pb-3 flex-shrink-0">
+              {roomDesignImages.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-1.5">
+                    <Palette className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="text-[11px] font-medium text-gray-500">
+                      AI 디자인 참조
+                    </span>
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {roomDesignImages.map((img) => (
+                      <img
+                        key={img.id}
+                        src={img.imageData}
+                        alt={img.description || "AI 디자인"}
+                        className="h-24 rounded-lg object-cover flex-shrink-0 border border-gray-200"
+                      />
+                    ))}
+                  </div>
                 </div>
+              ) : (
+                <div className="rounded-lg bg-gray-50 border border-dashed border-gray-200 p-3 text-center">
+                  <Palette className="w-5 h-5 mx-auto text-gray-300 mb-1" />
+                  <p className="text-[10px] text-gray-400">
+                    AI 디자인 이미지가 없습니다
+                  </p>
+                  <p className="text-[10px] text-gray-300">
+                    디자인하기 탭에서 AI 디자인을 생성해보세요
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
-                {/* 3개 추천 카드 */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {products.map((product) => {
-                    const isSelected = selectedId === product.id;
-                    const grade = GRADE[product.priceGrade];
+          {/* 공간 목록 */}
+          <div className="px-3 pb-3 flex-shrink-0">
+            <div className="flex items-center gap-1.5 mb-2">
+              <MapPin className="w-3.5 h-3.5 text-gray-400" />
+              <span className="text-[11px] font-medium text-gray-500">공간 선택</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {materialRooms.map((room) => {
+                const isActive = room.id === selectedRoomId;
+                const status = roomCompletionStatus[room.id];
+                const cats = getCategoriesForRoom(room.type);
+                const done = cats.filter((c) => selectedProducts[c.code]).length;
+                const isComplete = status === "complete";
+
+                return (
+                  <button
+                    key={room.id}
+                    onClick={() => setSelectedRoomId(room.id)}
+                    className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                      isActive
+                        ? "bg-blue-100 text-blue-700 border border-blue-300"
+                        : isComplete
+                        ? "bg-green-50 text-green-700 border border-green-200"
+                        : status === "partial"
+                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                        : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
+                    }`}
+                  >
+                    {isComplete ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />
+                    ) : null}
+                    {room.name}
+                    {!isComplete && (
+                      <span className="text-[10px] opacity-60">
+                        {done}/{cats.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* 우측: 자재 카테고리 */}
+        <div className="flex-1 overflow-y-auto bg-gray-50">
+          {selectedRoom ? (
+            <div className="max-w-3xl mx-auto px-4 py-6">
+              {/* 방 헤더 */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      roomProgress.done === roomProgress.total
+                        ? "bg-green-100"
+                        : "bg-blue-100"
+                    }`}
+                  >
+                    {roomProgress.done === roomProgress.total ? (
+                      <CheckCircle2 className="w-5 h-5 text-green-600" />
+                    ) : (
+                      <Package className="w-5 h-5 text-blue-600" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {selectedRoom.name}
+                      <span className="text-sm font-normal text-gray-400 ml-2">
+                        {selectedRoom.area}m²
+                      </span>
+                    </h3>
+                    <p className="text-xs text-gray-500">
+                      {roomProgress.done}/{roomProgress.total} 부위 선택됨
+                    </p>
+                  </div>
+                </div>
+                {/* 방 진행 바 */}
+                <div className="hidden sm:flex items-center gap-2">
+                  <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        roomProgress.done === roomProgress.total
+                          ? "bg-green-500"
+                          : "bg-blue-500"
+                      }`}
+                      style={{
+                        width: `${roomProgress.total > 0 ? (roomProgress.done / roomProgress.total) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 카테고리 카드 그리드 */}
+              {roomCategories.length > 0 ? (
+                renderCategoryCards(roomCategories)
+              ) : (
+                <div className="text-center py-16">
+                  <Package className="w-10 h-10 mx-auto mb-3 text-gray-200" />
+                  <p className="text-sm text-gray-400">
+                    이 공간은 별도 자재 선택이 필요하지 않습니다
+                  </p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* 방 미선택 상태 */
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center px-6 max-w-sm">
+                <div className="w-16 h-16 rounded-2xl bg-blue-50 flex items-center justify-center mx-auto mb-4">
+                  <MapPin className="w-8 h-8 text-blue-400" />
+                </div>
+                <h3 className="text-lg font-bold text-gray-700 mb-2">
+                  도면에서 방을 선택해주세요
+                </h3>
+                <p className="text-sm text-gray-400 mb-6">
+                  방을 클릭하면 해당 공간에 필요한 자재를 선택할 수 있습니다
+                </p>
+                {/* 방 칩 바로가기 */}
+                <div className="flex flex-wrap justify-center gap-2">
+                  {materialRooms.map((room) => {
+                    const status = roomCompletionStatus[room.id];
+                    const cats = getCategoriesForRoom(room.type);
+                    const done = cats.filter((c) => selectedProducts[c.code]).length;
+                    const isComplete = status === "complete";
 
                     return (
                       <button
-                        key={product.id}
-                        onClick={() => handleSelect(category, product)}
-                        className={`group relative text-left rounded-xl border-2 transition-all ${
-                          isSelected
-                            ? "border-blue-500 bg-white shadow-md"
-                            : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                        key={room.id}
+                        onClick={() => setSelectedRoomId(room.id)}
+                        className={`flex items-center gap-1 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          isComplete
+                            ? "bg-green-50 text-green-700 border border-green-200"
+                            : status === "partial"
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 hover:border-gray-300"
                         }`}
                       >
-                        {/* 이미지 영역 (추후 크롤링 이미지 삽입용) */}
-                        <div className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${
-                          isSelected ? "bg-blue-50" : "bg-gray-50"
-                        }`}>
-                          {/* TODO: 자재 실물 이미지 (크롤링 후 삽입) */}
-                          <div className="absolute inset-0 flex flex-col items-center justify-center">
-                            <ImageIcon className={`w-8 h-8 ${isSelected ? "text-blue-200" : "text-gray-200"}`} />
-                            <span className="text-[10px] text-gray-300 mt-1">자재 이미지</span>
-                          </div>
-                          {/* 등급 배지 */}
-                          <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}>
-                            {grade.label}
-                          </div>
-                          {/* 선택 체크 */}
-                          {isSelected && (
-                            <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow">
-                              <Check className="w-4 h-4 text-white" />
-                            </div>
-                          )}
-                          {/* 컬러 스와치 */}
-                          {product.colorHex && (
-                            <div className="absolute bottom-2 left-2 flex items-center gap-1">
-                              <div
-                                className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
-                                style={{ backgroundColor: product.colorHex }}
-                              />
-                            </div>
-                          )}
-                        </div>
-
-                        {/* 정보 */}
-                        <div className="p-3">
-                          <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
-                          <p className={`text-sm font-bold mb-1 leading-snug ${isSelected ? "text-blue-800" : "text-gray-800"}`}>
-                            {product.productName}
-                          </p>
-                          <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{product.spec}</p>
-
-                          {/* 가격 */}
-                          <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
-                            <div>
-                              <span className="text-base font-extrabold text-gray-900">
-                                {product.unitPrice.toLocaleString()}
-                              </span>
-                              <span className="text-[10px] text-gray-400 ml-0.5">원/{product.unit}</span>
-                            </div>
-                            <span className="text-[10px] text-gray-400">
-                              시공 {product.laborPrice.toLocaleString()}
-                            </span>
-                          </div>
-
-                          {/* 태그 */}
-                          {product.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {product.tags.map((tag) => (
-                                <span key={tag} className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded">
-                                  {tag}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* 선택 시 부자재 */}
-                          {isSelected && product.subItems.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-blue-100 space-y-0.5">
-                              <p className="text-[10px] text-blue-500 font-bold">포함 부자재</p>
-                              {product.subItems.map((sub) => (
-                                <div key={sub.name} className="flex justify-between">
-                                  <span className="text-[10px] text-gray-500">{sub.name}</span>
-                                  <span className="text-[10px] text-gray-400">{sub.unitPrice.toLocaleString()}원</span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        {isComplete && (
+                          <CheckCircle2 className="w-4 h-4 text-green-500" />
+                        )}
+                        {room.name}
+                        {!isComplete && (
+                          <span className="text-xs opacity-50">
+                            {done}/{cats.length}
+                          </span>
+                        )}
                       </button>
                     );
                   })}
                 </div>
-              </section>
-            );
-          })}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* 모바일 하단 바 */}
+      {/* ── 모바일 하단 바 ── */}
       <div className="md:hidden sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-30">
-        <div className="flex items-center gap-2">
-          <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(selectedCount / totalCategories) * 100}%` }} />
-          </div>
-          <span className="text-[11px] text-gray-500">{selectedCount}/{totalCategories}</span>
+        <div>
+          {selectedRoom ? (
+            <span className="text-xs font-medium text-gray-600">
+              {selectedRoom.name} {roomProgress.done}/{roomProgress.total}
+            </span>
+          ) : (
+            <span className="text-xs text-gray-400">
+              {selectedCount}/{totalCategories} 선택
+            </span>
+          )}
         </div>
         {selectedCount > 0 && (
           <button
             onClick={() => setShowConfirm(true)}
             className="flex items-center gap-1 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg"
           >
-            확인 <ArrowRight className="w-4 h-4" />
+            선택 완료 <ArrowRight className="w-4 h-4" />
           </button>
         )}
       </div>
 
-      {/* 컨펌 모달 */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4" onClick={() => setShowConfirm(false)}>
-          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[80vh] flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="px-5 pt-5 pb-3 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">자재 선택 확인</h3>
-                <p className="text-xs text-gray-400 mt-0.5">{selectedSummary.length}개 부위 선택 · 물량산출로 이동합니다</p>
-              </div>
-              <button onClick={() => setShowConfirm(false)} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-5 pb-3 space-y-1.5">
-              {selectedSummary.map((item) => {
-                const grade = GRADE[item.product.priceGrade];
-                return (
-                  <div key={item.categoryCode} className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50">
-                    {/* 이미지 미니 */}
-                    <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                      {item.product.colorHex ? (
-                        <div className="w-6 h-6 rounded" style={{ backgroundColor: item.product.colorHex }} />
-                      ) : (
-                        <ImageIcon className="w-4 h-4 text-gray-300" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-1">
-                        <span className="text-[10px] text-gray-400">{item.category}</span>
-                        <span className={`px-1 text-[9px] font-medium rounded ${grade.bg} ${grade.color}`}>
-                          {grade.label}
-                        </span>
-                      </div>
-                      <p className="text-xs font-medium text-gray-800 truncate">
-                        {item.product.brand} {item.product.productName}
-                      </p>
-                    </div>
-                    <span className="text-xs font-bold text-gray-700 flex-shrink-0">
-                      {item.product.unitPrice.toLocaleString()}원
-                    </span>
-                  </div>
-                );
-              })}
-
-              {selectedCount < totalCategories && (
-                <div className="p-3 bg-amber-50 rounded-xl border border-amber-100 mt-2">
-                  <p className="text-xs text-amber-700">
-                    <strong>{totalCategories - selectedCount}개 부위</strong> 미선택 — 기본 단가로 산출됩니다
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-gray-600">예상 단가 합계</span>
-                <span className="text-xl font-extrabold text-gray-900">
-                  {totalMaterialCost.toLocaleString()}<span className="text-sm font-normal text-gray-400 ml-0.5">원</span>
-                </span>
-              </div>
-              <button
-                onClick={handleConfirm}
-                className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white text-sm font-bold rounded-xl hover:bg-blue-700 transition-colors"
-              >
-                <CheckCircle2 className="w-5 h-5" />
-                확인 완료 · 물량산출로 이동
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {confirmModal}
     </div>
   );
 }

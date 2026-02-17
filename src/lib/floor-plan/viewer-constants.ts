@@ -59,6 +59,11 @@ export const ENG_COLORS = {
     TILE_LINE: "#C8C8D0",
     TILE_BG: "#F0F0F4",
   },
+  // 방 완성도 (자재 선택 상태)
+  ROOM_COMPLETION: {
+    COMPLETE: "rgba(34, 197, 94, 0.25)",
+    PARTIAL: "rgba(234, 179, 8, 0.20)",
+  },
 } as const;
 
 export const VIEWER_SCALE = 50; // 1m = 50px in SVG

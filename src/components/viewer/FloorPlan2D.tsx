@@ -14,6 +14,7 @@ interface FloorPlan2DProps {
   className?: string;
   showDimensions?: boolean;
   showFixtures?: boolean;
+  roomCompletionStatus?: Record<string, 'none' | 'partial' | 'complete'>;
 }
 
 export interface FloorPlan2DHandle {
@@ -393,7 +394,7 @@ function FixtureSVG({ fixture, scale }: { fixture: FixtureData; scale: number })
 // ─── Main Component ──────────────────────────────────
 
 const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function FloorPlan2D(
-  { floorPlan, selectedRoomId, onRoomClick, className = "", showDimensions = true, showFixtures = true },
+  { floorPlan, selectedRoomId, onRoomClick, className = "", showDimensions = true, showFixtures = true, roomCompletionStatus },
   ref
 ) {
   const [hoveredRoom, setHoveredRoom] = useState<string | null>(null);
@@ -535,8 +536,13 @@ const FloorPlan2D = forwardRef<FloorPlan2DHandle, FloorPlan2DProps>(function Flo
         {floorPlan.rooms.filter(r => isFinite(r.position.x) && isFinite(r.position.y) && r.position.width > 0 && r.position.height > 0).map((room) => {
           const isSelected = room.id === selectedRoomId;
           const isHovered = room.id === hoveredRoom;
+          const completionState = roomCompletionStatus?.[room.id];
           const fillColor = isSelected
             ? ENG_COLORS.SELECTED_FILL
+            : completionState === 'complete'
+            ? ENG_COLORS.ROOM_COMPLETION.COMPLETE
+            : completionState === 'partial'
+            ? ENG_COLORS.ROOM_COMPLETION.PARTIAL
             : ENG_COLORS.ROOM_FILLS[room.type] || "rgba(215, 215, 215, 0.35)";
           const strokeColor = isSelected ? ENG_COLORS.SELECTED_STROKE : isHovered ? ENG_COLORS.HOVER_STROKE : "transparent";
           const strokeW = isSelected ? 2 : isHovered ? 1.5 : 0;
