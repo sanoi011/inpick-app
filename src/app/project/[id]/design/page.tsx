@@ -25,6 +25,11 @@ import BuildingInfoPanel from "@/components/workspace/BuildingInfoPanel";
 import UploadOptionsPanel from "@/components/workspace/UploadOptionsPanel";
 import DesignPromptBar from "@/components/workspace/DesignPromptBar";
 
+const FloorPlanGenerationProgress = dynamic(
+  () => import("@/components/workspace/FloorPlanGenerationProgress"),
+  { ssr: false }
+);
+
 // Three.js SSR 불가 → dynamic import
 const FloorPlan3D = dynamic(() => import("@/components/project/FloorPlan3D"), {
   ssr: false,
@@ -100,6 +105,16 @@ export default function FloorPlanPage() {
   const [yoloStats, setYoloStats] = useState<{ added: number; corrected: number } | null>(null);
   const [, setMultiPhotos] = useState<File[]>([]);
   const [multiPhotoUrls, setMultiPhotoUrls] = useState<string[]>([]);
+
+  // 실시간 도면 생성 상태
+  const [generatingFloorPlan, setGeneratingFloorPlan] = useState<{
+    complexNo: string;
+    pyeongNo: number;
+    grandPlanUrl: string;
+    complexName?: string;
+    pyeongName?: string;
+    exclusiveArea?: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
   const uploadedImageRef = useRef<HTMLImageElement | null>(null);
@@ -176,8 +191,44 @@ export default function FloorPlanPage() {
       totalFloor: building.totalFloor,
     };
     confirmBuilding(addressData, building.sampleId);
-    setSidebarOpen(false); // Close sidebar on mobile after selection
-    toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
+    setSidebarOpen(false);
+
+    // 실시간 도면 생성: grandPlanUrl이 있고 sampleId가 없는 경우
+    if (building.grandPlanUrl && building.complexNo && building.pyeongNo && !building.sampleId) {
+      // 먼저 이미 생성된 도면이 있는지 확인 (GET)
+      fetch(`/api/project/generate-floorplan?complexNo=${building.complexNo}&pyeongNo=${building.pyeongNo}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.exists) {
+            // 이미 생성된 도면이 있음 → 이미지 URL 설정
+            setFloorPlanImageUrl(data.finalUrl);
+            toast({ type: "success", title: "도면 로드 완료", message: "이전에 생성된 도면을 불러왔습니다" });
+          } else {
+            // 실시간 생성 시작
+            setGeneratingFloorPlan({
+              complexNo: building.complexNo!,
+              pyeongNo: building.pyeongNo!,
+              grandPlanUrl: building.grandPlanUrl!,
+              complexName: building.complexName,
+              pyeongName: building.typeName,
+              exclusiveArea: building.exclusiveArea,
+            });
+          }
+        })
+        .catch(() => {
+          // 조회 실패 → 바로 생성 시작
+          setGeneratingFloorPlan({
+            complexNo: building.complexNo!,
+            pyeongNo: building.pyeongNo!,
+            grandPlanUrl: building.grandPlanUrl!,
+            complexName: building.complexName,
+            pyeongName: building.typeName,
+            exclusiveArea: building.exclusiveArea,
+          });
+        });
+    } else {
+      toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
+    }
   }, [selectedAddress, confirmBuilding]);
 
   const handleSelectUploadMode = useCallback((mode: "upload" | "lidar" | "photo" | "hand-drawing" | "draw") => {
@@ -780,11 +831,30 @@ export default function FloorPlanPage() {
 
         {/* Main viewer area */}
         <div className="flex-1 min-h-0">
-          {(uploadMode === "draw" && !floorPlan) || (uploadMode && !floorPlan && !analyzing) || (showParseResult && pendingFloorPlan) || analyzing ? (
+          {generatingFloorPlan ? (
+            <FloorPlanGenerationProgress
+              complexNo={generatingFloorPlan.complexNo}
+              pyeongNo={generatingFloorPlan.pyeongNo}
+              grandPlanUrl={generatingFloorPlan.grandPlanUrl}
+              complexName={generatingFloorPlan.complexName}
+              pyeongName={generatingFloorPlan.pyeongName}
+              exclusiveArea={generatingFloorPlan.exclusiveArea}
+              onComplete={(result) => {
+                setFloorPlanImageUrl(result.finalUrl);
+                setGeneratingFloorPlan(null);
+                toast({
+                  type: "success",
+                  title: "도면 생성 완료",
+                  message: `${Math.round(result.processingTimeMs / 1000)}초 소요`,
+                });
+              }}
+              onCancel={() => setGeneratingFloorPlan(null)}
+            />
+          ) : (uploadMode === "draw" && !floorPlan) || (uploadMode && !floorPlan && !analyzing) || (showParseResult && pendingFloorPlan) || analyzing ? (
             renderUploadContent()
-          ) : !floorPlan && !uploadMode ? (
+          ) : !floorPlan && !floorPlanImageUrl && !uploadMode ? (
             renderUploadContent()
-          ) : floorPlan ? (
+          ) : (floorPlan || floorPlanImageUrl) ? (
             /* 도면/3D 뷰어 */
             <div className="h-full flex flex-col">
               <div className="flex-1 min-h-0">
@@ -793,23 +863,27 @@ export default function FloorPlanPage() {
                     <div className="h-full bg-white rounded-xl border border-gray-200 overflow-hidden flex items-center justify-center">
                       {floorPlanImageUrl ? (
                         <img src={floorPlanImageUrl} alt="평면도" className="max-w-full max-h-full object-contain" />
-                      ) : (
+                      ) : floorPlan ? (
                         <FloorPlan2D
                           ref={floorPlan2DRef}
                           floorPlan={floorPlan}
                           className="h-full w-full"
                           showDimensions={showDimensions}
                         />
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                ) : (
+                ) : floorPlan ? (
                   <FloorPlan3D
                     floorPlan={floorPlan}
                     className="h-full"
                     cameraMode={cameraMode}
                     showCeiling={showCeiling}
                   />
+                ) : (
+                  <div className="h-full flex items-center justify-center bg-gray-50">
+                    <p className="text-sm text-gray-400">3D 뷰는 도면 데이터가 필요합니다</p>
+                  </div>
                 )}
               </div>
               <ViewerToolbar
@@ -841,6 +915,23 @@ export default function FloorPlanPage() {
             {parseWarnings.length > 1 && (
               <span className="text-amber-500">외 {parseWarnings.length - 1}건</span>
             )}
+          </div>
+        )}
+
+        {/* Bottom info for image-only view */}
+        {!floorPlan && floorPlanImageUrl && (
+          <div className="px-4 py-2 bg-white border-t border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-3 text-xs text-gray-500">
+              <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded-full text-[10px] font-semibold">
+                AI 생성 도면
+              </span>
+              {project?.address?.exclusiveArea && (
+                <span>전용면적: <strong className="text-gray-900">{project.address.exclusiveArea}m²</strong></span>
+              )}
+            </div>
+            <div className="text-xs text-gray-400 truncate max-w-full">
+              {project?.address?.roadAddress || ""}
+            </div>
           </div>
         )}
 

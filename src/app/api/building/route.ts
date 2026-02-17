@@ -18,6 +18,43 @@ export async function GET(request: NextRequest) {
   const bcode = request.nextUrl.searchParams.get("bcode");
   const address = request.nextUrl.searchParams.get("address") || "";
   const buildingName = request.nextUrl.searchParams.get("buildingName");
+  const mode = request.nextUrl.searchParams.get("mode");
+
+  // mode=manual: 수동 동/호 입력 → pyeongList 반환
+  if (mode === "manual") {
+    const cortarNo = bcode || "";
+    const dong = request.nextUrl.searchParams.get("dong") || "";
+    const ho = request.nextUrl.searchParams.get("ho") || "";
+
+    if (!cortarNo || !buildingName) {
+      return NextResponse.json({ error: "bcode와 buildingName이 필요합니다" }, { status: 400 });
+    }
+
+    // naver-cache에서 단지 검색
+    const cachedDetail = findCachedComplexDetail(cortarNo, buildingName);
+    if (!cachedDetail) {
+      return NextResponse.json({ pyeongList: [], complexName: null, error: "단지 정보를 찾을 수 없습니다" });
+    }
+
+    const pyeongList = cachedDetail.pyeongList.map((p) => ({
+      pyeongNo: p.pyeongNo,
+      pyeongName: p.pyeongName,
+      exclusiveArea: p.exclusiveArea,
+      supplyArea: p.supplyArea,
+      roomCnt: p.roomCnt,
+      bathroomCnt: p.bathroomCnt,
+      grandPlanUrl: p.grandPlanUrl || null,
+      hasFloorPlan: !!p.grandPlanUrl,
+    }));
+
+    return NextResponse.json({
+      pyeongList,
+      complexNo: cachedDetail.complex.complexNo,
+      complexName: cachedDetail.complex.complexName,
+      dong,
+      ho,
+    });
+  }
 
   console.log(`[building] bcode=${bcode}, buildingName=${buildingName}, address=${address?.slice(0, 30)}`);
 
@@ -255,6 +292,9 @@ function generateNaverBuildings(
           sampleId,
           typeName,
           complexName: complex.complexName,
+          complexNo: complex.complexNo,
+          pyeongNo: pyeong.pyeongNo,
+          grandPlanUrl: pyeong.grandPlanUrl || undefined,
         });
       }
     }

@@ -1,9 +1,13 @@
 /**
- * batch-process.mjs - 전체 도면 3단계 파이프라인
+ * batch-process.mjs - 전체 도면 4단계 파이프라인
  *
- * Step 1: Gemini 클린 (원본 → clean.png)
- * Step 2: Gemini 치수 추가 (clean.png → final.png)
- * Step 3: 좌우 반전 자동 생성 (clean.png → clean_mirror.png, final.png → final_mirror.png)
+ * Step 1: Gemini Pro 클린 (original.jpg → clean.png)
+ * Step 2: 좌우 반전 (clean.png → clean_mirror.png) [sharp.flop]
+ * Step 3: Gemini Pro 치수 추가 (clean.png → final.png)
+ * Step 4: Gemini Pro 치수 추가 (clean_mirror.png → final_mirror.png)
+ *
+ * 핵심: 치수는 미러 후 각각 추가해야 텍스트가 정방향으로 표시됨
+ * (sharp.flop(final)하면 치수 텍스트가 거꾸로 됨)
  *
  * 중단 후 재실행하면 이미 처리된 파일은 건너뜀
  *
@@ -94,28 +98,23 @@ const DIM_PROMPT = `이 깨끗한 아파트 평면도에 내부 치수선만 추
 - 공간 이름은 표시하지 마. 치수만 표시해.
 - 건축 실시설계 도면 느낌으로`;
 
-// ─── 모델 ───
+// ─── 모델 (Pro만 사용) ───
 
-const CLEAN_MODELS = [
-  'gemini-3-pro-image-preview',
-  'gemini-2.5-flash-image',
-  'gemini-2.0-flash-exp-image-generation',
-];
+const MODEL = 'gemini-3-pro-image-preview';
 
-const DIM_MODELS = [
-  'gemini-3-pro-image-preview',
-  'gemini-2.5-flash-image',
-];
+const MAX_RETRIES = 5;
+const RATE_LIMIT_WAIT = 30000; // 30초 대기 후 재시도
+const INTER_CALL_DELAY = 15000; // Gemini 호출 간 15초 대기 (rate limit 방지)
 
-// ─── Gemini 호출 ───
+// ─── Gemini Pro 호출 (재시도 포함) ───
 
-async function callGemini(models, imageBuffer, mimeType, prompt) {
+async function callGeminiPro(imageBuffer, mimeType, prompt) {
   const base64Image = imageBuffer.toString('base64');
 
-  for (const modelName of models) {
+  for (let retry = 0; retry < MAX_RETRIES; retry++) {
     try {
       const response = await ai.models.generateContent({
-        model: modelName,
+        model: MODEL,
         contents: [{
           role: 'user',
           parts: [
@@ -129,20 +128,19 @@ async function callGemini(models, imageBuffer, mimeType, prompt) {
       if (response.candidates && response.candidates[0]) {
         for (const part of response.candidates[0].content.parts) {
           if (part.inlineData) {
-            return {
-              imageData: Buffer.from(part.inlineData.data, 'base64'),
-              model: modelName,
-            };
+            return Buffer.from(part.inlineData.data, 'base64');
           }
         }
       }
     } catch (err) {
       const msg = err.message || '';
       if (msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED')) {
-        console.log(`    Rate limited on ${modelName}, waiting 10s...`);
-        await sleep(10000);
+        console.log(`    Rate limited (retry ${retry + 1}/${MAX_RETRIES}), waiting ${RATE_LIMIT_WAIT / 1000}s...`);
+        await sleep(RATE_LIMIT_WAIT);
+        continue;
       }
-      // try next model
+      console.log(`    Error: ${msg.slice(0, 150)}`);
+      break;
     }
   }
   return null;
@@ -152,7 +150,7 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-// ─── 좌우 반전 (canvas) ───
+// ─── 좌우 반전 (sharp) ───
 
 async function mirrorImage(inputPath, outputPath) {
   const buffer = await sharp(inputPath).flop().png().toBuffer();
@@ -208,144 +206,143 @@ async function main() {
   const tasks = findAllPlans(savedPlansDir);
 
   console.log('============================================================');
-  console.log('  도면 3단계 파이프라인 (Clean + Dimensions + Mirror)');
+  console.log('  도면 4단계 파이프라인 (Pro Only)');
+  console.log('  Clean → Mirror(clean) → Dim(clean) → Dim(mirror)');
+  console.log(`  Model: ${MODEL}`);
   console.log('============================================================');
-  console.log(`  Total plans: ${tasks.length} (× 2 with mirrors = ${tasks.length * 2})`);
+  console.log(`  Total plans: ${tasks.length}`);
 
   // 상태 확인
   let needClean = 0;
-  let needDim = 0;
   let needMirror = 0;
+  let needDim = 0;
+  let needDimMirror = 0;
   let done = 0;
 
   for (const t of tasks) {
     const hasClean = fs.existsSync(t.cleanPath) && fs.statSync(t.cleanPath).size > 1000;
+    const hasCleanMirror = fs.existsSync(t.cleanMirrorPath) && fs.statSync(t.cleanMirrorPath).size > 1000;
     const hasFinal = fs.existsSync(t.finalPath) && fs.statSync(t.finalPath).size > 1000;
-    const hasMirror = fs.existsSync(t.finalMirrorPath) && fs.statSync(t.finalMirrorPath).size > 1000;
-    if (hasFinal && hasMirror) { done++; }
-    else if (hasFinal) { needMirror++; }
-    else if (hasClean) { needDim++; }
-    else { needClean++; }
+    const hasFinalMirror = fs.existsSync(t.finalMirrorPath) && fs.statSync(t.finalMirrorPath).size > 1000;
+
+    if (hasFinal && hasFinalMirror) { done++; }
+    else if (!hasClean) { needClean++; }
+    else if (!hasCleanMirror) { needMirror++; }
+    else if (!hasFinal) { needDim++; }
+    else { needDimMirror++; }
   }
 
-  console.log(`  Done: ${done} | Need clean: ${needClean} | Need dim: ${needDim} | Need mirror: ${needMirror}`);
+  console.log(`  Done: ${done} | Clean: ${needClean} | Mirror: ${needMirror} | Dim: ${needDim} | DimMirror: ${needDimMirror}`);
   console.log('============================================================\n');
 
   let processed = 0;
-  let cleanOk = 0;
-  let cleanFail = 0;
-  let dimOk = 0;
-  let dimFail = 0;
+  let cleanOk = 0, cleanFail = 0;
+  let dimOk = 0, dimFail = 0;
+  let dimMirrorOk = 0, dimMirrorFail = 0;
   let mirrorOk = 0;
   const startTime = Date.now();
 
-  // 결과 로그
   const logPath = path.join(import.meta.dirname, 'batch-results.json');
   const results = [];
 
   for (let i = 0; i < tasks.length; i++) {
     const t = tasks[i];
     const label = `${t.complexName}/${t.pyeongId}`;
-    const hasClean = fs.existsSync(t.cleanPath) && fs.statSync(t.cleanPath).size > 1000;
-    const hasFinal = fs.existsSync(t.finalPath) && fs.statSync(t.finalPath).size > 1000;
-    const hasMirror = fs.existsSync(t.finalMirrorPath) && fs.statSync(t.finalMirrorPath).size > 1000;
-
-    if (hasFinal && hasMirror) {
-      // already fully done (original + mirror)
-      continue;
-    }
-
     const progress = `[${i + 1}/${tasks.length}]`;
 
-    // Step 1: Clean
-    if (!hasClean) {
-      console.log(`${progress} CLEAN: ${label}`);
-      const imageBuffer = fs.readFileSync(t.originalPath);
-      const mimeType = 'image/jpeg';
+    const hasClean = fs.existsSync(t.cleanPath) && fs.statSync(t.cleanPath).size > 1000;
+    const hasCleanMirror = fs.existsSync(t.cleanMirrorPath) && fs.statSync(t.cleanMirrorPath).size > 1000;
+    const hasFinal = fs.existsSync(t.finalPath) && fs.statSync(t.finalPath).size > 1000;
+    const hasFinalMirror = fs.existsSync(t.finalMirrorPath) && fs.statSync(t.finalMirrorPath).size > 1000;
 
-      const result = await callGemini(CLEAN_MODELS, imageBuffer, mimeType, CLEAN_PROMPT);
+    if (hasFinal && hasFinalMirror) continue;
+
+    // Step 1: Clean (original → Gemini Pro → clean.png)
+    if (!hasClean) {
+      console.log(`${progress} STEP1 CLEAN: ${label}`);
+      const imageBuffer = fs.readFileSync(t.originalPath);
+      const result = await callGeminiPro(imageBuffer, 'image/jpeg', CLEAN_PROMPT);
       if (result) {
-        fs.writeFileSync(t.cleanPath, result.imageData);
+        fs.writeFileSync(t.cleanPath, result);
         cleanOk++;
-        console.log(`  [OK] ${result.model} (${(result.imageData.length / 1024).toFixed(0)}KB)`);
+        console.log(`  [OK] ${(result.length / 1024).toFixed(0)}KB`);
       } else {
         cleanFail++;
-        console.log(`  [FAIL] All models failed`);
+        console.log(`  [FAIL]`);
         results.push({ label, step: 'clean', success: false });
-        continue; // skip dim if clean failed
+        continue;
       }
-
-      await sleep(2000);
+      await sleep(INTER_CALL_DELAY);
     }
 
-    // Step 2: Dimensions
-    console.log(`${progress} DIM:   ${label}`);
-    const cleanBuffer = fs.readFileSync(t.cleanPath);
-
-    const dimResult = await callGemini(DIM_MODELS, cleanBuffer, 'image/png', DIM_PROMPT);
-    if (dimResult) {
-      fs.writeFileSync(t.finalPath, dimResult.imageData);
-      dimOk++;
-      console.log(`  [OK] ${dimResult.model} (${(dimResult.imageData.length / 1024).toFixed(0)}KB)`);
-      results.push({ label, step: 'done', success: true });
-    } else {
-      dimFail++;
-      console.log(`  [FAIL] Dimension failed`);
-      results.push({ label, step: 'dim', success: false });
-      processed++;
-      await sleep(2000);
-      continue;
-    }
-
-    // Step 3: Mirror (좌우 반전) - Gemini 호출 없이 즉시 처리
-    if (!hasMirror) {
+    // Step 2: Mirror clean (clean.png → sharp.flop → clean_mirror.png)
+    if (!hasCleanMirror) {
       try {
-        const cleanMirrorSize = await mirrorImage(t.cleanPath, t.cleanMirrorPath);
-        const finalMirrorSize = await mirrorImage(t.finalPath, t.finalMirrorPath);
+        const size = await mirrorImage(t.cleanPath, t.cleanMirrorPath);
         mirrorOk++;
-        console.log(`  [MIRROR] clean_mirror (${(cleanMirrorSize / 1024).toFixed(0)}KB) + final_mirror (${(finalMirrorSize / 1024).toFixed(0)}KB)`);
+        console.log(`${progress} STEP2 MIRROR: ${label} → ${(size / 1024).toFixed(0)}KB`);
       } catch (err) {
-        console.log(`  [MIRROR FAIL] ${err.message}`);
+        console.log(`${progress} STEP2 MIRROR FAIL: ${err.message}`);
+        continue;
       }
+    }
+
+    // Step 3: Dim on clean (clean.png → Gemini Pro → final.png)
+    if (!hasFinal) {
+      console.log(`${progress} STEP3 DIM: ${label}`);
+      const cleanBuffer = fs.readFileSync(t.cleanPath);
+      const result = await callGeminiPro(cleanBuffer, 'image/png', DIM_PROMPT);
+      if (result) {
+        fs.writeFileSync(t.finalPath, result);
+        dimOk++;
+        console.log(`  [OK] ${(result.length / 1024).toFixed(0)}KB`);
+      } else {
+        dimFail++;
+        console.log(`  [FAIL]`);
+        results.push({ label, step: 'dim', success: false });
+      }
+      await sleep(INTER_CALL_DELAY);
+    }
+
+    // Step 4: Dim on mirror (clean_mirror.png → Gemini Pro → final_mirror.png)
+    if (!hasFinalMirror) {
+      console.log(`${progress} STEP4 DIM MIRROR: ${label}`);
+      const mirrorBuffer = fs.readFileSync(t.cleanMirrorPath);
+      const result = await callGeminiPro(mirrorBuffer, 'image/png', DIM_PROMPT);
+      if (result) {
+        fs.writeFileSync(t.finalMirrorPath, result);
+        dimMirrorOk++;
+        console.log(`  [OK] ${(result.length / 1024).toFixed(0)}KB`);
+      } else {
+        dimMirrorFail++;
+        console.log(`  [FAIL]`);
+        results.push({ label, step: 'dim_mirror', success: false });
+      }
+      await sleep(INTER_CALL_DELAY);
     }
 
     processed++;
-    await sleep(2000);
+    results.push({ label, step: 'done', success: true });
 
-    // 매 50개마다 중간 저장
-    if (processed % 50 === 0) {
+    // 매 10개마다 중간 저장
+    if (processed % 10 === 0) {
       const elapsed = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
       console.log(`\n--- Progress: ${processed} processed, ${elapsed}min elapsed ---\n`);
-      fs.writeFileSync(logPath, JSON.stringify({
-        total: tasks.length,
-        processed,
-        cleanOk,
-        cleanFail,
-        dimOk,
-        dimFail,
-        results,
-      }, null, 2));
+      fs.writeFileSync(logPath, JSON.stringify({ total: tasks.length, processed, cleanOk, cleanFail, dimOk, dimFail, dimMirrorOk, dimMirrorFail, results }, null, 2));
     }
   }
 
-  // 최종 결과 저장
   const totalElapsed = ((Date.now() - startTime) / 1000 / 60).toFixed(1);
   fs.writeFileSync(logPath, JSON.stringify({
-    total: tasks.length,
-    processed,
-    cleanOk,
-    cleanFail,
-    dimOk,
-    dimFail,
-    elapsed_min: totalElapsed,
-    results,
+    total: tasks.length, processed, cleanOk, cleanFail, dimOk, dimFail, dimMirrorOk, dimMirrorFail, elapsed_min: totalElapsed, results,
   }, null, 2));
 
   console.log('\n============================================================');
   console.log(`  Pipeline complete! (${totalElapsed} min)`);
-  console.log(`  Clean:  OK ${cleanOk} / FAIL ${cleanFail}`);
-  console.log(`  Dim:    OK ${dimOk} / FAIL ${dimFail}`);
-  console.log(`  Mirror: OK ${mirrorOk}`);
+  console.log(`  Clean:      OK ${cleanOk} / FAIL ${cleanFail}`);
+  console.log(`  Mirror:     OK ${mirrorOk}`);
+  console.log(`  Dim:        OK ${dimOk} / FAIL ${dimFail}`);
+  console.log(`  Dim Mirror: OK ${dimMirrorOk} / FAIL ${dimMirrorFail}`);
   console.log(`  Results: ${logPath}`);
   console.log('============================================================');
 }

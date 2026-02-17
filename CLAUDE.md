@@ -1355,3 +1355,67 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260216000000_consumer_notifications.sql` | **미적용** |
 | `20260217000000_chat_messages.sql` | **미적용** |
 | `20260218000000_construction_schedule.sql` | **미적용** |
+| `20260220000000_floor_plan_collection.sql` | **미적용** |
+| `20260222000000_generated_floorplans.sql` | **미적용** |
+
+## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
+
+### 실시간 도면 생성 파이프라인
+유저가 검색한 아파트에 기존 도면이 없을 때, 네이버 원본 → Gemini Pro 4단계 파이프라인으로 실시간 생성 + 캐시
+
+- `src/types/address.ts` (수정) - BuildingInfo에 complexNo, pyeongNo, grandPlanUrl 3개 필드 추가
+- `src/app/api/building/route.ts` (수정)
+  - generateNaverBuildings()에서 complexNo, pyeongNo, grandPlanUrl 전달
+  - mode=manual 핸들러 추가 (수동 동/호 입력 시 pyeongList 반환)
+- `supabase/migrations/20260222000000_generated_floorplans.sql` (신규) - 생성된 도면 캐시 테이블
+  - complex_no + pyeong_no UNIQUE, status (pending/processing/completed/failed)
+  - final_url, final_mirror_url, clean_url (Supabase Storage)
+- `src/app/api/project/generate-floorplan/route.ts` (신규, ~250줄) - SSE 4단계 파이프라인
+  - POST: SSE 스트리밍으로 진행률 전송, 완료 시 Supabase Storage 업로드
+  - GET: 기존 생성 도면 조회 (DB 캐시)
+  - Step 0: 원본 다운로드 → Step 1: Gemini Pro Clean → Step 2: sharp.flop Mirror → Step 3: Dim(clean) → Step 4: Dim(mirror)
+  - Rate limit 재시도 (3회, 30초 대기), maxDuration=300 (Vercel Pro 5분)
+- `src/components/workspace/FloorPlanGenerationProgress.tsx` (신규, ~220줄) - 진행률 UI
+  - 5단계 스텝 인디케이터 (다운로드/AI클린/미러/치수/미러치수)
+  - 프로그레스 바 + 현재 상태 메시지
+  - GET 캐시 체크 → SSE POST → ReadableStream 파싱
+  - 에러 시 재시도 버튼, 완료 시 onComplete 콜백
+
+### 수동 동/호 입력 UI
+동/호수 데이터가 없는 아파트에서 사용자가 직접 입력하여 정확한 평형 매칭
+
+- `src/components/workspace/BuildingInfoPanel.tsx` (전면 개선, 153→387줄)
+  - buildings.length === 0 일 때: "동/호수 직접 입력" 버튼 표시
+  - buildings.length > 0 일 때도: 하단 "동/호수 직접 입력" 토글
+  - ManualInputSection 컴포넌트: 동/호 텍스트 입력 → 평형 타입 검색
+  - mode=manual API 호출 → naver-cache에서 pyeongList 반환
+  - 각 평형에 grandPlanUrl 유무 배지 (도면/도면없음)
+  - 평형 선택 → BuildingInfo 생성 → onSelectBuilding() 호출
+
+### Design 페이지 통합
+- `src/app/project/[id]/design/page.tsx` (수정)
+  - generatingFloorPlan 상태 추가
+  - handleSelectBuilding: grandPlanUrl 있고 sampleId 없으면 → GET 캐시 체크 → 생성 시작
+  - 캔버스 영역: generatingFloorPlan → FloorPlanGenerationProgress 렌더
+  - floorPlanImageUrl만 있을 때 (floorPlan 없이) 이미지 뷰어 표시
+  - AI 생성 도면 하단 정보 바
+
+### 실시간 도면 생성 플로우
+```
+사용자 아파트 검색 → Building API (naver-cache 매칭)
+  ├── sampleId 있음 → 기존 샘플 도면 즉시 표시
+  ├── grandPlanUrl 있음 → GET /api/project/generate-floorplan (캐시 확인)
+  │   ├── exists=true → 캐시된 이미지 즉시 표시
+  │   └── exists=false → SSE POST → 4단계 파이프라인 실시간 진행
+  │       Step 0: 네이버 원본 다운로드
+  │       Step 1: Gemini Pro 클린 (워터마크/텍스트/설비 제거)
+  │       Step 2: sharp.flop 좌우 반전
+  │       Step 3: Gemini Pro 치수선 추가 (기본형)
+  │       Step 4: Gemini Pro 치수선 추가 (미러형)
+  │       → Supabase Storage 업로드 → DB 캐시 → 완료
+  └── 둘 다 없음 → 도면 직접 업로드/입력 옵션
+
+수동 동/호 입력:
+  건물 정보 없음 → "동/호수 직접 입력" → 동/호 입력 → 평형 검색
+  → naver-cache에서 pyeongList 반환 → 평형 선택 → BuildingInfo 생성
+```
