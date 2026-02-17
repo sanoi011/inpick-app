@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2, CheckCircle2, XCircle, RefreshCw, Download, FlipHorizontal, Ruler, Sparkles } from "lucide-react";
 
 interface GenerationResult {
@@ -43,139 +43,142 @@ export default function FloorPlanGenerationProgress({
   const [message, setMessage] = useState("도면 생성 준비 중...");
   const [error, setError] = useState<string | null>(null);
   const [completed, setCompleted] = useState(false);
-  const abortRef = useRef<AbortController | null>(null);
-  const startedRef = useRef(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const startGeneration = useCallback(async () => {
-    if (startedRef.current) return;
-    startedRef.current = true;
+  // Ref로 최신 콜백 유지 (useEffect deps에서 제외)
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
 
+  useEffect(() => {
     const abortController = new AbortController();
-    abortRef.current = abortController;
 
-    try {
-      // First check if already completed
-      const checkRes = await fetch(
-        `/api/project/generate-floorplan?complexNo=${complexNo}&pyeongNo=${pyeongNo}`
-      );
-      const checkData = await checkRes.json();
+    async function run() {
+      try {
+        // ① 캐시 확인
+        const checkRes = await fetch(
+          `/api/project/generate-floorplan?complexNo=${complexNo}&pyeongNo=${pyeongNo}`,
+          { signal: abortController.signal }
+        );
+        const checkData = await checkRes.json();
 
-      if (checkData.exists) {
-        setProgress(100);
-        setCurrentStep(4);
-        setCompleted(true);
-        setMessage("캐시된 도면 로드 완료!");
-        onComplete({
-          finalUrl: checkData.finalUrl,
-          finalMirrorUrl: checkData.finalMirrorUrl,
-          processingTimeMs: 0,
-        });
-        return;
-      }
-
-      // Start SSE pipeline
-      const res = await fetch("/api/project/generate-floorplan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          complexNo,
-          pyeongNo,
-          grandPlanUrl,
-          complexName,
-          pyeongName,
-          exclusiveArea,
-        }),
-        signal: abortController.signal,
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "서버 오류" }));
-        throw new Error(err.error || `HTTP ${res.status}`);
-      }
-
-      // Check for cached response (non-SSE)
-      const contentType = res.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        const data = await res.json();
-        if (data.cached) {
+        if (checkData.exists) {
           setProgress(100);
           setCurrentStep(4);
           setCompleted(true);
           setMessage("캐시된 도면 로드 완료!");
-          onComplete({
-            finalUrl: data.finalUrl,
-            finalMirrorUrl: data.finalMirrorUrl,
+          onCompleteRef.current({
+            finalUrl: checkData.finalUrl,
+            finalMirrorUrl: checkData.finalMirrorUrl,
             processingTimeMs: 0,
           });
           return;
         }
-      }
 
-      // Parse SSE stream
-      const reader = res.body?.getReader();
-      if (!reader) throw new Error("스트림 읽기 실패");
+        // ② SSE 파이프라인 시작
+        const res = await fetch("/api/project/generate-floorplan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            complexNo,
+            pyeongNo,
+            grandPlanUrl,
+            complexName,
+            pyeongName,
+            exclusiveArea,
+          }),
+          signal: abortController.signal,
+        });
 
-      const decoder = new TextDecoder();
-      let buffer = "";
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: "서버 오류" }));
+          throw new Error(err.error || `HTTP ${res.status}`);
+        }
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr || jsonStr === "[DONE]") continue;
-
-          try {
-            const data = JSON.parse(jsonStr);
-
-            if (data.event === "progress") {
-              setProgress(data.progress || 0);
-              setCurrentStep(data.step || 0);
-              setMessage(data.message || "처리 중...");
-            } else if (data.event === "complete") {
-              setProgress(100);
-              setCurrentStep(4);
-              setCompleted(true);
-              setMessage("도면 생성 완료!");
-              onComplete({
-                finalUrl: data.finalUrl,
-                finalMirrorUrl: data.finalMirrorUrl,
-                processingTimeMs: data.processingTimeMs,
-              });
-            } else if (data.event === "error") {
-              setError(data.message || "알 수 없는 오류");
-            }
-          } catch {
-            // ignore parse errors
+        // JSON 캐시 응답 체크
+        const contentType = res.headers.get("content-type") || "";
+        if (contentType.includes("application/json")) {
+          const data = await res.json();
+          if (data.cached) {
+            setProgress(100);
+            setCurrentStep(4);
+            setCompleted(true);
+            setMessage("캐시된 도면 로드 완료!");
+            onCompleteRef.current({
+              finalUrl: data.finalUrl,
+              finalMirrorUrl: data.finalMirrorUrl,
+              processingTimeMs: 0,
+            });
+            return;
           }
         }
-      }
-    } catch (err: unknown) {
-      if ((err as Error).name === "AbortError") return;
-      setError((err as Error).message || "알 수 없는 오류");
-    }
-  }, [complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, onComplete]);
 
-  useEffect(() => {
-    startGeneration();
+        // ③ SSE 스트림 파싱
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("스트림 읽기 실패");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            const jsonStr = line.slice(6).trim();
+            if (!jsonStr || jsonStr === "[DONE]") continue;
+
+            try {
+              const data = JSON.parse(jsonStr);
+
+              if (data.event === "progress") {
+                setProgress(data.progress || 0);
+                setCurrentStep(data.step || 0);
+                setMessage(data.message || "처리 중...");
+              } else if (data.event === "complete") {
+                setProgress(100);
+                setCurrentStep(4);
+                setCompleted(true);
+                setMessage("도면 생성 완료!");
+                onCompleteRef.current({
+                  finalUrl: data.finalUrl,
+                  finalMirrorUrl: data.finalMirrorUrl,
+                  processingTimeMs: data.processingTimeMs,
+                });
+              } else if (data.event === "error") {
+                setError(data.message || "알 수 없는 오류");
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+      } catch (err: unknown) {
+        if ((err as Error).name === "AbortError") return;
+        setError((err as Error).message || "알 수 없는 오류");
+      }
+    }
+
+    run();
+
     return () => {
-      abortRef.current?.abort();
+      abortController.abort();
     };
-  }, [startGeneration]);
+    // retryCount를 deps에 넣어서 재시도 트리거
+    // onComplete는 ref로 관리하여 deps에서 제외
+  }, [complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, retryCount]);
 
   const handleRetry = () => {
     setError(null);
     setProgress(0);
     setCurrentStep(0);
     setMessage("도면 생성 준비 중...");
-    startedRef.current = false;
-    startGeneration();
+    setCompleted(false);
+    setRetryCount((c) => c + 1);
   };
 
   return (
@@ -229,12 +232,6 @@ export default function FloorPlanGenerationProgress({
                 >
                   {step.label}
                 </span>
-                {i < STEPS.length - 1 && (
-                  <div
-                    className={`absolute h-0.5 w-full ${isDone ? "bg-green-300" : "bg-gray-200"}`}
-                    style={{ display: "none" }}
-                  />
-                )}
               </div>
             );
           })}

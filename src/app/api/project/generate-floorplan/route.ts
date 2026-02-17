@@ -1,7 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
-import { createClient } from "@/lib/supabase/server";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+
+// Storage 업로드용 service role client (anon key로는 업로드 불가)
+function createAdminClient() {
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (serviceKey) {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceKey
+    );
+  }
+  // fallback: server client (RLS 적용됨)
+  return createServerClient();
+}
 
 export const maxDuration = 300; // Vercel Pro 5분
 
@@ -114,7 +128,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "complexNo, pyeongNo 필수" }, { status: 400 });
   }
 
-  const supabase = createClient();
+  const supabase = createAdminClient();
   const { data } = await supabase
     .from("generated_floorplans")
     .select("*")
@@ -151,7 +165,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Gemini API 키가 설정되지 않았습니다" }, { status: 500 });
   }
 
-  const supabase = createClient();
+  const supabase = createAdminClient();
 
   // Check if already completed
   const { data: existing } = await supabase
@@ -175,8 +189,14 @@ export async function POST(request: NextRequest) {
 
   const stream = new ReadableStream({
     async start(controller) {
+      let closed = false;
       const send = (event: string, data: Record<string, unknown>) => {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event, ...data })}\n\n`));
+        if (closed) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ event, ...data })}\n\n`));
+        } catch {
+          closed = true;
+        }
       };
 
       try {
@@ -259,7 +279,7 @@ export async function POST(request: NextRequest) {
             .upload(u.path, u.buffer, { contentType: "image/png", upsert: true });
 
           if (uploadError) {
-            console.error(`Upload error for ${u.path}:`, uploadError.message);
+            throw new Error(`이미지 업로드 실패 (${u.path}): ${uploadError.message}`);
           }
 
           const { data: urlData } = supabase.storage.from("uploads").getPublicUrl(u.path);
@@ -308,7 +328,10 @@ export async function POST(request: NextRequest) {
 
         send("error", { message: msg });
       } finally {
-        controller.close();
+        if (!closed) {
+          try { controller.close(); } catch { /* already closed */ }
+        }
+        closed = true;
       }
     },
   });
