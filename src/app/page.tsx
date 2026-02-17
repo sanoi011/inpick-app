@@ -10,8 +10,6 @@ import FeaturesDark from "@/components/landing/FeaturesDark";
 import Contact from "@/components/landing/Contact";
 import FAQ from "@/components/landing/FAQ";
 import LandingFooter from "@/components/landing/Footer";
-import DataCoverage from "@/components/landing/DataCoverage";
-
 export default function Home() {
   return (
     <>
@@ -20,7 +18,6 @@ export default function Home() {
       <HowItWorks />
       <LogoCloud />
       <Features />
-      <DataCoverage />
       <PainPoints />
       <Testimonials />
       <Pricing />

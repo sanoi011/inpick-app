@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, MapPin, Loader2, Building2 } from "lucide-react";
+import { Search, MapPin, Loader2, Store, Home, CheckCircle2 } from "lucide-react";
 import type { AddressSearchResult } from "@/types/address";
 
 const RECENT_ADDRESSES_KEY = "inpick_recent_addresses";
 const MAX_RECENT = 5;
+
+type BuildingType = "residential" | "commercial";
 
 function loadRecentAddresses(): AddressSearchResult[] {
   try {
@@ -37,6 +39,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
   const [totalCount, setTotalCount] = useState(0);
   const [showRecent, setShowRecent] = useState(false);
   const [recentAddresses, setRecentAddresses] = useState<AddressSearchResult[]>([]);
+  const [buildingType, setBuildingType] = useState<BuildingType>("residential");
 
   const searchAddress = useCallback(async (query: string) => {
     if (query.trim().length < 2) {
@@ -111,9 +114,45 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
 
   return (
     <div className="px-4 py-3">
-      <h3 className="text-sm font-bold text-gray-900 mb-2 flex items-center gap-1.5">
-        <Search className="w-4 h-4" /> 주소 검색
+      <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+        <Search className="w-4 h-4" /> 우리집 찾기
       </h3>
+
+      {/* Building Type Tabs */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        <button
+          onClick={() => setBuildingType("residential")}
+          className={`relative p-3 rounded-xl border-2 transition-all text-left ${
+            buildingType === "residential"
+              ? "border-blue-500 bg-blue-50 shadow-sm"
+              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+          }`}
+        >
+          {buildingType === "residential" && (
+            <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-blue-600" />
+          )}
+          <Home className={`w-5 h-5 mb-1.5 ${buildingType === "residential" ? "text-blue-600" : "text-gray-400"}`} />
+          <p className={`text-xs font-bold ${buildingType === "residential" ? "text-blue-900" : "text-gray-700"}`}>아파트 / 빌라</p>
+          <p className={`text-[10px] mt-0.5 ${buildingType === "residential" ? "text-blue-600" : "text-gray-400"}`}>도면 자동 조회</p>
+        </button>
+        <button
+          onClick={() => setBuildingType("commercial")}
+          className={`relative p-3 rounded-xl border-2 transition-all text-left ${
+            buildingType === "commercial"
+              ? "border-indigo-500 bg-indigo-50 shadow-sm"
+              : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50"
+          }`}
+        >
+          {buildingType === "commercial" && (
+            <CheckCircle2 className="absolute top-2 right-2 w-4 h-4 text-indigo-600" />
+          )}
+          <Store className={`w-5 h-5 mb-1.5 ${buildingType === "commercial" ? "text-indigo-600" : "text-gray-400"}`} />
+          <p className={`text-xs font-bold ${buildingType === "commercial" ? "text-indigo-900" : "text-gray-700"}`}>상가 / 사무실</p>
+          <p className={`text-[10px] mt-0.5 ${buildingType === "commercial" ? "text-indigo-600" : "text-gray-400"}`}>맞춤 견적</p>
+        </button>
+      </div>
+
+      {/* Address Search */}
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
         {loading && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 w-4 h-4 animate-spin" />}
@@ -129,19 +168,19 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
             }
           }}
           onBlur={() => setTimeout(() => setShowRecent(false), 200)}
-          placeholder="도로명 주소 또는 건물명"
-          className="w-full pl-9 pr-9 py-2.5 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          placeholder={buildingType === "residential" ? "아파트/빌라 도로명 주소 또는 단지명" : "상가/사무실 도로명 주소 또는 건물명"}
+          className="w-full pl-9 pr-9 py-2.5 rounded-xl border border-gray-200 bg-gray-50/80 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white outline-none transition-colors"
           autoFocus
         />
 
         {showRecent && recentAddresses.length > 0 && results.length === 0 && (
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
             <div className="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-100">최근 검색</div>
             {recentAddresses.map((addr, i) => (
               <button
                 key={i}
                 onClick={() => handleSelect(addr)}
-                className="w-full px-3 py-2 text-left hover:bg-blue-50 transition-colors flex items-start gap-2 border-b border-gray-50 last:border-0"
+                className="w-full px-3 py-2.5 text-left hover:bg-blue-50 transition-colors flex items-start gap-2 border-b border-gray-50 last:border-0"
               >
                 <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
@@ -154,7 +193,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
         )}
 
         {results.length > 0 && (
-          <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-lg border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
+          <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
             <div className="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-100">
               {totalCount.toLocaleString()}건
             </div>
@@ -162,7 +201,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
               <button
                 key={i}
                 onClick={() => handleSelect(addr)}
-                className="w-full px-3 py-2 text-left hover:bg-blue-50 transition-colors flex items-start gap-2 border-b border-gray-50 last:border-0"
+                className="w-full px-3 py-2.5 text-left hover:bg-blue-50 transition-colors flex items-start gap-2 border-b border-gray-50 last:border-0"
               >
                 <MapPin className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
@@ -177,18 +216,21 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        <div className="bg-white rounded-lg p-3 border border-gray-200">
-          <Building2 className="w-5 h-5 text-blue-600 mb-1" />
-          <p className="text-xs font-semibold text-gray-900">아파트 / 빌라</p>
-          <p className="text-[10px] text-gray-500">도면 자동 조회</p>
+      {/* Commercial note */}
+      {buildingType === "commercial" && (
+        <div className="mt-2.5 p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
+          <p className="text-[11px] text-indigo-700 leading-relaxed">
+            <strong>상가/사무실</strong>은 주소 검색 후 도면을 직접 업로드하거나, 아래 도면 등록 방법에서 직접 그리기를 이용해주세요.
+          </p>
         </div>
-        <div className="bg-white rounded-lg p-3 border border-gray-200">
-          <Building2 className="w-5 h-5 text-indigo-600 mb-1" />
-          <p className="text-xs font-semibold text-gray-900">상가 / 사무실</p>
-          <p className="text-[10px] text-gray-500">맞춤 견적</p>
-        </div>
-      </div>
+      )}
+
+      {/* Search hint */}
+      {keyword.trim().length === 0 && results.length === 0 && (
+        <p className="mt-2 text-[10px] text-gray-400 text-center">
+          예: 래미안 아파트, 서울시 강남구 역삼동 123
+        </p>
+      )}
     </div>
   );
 }

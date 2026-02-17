@@ -97,6 +97,55 @@ export default function DimensionEditorOverlay({
   const [dragging, setDragging] = useState<{ dimId: string; handle: "start" | "end" } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // Track actual image rendered area within container
+  const [imgRect, setImgRect] = useState<{ left: number; top: number; width: number; height: number } | null>(null);
+
+  // Measure the actual rendered image area (object-contain leaves gaps)
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    function measureImage() {
+      const container = containerRef.current;
+      if (!container) return;
+      const img = container.querySelector("img");
+      if (!img || !img.naturalWidth || !img.naturalHeight) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const cw = containerRect.width;
+      const ch = containerRect.height;
+      const iw = img.naturalWidth;
+      const ih = img.naturalHeight;
+
+      // Calculate object-contain fit
+      const scale = Math.min(cw / iw, ch / ih);
+      const renderedW = iw * scale;
+      const renderedH = ih * scale;
+      const left = (cw - renderedW) / 2;
+      const top = (ch - renderedH) / 2;
+
+      setImgRect({ left, top, width: renderedW, height: renderedH });
+    }
+
+    // Measure on load and resize
+    const img = container.querySelector("img");
+    if (img) {
+      if (img.complete) {
+        measureImage();
+      } else {
+        img.addEventListener("load", measureImage);
+      }
+    }
+
+    const ro = new ResizeObserver(measureImage);
+    ro.observe(container);
+
+    return () => {
+      ro.disconnect();
+      if (img) img.removeEventListener("load", measureImage);
+    };
+  }, [containerRef]);
+
   // Focus input when editing starts
   useEffect(() => {
     if (editingId && inputRef.current) {
@@ -105,16 +154,23 @@ export default function DimensionEditorOverlay({
     }
   }, [editingId, editField]);
 
-  // Get normalized coordinates from mouse event
+  // Get normalized 0-1 coordinates relative to the IMAGE (not container)
   const getNormCoords = useCallback((e: React.MouseEvent) => {
     const container = containerRef.current;
-    if (!container) return null;
-    const rect = container.getBoundingClientRect();
+    if (!container || !imgRect) return null;
+    const containerRect = container.getBoundingClientRect();
+    // Mouse position relative to container
+    const cx = e.clientX - containerRect.left;
+    const cy = e.clientY - containerRect.top;
+    // Convert to image-relative normalized coords
+    const x = (cx - imgRect.left) / imgRect.width;
+    const y = (cy - imgRect.top) / imgRect.height;
+    // Clamp to 0-1
     return {
-      x: (e.clientX - rect.left) / rect.width,
-      y: (e.clientY - rect.top) / rect.height,
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, y)),
     };
-  }, [containerRef]);
+  }, [containerRef, imgRect]);
 
   // ─── Drawing new dimension ───
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -238,18 +294,28 @@ export default function DimensionEditorOverlay({
 
   // ─── Render ───
   if (!editable && dimensions.length === 0) return null;
+  if (!imgRect) return null; // Wait for image measurement
 
   const roomSummaries = calcRoomSummaries(dimensions);
   const totalArea = roomSummaries.reduce((sum, r) => sum + (r.areaSqm || 0), 0);
 
+  // Convert normalized 0-1 to pixel coords within the SVG overlay
+  const toPixelX = (nx: number) => imgRect.left + nx * imgRect.width;
+  const toPixelY = (ny: number) => imgRect.top + ny * imgRect.height;
+
+  // Get container dimensions for SVG viewBox
+  const container = containerRef.current;
+  const containerW = container?.clientWidth || 800;
+  const containerH = container?.clientHeight || 600;
+
   return (
     <>
-      {/* SVG Overlay */}
+      {/* SVG Overlay - covers entire container but coordinates account for image position */}
       <svg
         ref={svgRef}
         className="absolute inset-0 w-full h-full"
         style={{ pointerEvents: editable ? "auto" : "none", zIndex: 10 }}
-        viewBox="0 0 1 1"
+        viewBox={`0 0 ${containerW} ${containerH}`}
         preserveAspectRatio="none"
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
@@ -260,14 +326,19 @@ export default function DimensionEditorOverlay({
         {dimensions.map((dim) => {
           const isSelected = dim.id === selectedId;
           const isEditing = dim.id === editingId;
-          const mx = (dim.x1 + dim.x2) / 2;
-          const my = (dim.y1 + dim.y2) / 2;
+
+          const px1 = toPixelX(dim.x1);
+          const py1 = toPixelY(dim.y1);
+          const px2 = toPixelX(dim.x2);
+          const py2 = toPixelY(dim.y2);
+          const mx = (px1 + px2) / 2;
+          const my = (py1 + py2) / 2;
 
           // Tick marks (perpendicular)
-          const dx = dim.x2 - dim.x1;
-          const dy = dim.y2 - dim.y1;
+          const dx = px2 - px1;
+          const dy = py2 - py1;
           const len = Math.hypot(dx, dy);
-          const tickLen = 0.012;
+          const tickLen = 8;
           const nx = len > 0 ? (-dy / len) * tickLen : 0;
           const ny = len > 0 ? (dx / len) * tickLen : 0;
 
@@ -275,48 +346,44 @@ export default function DimensionEditorOverlay({
             <g key={dim.id} onClick={(e) => { e.stopPropagation(); setSelectedId(dim.id); }}>
               {/* Main line */}
               <line
-                x1={dim.x1} y1={dim.y1} x2={dim.x2} y2={dim.y2}
+                x1={px1} y1={py1} x2={px2} y2={py2}
                 stroke={isSelected ? "#2563eb" : "#dc2626"}
-                strokeWidth={isSelected ? 0.003 : 0.002}
-                vectorEffect="non-scaling-stroke"
+                strokeWidth={isSelected ? 2.5 : 1.5}
               />
               {/* Start tick */}
               <line
-                x1={dim.x1 - nx} y1={dim.y1 - ny}
-                x2={dim.x1 + nx} y2={dim.y1 + ny}
+                x1={px1 - nx} y1={py1 - ny}
+                x2={px1 + nx} y2={py1 + ny}
                 stroke={isSelected ? "#2563eb" : "#dc2626"}
-                strokeWidth={0.002}
-                vectorEffect="non-scaling-stroke"
+                strokeWidth={1.5}
               />
               {/* End tick */}
               <line
-                x1={dim.x2 - nx} y1={dim.y2 - ny}
-                x2={dim.x2 + nx} y2={dim.y2 + ny}
+                x1={px2 - nx} y1={py2 - ny}
+                x2={px2 + nx} y2={py2 + ny}
                 stroke={isSelected ? "#2563eb" : "#dc2626"}
-                strokeWidth={0.002}
-                vectorEffect="non-scaling-stroke"
+                strokeWidth={1.5}
               />
 
-              {/* Value label (non-scaling) */}
+              {/* Value label */}
               {!isEditing && (
                 <g
                   onDoubleClick={(e) => { e.stopPropagation(); startEdit(dim.id, "value"); }}
                   style={{ cursor: editable ? "pointer" : "default" }}
                 >
-                  {/* Background rect */}
                   <rect
-                    x={mx - 0.035} y={my - 0.015}
-                    width={0.07} height={0.02}
+                    x={mx - 30} y={my - 10}
+                    width={60} height={18}
                     fill="white" fillOpacity={0.9}
-                    rx={0.003}
+                    rx={3}
                     stroke={isSelected ? "#2563eb" : "#999"}
-                    strokeWidth={0.001}
+                    strokeWidth={0.8}
                   />
                   <text
-                    x={mx} y={my}
+                    x={mx} y={my + 1}
                     textAnchor="middle" dominantBaseline="central"
                     fill={isSelected ? "#2563eb" : "#333"}
-                    fontSize={0.012}
+                    fontSize={11}
                     fontWeight={600}
                     fontFamily="sans-serif"
                   >
@@ -329,10 +396,10 @@ export default function DimensionEditorOverlay({
               {dim.roomName && !isEditing && (
                 <g onDoubleClick={(e) => { e.stopPropagation(); startEdit(dim.id, "room"); }}>
                   <text
-                    x={mx} y={my + 0.02}
+                    x={mx} y={my + 16}
                     textAnchor="middle" dominantBaseline="central"
                     fill="#6b7280"
-                    fontSize={0.009}
+                    fontSize={9}
                     fontFamily="sans-serif"
                   >
                     {dim.roomName} {dim.direction === "width" ? "가로" : "세로"}
@@ -344,17 +411,17 @@ export default function DimensionEditorOverlay({
               {editable && (
                 <>
                   <circle
-                    cx={dim.x1} cy={dim.y1} r={0.008}
+                    cx={px1} cy={py1} r={6}
                     fill={isSelected ? "#2563eb" : "#ef4444"}
                     fillOpacity={0.6}
-                    stroke="white" strokeWidth={0.002}
+                    stroke="white" strokeWidth={1.5}
                     style={{ cursor: "move" }}
                   />
                   <circle
-                    cx={dim.x2} cy={dim.y2} r={0.008}
+                    cx={px2} cy={py2} r={6}
                     fill={isSelected ? "#2563eb" : "#ef4444"}
                     fillOpacity={0.6}
-                    stroke="white" strokeWidth={0.002}
+                    stroke="white" strokeWidth={1.5}
                     style={{ cursor: "move" }}
                   />
                 </>
@@ -367,27 +434,25 @@ export default function DimensionEditorOverlay({
         {tool === "add" && drawStart && mousePos && (
           <>
             <line
-              x1={drawStart.x} y1={drawStart.y}
-              x2={mousePos.x} y2={mousePos.y}
-              stroke="#3b82f6" strokeWidth={0.002}
-              strokeDasharray="0.005 0.005"
-              vectorEffect="non-scaling-stroke"
+              x1={toPixelX(drawStart.x)} y1={toPixelY(drawStart.y)}
+              x2={toPixelX(mousePos.x)} y2={toPixelY(mousePos.y)}
+              stroke="#3b82f6" strokeWidth={1.5}
+              strokeDasharray="6 4"
             />
-            <circle cx={drawStart.x} cy={drawStart.y} r={0.006}
+            <circle cx={toPixelX(drawStart.x)} cy={toPixelY(drawStart.y)} r={5}
               fill="#3b82f6" fillOpacity={0.5} />
-            <circle cx={mousePos.x} cy={mousePos.y} r={0.006}
+            <circle cx={toPixelX(mousePos.x)} cy={toPixelY(mousePos.y)} r={5}
               fill="#3b82f6" fillOpacity={0.5} />
           </>
         )}
       </svg>
 
-      {/* Editing input overlay (positioned in HTML for better UX) */}
+      {/* Editing input overlay */}
       {editingId && editable && (() => {
         const dim = dimensions.find((d) => d.id === editingId);
         if (!dim || !containerRef.current) return null;
-        const rect = containerRef.current.getBoundingClientRect();
-        const mx = ((dim.x1 + dim.x2) / 2) * rect.width;
-        const my = ((dim.y1 + dim.y2) / 2) * rect.height;
+        const mx = toPixelX((dim.x1 + dim.x2) / 2);
+        const my = toPixelY((dim.y1 + dim.y2) / 2);
 
         return (
           <div

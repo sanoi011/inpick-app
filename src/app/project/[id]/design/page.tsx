@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Upload, Camera, FileImage, Loader2,
   AlertTriangle, Smartphone, PenTool, ImagePlus, Info, Menu, X,
-  Send, Sparkles, MessageSquare, Palette, ChevronRight,
+  Send, Sparkles, MessageSquare, Palette, ChevronRight, ChevronLeft,
 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
@@ -87,8 +87,9 @@ export default function FloorPlanPage() {
   const [aiInput, setAiInput] = useState("");
   const [aiGenerating, setAiGenerating] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
-  // AI 디자인 이미지 생성 상태
-  const [generatedDesignUrl, setGeneratedDesignUrl] = useState<string | null>(null);
+  // AI 디자인 이미지 생성 상태 (4컷 슬라이드)
+  const [generatedDesigns, setGeneratedDesigns] = useState<{room: string; label: string; imageData: string | null; description: string}[]>([]);
+  const [designSlideIndex, setDesignSlideIndex] = useState(0);
   const [generatingDesign, setGeneratingDesign] = useState(false);
   const [designPrefs, setDesignPrefs] = useState<DesignPreferences>(
     project?.designPreferences || { style: "", budget: "", priorities: [], specialNotes: [] }
@@ -391,7 +392,7 @@ export default function FloorPlanPage() {
     setAiGenerating(false);
   }, [aiInput, aiGenerating, floorPlan, designPrefs, aiMessages]);
 
-  // === AI 디자인 이미지 생성 ===
+  // === AI 디자인 이미지 생성 (4컷 병렬) ===
   const handleGenerateDesign = useCallback(async () => {
     if (generatingDesign) return;
     setGeneratingDesign(true);
@@ -423,21 +424,25 @@ export default function FloorPlanPage() {
       }
 
       const data = await res.json();
-      if (data.imageData) {
-        setGeneratedDesignUrl(data.imageData);
+      if (data.images && data.images.length > 0) {
+        const successImages = data.images.filter((img: { imageData: string | null }) => img.imageData !== null);
+        setGeneratedDesigns(data.images);
+        setDesignSlideIndex(0);
         // AI 채팅에 결과 메시지 추가
+        const successCount = successImages.length;
+        const totalCount = data.images.length;
         setAiMessages((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
             role: "assistant",
-            content: data.description || "디자인 이미지가 생성되었습니다.",
-            images: data.imageData ? [data.imageData] : undefined,
+            content: `${totalCount}개 공간 중 ${successCount}개 디자인 이미지가 생성되었습니다. 캔버스에서 좌우 화살표로 넘겨보세요.${data.isMock ? "\n\n*Mock 모드로 생성된 프리뷰입니다.*" : ""}`,
+            images: successImages.map((img: { imageData: string }) => img.imageData),
           },
         ]);
-        toast({ type: "success", title: "디자인 완성", message: "AI 디자인 이미지가 생성되었습니다" });
+        toast({ type: "success", title: "디자인 완성", message: `${successCount}컷 AI 디자인 이미지가 생성되었습니다` });
       } else {
-        toast({ type: "error", title: "생성 실패", message: data.description || "이미지 생성에 실패했습니다" });
+        toast({ type: "error", title: "생성 실패", message: "이미지 생성에 실패했습니다" });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "알 수 없는 오류";
@@ -1086,35 +1091,95 @@ export default function FloorPlanPage() {
                         <div className="w-16 h-16 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-5 shadow-lg">
                           <Sparkles className="w-8 h-8 text-white animate-pulse" />
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-1">AI 디자인 생성 중</h3>
-                        <p className="text-sm text-gray-500">대화 내용과 옵션을 분석하여 디자인을 생성합니다...</p>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">AI 디자인 4컷 생성 중</h3>
+                        <p className="text-sm text-gray-500">도면 + 대화 내용을 기반으로 거실·부엌·침실·욕실 디자인을 생성합니다...</p>
                         <div className="mt-4 flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                          <span className="text-xs text-indigo-600 font-medium">Gemini Pro 3.0 이미지 생성 중 · 약 30초~1분</span>
+                          <span className="text-xs text-indigo-600 font-medium">Gemini Pro 3.0 × 4컷 병렬 생성 중 · 약 1~2분</span>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          {["거실", "부엌", "침실", "욕실"].map((label) => (
+                            <span key={label} className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-medium rounded-full animate-pulse">
+                              {label}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
 
-                    {/* AI 생성 디자인 이미지 (메인) */}
-                    {generatedDesignUrl ? (
+                    {/* AI 생성 디자인 4컷 슬라이드 뷰어 */}
+                    {generatedDesigns.length > 0 ? (
                       <>
-                        <img
-                          src={generatedDesignUrl}
-                          alt="AI 생성 디자인"
-                          className="max-w-full max-h-full object-contain"
-                        />
-                        {/* AI 디자인 라벨 (좌측 상단) */}
-                        <div className="absolute top-3 left-3 z-20 px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold rounded-lg shadow-md flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" /> AI 생성 디자인
+                        {/* 현재 슬라이드 이미지 */}
+                        {generatedDesigns[designSlideIndex]?.imageData ? (
+                          <img
+                            src={generatedDesigns[designSlideIndex].imageData!}
+                            alt={`AI 생성 디자인 - ${generatedDesigns[designSlideIndex].label}`}
+                            className="max-w-full max-h-full object-contain"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center text-gray-400 gap-2">
+                            <AlertTriangle className="w-8 h-8" />
+                            <p className="text-sm">{generatedDesigns[designSlideIndex]?.label} 이미지 생성 실패</p>
+                          </div>
+                        )}
+
+                        {/* 좌측 상단: AI 라벨 + 방 이름 */}
+                        <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
+                          <div className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold rounded-lg shadow-md flex items-center gap-1">
+                            <Sparkles className="w-3 h-3" /> AI 생성 디자인
+                          </div>
+                          <div className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-800 text-xs font-bold rounded-lg shadow-md border border-gray-200">
+                            {generatedDesigns[designSlideIndex]?.label}
+                          </div>
+                          <div className="px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium rounded-lg">
+                            {designSlideIndex + 1} / {generatedDesigns.length}
+                          </div>
                         </div>
-                        {/* 도면 썸네일 (우측 상단) */}
+
+                        {/* 좌우 화살표 네비게이션 */}
+                        {generatedDesigns.length > 1 && (
+                          <>
+                            <button
+                              onClick={() => setDesignSlideIndex((i) => (i - 1 + generatedDesigns.length) % generatedDesigns.length)}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center transition-all shadow-lg hover:scale-110"
+                            >
+                              <ChevronLeft className="w-5 h-5" />
+                            </button>
+                            <button
+                              onClick={() => setDesignSlideIndex((i) => (i + 1) % generatedDesigns.length)}
+                              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 bg-black/40 hover:bg-black/60 backdrop-blur-sm text-white rounded-full flex items-center justify-center transition-all shadow-lg hover:scale-110"
+                            >
+                              <ChevronRight className="w-5 h-5" />
+                            </button>
+                          </>
+                        )}
+
+                        {/* 하단 도트 인디케이터 + 방 라벨 */}
+                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-2 bg-black/50 backdrop-blur-sm rounded-full">
+                          {generatedDesigns.map((d, i) => (
+                            <button
+                              key={d.room}
+                              onClick={() => setDesignSlideIndex(i)}
+                              className={`px-2.5 py-1 text-[11px] font-medium rounded-full transition-all ${
+                                i === designSlideIndex
+                                  ? "bg-white text-gray-900 shadow-sm"
+                                  : "text-white/70 hover:text-white hover:bg-white/20"
+                              }`}
+                            >
+                              {d.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* 도면 썸네일 (우측 상단) → 도면 보기로 전환 */}
                         {floorPlanImageUrl && (
                           <button
-                            onClick={() => setGeneratedDesignUrl(null)}
+                            onClick={() => setGeneratedDesigns([])}
                             className="absolute top-3 right-3 z-20 group"
                             title="도면 보기로 전환"
                           >
-                            <div className="w-24 h-24 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-blue-400 group-hover:scale-105 transition-all">
+                            <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-blue-400 group-hover:scale-105 transition-all">
                               <img
                                 src={floorPlanImageUrl}
                                 alt="도면"
@@ -1129,8 +1194,8 @@ export default function FloorPlanPage() {
                         )}
                         {!floorPlanImageUrl && floorPlan && (
                           <button
-                            onClick={() => setGeneratedDesignUrl(null)}
-                            className="absolute top-3 right-3 z-20 w-24 h-24 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white hover:border-blue-400 hover:scale-105 transition-all"
+                            onClick={() => setGeneratedDesigns([])}
+                            className="absolute top-3 right-3 z-20 w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white hover:border-blue-400 hover:scale-105 transition-all"
                             title="도면 보기로 전환"
                           >
                             <FloorPlan2D
@@ -1253,14 +1318,14 @@ export default function FloorPlanPage() {
                 ) : (
                   <>
                     <Sparkles className="w-4 h-4" />
-                    대화 내용 기반으로 우리집 디자인 완성하기
+                    도면 기반 4컷 디자인 완성하기
                     <ChevronRight className="w-4 h-4 ml-1" />
                   </>
                 )}
               </button>
               {!generatingDesign && (
                 <p className="text-center text-[10px] text-indigo-400 mt-1.5">
-                  좌측 옵션 + 아래 채팅 내용을 모두 반영하여 Gemini Pro 3.0이 디자인 이미지를 생성합니다
+                  도면 + 채팅 내용 + 옵션을 종합하여 거실·부엌·침실·욕실 4컷 디자인을 생성합니다
                 </p>
               )}
             </div>
@@ -1297,7 +1362,11 @@ export default function FloorPlanPage() {
                           src={imgSrc}
                           alt="AI 생성 디자인"
                           className="mt-2 rounded-lg max-w-full cursor-pointer hover:opacity-80 transition-opacity border border-white/20"
-                          onClick={() => setGeneratedDesignUrl(imgSrc)}
+                          onClick={() => {
+                            // 해당 이미지의 슬라이드 인덱스 찾기
+                            const idx = generatedDesigns.findIndex((d) => d.imageData === imgSrc);
+                            if (idx >= 0) setDesignSlideIndex(idx);
+                          }}
                         />
                       ))}
                     </div>
