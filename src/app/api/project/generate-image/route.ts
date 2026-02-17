@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
         ].filter(Boolean).join("\n");
 
         const response = await client.models.generateContent({
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-3-pro-image-preview",
           contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
           config: {
             responseModalities: ["TEXT", "IMAGE"],

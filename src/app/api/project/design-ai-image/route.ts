@@ -3,7 +3,7 @@ import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 
 export const maxDuration = 120;
 
-const IMAGE_GEN_MODEL = "gemini-2.0-flash-exp";
+const IMAGE_GEN_MODEL = "gemini-3-pro-image-preview";
 
 export async function POST(request: NextRequest) {
   try {
