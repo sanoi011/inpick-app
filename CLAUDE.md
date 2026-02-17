@@ -1350,13 +1350,14 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260213000000_ai_data_pipeline.sql` | Supabase 적용 완료 |
 | `20260214000000_material_catalog_seed.sql` | Supabase 적용 완료 |
 | `20260214100000_consumer_projects.sql` | Supabase 적용 완료 |
-| `20260215000000_vector_embeddings.sql` | **미적용** (pgvector 확장 필요) |
-| `20260216000000_drawing_parse_logs.sql` | **미적용** |
-| `20260216000000_consumer_notifications.sql` | **미적용** |
-| `20260217000000_chat_messages.sql` | **미적용** |
-| `20260218000000_construction_schedule.sql` | **미적용** |
-| `20260220000000_floor_plan_collection.sql` | **미적용** |
-| `20260222000000_generated_floorplans.sql` | **미적용** |
+| `20260215000000_vector_embeddings.sql` | Supabase 적용 완료 |
+| `20260216000000_consumer_notifications.sql` | Supabase 적용 완료 |
+| `20260216100000_drawing_parse_logs.sql` | Supabase 적용 완료 |
+| `20260217000000_chat_messages.sql` | Supabase 적용 완료 |
+| `20260218000000_construction_schedule.sql` | Supabase 적용 완료 |
+| `20260218100000_fix_schedule_tasks_rls.sql` | Supabase 적용 완료 |
+| `20260220000000_floor_plan_collection.sql` | Supabase 적용 완료 |
+| `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
 
 ## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
 
