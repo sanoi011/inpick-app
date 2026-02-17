@@ -190,21 +190,47 @@ export default function FloorPlanPage() {
       floor: building.floor,
       totalFloor: building.totalFloor,
     };
-    confirmBuilding(addressData, building.sampleId);
+    confirmBuilding(addressData);
     setSidebarOpen(false);
 
-    // 실시간 도면 생성: grandPlanUrl이 있고 sampleId가 없는 경우
-    if (building.grandPlanUrl && building.complexNo && building.pyeongNo && !building.sampleId) {
-      // 먼저 이미 생성된 도면이 있는지 확인 (GET)
-      fetch(`/api/project/generate-floorplan?complexNo=${building.complexNo}&pyeongNo=${building.pyeongNo}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.exists) {
-            // 이미 생성된 도면이 있음 → 이미지 URL 설정
-            setFloorPlanImageUrl(data.finalUrl);
-            toast({ type: "success", title: "도면 로드 완료", message: "이전에 생성된 도면을 불러왔습니다" });
-          } else {
-            // 실시간 생성 시작
+    // 도면 로드 우선순위: ① manifest(배치 처리 완료) → ② DB 캐시 → ③ Gemini Pro 실시간 생성
+    if (building.complexNo && building.pyeongNo) {
+      const manifestId = `naver-${building.complexNo}-${building.pyeongNo}`;
+
+      // ① manifest.json에서 배치 처리된 도면 확인
+      getFloorPlanImageUrl(manifestId).then(manifestUrl => {
+        if (manifestUrl) {
+          setFloorPlanImageUrl(manifestUrl);
+          toast({ type: "success", title: "도면 로드 완료", message: "배치 처리된 도면을 불러왔습니다" });
+          return;
+        }
+
+        // grandPlanUrl 없으면 생성 불가
+        if (!building.grandPlanUrl) {
+          toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
+          return;
+        }
+
+        // ② DB 캐시 확인
+        fetch(`/api/project/generate-floorplan?complexNo=${building.complexNo}&pyeongNo=${building.pyeongNo}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.exists) {
+              setFloorPlanImageUrl(data.finalUrl);
+              toast({ type: "success", title: "도면 로드 완료", message: "캐시된 도면을 불러왔습니다" });
+            } else {
+              // ③ Gemini Pro 실시간 생성
+              setGeneratingFloorPlan({
+                complexNo: building.complexNo!,
+                pyeongNo: building.pyeongNo!,
+                grandPlanUrl: building.grandPlanUrl!,
+                complexName: building.complexName,
+                pyeongName: building.typeName,
+                exclusiveArea: building.exclusiveArea,
+              });
+            }
+          })
+          .catch(() => {
             setGeneratingFloorPlan({
               complexNo: building.complexNo!,
               pyeongNo: building.pyeongNo!,
@@ -213,19 +239,8 @@ export default function FloorPlanPage() {
               pyeongName: building.typeName,
               exclusiveArea: building.exclusiveArea,
             });
-          }
-        })
-        .catch(() => {
-          // 조회 실패 → 바로 생성 시작
-          setGeneratingFloorPlan({
-            complexNo: building.complexNo!,
-            pyeongNo: building.pyeongNo!,
-            grandPlanUrl: building.grandPlanUrl!,
-            complexName: building.complexName,
-            pyeongName: building.typeName,
-            exclusiveArea: building.exclusiveArea,
           });
-        });
+      });
     } else {
       toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
     }
@@ -320,8 +335,7 @@ export default function FloorPlanPage() {
 
     try {
       const knownArea = project?.address?.exclusiveArea;
-      const sType = project?.drawingId?.startsWith("sample-") ? project.drawingId : undefined;
-      const result = await parseDrawingFile(file, knownArea, sType);
+      const result = await parseDrawingFile(file, knownArea);
 
       setPendingFloorPlan(result.floorPlan);
       setParseConfidence(result.confidence);

@@ -101,6 +101,9 @@ interface FloorPlanImageEntry {
   complexNo: string;
   pyeongNo: number;
   imagePath: string;
+  exclusiveArea: number;
+  processed?: boolean;
+  sourceType?: string;
 }
 
 export async function getFloorPlanImageUrl(drawingId: string): Promise<string | null> {
@@ -117,10 +120,26 @@ export async function getFloorPlanImageUrl(drawingId: string): Promise<string | 
     const complexNo = parts[0];
     const pyeongNo = parseInt(parts[1]);
 
-    const entry = manifestCache!.find(
+    // 1. 정확한 pyeongNo 매칭 (processed만)
+    const exact = manifestCache!.find(
+      (e) => e.complexNo === complexNo && e.pyeongNo === pyeongNo && e.processed === true
+    );
+    if (exact) return exact.imagePath;
+
+    // 2. 같은 단지 + 같은 전용면적의 처리된 도면 폴백 (기본형↔확장형 매핑)
+    const unprocessed = manifestCache!.find(
       (e) => e.complexNo === complexNo && e.pyeongNo === pyeongNo
     );
-    return entry?.imagePath || null;
+    if (unprocessed) {
+      const areaFallback = manifestCache!.find(
+        (e) => e.complexNo === complexNo
+          && Math.abs(e.exclusiveArea - unprocessed.exclusiveArea) < 0.1
+          && e.processed === true
+      );
+      if (areaFallback) return areaFallback.imagePath;
+    }
+
+    return null;
   } catch {
     return null;
   }
