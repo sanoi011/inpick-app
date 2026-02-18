@@ -8,6 +8,7 @@ import {
   MapPin, Building2, Database,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface Stats {
   estimates: number;
@@ -80,14 +81,14 @@ export default function AdminDashboardPage() {
         setStats(data.stats);
         setRecentCrawls(data.recentCrawls || []);
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "통계를 불러올 수 없습니다" }); }
   }
 
   async function loadCoverage() {
     try {
       const res = await fetch("/api/admin/coverage");
       if (res.ok) setCoverage(await res.json());
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "커버리지를 불러올 수 없습니다" }); }
   }
 
   async function runCrawler(type: string) {
@@ -99,7 +100,7 @@ export default function AdminDashboardPage() {
         body: JSON.stringify({ type }),
       });
       await loadStats();
-    } catch { /* ignore */ } finally {
+    } catch { toast({ type: "error", title: "오류", message: "크롤러 실행에 실패했습니다" }); } finally {
       setCrawling(false);
     }
   }

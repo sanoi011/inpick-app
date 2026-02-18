@@ -131,6 +131,7 @@ export default function ContractsPage() {
   const [error, setError] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [visibleCount, setVisibleCount] = useState(10);
 
   const loadContracts = useCallback(async () => {
     if (!user) return;
@@ -277,13 +278,21 @@ export default function ContractsPage() {
           </div>
         ) : (
           <div className="space-y-3">
-            {filtered.map((contract) => (
+            {filtered.slice(0, visibleCount).map((contract) => (
               <ContractCard
                 key={contract.id}
                 contract={contract}
                 onClick={() => router.push(`/contract/${contract.id}`)}
               />
             ))}
+            {filtered.length > visibleCount && (
+              <button
+                onClick={() => setVisibleCount((v) => v + 10)}
+                className="w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors"
+              >
+                더 보기 ({filtered.length - visibleCount}개 남음)
+              </button>
+            )}
           </div>
         )}
       </main>

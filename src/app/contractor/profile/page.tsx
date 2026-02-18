@@ -6,6 +6,7 @@ import {
   Building2, Phone, Mail, MapPin, FileText, Briefcase, Image, Upload,
 } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
+import { toast } from "@/components/ui/Toast";
 
 const TRADE_OPTIONS = [
   { code: "T01", label: "도배" }, { code: "T02", label: "타일" },
@@ -116,7 +117,7 @@ export default function ProfilePage() {
       setReviews(reviewData.reviews || []);
       setReviewStats(reviewData.stats || { totalReviews: 0, averageRating: 0 });
     } catch {
-      // silently fail
+      toast({ type: "error", title: "오류", message: "프로필을 불러올 수 없습니다" });
     } finally {
       setLoading(false);
     }
@@ -180,14 +181,14 @@ export default function ProfilePage() {
         setPortfolioImageUrls([]);
         loadProfile();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "포트폴리오 추가에 실패했습니다" }); }
   }
 
   async function deletePortfolio(id: string) {
     try {
       await fetch(`/api/contractor/portfolio?id=${id}&contractorId=${contractorId}`, { method: "DELETE" });
       setPortfolio(portfolio.filter(p => p.id !== id));
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "포트폴리오 삭제에 실패했습니다" }); }
   }
 
   async function submitResponse(reviewId: string) {
@@ -203,7 +204,7 @@ export default function ProfilePage() {
         setResponseText(prev => ({ ...prev, [reviewId]: "" }));
         loadProfile();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "리뷰 답변 등록에 실패했습니다" }); }
   }
 
   if (!authChecked || loading) {

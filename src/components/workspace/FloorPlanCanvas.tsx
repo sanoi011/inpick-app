@@ -149,8 +149,8 @@ export default function FloorPlanCanvas({
         );
 
         setLoaded(true);
-      } catch (err) {
-        console.warn("[FloorPlanCanvas] Failed to load images:", err);
+      } catch {
+        // Image load failed silently
       }
     };
 

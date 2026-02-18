@@ -6,7 +6,7 @@ const STAT_CARDS = [
   { stat: "10X", label: "견적 비용 절감", company: "vs 기존 외주", bgColor: "#EFF6FF", borderColor: "#BFDBFE" },
   { stat: "5분", label: "견적 생성 시간", company: "AI 자동 산출", bgColor: "#F0FDF4", borderColor: "#BBF7D0" },
   { stat: "99%", label: "단가 정확도", company: "공식 데이터 기반", bgColor: "#EFF6FF", borderColor: "#BFDBFE" },
-  { stat: "22개", label: "공종 자동 분류", company: "선행공정 매핑", bgColor: "#FEF2F2", borderColor: "#FECACA" },
+  { stat: "17개", label: "공종 자동 분류", company: "선행공정 매핑", bgColor: "#FEF2F2", borderColor: "#FECACA" },
 ];
 
 const TESTIMONIALS = [
@@ -79,6 +79,7 @@ export default function Testimonials() {
             </div>
           </motion.div>
         </motion.div>
+        <p className="text-xs text-gray-400 mt-6 text-center">* 상기 후기는 서비스 이용 시나리오를 기반으로 구성되었습니다.</p>
       </div>
     </section>
   );

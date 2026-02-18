@@ -16,6 +16,7 @@ import {
   PHASE_STATUS_COLORS, ISSUE_SEVERITY_COLORS,
 } from "@/types/project";
 import type { ConstructionSchedule } from "@/types/construction-schedule";
+import { toast } from "@/components/ui/Toast";
 
 const GanttChart = dynamic(() => import("@/components/schedule/GanttChart").then(m => ({ default: m.GanttChart })), { ssr: false });
 
@@ -61,7 +62,7 @@ export default function ProjectsPage() {
       const res = await fetch(`/api/contractor/projects?${params}`);
       const data = await res.json();
       setProjects((data.projects || []).map((p: Record<string, unknown>) => mapDbProject(p)));
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "프로젝트를 불러올 수 없습니다" }); } finally { setLoading(false); }
   }, [contractorId, statusFilter]);
 
   useEffect(() => { if (authChecked && contractorId) loadProjects(); }, [authChecked, contractorId, loadProjects]);
@@ -77,7 +78,7 @@ export default function ProjectsPage() {
       const res = await fetch(`/api/contractor/projects/${projectId}`);
       const data = await res.json();
       if (data.project) setDetailProject(mapDbProject(data.project));
-    } catch { /* ignore */ } finally { setDetailLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "프로젝트 상세를 불러올 수 없습니다" }); } finally { setDetailLoading(false); }
   };
 
   // 공정표 로드
@@ -102,7 +103,7 @@ export default function ProjectsPage() {
         body: JSON.stringify({ action: "generateSchedule" }),
       });
       if (res.ok) await loadSchedule(detailProject.id);
-    } catch { /* ignore */ } finally { setGeneratingSchedule(false); }
+    } catch { toast({ type: "error", title: "오류", message: "공정표 생성에 실패했습니다" }); } finally { setGeneratingSchedule(false); }
   };
 
   // 공정표 바 드래그 업데이트
@@ -115,7 +116,7 @@ export default function ProjectsPage() {
         body: JSON.stringify({ action: "updatePhaseSchedule", phaseId, startDate, endDate }),
       });
       await loadSchedule(detailProject.id);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "공정 업데이트에 실패했습니다" }); }
   };
 
   // 프로젝트 생성
@@ -140,7 +141,7 @@ export default function ProjectsPage() {
         setCreateForm({ name: "", address: "", startDate: "", endDate: "", totalBudget: "" });
         loadProjects();
       }
-    } catch { /* ignore */ } finally { setCreating(false); }
+    } catch { toast({ type: "error", title: "오류", message: "프로젝트 생성에 실패했습니다" }); } finally { setCreating(false); }
   };
 
   // 공정 체크리스트 토글
@@ -155,7 +156,7 @@ export default function ProjectsPage() {
         body: JSON.stringify({ action: "updatePhase", phaseId: phase.id, checklist: updated }),
       });
       loadDetail(detailProject.id);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "체크리스트 업데이트에 실패했습니다" }); }
   };
 
   // 공정 상태 변경
@@ -169,7 +170,7 @@ export default function ProjectsPage() {
       });
       loadDetail(detailProject.id);
       loadProjects();
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "공정 상태 변경에 실패했습니다" }); }
   };
 
   // 이슈 추가
@@ -184,7 +185,7 @@ export default function ProjectsPage() {
       setShowIssueForm(false);
       setIssueForm({ title: "", description: "", severity: "medium" });
       loadDetail(detailProject.id);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "이슈 추가에 실패했습니다" }); }
   };
 
   if (!authChecked) return null;
@@ -483,7 +484,7 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle, projectId, contra
         body: JSON.stringify({ action: "addPhasePhoto", phaseId: phase.id, photoUrl: uploadData.url, fileName: file.name }),
       });
       onReload();
-    } catch { /* ignore */ } finally { setUploading(false); e.target.value = ""; }
+    } catch { toast({ type: "error", title: "오류", message: "사진 업로드에 실패했습니다" }); } finally { setUploading(false); e.target.value = ""; }
   };
 
   const handlePhotoDelete = async (idx: number) => {
@@ -494,7 +495,7 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle, projectId, contra
         body: JSON.stringify({ action: "removePhasePhoto", phaseId: phase.id, photoIndex: idx }),
       });
       onReload();
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "사진 삭제에 실패했습니다" }); }
   };
 
   return (

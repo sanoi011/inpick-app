@@ -117,9 +117,12 @@ export default function FloorPlanPage() {
   const [pendingFloorPlan, setPendingFloorPlan] = useState<ParsedFloorPlan | null>(null);
   const [showParseResult, setShowParseResult] = useState(false);
   const [yoloAvailable, setYoloAvailable] = useState(false);
-  const [, setYoloEnhancing] = useState(false);
-  const [, setYoloStats] = useState<{ added: number; corrected: number } | null>(null);
-  const [, setMultiPhotos] = useState<File[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_yoloEnhancing, setYoloEnhancing] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_yoloStats, setYoloStats] = useState<{ added: number; corrected: number } | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_multiPhotos, setMultiPhotos] = useState<File[]>([]);
   const [multiPhotoUrls, setMultiPhotoUrls] = useState<string[]>([]);
 
   // 확장형/기본형 선택 상태
@@ -598,7 +601,7 @@ export default function FloorPlanPage() {
 
   // 카메라 스캐닝 (향후)
   const handleCameraScan = useCallback(async () => {
-    toast({ type: "info", title: "카메라 스캐닝", message: "향후 업데이트 예정입니다." });
+    toast({ type: "info", title: "카메라 스캐닝", message: "카메라 스캐닝 기능은 준비 중입니다" });
   }, []);
 
   // 다중 사진 업로드
@@ -699,8 +702,7 @@ export default function FloorPlanPage() {
       }
       setYoloEnhancing(false);
       return fused;
-    } catch (err) {
-      console.warn("[yolo-enhance] Failed:", err);
+    } catch {
       setYoloEnhancing(false);
       return plan;
     }

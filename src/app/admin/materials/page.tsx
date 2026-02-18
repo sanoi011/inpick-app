@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Package, DollarSign, TrendingUp, RefreshCw, Loader2 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 export default function AdminMaterialsPage() {
   const { authChecked } = useAdminAuth();
@@ -17,7 +18,7 @@ export default function AdminMaterialsPage() {
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
         body: JSON.stringify({ type }),
       });
-    } catch { /* ignore */ } finally {
+    } catch { toast({ type: "error", title: "오류", message: "크롤러 실행에 실패했습니다" }); } finally {
       setCrawling(null);
     }
   }

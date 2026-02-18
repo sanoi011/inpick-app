@@ -7,7 +7,7 @@ import {
   ArrowLeft, Loader2, FileText, CheckCircle2, Pen, Building2, Phone,
   Mail, Calendar, CreditCard, AlertCircle, Shield, MessageCircle,
   ChevronDown, ChevronUp, Download, FileImage, ClipboardList, Scale,
-  Edit3, Image as ImageIcon,
+  Edit3, Image as ImageIcon, Star,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import type { Contract } from "@/types/contract";
@@ -15,6 +15,8 @@ import { mapDbContract, CONTRACT_STATUS_LABELS, CONTRACT_STATUS_COLORS } from "@
 import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { ConstructionSchedule } from "@/types/construction-schedule";
 import { ScheduleOverview } from "@/components/schedule/ScheduleOverview";
+import { generateContractPdf } from "@/lib/pdf/contract-pdf-generator";
+import { toast } from "@/components/ui/Toast";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -348,9 +350,10 @@ function ContractPart3({ contract }: { contract: Contract }) {
 
 // ─── 4부: 전자서명 ───
 
-function ContractPart4({ contract, onSign }: {
+function ContractPart4({ contract, onSign, contractor }: {
   contract: Contract;
   onSign: (type: 'consumer' | 'contractor') => void;
+  contractor?: Record<string, string>;
 }) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -422,14 +425,30 @@ function ContractPart4({ contract, onSign }: {
               </div>
             </div>
             <button
-              onClick={() => {
-                // PDF 다운로드 (서명 완료 후에만 가능)
-                alert("견적서 PDF 다운로드 기능은 물량산출 데이터 연동 후 활성화됩니다.");
+              onClick={async () => {
+                await generateContractPdf({
+                  id: contract.id,
+                  projectName: contract.projectName,
+                  address: contract.address || "",
+                  totalAmount: contract.totalAmount,
+                  depositAmount: contract.depositAmount,
+                  finalPayment: contract.finalPayment,
+                  progressPayments: contract.progressPayments.map((p) => ({
+                    label: p.phase, amount: p.amount, dueDate: p.dueDate || "", status: p.status,
+                  })),
+                  startDate: contract.startDate || "",
+                  expectedEndDate: contract.expectedEndDate || "",
+                  consumerSignature: contract.consumerSignature || undefined,
+                  contractorSignature: contract.contractorSignature || undefined,
+                  signedAt: contract.signedAt || undefined,
+                  contractorName: contractor?.company_name || contractor?.contact_name || "",
+                  consumerName: "",
+                });
               }}
               className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
             >
               <Download className="w-4 h-4" />
-              견적서 다운로드
+              계약서 다운로드
             </button>
           </div>
         )}
@@ -487,6 +506,148 @@ function PaymentTimeline({ contract }: { contract: Contract }) {
             </div>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── 5부: 리뷰 작성 ───
+
+function ReviewSection({ contract, userId }: { contract: Contract; userId?: string }) {
+  const contractorId = (contract as unknown as Record<string, unknown>).contractor_id as string;
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [existingReview, setExistingReview] = useState<Record<string, unknown> | null>(null);
+  const [checkingExisting, setCheckingExisting] = useState(true);
+
+  useEffect(() => {
+    if (!contractorId) { setCheckingExisting(false); return; }
+    (async () => {
+      try {
+        const res = await fetch(`/api/reviews?contractorId=${contractorId}&contractId=${contract.id}`);
+        const data = await res.json();
+        if (data.review) setExistingReview(data.review);
+      } catch { toast({ type: "error", title: "오류", message: "리뷰를 불러올 수 없습니다" }); }
+      setCheckingExisting(false);
+    })();
+  }, [contractorId, contract.id]);
+
+  const handleSubmit = async () => {
+    if (rating === 0 || !content.trim()) return;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contractorId,
+          contractId: contract.id,
+          rating,
+          title: title.trim() || undefined,
+          content: content.trim(),
+          reviewerId: userId || undefined,
+        }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      }
+    } catch { toast({ type: "error", title: "오류", message: "리뷰 등록에 실패했습니다" }); }
+    setSubmitting(false);
+  };
+
+  if (checkingExisting) return null;
+
+  // 이미 리뷰를 작성한 경우
+  if (existingReview || submitted) {
+    const r = existingReview;
+    return (
+      <div className="bg-white border border-gray-200 rounded-xl p-6">
+        <div className="flex items-center gap-2 mb-3">
+          <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+          <h3 className="text-sm font-bold text-gray-900">내가 작성한 리뷰</h3>
+        </div>
+        <div className="flex items-center gap-1 mb-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <Star key={i} className={`w-4 h-4 ${i <= ((r?.rating as number) || rating) ? "text-yellow-500 fill-yellow-500" : "text-gray-300"}`} />
+          ))}
+          <span className="text-sm font-semibold text-gray-700 ml-1">{(r?.rating as number) || rating}</span>
+        </div>
+        {(r?.title || title) && <p className="text-sm font-semibold text-gray-800 mb-1">{(r?.title as string) || title}</p>}
+        <p className="text-sm text-gray-600">{(r?.content as string) || content}</p>
+        <p className="text-xs text-green-600 mt-3 flex items-center gap-1">
+          <CheckCircle2 className="w-3.5 h-3.5" /> 리뷰가 등록되었습니다
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <Star className="w-4 h-4 text-yellow-500" />
+        <h3 className="text-sm font-bold text-gray-900">시공 리뷰 작성</h3>
+      </div>
+
+      {/* 별점 */}
+      <div className="mb-4">
+        <p className="text-xs text-gray-500 mb-2">시공 만족도를 평가해주세요</p>
+        <div className="flex items-center gap-1">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <button
+              key={i}
+              onMouseEnter={() => setHoverRating(i)}
+              onMouseLeave={() => setHoverRating(0)}
+              onClick={() => setRating(i)}
+              className="p-0.5"
+            >
+              <Star className={`w-7 h-7 transition-colors ${
+                i <= (hoverRating || rating)
+                  ? "text-yellow-500 fill-yellow-500"
+                  : "text-gray-300"
+              }`} />
+            </button>
+          ))}
+          {rating > 0 && (
+            <span className="text-sm font-semibold text-gray-700 ml-2">
+              {rating === 5 ? "매우 만족" : rating === 4 ? "만족" : rating === 3 ? "보통" : rating === 2 ? "불만족" : "매우 불만족"}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* 제목 */}
+      <input
+        type="text"
+        placeholder="리뷰 제목 (선택)"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        maxLength={100}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+
+      {/* 내용 */}
+      <textarea
+        placeholder="시공 후기를 작성해주세요 (최소 10자)"
+        value={content}
+        onChange={(e) => setContent(e.target.value)}
+        maxLength={1000}
+        rows={4}
+        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm mb-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-400">{content.length}/1000</p>
+        <button
+          onClick={handleSubmit}
+          disabled={rating === 0 || content.trim().length < 10 || submitting}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+        >
+          {submitting && <Loader2 className="w-4 h-4 animate-spin" />}
+          리뷰 등록
+        </button>
       </div>
     </div>
   );
@@ -551,7 +712,7 @@ function ContractDetailContent() {
         const res = await fetch(`/api/schedule?contractId=${contract.id}`);
         const data = await res.json();
         if (data.generated && data.schedule) setSchedule(data.schedule);
-      } catch { /* ignore */ }
+      } catch { toast({ type: "error", title: "오류", message: "시공 일정을 불러올 수 없습니다" }); }
     })();
   }, [contract?.id]);
 
@@ -701,7 +862,7 @@ function ContractDetailContent() {
         {activeSection === 1 && <ContractPart1 contract={contract} contractor={contractor} />}
         {activeSection === 2 && <ContractPart2 contract={contract} onUpdateNotes={handleUpdateNotes} />}
         {activeSection === 3 && <ContractPart3 contract={contract} />}
-        {activeSection === 4 && <ContractPart4 contract={contract} onSign={handleSign} />}
+        {activeSection === 4 && <ContractPart4 contract={contract} onSign={handleSign} contractor={contractor} />}
 
         {/* 시공사 정보 */}
         {contractor && (
@@ -767,6 +928,11 @@ function ContractDetailContent() {
               {contract.signedAt && `${new Date(contract.signedAt).toLocaleDateString("ko-KR")} 서명 완료`}
             </p>
           </div>
+        )}
+
+        {/* 소비자 리뷰 작성 (계약 체결 후) */}
+        {user && ["SIGNED", "IN_PROGRESS", "COMPLETED"].includes(contract.status) && (
+          <ReviewSection contract={contract} userId={user.id} />
         )}
       </main>
     </div>

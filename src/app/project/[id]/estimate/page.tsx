@@ -5,7 +5,6 @@ import { useParams, useRouter } from "next/navigation";
 import {
   ArrowRight,
   ArrowLeft,
-  Download,
   Calculator,
   Home,
   ChefHat,
@@ -16,6 +15,8 @@ import {
   CheckCircle2,
   Loader2,
   Layers,
+  AlertTriangle,
+  Ruler,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import dynamic from "next/dynamic";
@@ -28,7 +29,6 @@ import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
 import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
 import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
-import { generateEstimatePdf } from "@/lib/pdf/estimate-pdf-generator";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>,
@@ -177,7 +177,7 @@ export default function EstimatePage() {
   const [saved, setSaved] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [viewMode, setViewMode] = useState<"room" | "trade">("room");
-  const [exporting, setExporting] = useState(false);
+  const [ceilingHeight, setCeilingHeight] = useState(2200); // mm 기본값
 
   // 도면 로드
   useEffect(() => {
@@ -191,6 +191,15 @@ export default function EstimatePage() {
     }
   }, [project?.drawingId]);
 
+  // 사용자 선택 자재
+  const userMaterials = useMemo(
+    () => project?.rendering?.materials || [],
+    [project?.rendering?.materials]
+  );
+
+  // 높이 할증 여부
+  const isHeightSurcharge = ceilingHeight > 2500;
+
   // QTY 엔진 기반 견적 생성
   const useEngine = !!floorPlan;
 
@@ -201,15 +210,14 @@ export default function EstimatePage() {
     if (useEngine && floorPlan) {
       // QTY 엔진 실행 (오류 시 폴백)
       try {
-        const fpp = adaptParsedFloorPlan(floorPlan, projectId);
+        const fpp = adaptParsedFloorPlan(floorPlan, projectId, '인테리어 공사');
         const qtyResult = calculateAllQuantities(fpp);
         estResult = calculateEstimate(qtyResult);
 
         secs = viewMode === "trade"
           ? convertToTradeSections(estResult)
           : convertToRoomSections(estResult);
-      } catch (err) {
-        console.error("[estimate] QTY engine error:", err);
+      } catch {
         secs = generateFallbackEstimate(floorPlan);
       }
     } else {
@@ -244,7 +252,7 @@ export default function EstimatePage() {
       summary: smry,
       engineResult: estResult,
     };
-  }, [useEngine, floorPlan, projectId, viewMode]);
+  }, [useEngine, floorPlan, projectId, viewMode, ceilingHeight, userMaterials]);
 
   // 물량산출 결과 로깅 (fire-and-forget, 1회만)
   const [qtyLogged, setQtyLogged] = useState(false);
@@ -264,30 +272,6 @@ export default function EstimatePage() {
       }),
     }).catch(() => { /* silent */ });
   }, [engineResult, qtyLogged, projectId, floorPlan]);
-
-  // PDF 내보내기
-  const handleExportPdf = useCallback(async () => {
-    if (exporting || sections.length === 0) return;
-    setExporting(true);
-    try {
-      await generateEstimatePdf({
-        sections,
-        grandTotal,
-        totalMaterial,
-        totalLabor,
-        totalOverhead,
-        engineSummary: engineResult?.summary ?? null,
-        projectId,
-        floorPlanArea: floorPlan?.totalArea,
-        roomCount: floorPlan?.rooms?.length,
-      });
-    } catch (err) {
-      console.error("[estimate] PDF export error:", err);
-      alert("PDF 내보내기 중 오류가 발생했습니다.");
-    } finally {
-      setExporting(false);
-    }
-  }, [exporting, sections, grandTotal, totalMaterial, totalLabor, totalOverhead, engineResult, projectId, floorPlan]);
 
   const filteredSections = activeRoom
     ? sections.filter((s) => s.roomName === activeRoom)
@@ -363,18 +347,33 @@ export default function EstimatePage() {
             </span>
           )}
         </div>
+
+        {/* 층고 입력 + 할증 경고 */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={handleExportPdf}
-            disabled={exporting || sections.length === 0}
-            className="flex items-center gap-1 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200 disabled:opacity-50"
-          >
-            {exporting ? (
-              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> PDF 생성중...</>
-            ) : (
-              <><Download className="w-3.5 h-3.5" /> PDF 내보내기</>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded-lg border border-gray-200">
+            <Ruler className="w-3.5 h-3.5 text-gray-500" />
+            <span className="text-xs text-gray-600 hidden sm:inline">층고</span>
+            <input
+              type="number"
+              value={ceilingHeight}
+              onChange={(e) => {
+                const v = parseInt(e.target.value) || 2200;
+                setCeilingHeight(Math.max(2000, Math.min(4000, v)));
+              }}
+              className="w-16 text-center text-xs font-bold text-gray-900 bg-white border border-gray-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+              min={2000}
+              max={4000}
+              step={100}
+            />
+            <span className="text-xs text-gray-500">mm</span>
+          </div>
+          {isHeightSurcharge && (
+            <span className="flex items-center gap-1 px-2 py-1 bg-red-50 text-red-600 text-xs font-medium rounded-lg border border-red-200">
+              <AlertTriangle className="w-3 h-3" />
+              <span className="hidden sm:inline">노무비 1.5배</span>
+              <span className="sm:hidden">1.5x</span>
+            </span>
+          )}
           <button
             onClick={handleSaveAndNext}
             disabled={sections.length === 0}
@@ -414,7 +413,7 @@ export default function EstimatePage() {
         }`}>
           {/* 총 비용 */}
           <div className="p-4 border-b border-gray-200">
-            <p className="text-xs text-gray-500 mb-1">공사비 합계 (VAT 별도)</p>
+            <p className="text-xs text-gray-500 mb-1">공사비 합계 (VAT 포함)</p>
             <p className="text-2xl font-bold text-gray-900">
               {grandTotal.toLocaleString("ko-KR")}
               <span className="text-sm font-normal text-gray-500 ml-1">원</span>
@@ -425,14 +424,24 @@ export default function EstimatePage() {
                 <span className="text-gray-900 font-medium">{totalMaterial.toLocaleString("ko-KR")}원</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">노무비</span>
-                <span className="text-gray-900 font-medium">{totalLabor.toLocaleString("ko-KR")}원</span>
+                <span className="text-gray-500">노무비{isHeightSurcharge ? " (1.5배)" : ""}</span>
+                <span className={`font-medium ${isHeightSurcharge ? "text-red-600" : "text-gray-900"}`}>
+                  {totalLabor.toLocaleString("ko-KR")}원
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">경비</span>
                 <span className="text-gray-900 font-medium">{totalOverhead.toLocaleString("ko-KR")}원</span>
               </div>
             </div>
+            {isHeightSurcharge && (
+              <div className="mt-2 px-2 py-1.5 bg-red-50 rounded-lg border border-red-200">
+                <p className="text-[10px] text-red-600 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  층고 {ceilingHeight}mm &gt; 2500mm: 노무비 1.5배 할증 적용
+                </p>
+              </div>
+            )}
           </div>
 
           {/* 공간별 비중 */}
@@ -493,17 +502,19 @@ export default function EstimatePage() {
               {useEngine ? (
                 <>
                   <p>- 17개 공종 정밀 물량산출 엔진</p>
-                  <p>- 단가: 2025년 서울 실거래 기준</p>
-                  <p>- 일반관리비: 직접공사비 × 6%</p>
-                  <p>- 이윤: (직접공사비+관리비) × 5%</p>
-                  <p>- VAT: 공급가액 × 10%</p>
+                  <p>- 층고: {ceilingHeight}mm{isHeightSurcharge ? " (할증 적용)" : ""}</p>
+                  <p>- 단가: 2026년 서울 실거래 기준</p>
+                  <p>- 일반관리비: 직접공사비 x 6%</p>
+                  <p>- 이윤: (직접공사비+관리비) x 5%</p>
+                  <p>- VAT: 공급가액 x 10%</p>
                   <p>- 할증률: 공종별 자재 로스 반영</p>
+                  {isHeightSurcharge && <p className="text-red-500">- 2500mm 초과 노무비 1.5배 할증</p>}
                 </>
               ) : (
                 <>
-                  <p>- 단가: 2025년 물가정보 기준</p>
-                  <p>- 노무비: 자재비 × 카테고리별 비율</p>
-                  <p>- 경비: (재료비+노무비) × 10%</p>
+                  <p>- 단가: 2026년 물가정보 기준</p>
+                  <p>- 노무비: 자재비 x 카테고리별 비율</p>
+                  <p>- 경비: (재료비+노무비) x 10%</p>
                   <p>- VAT 별도, 부대비용 별도</p>
                 </>
               )}

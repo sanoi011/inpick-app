@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Bot, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Download } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface AILog {
   id: string;
@@ -70,7 +71,7 @@ export default function AdminAILogsPage() {
       const data = await res.json();
       setLogs(data.logs || []);
       setTotal(data.total || 0);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "AI 로그를 불러올 수 없습니다" }); }
     setLoading(false);
   }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -8,6 +9,11 @@ export async function GET(req: NextRequest) {
 
     if (!contractorId) {
       return NextResponse.json({ error: "contractorId 필수" }, { status: 400 });
+    }
+
+    const authId = getContractorIdFromRequest(req);
+    if (authId && authId !== contractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();

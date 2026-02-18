@@ -5,6 +5,7 @@ import { useContractorAuth } from "@/hooks/useContractorAuth";
 import {
   Loader2, Users, Search, Star, Shield, Clock, MapPin, Send, X, Award,
 } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 
 const TRADE_OPTIONS = [
   { code: "INT_GENERAL", name: "인테리어 종합" },
@@ -133,7 +134,7 @@ export default function MatchingPage() {
 
       allResults.sort((a, b) => b.scores.total - a.scores.total);
       setResults(allResults);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "매칭 검색에 실패했습니다" }); } finally { setLoading(false); }
   };
 
   const handleCollabRequest = async () => {
@@ -157,7 +158,7 @@ export default function MatchingPage() {
         setCollabForm({ message: "", proposedAmount: "", startDate: "", endDate: "" });
         alert("협업 요청이 전송되었습니다");
       }
-    } catch { /* ignore */ } finally { setCollabSending(false); }
+    } catch { toast({ type: "error", title: "오류", message: "협업 요청에 실패했습니다" }); } finally { setCollabSending(false); }
   };
 
   if (!authChecked) return null;

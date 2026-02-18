@@ -8,6 +8,7 @@ interface ContractorAuth {
   contractorName: string | null;
   authChecked: boolean;
   logout: () => void;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 export function useContractorAuth(): ContractorAuth {
@@ -36,5 +37,12 @@ export function useContractorAuth(): ContractorAuth {
     router.replace("/contractor/login");
   };
 
-  return { contractorId, contractorName, authChecked, logout };
+  const authFetch = (url: string, options?: RequestInit): Promise<Response> => {
+    const token = localStorage.getItem("contractor_token");
+    const headers = new Headers(options?.headers);
+    if (token) headers.set("Authorization", `Bearer ${token}`);
+    return fetch(url, { ...options, headers });
+  };
+
+  return { contractorId, contractorName, authChecked, logout, authFetch };
 }

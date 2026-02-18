@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface CrawlLog {
   id: string;
@@ -30,7 +31,7 @@ export default function AdminCrawlersPage() {
         const data = await res.json();
         setLogs(data.recentCrawls || []);
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "크롤러 로그를 불러올 수 없습니다" }); }
   }
 
   async function runCrawler(type: string) {
@@ -42,7 +43,7 @@ export default function AdminCrawlersPage() {
         body: JSON.stringify({ type }),
       });
       await loadLogs();
-    } catch { /* ignore */ } finally {
+    } catch { toast({ type: "error", title: "오류", message: "크롤러 실행에 실패했습니다" }); } finally {
       setCrawling(false);
     }
   }

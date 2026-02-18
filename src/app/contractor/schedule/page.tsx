@@ -10,6 +10,7 @@ import {
   mapDbSchedule,
   SCHEDULE_TYPE_LABELS, SCHEDULE_TYPE_COLORS,
 } from "@/types/schedule";
+import { toast } from "@/components/ui/Toast";
 
 const DAYS = ["일", "월", "화", "수", "목", "금", "토"];
 
@@ -72,7 +73,7 @@ export default function SchedulePage() {
       const data = await res.json();
       setSchedules((data.schedules || []).map((s: Record<string, unknown>) => mapDbSchedule(s)));
       setConflicts(data.conflicts || []);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "일정을 불러올 수 없습니다" }); } finally { setLoading(false); }
   }, [contractorId, year, month]);
 
   useEffect(() => { if (authChecked && contractorId) loadSchedules(); }, [authChecked, contractorId, loadSchedules]);
@@ -126,7 +127,7 @@ export default function SchedulePage() {
         const err = await res.json();
         alert(err.error || "저장 실패");
       }
-    } catch { /* ignore */ } finally { setSaving(false); }
+    } catch { toast({ type: "error", title: "오류", message: "일정 저장에 실패했습니다" }); } finally { setSaving(false); }
   };
 
   const handleDelete = async (id: string) => {
@@ -139,7 +140,7 @@ export default function SchedulePage() {
       });
       setLoading(true);
       loadSchedules();
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "일정 삭제에 실패했습니다" }); }
   };
 
   // 날짜별 일정 맵

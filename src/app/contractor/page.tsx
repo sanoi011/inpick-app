@@ -71,7 +71,7 @@ export default function ContractorDashboard() {
           receivableTotal: statsData?.receivableTotal ?? 0,
         });
       } catch {
-        // silently fail
+        toast({ type: "error", title: "오류", message: "대시보드를 불러올 수 없습니다" });
       } finally {
         setLoading(false);
       }

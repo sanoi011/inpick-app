@@ -12,6 +12,7 @@ import {
   INVOICE_STATUS_LABELS, INVOICE_STATUS_COLORS,
   EXPENSE_CATEGORY_LABELS, EXPENSE_CATEGORY_COLORS,
 } from "@/types/finance";
+import { toast } from "@/components/ui/Toast";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -75,7 +76,7 @@ export default function FinancePage() {
       const data = await res.json();
       setSummary(data.summary || null);
       setProjectProfits(data.projectProfits || []);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "재무 요약을 불러올 수 없습니다" }); } finally { setLoading(false); }
   }, [contractorId]);
 
   const loadInvoices = useCallback(async () => {
@@ -145,7 +146,7 @@ export default function FinancePage() {
           if (monthIdx >= 0) months[monthIdx].expense += exp.amount || 0;
         }
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "월간 추이를 불러올 수 없습니다" }); }
 
     setMonthlyTrend(months);
   }, [contractorId]);
@@ -179,7 +180,7 @@ export default function FinancePage() {
         loadInvoices();
         loadSummary();
       }
-    } catch { /* ignore */ } finally { setSaving(false); }
+    } catch { toast({ type: "error", title: "오류", message: "청구서 생성에 실패했습니다" }); } finally { setSaving(false); }
   };
 
   // 청구서 상태 변경
@@ -195,7 +196,7 @@ export default function FinancePage() {
         loadInvoices();
         loadSummary();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "청구서 상태 변경에 실패했습니다" }); }
   };
 
   // 지출 추가
@@ -220,7 +221,7 @@ export default function FinancePage() {
         loadExpenses();
         loadSummary();
       }
-    } catch { /* ignore */ } finally { setSaving(false); }
+    } catch { toast({ type: "error", title: "오류", message: "지출 등록에 실패했습니다" }); } finally { setSaving(false); }
   };
 
   // 지출 수정
@@ -245,7 +246,7 @@ export default function FinancePage() {
         loadExpenses();
         loadSummary();
       }
-    } catch { /* ignore */ } finally { setSaving(false); }
+    } catch { toast({ type: "error", title: "오류", message: "지출 수정에 실패했습니다" }); } finally { setSaving(false); }
   };
 
   // 지출 삭제
@@ -259,7 +260,7 @@ export default function FinancePage() {
         loadExpenses();
         loadSummary();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "지출 삭제에 실패했습니다" }); }
   };
 
   // CSV 내보내기

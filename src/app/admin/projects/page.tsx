@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { FolderKanban, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 const STATUS_OPTIONS = [
   { value: "", label: "전체" },
@@ -62,7 +63,7 @@ export default function AdminProjectsPage() {
       const data = await res.json();
       setProjects(data.projects || []);
       setTotal(data.total || 0);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "프로젝트를 불러올 수 없습니다" }); }
     setLoading(false);
   }
 

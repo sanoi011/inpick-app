@@ -16,6 +16,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 
 interface LibraryItem {
   id: string;
@@ -70,7 +71,7 @@ export default function FloorPlanLibraryPage() {
       setTotal(data.total || 0);
       if (data.stats) setStats(data.stats);
     } catch {
-      // fallback
+      toast({ type: "error", title: "오류", message: "도면 라이브러리를 불러올 수 없습니다" });
     } finally {
       setLoading(false);
     }

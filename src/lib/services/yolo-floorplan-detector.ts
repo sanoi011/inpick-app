@@ -59,13 +59,11 @@ export async function loadModel(): Promise<boolean> {
     // 모델 파일 존재 확인
     const res = await fetch(MODEL_URL, { method: "HEAD" });
     if (!res.ok) {
-      console.warn("[yolo-detector] Model not found at", MODEL_URL);
       loading = false;
       return false;
     }
 
     session = await ort.InferenceSession.create(MODEL_URL, options);
-    console.log("[yolo-detector] Model loaded successfully");
     loading = false;
     return true;
   } catch (err) {

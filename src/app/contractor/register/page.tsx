@@ -31,7 +31,10 @@ const REGION_OPTIONS = [
   "강원", "충북", "충남", "전북", "전남", "경북", "경남", "제주",
 ];
 
+type ContractorType = "general" | "specialty";
+
 interface FormData {
+  contractorType: ContractorType;
   companyName: string;
   representativeName: string;
   phone: string;
@@ -50,6 +53,7 @@ export default function ContractorRegisterPage() {
   const [submitted, setSubmitted] = useState(false);
 
   const [form, setForm] = useState<FormData>({
+    contractorType: "specialty",
     companyName: "",
     representativeName: "",
     phone: "",
@@ -171,6 +175,45 @@ export default function ContractorRegisterPage() {
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
               <Building2 className="w-5 h-5 text-blue-600" /> 기본 정보
             </h2>
+
+            {/* 업체 유형 선택 */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                업체 유형 <span className="text-red-500">*</span>
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => updateField("contractorType", "general")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    form.contractorType === "general"
+                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-200"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <Building2 className={`w-6 h-6 ${form.contractorType === "general" ? "text-blue-600" : "text-gray-400"}`} />
+                  <span className={`text-sm font-bold ${form.contractorType === "general" ? "text-blue-700" : "text-gray-700"}`}>
+                    종합 인테리어
+                  </span>
+                  <span className="text-xs text-gray-500 text-center">전체 시공 관리</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => updateField("contractorType", "specialty")}
+                  className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                    form.contractorType === "specialty"
+                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-200"
+                      : "border-gray-200 hover:border-gray-300"
+                  }`}
+                >
+                  <Briefcase className={`w-6 h-6 ${form.contractorType === "specialty" ? "text-blue-600" : "text-gray-400"}`} />
+                  <span className={`text-sm font-bold ${form.contractorType === "specialty" ? "text-blue-700" : "text-gray-700"}`}>
+                    전문 공종
+                  </span>
+                  <span className="text-xs text-gray-500 text-center">도배, 타일 등 전문</span>
+                </button>
+              </div>
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -328,6 +371,12 @@ export default function ContractorRegisterPage() {
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 mb-0.5">업체 유형</p>
+                    <p className="text-sm font-semibold text-gray-900">
+                      {form.contractorType === "general" ? "종합 인테리어" : "전문 공종"}
+                    </p>
+                  </div>
                   <div>
                     <p className="text-xs text-gray-500 mb-0.5">회사명</p>
                     <p className="text-sm font-semibold text-gray-900">{form.companyName}</p>

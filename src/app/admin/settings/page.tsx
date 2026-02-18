@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Shield, Key, Server, Loader2 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 export default function AdminSettingsPage() {
   const { adminEmail, adminName, authChecked } = useAdminAuth();
@@ -21,7 +22,7 @@ export default function AdminSettingsPage() {
         // API가 동작하면 Supabase는 연결된 것
         setEnvStatus({ supabase: true });
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "환경변수 상태를 확인할 수 없습니다" }); }
   }
 
   if (!authChecked) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;

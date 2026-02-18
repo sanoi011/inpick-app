@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { FileText, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface Item {
   id: string;
@@ -48,7 +49,7 @@ export default function AdminContractsPage() {
       const data = await res.json();
       setItems(data.items || []);
       setTotal(data.total || 0);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "계약/입찰 데이터를 불러올 수 없습니다" }); }
     setLoading(false);
   }
 

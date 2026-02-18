@@ -12,6 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/contracts",
     "/consult",
     "/viewer",
+    "/find-contractors",
   ];
 
   const contractorPages = [

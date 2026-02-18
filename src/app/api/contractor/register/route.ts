@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
     const {
       companyName, representativeName, phone, email,
       licenseNumber, region, address, selectedTrades,
-      experienceYears, introduction,
+      experienceYears, introduction, contractorType,
     } = body;
 
     if (!companyName || !representativeName || !phone || !email) {
@@ -32,7 +32,9 @@ export async function POST(request: NextRequest) {
         completed_projects: 0,
         is_verified: false,
         is_active: true,
-        metadata: { introduction: introduction || "", registration_status: "pending" },
+        contractor_type: contractorType === "general" ? "general" : "specialty",
+        introduction: introduction || null,
+        metadata: { registration_status: "pending" },
       })
       .select()
       .single();

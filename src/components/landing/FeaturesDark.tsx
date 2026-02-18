@@ -8,7 +8,7 @@ const FEATURES = [
   { icon: "folder", title: "피그마 도면 연동", description: "도면을 업로드하면 자동으로 공간을 분석합니다" },
   { icon: "user-plus", title: "전문업체 자동 매칭", description: "AI가 최적의 전문업체를 6가지 기준으로 매칭" },
   { icon: "timer", title: "실시간 단가 갱신", description: "3대 공식 기관 데이터를 자동 크롤링" },
-  { icon: "tag", title: "22개 공종 자동 분류", description: "견적 항목별 공종 자동 배분 및 관리" },
+  { icon: "tag", title: "17개 공종 자동 분류", description: "견적 항목별 공종 자동 배분 및 관리" },
 ] as const;
 
 const TAGS = [

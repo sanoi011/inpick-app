@@ -11,11 +11,11 @@ const HOME_LINKS = [
 
 const COMPANY_INFO = {
   copyright: "Copyright © 2026 AIOD. All rights reserved.",
-  businessNumber: "사업자등록번호: 예비창업 준비 중",
+  businessNumber: "사업자등록번호: 예비창업패키지 참여 중",
   ceo: "회사명: AIOD | 플랫폼명: INPICK",
   email: "이메일: tjsqhs011@naver.com",
   phone: "대표: 선우빈",
-  address: "본사: 서울특별시",
+  address: "소재지: 서울특별시",
 };
 
 const LEGAL_LINKS = [
@@ -47,8 +47,8 @@ export default function LandingFooter() {
                 <div className="flex flex-col gap-3">
                   <a href="/project/new" className="text-sm text-gray-400 hover:text-white transition-colors">프로젝트 시작</a>
                   <a href="/contractor/register" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 등록</a>
+                  <a href="/find-contractors" className="text-sm text-gray-400 hover:text-white transition-colors">업체 찾기</a>
                   <a href="/contractor/login" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 로그인</a>
-                  <a href="/admin" className="text-sm text-gray-400 hover:text-white transition-colors">관리자</a>
                   <a href="#contact" className="text-sm text-gray-400 hover:text-white transition-colors">문의하기</a>
                 </div>
               </div>
@@ -74,3 +74,5 @@ export default function LandingFooter() {
     </footer>
   );
 }
+
+export { LandingFooter as Footer };

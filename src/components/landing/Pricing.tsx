@@ -97,6 +97,11 @@ export default function Pricing() {
           <div className="w-1 h-1 rounded-full bg-gray-300" />
           <div className="flex items-center gap-2"><Calendar className="w-5 h-5 text-gray-900" /><span className="text-gray-900">첫 가입 시, 무료 1회 견적 제공</span></div>
         </motion.div>
+        <motion.p initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: 0.7 }}
+          className="text-center text-xs text-gray-400 mt-6">
+          * 표시 가격은 부가세(VAT) 별도입니다. 자세한 내용은{" "}
+          <a href="/terms" className="underline hover:text-gray-600">이용약관</a>을 확인해주세요.
+        </motion.p>
       </div>
     </section>
   );

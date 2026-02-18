@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { DollarSign, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface CreditUser {
   id: string;
@@ -75,7 +76,7 @@ export default function AdminCreditsPage() {
         setTransactions(data.transactions || []);
       }
       setTotal(data.total || 0);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "크레딧 데이터를 불러올 수 없습니다" }); }
     setLoading(false);
   }
 
@@ -103,7 +104,7 @@ export default function AdminCreditsPage() {
         setGrantDesc("");
         load();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "크레딧 부여에 실패했습니다" }); }
     setGranting(false);
   }
 

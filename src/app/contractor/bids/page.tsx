@@ -8,6 +8,7 @@ import {
   FileText, CheckCircle2, XCircle, Filter,
 } from "lucide-react";
 import { BID_STATUS_LABELS, BID_STATUS_COLORS, type BidStatus } from "@/types/bid";
+import { toast } from "@/components/ui/Toast";
 
 interface RfqData {
   specialNotes?: string;
@@ -154,7 +155,7 @@ export default function BidsPage() {
           },
         })));
       }
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch { toast({ type: "error", title: "오류", message: "입찰 데이터를 불러올 수 없습니다" }); } finally { setLoading(false); }
   }, [contractorId, tab, spaceType, budgetRange]);
 
   useEffect(() => { if (authChecked && contractorId) loadData(); }, [authChecked, contractorId, loadData]);
@@ -186,7 +187,7 @@ export default function BidsPage() {
         setBidForm({ bidAmount: "", discountRate: "", estimatedDays: "30", startAvailableDate: "", message: "", highlights: "", warrantyMonths: "12" });
         loadData();
       }
-    } catch { /* ignore */ } finally { setSubmitting(false); }
+    } catch { toast({ type: "error", title: "오류", message: "입찰 제출에 실패했습니다" }); } finally { setSubmitting(false); }
   };
 
   const mapBidStatus = (s: string): BidStatus => {

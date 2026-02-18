@@ -8,7 +8,6 @@ import {
   Package,
   Check,
   X,
-  ImageIcon,
   MapPin,
   Palette,
   Search,
@@ -33,6 +32,30 @@ import { ROOM_FLOOR_CATEGORY } from "@/lib/constants/room-segmentation";
 
 const FloorPlan2D = dynamic(() => import("@/components/viewer/FloorPlan2D"), { ssr: false });
 const FloorPlanCanvas = dynamic(() => import("@/components/workspace/FloorPlanCanvas"), { ssr: false });
+
+// 카테고리별 스와치 색상 (이미지 대신 의미 있는 색상 표현)
+const CATEGORY_SWATCH: Record<string, { bg: string; text: string }> = {
+  FLOORING:          { bg: "bg-gradient-to-br from-amber-700 to-amber-900",   text: "text-amber-200" },
+  WALLPAPER:         { bg: "bg-gradient-to-br from-rose-200 to-rose-400",     text: "text-rose-700" },
+  PAINT:             { bg: "bg-gradient-to-br from-sky-200 to-sky-400",       text: "text-sky-700" },
+  CEILING:           { bg: "bg-gradient-to-br from-gray-100 to-gray-300",     text: "text-gray-500" },
+  DOOR_ROOM:         { bg: "bg-gradient-to-br from-orange-300 to-orange-500", text: "text-orange-900" },
+  SLIDING_PARTITION:  { bg: "bg-gradient-to-br from-orange-200 to-orange-400", text: "text-orange-800" },
+  ENTRY_DOOR:        { bg: "bg-gradient-to-br from-stone-400 to-stone-600",   text: "text-stone-100" },
+  BASEBOARD:         { bg: "bg-gradient-to-br from-neutral-300 to-neutral-500", text: "text-neutral-800" },
+  LIGHTING:          { bg: "bg-gradient-to-br from-yellow-200 to-yellow-400", text: "text-yellow-700" },
+  WINDOW:            { bg: "bg-gradient-to-br from-cyan-200 to-cyan-400",     text: "text-cyan-700" },
+  TOILET:            { bg: "bg-gradient-to-br from-slate-100 to-slate-300",   text: "text-slate-600" },
+  VANITY:            { bg: "bg-gradient-to-br from-slate-200 to-slate-400",   text: "text-slate-700" },
+  SHOWER_BATH:       { bg: "bg-gradient-to-br from-blue-200 to-blue-400",     text: "text-blue-700" },
+  BATH_FAUCET:       { bg: "bg-gradient-to-br from-zinc-300 to-zinc-500",     text: "text-zinc-100" },
+  BATH_TILE:         { bg: "bg-gradient-to-br from-teal-200 to-teal-400",     text: "text-teal-700" },
+  KITCHEN_SINK:      { bg: "bg-gradient-to-br from-zinc-200 to-zinc-400",     text: "text-zinc-700" },
+  KITCHEN_CABINET:   { bg: "bg-gradient-to-br from-amber-100 to-amber-300",   text: "text-amber-700" },
+  KITCHEN_FAUCET:    { bg: "bg-gradient-to-br from-zinc-300 to-zinc-500",     text: "text-zinc-100" },
+  KITCHEN_TILE:      { bg: "bg-gradient-to-br from-emerald-200 to-emerald-400", text: "text-emerald-700" },
+};
+const DEFAULT_SWATCH = { bg: "bg-gradient-to-br from-gray-200 to-gray-400", text: "text-gray-600" };
 
 // 등급 스타일
 const GRADE: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -358,116 +381,136 @@ export default function RenderingPage() {
       {categories.map((category) => {
         const products = sorted(category.products);
         const selectedId = selectedProducts[category.code];
+        const recommendedCount = 3; // 처음 3개는 추천
 
         return (
           <section key={category.code}>
             <div className="flex items-center gap-2 mb-3">
               <h3 className="text-sm font-bold text-gray-900">{category.nameKr}</h3>
               {selectedId && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+              <span className="text-[10px] text-gray-400">{products.length}개 옵션</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {products.map((product) => {
+            {/* 가로 스크롤 컨테이너 */}
+            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory">
+              {products.map((product, idx) => {
                 const isSelected = selectedId === product.id;
                 const grade = GRADE[product.priceGrade];
+                const showDivider = idx === recommendedCount && products.length > recommendedCount;
 
                 return (
-                  <button
-                    key={product.id}
-                    onClick={() => handleSelect(category, product)}
-                    className={`group relative text-left rounded-xl border-2 transition-all ${
-                      isSelected
-                        ? "border-blue-500 bg-white shadow-md"
-                        : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
-                    }`}
-                  >
-                    {/* 이미지 placeholder */}
-                    <div
-                      className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${
-                        isSelected ? "bg-blue-50" : "bg-gray-50"
+                  <div key={product.id} className="flex gap-3 snap-start">
+                    {/* 추천/추가옵션 구분선 */}
+                    {showDivider && (
+                      <div className="flex flex-col items-center justify-center px-1 flex-shrink-0">
+                        <div className="w-px h-full bg-gray-200" />
+                        <span className="text-[9px] text-gray-400 whitespace-nowrap py-1 -rotate-0">더보기</span>
+                        <div className="w-px h-full bg-gray-200" />
+                      </div>
+                    )}
+                    <button
+                      onClick={() => handleSelect(category, product)}
+                      className={`group relative text-left rounded-xl border-2 transition-all w-[200px] sm:w-[220px] flex-shrink-0 ${
+                        isSelected
+                          ? "border-blue-500 bg-white shadow-md"
+                          : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
                       }`}
                     >
-                      <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <ImageIcon
-                          className={`w-8 h-8 ${isSelected ? "text-blue-200" : "text-gray-200"}`}
-                        />
-                        <span className="text-[10px] text-gray-300 mt-1">자재 이미지</span>
-                      </div>
+                      {/* 자재 스와치 */}
                       <div
-                        className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}
+                        className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${
+                          product.colorHex ? "" : (CATEGORY_SWATCH[category.code] ?? DEFAULT_SWATCH).bg
+                        } ${!product.colorHex && !isSelected ? "" : ""}`}
+                        style={product.colorHex ? { backgroundColor: product.colorHex } : undefined}
                       >
-                        {grade.label}
-                      </div>
-                      {isSelected && (
-                        <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow">
-                          <Check className="w-4 h-4 text-white" />
-                        </div>
-                      )}
-                      {product.colorHex && (
-                        <div className="absolute bottom-2 left-2">
-                          <div
-                            className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
-                            style={{ backgroundColor: product.colorHex }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="p-3">
-                      <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
-                      <p
-                        className={`text-sm font-bold mb-1 leading-snug ${
-                          isSelected ? "text-blue-800" : "text-gray-800"
-                        }`}
-                      >
-                        {product.productName}
-                      </p>
-                      <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">
-                        {product.spec}
-                      </p>
-
-                      <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
-                        <div>
-                          <span className="text-base font-extrabold text-gray-900">
-                            {product.unitPrice.toLocaleString()}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                          <span className={`text-2xl font-bold ${product.colorHex ? "text-white/80" : (CATEGORY_SWATCH[category.code] ?? DEFAULT_SWATCH).text}`}
+                            style={product.colorHex ? { textShadow: "0 1px 3px rgba(0,0,0,0.3)" } : undefined}
+                          >
+                            {product.productName.charAt(0)}
                           </span>
-                          <span className="text-[10px] text-gray-400 ml-0.5">
-                            원/{product.unit}
+                          <span className={`text-[10px] mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[category.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
+                            style={product.colorHex ? { textShadow: "0 1px 2px rgba(0,0,0,0.2)" } : undefined}
+                          >
+                            {category.nameKr}
                           </span>
                         </div>
-                        <span className="text-[10px] text-gray-400">
-                          시공 {product.laborPrice.toLocaleString()}
-                        </span>
+                        <div
+                          className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}
+                        >
+                          {grade.label}
+                        </div>
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow">
+                            <Check className="w-4 h-4 text-white" />
+                          </div>
+                        )}
+                        {product.colorHex && (
+                          <div className="absolute bottom-2 left-2">
+                            <div
+                              className="w-5 h-5 rounded-full border-2 border-white shadow-sm"
+                              style={{ backgroundColor: product.colorHex }}
+                            />
+                          </div>
+                        )}
                       </div>
 
-                      {product.tags.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mt-2">
-                          {product.tags.map((tag) => (
-                            <span
-                              key={tag}
-                              className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded"
-                            >
-                              {tag}
+                      <div className="p-3">
+                        <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                        <p
+                          className={`text-sm font-bold mb-1 leading-snug line-clamp-1 ${
+                            isSelected ? "text-blue-800" : "text-gray-800"
+                          }`}
+                        >
+                          {product.productName}
+                        </p>
+                        <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">
+                          {product.spec}
+                        </p>
+
+                        <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
+                          <div>
+                            <span className="text-base font-extrabold text-gray-900">
+                              {product.unitPrice.toLocaleString()}
                             </span>
-                          ))}
+                            <span className="text-[10px] text-gray-400 ml-0.5">
+                              원/{product.unit}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-gray-400">
+                            시공 {product.laborPrice.toLocaleString()}
+                          </span>
                         </div>
-                      )}
 
-                      {isSelected && product.subItems.length > 0 && (
-                        <div className="mt-2 pt-2 border-t border-blue-100 space-y-0.5">
-                          <p className="text-[10px] text-blue-500 font-bold">포함 부자재</p>
-                          {product.subItems.map((sub) => (
-                            <div key={sub.name} className="flex justify-between">
-                              <span className="text-[10px] text-gray-500">{sub.name}</span>
-                              <span className="text-[10px] text-gray-400">
-                                {sub.unitPrice.toLocaleString()}원
+                        {product.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-2">
+                            {product.tags.map((tag) => (
+                              <span
+                                key={tag}
+                                className="px-1.5 py-0.5 text-[9px] bg-gray-100 text-gray-500 rounded"
+                              >
+                                {tag}
                               </span>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {isSelected && product.subItems.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-blue-100 space-y-0.5">
+                            <p className="text-[10px] text-blue-500 font-bold">포함 부자재</p>
+                            {product.subItems.map((sub) => (
+                              <div key={sub.name} className="flex justify-between">
+                                <span className="text-[10px] text-gray-500">{sub.name}</span>
+                                <span className="text-[10px] text-gray-400">
+                                  {sub.unitPrice.toLocaleString()}원
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </div>
                 );
               })}
             </div>
@@ -511,15 +554,18 @@ export default function RenderingPage() {
                 key={item.categoryCode}
                 className="flex items-center gap-3 p-2.5 rounded-xl bg-gray-50"
               >
-                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center flex-shrink-0">
-                  {item.product.colorHex ? (
-                    <div
-                      className="w-6 h-6 rounded"
-                      style={{ backgroundColor: item.product.colorHex }}
-                    />
-                  ) : (
-                    <ImageIcon className="w-4 h-4 text-gray-300" />
-                  )}
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  item.product.colorHex ? "bg-gray-100" : (CATEGORY_SWATCH[item.categoryCode] ?? DEFAULT_SWATCH).bg
+                }`}
+                  style={item.product.colorHex ? { backgroundColor: item.product.colorHex } : undefined}
+                >
+                  <span className={`text-sm font-bold ${
+                    item.product.colorHex ? "text-white/90" : (CATEGORY_SWATCH[item.categoryCode] ?? DEFAULT_SWATCH).text
+                  }`}
+                    style={item.product.colorHex ? { textShadow: "0 1px 2px rgba(0,0,0,0.3)" } : undefined}
+                  >
+                    {item.product.productName.charAt(0)}
+                  </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
@@ -1085,10 +1131,22 @@ export default function RenderingPage() {
                                       : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
                                   }`}
                                 >
-                                  <div className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${isSelected ? "bg-blue-50" : "bg-gray-50"}`}>
+                                  <div className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${
+                                    product.colorHex ? "" : (CATEGORY_SWATCH[cat.code] ?? DEFAULT_SWATCH).bg
+                                  }`}
+                                    style={product.colorHex ? { backgroundColor: product.colorHex } : undefined}
+                                  >
                                     <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                      <ImageIcon className={`w-8 h-8 ${isSelected ? "text-blue-200" : "text-gray-200"}`} />
-                                      <span className="text-[10px] text-gray-300 mt-1">자재 이미지</span>
+                                      <span className={`text-2xl font-bold ${product.colorHex ? "text-white/80" : (CATEGORY_SWATCH[cat.code] ?? DEFAULT_SWATCH).text}`}
+                                        style={product.colorHex ? { textShadow: "0 1px 3px rgba(0,0,0,0.3)" } : undefined}
+                                      >
+                                        {product.productName.charAt(0)}
+                                      </span>
+                                      <span className={`text-[10px] mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[cat.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
+                                        style={product.colorHex ? { textShadow: "0 1px 2px rgba(0,0,0,0.2)" } : undefined}
+                                      >
+                                        {cat.nameKr}
+                                      </span>
                                     </div>
                                     <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}>
                                       {grade.label}

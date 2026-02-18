@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
+import { toast } from "@/components/ui/Toast";
 
 interface ConsumerUser {
   id: string;
@@ -67,7 +68,7 @@ export default function AdminUsersPage() {
       if (tab === "consumer") setConsumers(data.users || []);
       else setContractors(data.users || []);
       setTotal(data.total || 0);
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "사용자 목록을 불러올 수 없습니다" }); }
     setLoading(false);
   }
 
@@ -120,7 +121,7 @@ export default function AdminUsersPage() {
         setGrantDescription("");
         load();
       }
-    } catch { /* ignore */ }
+    } catch { toast({ type: "error", title: "오류", message: "크레딧 부여에 실패했습니다" }); }
     setGranting(false);
   }
 
