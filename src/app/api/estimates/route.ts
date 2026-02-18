@@ -43,6 +43,7 @@ export async function GET(request: NextRequest) {
   const { data: estimates, error } = await query;
 
   if (error) {
+    console.error("Estimates GET error:", error.message, error.code);
     return NextResponse.json({ error: "견적 목록 조회 실패" }, { status: 500 });
   }
   return NextResponse.json({ estimates: estimates || [] });
@@ -82,6 +83,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (estError || !estimate) {
+      console.error("Estimate create error:", estError?.message, estError?.code);
       return NextResponse.json({ error: "견적 생성 실패" }, { status: 500 });
     }
 
@@ -217,6 +219,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (updateErr) {
+      console.error("Estimate update error:", updateErr.message, updateErr.code);
       return NextResponse.json({ error: "견적 업데이트 실패" }, { status: 500 });
     }
 
@@ -246,6 +249,7 @@ export async function PATCH(request: NextRequest) {
       .single();
 
     if (error) {
+      console.error("Estimate PATCH error:", error.message, error.code);
       return NextResponse.json({ error: "견적 수정 실패" }, { status: 500 });
     }
 

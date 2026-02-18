@@ -39,6 +39,7 @@ const AI_TAG_STYLES: Record<string, string> = {
 
 // 입찰에 AI 태그 부여
 function assignAiTag(bid: BidData, allBids: BidData[]): { tag: string; reason: string } {
+  if (allBids.length === 0) return { tag: "", reason: "" };
   const minAmount = Math.min(...allBids.map((b) => b.bid_amount));
   const maxRating = Math.max(...allBids.map((b) => b.specialty_contractors?.rating || 0));
   const minDays = Math.min(...allBids.map((b) => b.estimated_days || 99));
