@@ -4,6 +4,7 @@ import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { buildSegmentationPrompt } from "@/lib/prompts/segmentation-prompt";
+import { ROOM_TYPE_COLORS } from "@/lib/constants/room-segmentation";
 import type { SegmentedRoom, RoomColorMap } from "@/lib/constants/room-segmentation";
 
 // Storage 업로드용 service role client (anon key로는 업로드 불가)
@@ -325,7 +326,19 @@ export async function POST(request: NextRequest) {
             }
           }
 
+          // JSON 방 목록이 없으면 모든 알려진 방 타입으로 폴백
+          if (parsedRooms.length === 0 && maskBuffer) {
+            parsedRooms = Object.entries(ROOM_TYPE_COLORS).map(([type, info]) => ({
+              type: type as SegmentedRoom["type"],
+              color: info.hex,
+              label: info.label,
+            }));
+          }
+
           if (maskBuffer) {
+            // 마스크를 PNG로 강제 변환 (Gemini가 JPEG 반환 시 색상 정확도 개선)
+            maskBuffer = await sharp(maskBuffer).png().toBuffer();
+
             // 마스크 크기를 클린 이미지와 동일하게 맞춤 (nearest neighbor - 색상 블렌딩 방지)
             const cleanMeta = await sharp(cleanBuffer).metadata();
             const maskMeta = await sharp(maskBuffer).metadata();
