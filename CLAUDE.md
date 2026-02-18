@@ -1361,6 +1361,7 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260218100000_fix_schedule_tasks_rls.sql` | Supabase 적용 완료 |
 | `20260220000000_floor_plan_collection.sql` | Supabase 적용 완료 |
 | `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
+| `20260222400000_add_segmentation_mask.sql` | Supabase 적용 완료 |
 
 ## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
 
@@ -1414,15 +1415,86 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   │       Step 0: 네이버 원본 다운로드
   │       Step 1: Gemini Pro 클린 (워터마크/텍스트/설비 제거)
   │       Step 2: sharp.flop 좌우 반전
-  │       Step 3: Gemini Pro 치수선 추가 (기본형)
-  │       Step 4: Gemini Pro 치수선 추가 (미러형)
-  │       → Supabase Storage 업로드 → DB 캐시 → 완료
+  │       Step 3: Gemini Pro 세그멘테이션 마스크 (방별 색상 분류)
+  │       Step 4: Supabase Storage 업로드 (clean/mirror/mask/mask_mirror)
+  │       → DB 캐시 (mask_url + room_color_map JSONB) → 완료
   └── 둘 다 없음 → 도면 직접 업로드/입력 옵션
 
 수동 동/호 입력:
   건물 정보 없음 → "동/호수 직접 입력" → 동/호 입력 → 평형 검색
   → naver-cache에서 pyeongList 반환 → 평형 선택 → BuildingInfo 생성
 ```
+
+## 완료된 작업 (2026-02-18) - 세그멘테이션 마스크 기반 실시간 자재 시각화
+
+### 개요
+렌더링 페이지에서 자재 선택 시 도면 위에 해당 방 영역의 색상이 실시간 오버레이.
+추가 Gemini API 호출 없이 HTML5 Canvas 픽셀 조작으로 즉시 반영.
+
+### 파이프라인
+```
+도면 생성 (Step 3): Gemini Pro → 색상 분류 마스크 PNG 생성
+  → JPEG→PNG 강제 변환 (sharp) + nearest-neighbor 리사이즈
+  → Supabase Storage 업로드 (mask.png, mask_mirror.png)
+  → DB 저장 (mask_url, mask_mirror_url, room_color_map JSONB)
+
+렌더링 페이지: FloorPlanCanvas 컴포넌트
+  → 마스크 로드 → buildPixelCache (방별 Uint32Array 인덱스)
+  → 자재 선택 시 alpha blend 오버레이 (getImageData/putImageData)
+  → 방 클릭 → getRoomAtPoint → 해당 공종 카테고리 전환
+```
+
+### 신규 파일
+- `supabase/migrations/20260222400000_add_segmentation_mask.sql` - mask_url, mask_mirror_url, room_color_map 컬럼
+- `src/lib/constants/room-segmentation.ts` - 13개 방 타입 색상 매핑 + ROOM_FLOOR_CATEGORY + hexToRgb
+- `src/lib/prompts/segmentation-prompt.ts` - Gemini 세그멘테이션 프롬프트
+- `src/components/workspace/FloorPlanCanvas.tsx` - Canvas 오버레이 컴포넌트
+  - buildPixelCache: 마스크 픽셀 → 방 타입별 Uint32Array
+  - colorDistSq: Euclidean distance² (임계값 7500 ≈ 50/ch)
+  - 실시간 alpha blend (overlayOpacity 0.35), hover highlight
+  - 방 클릭 감지, 레전드 UI
+
+### 수정 파일
+- `src/app/api/project/generate-floorplan/route.ts` - Step 3 마스크 생성 + JPEG→PNG 변환 + JSON 폴백
+- `src/types/consumer-project.ts` - floorPlanMaskUrl, roomColorMap 필드
+- `src/hooks/useProjectState.ts` - setFloorPlanMask 메서드
+- `src/components/workspace/FloorPlanGenerationProgress.tsx` - maskUrl/roomColorMap 전달
+- `src/app/project/[id]/design/page.tsx` - onComplete에서 setFloorPlanMask 호출
+- `src/app/project/[id]/rendering/page.tsx` - FloorPlanCanvas 조건부 렌더링
+
+### 13개 방 타입 색상 매핑
+| 타입 | 색상 | Hex | 타입 | 색상 | Hex |
+|------|------|-----|------|------|-----|
+| living | 빨강 | #FF0000 | bathroom1 | 시안 | #00FFFF |
+| bedroom1 | 초록 | #00FF00 | bathroom2 | 주황 | #FF8000 |
+| bedroom2 | 파랑 | #0000FF | entrance | 보라 | #8000FF |
+| bedroom3 | 노랑 | #FFFF00 | balcony1 | 스프링그린 | #00FF80 |
+| kitchen | 마젠타 | #FF00FF | balcony2 | 로즈 | #FF0080 |
+| utility | 연두 | #80FF00 | dressroom | 애저 | #0080FF |
+| hallway | 회색 | #808080 | walls | 검정 | #000000 |
+
+### E2E 테스트 결과 (샘물타운 105평형 84.94m²)
+| 항목 | 결과 |
+|------|------|
+| 파이프라인 | 59.8초 (클린~45s + 마스크~15s) |
+| 마스크 포맷 | PNG, 553KB, 1200x880 |
+| 클린-마스크 크기 | 일치 (1200x880) |
+| 방 감지 | 13/13 전부 매칭 |
+| 매칭 픽셀 | 38.1% (401,981 px) |
+| 미매칭 | 1.8% (JPEG 아티팩트) |
+| DB 캐시 | 정상 저장 |
+
+### 테스트 스크립트
+- `scripts/test-segmentation.mjs` - 단독 마스크 생성 + 픽셀 분석
+- `scripts/test-e2e-mask.mjs` - API 파이프라인 E2E (SSE → 마스크 → DB 확인)
+- `src/app/test-mask/page.tsx` - 브라우저 마스크 오버레이 확인 페이지
+
+### 기술 주의사항
+- Gemini Pro는 마스크를 JPEG로 반환 → `sharp(buf).png().toBuffer()` 강제 변환 필수
+- Gemini Pro가 JSON 텍스트를 반환하지 않는 경우 있음 → `ROOM_TYPE_COLORS` 전체로 폴백
+- 마스크 크기가 클린 이미지와 다를 수 있음 → `sharp.resize(w, h, { kernel: "nearest" })` 보정
+- Map iteration: `Array.from(map.entries())` 사용 (TypeScript ES2018 제약)
+- 마스크 생성 실패 시 파이프라인은 계속 진행 (마스크는 선택적)
 
 ## 완료된 작업 (2026-02-17) - 84B E2E 워크플로우 검증
 
