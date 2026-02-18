@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const agentType = searchParams.get("agentType");
-  const minRating = parseInt(searchParams.get("minRating") || "4");
+  const minRating = Math.max(0, Math.min(5, parseInt(searchParams.get("minRating") || "4", 10)));
   const format = searchParams.get("format") || "jsonl";
 
   try {

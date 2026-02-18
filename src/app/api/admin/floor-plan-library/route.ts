@@ -14,8 +14,8 @@ const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "20");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
     const apartmentId = searchParams.get("apartmentId");
     const verified = searchParams.get("verified");
     const minQuality = searchParams.get("minQuality");

@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData();
     const photos = formData.getAll("photos") as File[];
     const approximateArea = parseFloat(formData.get("approximateArea") as string) || 84;
-    const roomCount = parseInt(formData.get("roomCount") as string) || 8;
+    const roomCount = parseInt(formData.get("roomCount") as string, 10) || 8;
 
     if (photos.length < 3) {
       return NextResponse.json(

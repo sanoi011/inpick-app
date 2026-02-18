@@ -14,8 +14,8 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const { searchParams } = request.nextUrl;
   const view = searchParams.get("view") || "users";
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "20");
+  const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+  const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
   const offset = (page - 1) * limit;
 
   try {

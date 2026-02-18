@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 // 받은/보낸 협업 요청 조회
 export async function GET(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const contractorId = req.nextUrl.searchParams.get("contractorId");
   const direction = req.nextUrl.searchParams.get("direction") || "received"; // received | sent
 
-  if (!contractorId) {
-    return NextResponse.json({ error: "contractorId 필수" }, { status: 400 });
+  if (!contractorId || contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   try {
@@ -35,12 +41,21 @@ export async function GET(req: NextRequest) {
 
 // 협업 요청 수락/거절
 export async function PATCH(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { id, contractorId, status: newStatus, responseMessage } = body;
 
     if (!id || !contractorId || !newStatus) {
       return NextResponse.json({ error: "id, contractorId, status 필수" }, { status: 400 });
+    }
+
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const validStatuses = ["accepted", "rejected", "cancelled"];
@@ -109,12 +124,21 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { requesterId, targetId, projectId, message, proposedAmount, proposedStartDate, proposedEndDate } = body;
 
     if (!requesterId || !targetId) {
       return NextResponse.json({ error: "requesterId, targetId 필수" }, { status: 400 });
+    }
+
+    if (requesterId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();
