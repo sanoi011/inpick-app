@@ -28,8 +28,11 @@ import {
 } from "@/lib/data/material-catalog-v2";
 import dynamic from "next/dynamic";
 import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
+import type { RoomColorMap, RoomTypeKey } from "@/lib/constants/room-segmentation";
+import { ROOM_FLOOR_CATEGORY } from "@/lib/constants/room-segmentation";
 
 const FloorPlan2D = dynamic(() => import("@/components/viewer/FloorPlan2D"), { ssr: false });
+const FloorPlanCanvas = dynamic(() => import("@/components/workspace/FloorPlanCanvas"), { ssr: false });
 
 // 등급 스타일
 const GRADE: Record<string, { label: string; color: string; bg: string; border: string }> = {
@@ -186,6 +189,18 @@ export default function RenderingPage() {
   const handleRoomClick = useCallback(
     (room: { id: string }) => {
       setSelectedRoomId(room.id);
+    },
+    []
+  );
+
+  // Canvas 마스크 기반 방 클릭 → 해당 카테고리 그룹으로 전환
+  const handleCanvasRoomClick = useCallback(
+    (roomType: RoomTypeKey) => {
+      const category = ROOM_FLOOR_CATEGORY[roomType];
+      if (!category) return;
+      // 해당 카테고리가 속한 FALLBACK_GROUP으로 전환
+      const group = FALLBACK_GROUPS.find((g) => g.codes.includes(category));
+      if (group) setActiveGroup(group.id);
     },
     []
   );
@@ -632,17 +647,29 @@ export default function RenderingPage() {
           <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
             {/* 좌측: 도면 이미지 + 공종 그룹 */}
             <div className="md:w-[420px] md:border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
-              {/* 도면 이미지 */}
+              {/* 도면 이미지 (마스크 있으면 Canvas 오버레이) */}
               <div className="p-3 flex-shrink-0">
-                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
-                  <img
-                    src={project.floorPlanImageUrl!}
-                    alt="도면"
-                    className="w-full h-auto max-h-[400px] object-contain"
+                {project?.floorPlanMaskUrl && project?.roomColorMap?.rooms?.length ? (
+                  <FloorPlanCanvas
+                    imageUrl={project.floorPlanImageUrl!}
+                    maskUrl={project.floorPlanMaskUrl}
+                    roomColorMap={project.roomColorMap as RoomColorMap}
+                    selectedProducts={selectedProducts}
+                    onRoomClick={handleCanvasRoomClick}
                   />
-                </div>
+                ) : (
+                  <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                    <img
+                      src={project.floorPlanImageUrl!}
+                      alt="도면"
+                      className="w-full h-auto max-h-[400px] object-contain"
+                    />
+                  </div>
+                )}
                 <p className="text-[10px] text-gray-400 text-center mt-1.5">
-                  도면을 참고하여 아래 공종별 자재를 선택하세요
+                  {project?.floorPlanMaskUrl
+                    ? "방을 클릭하면 해당 공간의 자재를 선택할 수 있습니다"
+                    : "도면을 참고하여 아래 공종별 자재를 선택하세요"}
                 </p>
               </div>
 

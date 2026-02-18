@@ -3,6 +3,8 @@ import { GoogleGenAI } from "@google/genai";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import { buildSegmentationPrompt } from "@/lib/prompts/segmentation-prompt";
+import type { SegmentedRoom, RoomColorMap } from "@/lib/constants/room-segmentation";
 
 // Storage 업로드용 service role client (anon key로는 업로드 불가)
 function createAdminClient() {
@@ -171,6 +173,9 @@ export async function GET(request: NextRequest) {
       finalUrl: data.final_url || data.clean_url,
       finalMirrorUrl: data.final_mirror_url,
       cleanUrl: data.clean_url,
+      maskUrl: data.mask_url || null,
+      maskMirrorUrl: data.mask_mirror_url || null,
+      roomColorMap: data.room_color_map || null,
     });
   }
 
@@ -211,6 +216,9 @@ export async function POST(request: NextRequest) {
         cached: true,
         finalUrl: existing.final_url || existing.clean_url,
         finalMirrorUrl: existing.final_mirror_url,
+        maskUrl: existing.mask_url || null,
+        maskMirrorUrl: existing.mask_mirror_url || null,
+        roomColorMap: existing.room_color_map || null,
       });
     }
   }
@@ -269,20 +277,99 @@ export async function POST(request: NextRequest) {
         send("progress", { step: 1, progress: 70, message: "클린 처리 완료" });
 
         // ── Step 2: Mirror (sharp.flop) ──
-        send("progress", { step: 2, progress: 75, message: "미러 이미지 생성 중..." });
+        send("progress", { step: 2, progress: 70, message: "미러 이미지 생성 중..." });
 
         const cleanMirrorBuffer = await sharp(cleanBuffer).flop().png().toBuffer();
 
-        send("progress", { step: 2, progress: 80, message: "미러 이미지 생성 완료" });
+        send("progress", { step: 2, progress: 72, message: "미러 이미지 생성 완료" });
+
+        // ── Step 3: Segmentation Mask (Gemini Pro) ──
+        send("progress", { step: 3, progress: 75, message: "방 영역 마스크 생성 중... (약 60초)" });
+
+        let maskBuffer: Buffer | null = null;
+        let maskMirrorBuffer: Buffer | null = null;
+        let roomColorMap: RoomColorMap | null = null;
+
+        try {
+          const segPrompt = buildSegmentationPrompt();
+          const segResponse = await ai.models.generateContent({
+            model: MODEL,
+            contents: [
+              {
+                role: "user",
+                parts: [
+                  { inlineData: { mimeType: "image/png", data: cleanBuffer.toString("base64") } },
+                  { text: segPrompt },
+                ],
+              },
+            ],
+            config: { responseModalities: ["IMAGE", "TEXT"] },
+          });
+
+          // 응답에서 이미지 + JSON 추출
+          let parsedRooms: SegmentedRoom[] = [];
+          if (segResponse.candidates && segResponse.candidates[0]) {
+            for (const part of segResponse.candidates[0].content?.parts || []) {
+              if (part.inlineData) {
+                maskBuffer = Buffer.from(part.inlineData.data!, "base64");
+              }
+              if (part.text) {
+                const jsonMatch = part.text.match(/```json\s*([\s\S]*?)\s*```/);
+                if (jsonMatch) {
+                  try {
+                    const parsed = JSON.parse(jsonMatch[1]);
+                    parsedRooms = parsed.rooms || [];
+                  } catch { /* ignore JSON parse error */ }
+                }
+              }
+            }
+          }
+
+          if (maskBuffer) {
+            // 마스크 크기를 클린 이미지와 동일하게 맞춤 (nearest neighbor - 색상 블렌딩 방지)
+            const cleanMeta = await sharp(cleanBuffer).metadata();
+            const maskMeta = await sharp(maskBuffer).metadata();
+            if (cleanMeta.width && cleanMeta.height &&
+                (maskMeta.width !== cleanMeta.width || maskMeta.height !== cleanMeta.height)) {
+              maskBuffer = await sharp(maskBuffer)
+                .resize(cleanMeta.width, cleanMeta.height, { kernel: "nearest" })
+                .png()
+                .toBuffer();
+            }
+
+            // 미러 마스크 생성
+            maskMirrorBuffer = await sharp(maskBuffer).flop().png().toBuffer();
+
+            roomColorMap = {
+              rooms: parsedRooms,
+              maskWidth: cleanMeta.width || 0,
+              maskHeight: cleanMeta.height || 0,
+            };
+
+            send("progress", { step: 3, progress: 85, message: "방 영역 마스크 생성 완료" });
+          } else {
+            console.warn("[generate-floorplan] 마스크 생성 실패 - 이미지 없음 (계속 진행)");
+            send("progress", { step: 3, progress: 85, message: "마스크 생성 건너뜀 (도면은 정상)" });
+          }
+        } catch (maskErr) {
+          console.warn("[generate-floorplan] 마스크 생성 오류 (계속 진행):", (maskErr as Error).message);
+          send("progress", { step: 3, progress: 85, message: "마스크 생성 건너뜀 (도면은 정상)" });
+        }
 
         // ── Upload to Supabase Storage ──
-        send("progress", { step: 2, progress: 85, message: "이미지 저장 중..." });
+        send("progress", { step: 4, progress: 88, message: "이미지 저장 중..." });
 
         const basePath = `floorplans/${complexNo}/${pyeongNo}`;
-        const uploads = [
+        const uploads: { path: string; buffer: Buffer }[] = [
           { path: `${basePath}/clean.png`, buffer: cleanBuffer },
           { path: `${basePath}/clean_mirror.png`, buffer: cleanMirrorBuffer },
         ];
+        if (maskBuffer) {
+          uploads.push({ path: `${basePath}/mask.png`, buffer: maskBuffer });
+        }
+        if (maskMirrorBuffer) {
+          uploads.push({ path: `${basePath}/mask_mirror.png`, buffer: maskMirrorBuffer });
+        }
 
         const urls: Record<string, string> = {};
         for (const u of uploads) {
@@ -309,6 +396,9 @@ export async function POST(request: NextRequest) {
             final_url: urls["clean"],
             final_mirror_url: urls["clean_mirror"],
             clean_url: urls["clean"],
+            mask_url: urls["mask"] || null,
+            mask_mirror_url: urls["mask_mirror"] || null,
+            room_color_map: roomColorMap || {},
             prompt_version: PROMPT_VERSION,
             processing_time_ms: processingTime,
             updated_at: new Date().toISOString(),
@@ -321,6 +411,9 @@ export async function POST(request: NextRequest) {
           message: "도면 생성 완료!",
           finalUrl: urls["clean"],
           finalMirrorUrl: urls["clean_mirror"],
+          maskUrl: urls["mask"] || null,
+          maskMirrorUrl: urls["mask_mirror"] || null,
+          roomColorMap: roomColorMap || null,
           processingTimeMs: processingTime,
         });
       } catch (err: unknown) {

@@ -336,6 +336,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 세그멘테이션 마스크 데이터 설정
+  const setFloorPlanMask = useCallback(
+    (maskUrl: string, roomColorMap: import("@/lib/constants/room-segmentation").RoomColorMap) => {
+      if (!project) return;
+      saveProject({ ...project, floorPlanMaskUrl: maskUrl, roomColorMap });
+    },
+    [project, saveProject]
+  );
+
   // 주소 + 도면 ID 원자적 저장 (레이스 컨디션 방지)
   const confirmBuilding = useCallback(
     (address: ProjectAddress, drawingId?: string) => {
@@ -505,6 +514,7 @@ export function useProjectState(projectId: string) {
     addDecision,
     setDrawingId,
     setFloorPlanImageUrl,
+    setFloorPlanMask,
     confirmBuilding,
     addGeneratedImage,
     removeGeneratedImage,

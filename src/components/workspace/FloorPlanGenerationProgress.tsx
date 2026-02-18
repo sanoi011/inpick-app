@@ -3,10 +3,13 @@
 import { useState, useEffect, useRef } from "react";
 import { Loader2, CheckCircle2, RefreshCw } from "lucide-react";
 
-interface GenerationResult {
+export interface GenerationResult {
   finalUrl: string;
   finalMirrorUrl: string;
   processingTimeMs: number;
+  maskUrl?: string | null;
+  maskMirrorUrl?: string | null;
+  roomColorMap?: import("@/lib/constants/room-segmentation").RoomColorMap | null;
 }
 
 interface Props {
@@ -61,6 +64,9 @@ export default function FloorPlanGenerationProgress({
             finalUrl: checkData.finalUrl,
             finalMirrorUrl: checkData.finalMirrorUrl,
             processingTimeMs: 0,
+            maskUrl: checkData.maskUrl || null,
+            maskMirrorUrl: checkData.maskMirrorUrl || null,
+            roomColorMap: checkData.roomColorMap || null,
           });
           return;
         }
@@ -98,6 +104,9 @@ export default function FloorPlanGenerationProgress({
               finalUrl: data.finalUrl,
               finalMirrorUrl: data.finalMirrorUrl,
               processingTimeMs: 0,
+              maskUrl: data.maskUrl || null,
+              maskMirrorUrl: data.maskMirrorUrl || null,
+              roomColorMap: data.roomColorMap || null,
             });
             return;
           }
@@ -137,6 +146,9 @@ export default function FloorPlanGenerationProgress({
                   finalUrl: data.finalUrl,
                   finalMirrorUrl: data.finalMirrorUrl,
                   processingTimeMs: data.processingTimeMs,
+                  maskUrl: data.maskUrl || null,
+                  maskMirrorUrl: data.maskMirrorUrl || null,
+                  roomColorMap: data.roomColorMap || null,
                 });
               } else if (data.event === "error") {
                 setError(data.message || "알 수 없는 오류");

@@ -250,6 +250,8 @@ export interface ConsumerProject {
   estimateId?: string;
   drawingId?: string;
   floorPlanImageUrl?: string; // 생성된 도면 이미지 URL (Supabase Storage 등)
+  floorPlanMaskUrl?: string; // 세그멘테이션 마스크 이미지 URL
+  roomColorMap?: import("@/lib/constants/room-segmentation").RoomColorMap; // 방별 색상 매핑
   editedDimensions?: EditedDimension[];
   createdAt: string;
   updatedAt: string;

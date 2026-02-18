@@ -75,7 +75,7 @@ export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences, addGeneratedImage, setFloorPlanImageUrl: persistFloorPlanImageUrl } = useProjectState(projectId);
+  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences, addGeneratedImage, setFloorPlanImageUrl: persistFloorPlanImageUrl, setFloorPlanMask } = useProjectState(projectId);
 
   // === Sidebar state ===
   const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
@@ -1172,6 +1172,9 @@ export default function FloorPlanPage() {
               isExpanded={generatingFloorPlan.isExpanded}
               onComplete={(result) => {
                 setFloorPlanImageUrl(result.finalUrl);
+                if (result.maskUrl && result.roomColorMap) {
+                  setFloorPlanMask(result.maskUrl, result.roomColorMap);
+                }
                 setGeneratingFloorPlan(null);
                 toast({
                   type: "success",
