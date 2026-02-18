@@ -464,8 +464,12 @@ export async function POST(request: NextRequest) {
   });
 }
 
-// DELETE: 기존 캐시 전체 삭제 (프롬프트 변경 시 사용)
-export async function DELETE() {
+// DELETE: 기존 캐시 전체 삭제 (프롬프트 변경 시 사용, 관리자 전용)
+export async function DELETE(request: NextRequest) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
   const supabase = createAdminClient();
 
   // 구버전 또는 전체 삭제

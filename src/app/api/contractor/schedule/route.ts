@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export async function GET(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const contractorId = req.nextUrl.searchParams.get("contractorId");
-  if (!contractorId) {
-    return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+  if (!contractorId || contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   const startDate = req.nextUrl.searchParams.get("startDate");
@@ -62,12 +68,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { contractorId, title, date, startTime, endTime, scheduleType, projectId, location, workers, notes, color } = body;
 
     if (!contractorId || !date) {
       return NextResponse.json({ error: "contractorId, date 필수" }, { status: 400 });
+    }
+
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();
@@ -127,12 +142,21 @@ export async function POST(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { id, contractorId, ...updates } = body;
 
     if (!id || !contractorId) {
       return NextResponse.json({ error: "id, contractorId 필수" }, { status: 400 });
+    }
+
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();
@@ -177,11 +201,20 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const { id, contractorId } = await req.json();
 
     if (!id || !contractorId) {
       return NextResponse.json({ error: "id, contractorId 필수" }, { status: 400 });
+    }
+
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();
