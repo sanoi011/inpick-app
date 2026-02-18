@@ -1,6 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+export async function GET(req: NextRequest) {
+  try {
+    const contractorId = req.nextUrl.searchParams.get("contractorId");
+    const from = req.nextUrl.searchParams.get("from");
+
+    if (!contractorId) {
+      return NextResponse.json({ error: "contractorId 필수" }, { status: 400 });
+    }
+
+    const supabase = createClient();
+
+    let query = supabase
+      .from("payment_records")
+      .select("*")
+      .eq("contractor_id", contractorId)
+      .order("paid_at", { ascending: false });
+
+    if (from) {
+      query = query.gte("paid_at", from);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Payment GET error:", error);
+      return NextResponse.json({ error: "결제 기록 조회 실패" }, { status: 500 });
+    }
+
+    return NextResponse.json({ payments: data || [] });
+  } catch (err) {
+    console.error("Payment GET error:", err);
+    return NextResponse.json({ error: "서버 오류" }, { status: 500 });
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();

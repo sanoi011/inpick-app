@@ -12,9 +12,12 @@ export default function Contact() {
     e.preventDefault();
     setSubmitState("sending");
     try {
-      // mailto 방식 폴백 (서버 API 없이)
-      const body = `이름: ${formData.name}\n제목: ${formData.subject}\n이메일: ${formData.email}\n전화: ${formData.phone}\n\n${formData.question}`;
-      window.location.href = `mailto:tjsqhs011@naver.com?subject=${encodeURIComponent(`[INPICK 문의] ${formData.subject}`)}&body=${encodeURIComponent(body)}`;
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      });
+      if (!res.ok) throw new Error("API error");
       setSubmitState("sent");
       setFormData({ name: "", subject: "", email: "", phone: "", question: "" });
       setTimeout(() => setSubmitState("idle"), 3000);

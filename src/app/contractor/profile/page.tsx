@@ -48,6 +48,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  // 디렉토리 설정
+  const [isPublic, setIsPublic] = useState(true);
+  const [contractorType, setContractorType] = useState<"general" | "specialty">("specialty");
+
   // 기본 정보
   const [profile, setProfile] = useState<ProfileData>({
     companyName: "", representativeName: "", phone: "", email: "",
@@ -99,6 +103,8 @@ export default function ProfilePage() {
           introduction: c.introduction || c.description || "",
           businessLicenseUrl: c.business_license_url || "",
         });
+        setIsPublic(c.is_public !== false);
+        setContractorType(c.contractor_type || "specialty");
         const dbTrades = (c.contractor_trades || []) as { trade_code: string; trade_name: string; experience_years: number; is_primary: boolean }[];
         setTrades(dbTrades.map(t => ({
           code: t.trade_code, label: t.trade_name,
@@ -123,7 +129,7 @@ export default function ProfilePage() {
       const res = await fetch("/api/contractor/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractorId, ...profile, trades }),
+        body: JSON.stringify({ contractorId, ...profile, trades, isPublic: isPublic, contractorType }),
       });
       if (res.ok) {
         setMessage("저장되었습니다");
@@ -284,6 +290,31 @@ export default function ProfilePage() {
               className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm focus:ring-2 focus:ring-blue-500 outline-none resize-none" />
             <p className="text-xs text-gray-400 mt-1">{profile.introduction.length}/500</p>
           </div>
+
+          {/* 디렉토리 설정 */}
+          <div className="border-t border-gray-200 pt-5 space-y-4">
+            <h3 className="text-sm font-semibold text-gray-900">디렉토리 설정</h3>
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+              <div>
+                <p className="text-sm font-medium text-gray-900">업체 찾기에 공개</p>
+                <p className="text-xs text-gray-500">소비자가 &quot;업체 찾기&quot;에서 우리 업체를 볼 수 있습니다</p>
+              </div>
+              <button onClick={() => setIsPublic(!isPublic)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${isPublic ? "bg-blue-600" : "bg-gray-300"}`}>
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${isPublic ? "translate-x-5" : ""}`} />
+              </button>
+            </div>
+            <div className="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3">
+              <span className="text-sm font-medium text-gray-900">업체 유형:</span>
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                contractorType === "general" ? "bg-blue-100 text-blue-700" : "bg-green-100 text-green-700"
+              }`}>
+                {contractorType === "general" ? "종합 인테리어" : "전문공종"}
+              </span>
+              <span className="text-xs text-gray-400">(등록 시 선택한 유형)</span>
+            </div>
+          </div>
+
           <button onClick={saveProfile} disabled={saving}
             className="inline-flex items-center gap-2 bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors">
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} 저장
@@ -430,10 +461,19 @@ export default function ProfilePage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {portfolio.map(item => (
-              <div key={item.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                {item.images && item.images.length > 0 && typeof item.images[0] === "object" ? (
-                  <div className="h-40 bg-gray-100 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-gray-300" />
+              <div key={item.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden relative">
+                {item.images && item.images.length > 0 ? (
+                  <div className="h-40 bg-gray-100 overflow-hidden">
+                    <img
+                      src={typeof item.images[0] === "string" ? item.images[0] : ""}
+                      alt={item.title}
+                      className="w-full h-full object-cover"
+                    />
+                    {item.images.length > 1 && (
+                      <div className="absolute top-2 right-2 bg-black/60 text-white text-xs px-1.5 py-0.5 rounded">
+                        +{item.images.length - 1}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="h-40 bg-gray-100 flex items-center justify-center">

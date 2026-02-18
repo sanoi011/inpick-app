@@ -14,7 +14,7 @@ export default function AdminMaterialsPage() {
     try {
       await fetch("/api/crawl", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
         body: JSON.stringify({ type }),
       });
     } catch { /* ignore */ } finally {

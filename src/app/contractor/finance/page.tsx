@@ -111,20 +111,35 @@ export default function FinancePage() {
     try {
       const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1).toISOString();
 
-      const [, expRes] = await Promise.all([
+      const [payRes, expRes] = await Promise.all([
         fetch(`/api/contractor/finance/payments?contractorId=${contractorId}&from=${sixMonthsAgo}`).catch(() => null),
         fetch(`/api/contractor/finance/expenses?contractorId=${contractorId}`).catch(() => null),
       ]);
 
-      // payments may not support date range filter, use all expenses instead
-      if (expRes) {
+      // 매출 데이터 처리
+      if (payRes && payRes.ok) {
+        const payData = await payRes.json();
+        const allPayments = (payData.payments || []) as { amount: number; paid_at: string; payment_type: string }[];
+        for (const pay of allPayments) {
+          if (!pay.paid_at || pay.payment_type !== "income") continue;
+          const payDate = new Date(pay.paid_at);
+          const monthIdx = months.findIndex((_m, idx) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
+            return payDate.getFullYear() === d.getFullYear() && payDate.getMonth() === d.getMonth();
+          });
+          if (monthIdx >= 0) months[monthIdx].revenue += pay.amount || 0;
+        }
+      }
+
+      // 지출 데이터 처리
+      if (expRes && expRes.ok) {
         const expData = await expRes.json();
         const allExpenses = (expData.expenses || []) as { amount: number; expense_date: string }[];
         for (const exp of allExpenses) {
           if (!exp.expense_date) continue;
           const expDate = new Date(exp.expense_date);
-          const monthIdx = months.findIndex((m) => {
-            const d = new Date(now.getFullYear(), now.getMonth() - (5 - months.indexOf(m)), 1);
+          const monthIdx = months.findIndex((_m, idx) => {
+            const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
             return expDate.getFullYear() === d.getFullYear() && expDate.getMonth() === d.getMonth();
           });
           if (monthIdx >= 0) months[monthIdx].expense += exp.amount || 0;

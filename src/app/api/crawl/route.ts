@@ -6,7 +6,12 @@ export async function POST(request: NextRequest) {
   try {
     const { type } = await request.json();
 
-    // TODO: 관리자 인증 추가
+    // 관리자 인증
+    const authHeader = request.headers.get("authorization");
+    const adminPassword = process.env.ADMIN_PASSWORD || "inpick2026!";
+    if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
+      return NextResponse.json({ error: "관리자 인증이 필요합니다" }, { status: 401 });
+    }
 
     switch (type) {
       case "material": {

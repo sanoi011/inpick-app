@@ -115,10 +115,36 @@ export default function AccountPage() {
     }
   };
 
+  const [deleting, setDeleting] = useState(false);
+
   const handleDeleteAccount = async () => {
-    toast({ type: "warning", title: "계정 삭제 요청이 접수되었습니다", message: "관리자 확인 후 처리됩니다" });
-    setShowDeleteConfirm(false);
-    setDeleteText("");
+    if (!user?.id) return;
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast({ type: "error", title: "계정 삭제 실패", message: data.error || "다시 시도해주세요" });
+        return;
+      }
+      if (data.pending) {
+        toast({ type: "warning", title: data.message });
+      } else {
+        toast({ type: "success", title: data.message });
+      }
+      setShowDeleteConfirm(false);
+      setDeleteText("");
+      await signOut();
+      router.push("/");
+    } catch {
+      toast({ type: "error", title: "계정 삭제 중 오류가 발생했습니다" });
+    } finally {
+      setDeleting(false);
+    }
   };
 
   const toggleNotif = (key: keyof NotifPref) => {
@@ -358,10 +384,11 @@ export default function AccountPage() {
                 <div className="flex gap-2">
                   <button
                     onClick={handleDeleteAccount}
-                    disabled={deleteText !== "삭제합니다"}
-                    className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+                    disabled={deleteText !== "삭제합니다" || deleting}
+                    className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
                   >
-                    삭제 확인
+                    {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {deleting ? "삭제 중..." : "삭제 확인"}
                   </button>
                   <button
                     onClick={() => { setShowDeleteConfirm(false); setDeleteText(""); }}
