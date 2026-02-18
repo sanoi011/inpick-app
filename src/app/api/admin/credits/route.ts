@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: `크레딧 레코드 생성 실패: ${insertErr.message}` }, { status: 500 });
       }
     } else {
-      newBalance = current.balance + amount;
+      newBalance = Math.max(0, current.balance + amount);
       await supabase
         .from("user_credits")
         .update({ balance: newBalance })

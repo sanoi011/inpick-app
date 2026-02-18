@@ -1,16 +1,17 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins } from "lucide-react";
+import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 
 interface ConsumerUser {
   id: string;
+  email: string;
+  name: string;
   balance: number;
   freeGenerationsUsed: number;
   projectCount: number;
   createdAt: string;
-  updatedAt: string;
 }
 
 interface ContractorUser {
@@ -36,9 +37,11 @@ export default function AdminUsersPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // 크레딧 부여 상태
+  // 크레딧 관리 상태
   const [grantTarget, setGrantTarget] = useState<string | null>(null);
+  const [grantMode, setGrantMode] = useState<"add" | "subtract">("add");
   const [grantAmount, setGrantAmount] = useState("100");
+  const [grantDescription, setGrantDescription] = useState("");
   const [granting, setGranting] = useState(false);
 
   // 테스트 계정 생성 상태
@@ -74,9 +77,28 @@ export default function AdminUsersPage() {
     load();
   };
 
+  function openGrant(userId: string, mode: "add" | "subtract") {
+    setGrantTarget(userId);
+    setGrantMode(mode);
+    setGrantAmount(mode === "add" ? "100" : "50");
+    setGrantDescription(mode === "add" ? "관리자 수동 부여" : "관리자 수동 차감");
+  }
+
   async function handleGrant(userId: string) {
-    const amount = parseInt(grantAmount);
-    if (!amount || amount <= 0) return;
+    const rawAmount = parseInt(grantAmount);
+    if (!rawAmount || rawAmount <= 0) return;
+
+    const finalAmount = grantMode === "subtract" ? -rawAmount : rawAmount;
+
+    // 차감 시 잔액 초과 검증
+    if (grantMode === "subtract") {
+      const user = consumers.find((u) => u.id === userId);
+      if (user && rawAmount > user.balance) {
+        alert(`현재 잔액(${user.balance})보다 많이 차감할 수 없습니다.`);
+        return;
+      }
+    }
+
     setGranting(true);
     try {
       const res = await fetch("/api/admin/credits", {
@@ -87,14 +109,15 @@ export default function AdminUsersPage() {
         },
         body: JSON.stringify({
           userId,
-          amount,
-          type: "CHARGE",
-          description: `관리자 수동 부여 (+${amount})`,
+          amount: finalAmount,
+          type: grantMode === "subtract" ? "REFUND" : "CHARGE",
+          description: grantDescription || (grantMode === "add" ? `관리자 수동 부여 (+${rawAmount})` : `관리자 수동 차감 (-${rawAmount})`),
         }),
       });
       if (res.ok) {
         setGrantTarget(null);
         setGrantAmount("100");
+        setGrantDescription("");
         load();
       }
     } catch { /* ignore */ }
@@ -166,25 +189,24 @@ export default function AdminUsersPage() {
       {/* 탭 + 검색 */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
         <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
-          <button onClick={() => { setTab("consumer"); setPage(1); }}
+          <button onClick={() => { setTab("consumer"); setPage(1); setSearch(""); }}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "consumer" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>
             소비자
           </button>
-          <button onClick={() => { setTab("contractor"); setPage(1); }}
+          <button onClick={() => { setTab("contractor"); setPage(1); setSearch(""); }}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-colors ${tab === "contractor" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>
             사업자
           </button>
         </div>
-        {tab === "contractor" && (
-          <form onSubmit={handleSearch} className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input value={search} onChange={(e) => setSearch(e.target.value)}
-                placeholder="회사명 또는 이메일" className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-60" />
-            </div>
-            <button type="submit" className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg">검색</button>
-          </form>
-        )}
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)}
+              placeholder={tab === "consumer" ? "이름, 이메일 또는 ID" : "회사명 또는 이메일"}
+              className="pl-9 pr-3 py-2 border border-gray-200 rounded-lg text-sm w-64" />
+          </div>
+          <button type="submit" className="px-3 py-2 bg-gray-900 text-white text-sm rounded-lg">검색</button>
+        </form>
       </div>
 
       {/* 테이블 */}
@@ -192,56 +214,88 @@ export default function AdminUsersPage() {
         {loading ? (
           <div className="flex items-center justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
         ) : tab === "consumer" ? (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">사용자 ID</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">크레딧 잔액</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">무료 사용</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">프로젝트</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">가입일</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">크레딧 부여</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {consumers.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />등록된 소비자가 없습니다
-                </td></tr>
-              ) : consumers.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-mono text-gray-600">{u.id.slice(0, 12)}...</td>
-                  <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{u.balance.toLocaleString()}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-500">{u.freeGenerationsUsed}/1</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-500">{u.projectCount}건</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-400">{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
-                  <td className="px-4 py-3 text-center">
-                    {grantTarget === u.id ? (
-                      <div className="flex items-center justify-center gap-1">
-                        <input value={grantAmount} onChange={(e) => setGrantAmount(e.target.value)}
-                          type="number" min="1"
-                          className="w-24 px-2 py-1 border border-gray-200 rounded text-sm text-right"
-                          placeholder="수량" />
-                        <button onClick={() => handleGrant(u.id)} disabled={granting}
-                          className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 disabled:opacity-50">
-                          {granting ? <Loader2 className="w-3 h-3 animate-spin" /> : "확인"}
-                        </button>
-                        <button onClick={() => setGrantTarget(null)}
-                          className="px-2 py-1 bg-gray-200 text-gray-600 text-xs rounded hover:bg-gray-300">
-                          취소
-                        </button>
-                      </div>
-                    ) : (
-                      <button onClick={() => { setGrantTarget(u.id); setGrantAmount("100"); }}
-                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors">
-                        <Coins className="w-3 h-3" /> 부여
-                      </button>
-                    )}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이메일</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이름</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">크레딧 잔액</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">무료 사용</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">프로젝트</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">가입일</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">크레딧 관리</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {consumers.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />등록된 소비자가 없습니다
+                  </td></tr>
+                ) : consumers.map((u) => (
+                  <tr key={u.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-sm text-gray-600">{u.email || <span className="text-gray-300">-</span>}</td>
+                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.name || <span className="text-gray-300">미입력</span>}</td>
+                    <td className="px-4 py-3 text-sm text-right font-medium">
+                      <span className={u.balance > 0 ? "text-blue-600" : "text-gray-400"}>{u.balance.toLocaleString()}</span>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-500">{u.freeGenerationsUsed}/1</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-500">{u.projectCount}건</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-400">{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
+                    <td className="px-4 py-3">
+                      {grantTarget === u.id ? (
+                        <div className="space-y-2">
+                          {/* 부여/차감 토글 */}
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => setGrantMode("add")}
+                              className={`flex items-center gap-0.5 px-2 py-1 text-xs rounded ${grantMode === "add" ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                              <Plus className="w-3 h-3" /> 부여
+                            </button>
+                            <button onClick={() => setGrantMode("subtract")}
+                              className={`flex items-center gap-0.5 px-2 py-1 text-xs rounded ${grantMode === "subtract" ? "bg-red-600 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}>
+                              <Minus className="w-3 h-3" /> 차감
+                            </button>
+                          </div>
+                          {/* 수량 + 사유 */}
+                          <div className="flex items-center gap-1">
+                            <input value={grantAmount} onChange={(e) => setGrantAmount(e.target.value)}
+                              type="number" min="1" max={grantMode === "subtract" ? u.balance : undefined}
+                              className="w-20 px-2 py-1 border border-gray-200 rounded text-sm text-right"
+                              placeholder="수량" />
+                          </div>
+                          <input value={grantDescription} onChange={(e) => setGrantDescription(e.target.value)}
+                            className="w-full px-2 py-1 border border-gray-200 rounded text-xs"
+                            placeholder="사유 (선택)" />
+                          {/* 액션 버튼 */}
+                          <div className="flex items-center justify-center gap-1">
+                            <button onClick={() => handleGrant(u.id)} disabled={granting}
+                              className={`px-3 py-1 text-white text-xs rounded disabled:opacity-50 ${grantMode === "add" ? "bg-blue-600 hover:bg-blue-700" : "bg-red-600 hover:bg-red-700"}`}>
+                              {granting ? <Loader2 className="w-3 h-3 animate-spin" /> : grantMode === "add" ? "부여 확인" : "차감 확인"}
+                            </button>
+                            <button onClick={() => setGrantTarget(null)}
+                              className="px-3 py-1 bg-gray-200 text-gray-600 text-xs rounded hover:bg-gray-300">
+                              취소
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center gap-1">
+                          <button onClick={() => openGrant(u.id, "add")}
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                            <Coins className="w-3 h-3" /> 부여
+                          </button>
+                          <button onClick={() => openGrant(u.id, "subtract")}
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded transition-colors">
+                            <Minus className="w-3 h-3" /> 차감
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
