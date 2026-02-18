@@ -1545,3 +1545,97 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | 배관 | 304만원 | 위생도기 | 248만원 |
 | 잡철 | 107만원 | 걸레받이 | 342만원 |
 | 고정설비 | 63만원 | 정리 | 45만원 |
+
+## 완료된 작업 (2026-02-22) - 보안 감사 Rounds 8-13 + 사업자 디렉토리
+
+### 보안 감사 전체 사이클 (Rounds 8-13, 70+ API 라우트 전수 검사)
+
+#### Round 8 (`926d964`)
+- `src/app/api/contractor/projects/[id]/route.ts` - GET/PATCH에 `getContractorIdFromRequest` 인증 + 소유권 검증 추가
+- `src/app/api/contractor/finance/invoices/route.ts` - GET 약한 인증 수정 (null 바이패스 방지), POST/PATCH 인증 추가
+- `src/app/api/contractor/projects/route.ts` - GET/POST 인증 추가
+- `src/app/api/contractor/finance/route.ts` - GET 인증 추가
+
+#### Round 9 (`871cef7`)
+- `src/app/api/account/delete/route.ts` - **CRITICAL**: `supabase.auth.getUser()` + userId 일치 확인 (아무나 계정 삭제 가능했던 취약점)
+- `src/app/api/contractor/finance/invoices/route.ts` - 청구 금액 양수 검증 (`Number.isFinite + > 0`)
+- `src/app/api/payments/confirm/route.ts` - 결제 금액/크레딧 양수 검증, `|| 0` 폴백 제거
+- `src/app/api/chat/route.ts` - 3개 사일런트 캐치 에러 로깅 추가
+
+#### Round 10 (`232e60a`)
+- `src/app/api/contractor/stats/route.ts` - 인증 없이 재무 통계 노출되던 취약점 수정
+- `src/app/api/contractor/notifications/route.ts` - GET/PATCH 인증 + PATCH 소유권 필터 추가
+- `src/app/api/contractor/login/route.ts` - 사일런트 캐치 에러 로깅
+
+#### Round 11 (`03eefb6`)
+- `src/app/api/contractor/portfolio/route.ts` - GET/POST/PATCH/DELETE 4개 메서드 인증 추가
+- `src/app/api/contractor/schedule/route.ts` - GET/POST/PATCH/DELETE 4개 메서드 인증 추가
+- `src/app/api/project/generate-floorplan/route.ts` - DELETE Bearer 토큰 인증 추가
+
+#### Round 12 (`72b381a`)
+- `src/app/api/contracts/route.ts` - **CRITICAL**: GET/PATCH 듀얼 인증 (소비자 supabase + 사업자 contractor) + 소유권 검증, 5개 사일런트 캐치 수정
+- `src/app/api/bids/route.ts` - PATCH 소비자 인증 + 견적 소유자 검증, POST bidAmount 양수 검증, 3개 사일런트 캐치 수정
+- `src/app/api/contractors/[id]/inquiry/route.ts` - consumerId 인증된 사용자와 일치 검증
+- `src/app/api/payments/checkout/route.ts` - 사일런트 캐치 에러 로깅
+
+#### Round 13 (최종 확인)
+- 70+ API 라우트 전수 재검사 → **신규 이슈 0건** 확인 완료
+
+### 보안 패턴 요약
+- **사업자 인증**: `getContractorIdFromRequest(req)` → 401 if null → contractorId 비교 → 403 if 불일치
+- **소비자 인증**: `supabase.auth.getUser()` → 401 if !user → userId 비교 → 403 if 불일치
+- **듀얼 인증** (contracts/bids): 소비자 OR 사업자 중 하나라도 소유자이면 허용
+- **숫자 검증**: `Number.isFinite(x) && x > 0` (금액, 크레딧)
+- **에러 로깅**: 모든 catch 블록에 `console.error("Context:", err)` 필수
+
+### 사업자 기능 강화: 업체 디렉토리 + 등록 분류 + 소비자 탐색 (`2e03df9`)
+
+#### 이미 구현되어 있던 항목 (이전 세션)
+- `supabase/migrations/20260219000000_contractor_directory.sql` - DB 마이그레이션
+- `src/types/contractor-directory.ts` - PublicContractor, TradeInfo, SORT_OPTIONS, REGION_OPTIONS 타입
+- `src/app/api/contractors/route.ts` - 업체 목록 API (필터/정렬/페이지네이션)
+- `src/app/api/contractors/[id]/route.ts` - 업체 상세 API (조회수 증가)
+- `src/app/api/contractors/[id]/inquiry/route.ts` - 문의 API
+- `src/components/contractor/ContractorCard.tsx` - 업체 카드 컴포넌트
+- `src/components/contractor/ContractorFilters.tsx` - 필터 컴포넌트
+- `src/components/contractor/InquiryModal.tsx` - 문의 모달 컴포넌트
+- `src/app/find-contractors/page.tsx` - 업체 디렉토리 페이지 (검색/필터/페이지네이션)
+- `src/app/find-contractors/[id]/page.tsx` - 업체 상세 페이지 (소개/포트폴리오/리뷰/공종 4탭)
+- `src/app/find-contractors/layout.tsx` - SEO metadata
+- `src/app/contractor/register/page.tsx` - 종합/전문 업체 유형 선택 (Step 1)
+- `src/app/contractor/profile/page.tsx` - 디렉토리 공개 토글 + 업체 유형 표시
+- Header/Footer/Sitemap에 "업체 찾기" 링크
+
+#### 이번 세션에서 추가한 항목
+- `src/app/api/contractor/profile/route.ts` - PATCH 허용 필드에 `isPublic`(`is_public`), `contractorType`(`contractor_type`) 추가
+- `src/app/api/contractor/register/route.ts` - `minProjectBudget`, `maxProjectBudget` 필드 추가 + 에러 로깅
+
+### 소비자 업체 찾기 페이지 구조
+| 페이지 | 경로 | 상태 |
+|--------|------|------|
+| 업체 디렉토리 | `/find-contractors` | 완료 |
+| 업체 상세 | `/find-contractors/[id]` | 완료 |
+
+### Git 커밋 이력 (이번 세션)
+| 커밋 | 설명 |
+|------|------|
+| `926d964` | Round 8: 사업자 프로젝트/재무 API 인증 |
+| `871cef7` | Round 9: 계정 삭제 인증 + 결제 금액 검증 |
+| `232e60a` | Round 10: 사업자 통계/알림 API 인증 |
+| `03eefb6` | Round 11: 포트폴리오/일정 API 인증 |
+| `72b381a` | Round 12: 계약/입찰 인증+소유권 검증 |
+| `2e03df9` | 사업자 디렉토리 기능 보완 |
+
+## 다음 작업 (우선순위 순)
+
+### 즉시 필요 (수동 작업)
+1. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
+2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
+4. **ODA File Converter 설치** (DWG→DXF 변환용)
+
+### 개발 작업
+- DXF 파서 실행 및 Ground Truth 비교 검증
+- Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
+- 84B 타입 E2E 워크플로우 검증 확장 (59㎡, 84A㎡)
+- 도면 인식 정확도 추가 개선
