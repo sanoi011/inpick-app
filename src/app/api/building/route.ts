@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
       const data = await res.json();
       const items = data?.response?.body?.items?.item;
 
-      if (items) {
+      if (items && typeof items === "object") {
         const list = Array.isArray(items) ? items : [items];
         const buildings: BuildingInfo[] = list.map((item: Record<string, unknown>, idx: number) => ({
           id: `bld-${idx}`,

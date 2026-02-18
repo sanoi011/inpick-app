@@ -105,7 +105,8 @@ async function collectContext(contractorId: string): Promise<Record<string, unkn
       upcomingScheduleCount: scheduleCount || 0,
       avgRating: profile?.rating || 0,
     };
-  } catch {
+  } catch (err) {
+    console.error("[contractor-ai] Context collection failed:", err);
     return {};
   }
 }
@@ -154,10 +155,12 @@ export async function POST(request: NextRequest) {
         max_tokens: 1024,
         system: systemPrompt,
         stream: true,
-        messages: messages.map((m: { role: string; content: string }) => ({
-          role: m.role,
-          content: m.content,
-        })),
+        messages: messages
+          .filter((m: { role?: string; content?: string }) => m && typeof m.role === "string" && typeof m.content === "string")
+          .map((m: { role: string; content: string }) => ({
+            role: m.role,
+            content: m.content,
+          })),
       }),
     });
 

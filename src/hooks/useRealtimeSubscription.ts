@@ -57,5 +57,6 @@ export function useRealtimeSubscription(config: SubscriptionConfig) {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.table, config.filter, config.event, config.enabled]);
 }

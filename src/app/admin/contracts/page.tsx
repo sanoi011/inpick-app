@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FileText, Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
@@ -34,11 +34,7 @@ export default function AdminContractsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (authChecked) load();
-  }, [authChecked, tab, page, statusFilter]);
-
-  async function load() {
+  const load = useCallback(async function load() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ view: tab, page: String(page), limit: "20" });
@@ -51,7 +47,11 @@ export default function AdminContractsPage() {
       setTotal(data.total || 0);
     } catch { toast({ type: "error", title: "오류", message: "계약/입찰 데이터를 불러올 수 없습니다" }); }
     setLoading(false);
-  }
+  }, [tab, page, statusFilter]);
+
+  useEffect(() => {
+    if (authChecked) load();
+  }, [authChecked, load]);
 
   if (!authChecked) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
 

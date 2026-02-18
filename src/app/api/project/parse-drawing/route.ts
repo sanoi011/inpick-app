@@ -202,6 +202,8 @@ export async function POST(request: NextRequest) {
         room_count: result.floorPlan.rooms.length,
       }).then(({ error: logError }) => {
         if (logError) console.warn("[parse-drawing] Log insert failed:", logError.message);
+      }, (err) => {
+        console.warn("[parse-drawing] Log insert error:", err);
       });
     }
 

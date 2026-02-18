@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 2. estimate_items 저장 (소비자 견적 항목 스냅샷)
-    if (estimateData.items && estimateData.items.length > 0) {
+    if (Array.isArray(estimateData.items) && estimateData.items.length > 0) {
       const items = estimateData.items.map((item: Record<string, unknown>, idx: number) => ({
         estimate_id: estimate.id,
         space_name: item.roomName || "",

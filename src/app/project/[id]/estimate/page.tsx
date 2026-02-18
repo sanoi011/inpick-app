@@ -191,8 +191,9 @@ export default function EstimatePage() {
     }
   }, [project?.drawingId]);
 
-  // 사용자 선택 자재
-  const userMaterials = useMemo(
+  // 사용자 선택 자재 (향후 자재별 단가 반영 시 활용)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _userMaterials = useMemo(
     () => project?.rendering?.materials || [],
     [project?.rendering?.materials]
   );
@@ -252,7 +253,7 @@ export default function EstimatePage() {
       summary: smry,
       engineResult: estResult,
     };
-  }, [useEngine, floorPlan, projectId, viewMode, ceilingHeight, userMaterials]);
+  }, [useEngine, floorPlan, projectId, viewMode]);
 
   // 물량산출 결과 로깅 (fire-and-forget, 1회만)
   const [qtyLogged, setQtyLogged] = useState(false);

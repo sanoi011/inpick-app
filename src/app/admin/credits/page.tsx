@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { DollarSign, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
@@ -56,11 +56,7 @@ export default function AdminCreditsPage() {
   const [grantDesc, setGrantDesc] = useState("");
   const [granting, setGranting] = useState(false);
 
-  useEffect(() => {
-    if (authChecked) load();
-  }, [authChecked, tab, page, typeFilter]);
-
-  async function load() {
+  const load = useCallback(async function load() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ view: tab, page: String(page), limit: "20" });
@@ -78,7 +74,11 @@ export default function AdminCreditsPage() {
       setTotal(data.total || 0);
     } catch { toast({ type: "error", title: "오류", message: "크레딧 데이터를 불러올 수 없습니다" }); }
     setLoading(false);
-  }
+  }, [tab, page, typeFilter]);
+
+  useEffect(() => {
+    if (authChecked) load();
+  }, [authChecked, load]);
 
   async function handleGrant() {
     if (!grantUserId || !grantAmount) return;

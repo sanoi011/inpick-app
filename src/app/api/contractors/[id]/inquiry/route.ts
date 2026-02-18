@@ -18,14 +18,14 @@ export async function POST(
     const supabase = createClient();
 
     // 업체 존재 확인
-    const { data: contractor } = await supabase
+    const { data: contractor, error: contractorErr } = await supabase
       .from("specialty_contractors")
-      .select("id, company_name")
+      .select("id, company_name, inquiry_count")
       .eq("id", contractorId)
       .eq("is_active", true)
       .single();
 
-    if (!contractor) {
+    if (contractorErr || !contractor) {
       return NextResponse.json({ error: "업체를 찾을 수 없습니다" }, { status: 404 });
     }
 
@@ -53,7 +53,7 @@ export async function POST(
     Promise.all([
       supabase
         .from("specialty_contractors")
-        .update({ inquiry_count: ((contractor as Record<string, number>).inquiry_count || 0) + 1 })
+        .update({ inquiry_count: (contractor.inquiry_count ?? 0) + 1 })
         .eq("id", contractorId)
         .then(() => {}),
       supabase.from("contractor_notifications").insert({

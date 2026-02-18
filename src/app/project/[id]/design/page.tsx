@@ -203,7 +203,7 @@ export default function FloorPlanPage() {
         floorPlanAvailable: !!project.drawingId,
       });
     }
-  }, [project?.address]);
+  }, [project?.address, project?.drawingId]);
 
   // === Sidebar handlers ===
   const handleSelectAddress = useCallback((addr: AddressSearchResult) => {
@@ -549,6 +549,7 @@ export default function FloorPlanPage() {
     } else {
       setLoading(false);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [project?.drawingId, project?.floorPlanImageUrl]);
 
   // === File upload ===
@@ -597,7 +598,7 @@ export default function FloorPlanPage() {
     } finally {
       setAnalyzing(false);
     }
-  }, [project?.address?.exclusiveArea, project?.drawingId]);
+  }, [project?.address?.exclusiveArea]);
 
   // 카메라 스캐닝 (향후)
   const handleCameraScan = useCallback(async () => {

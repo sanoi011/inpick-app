@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bot, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Star, Download } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
@@ -55,11 +55,7 @@ export default function AdminAILogsPage() {
     window.open(`/api/admin/fine-tuning?${params}`, "_blank");
   };
 
-  useEffect(() => {
-    if (authChecked) load();
-  }, [authChecked, page, agentFilter, ratingOnly]);
-
-  async function load() {
+  const load = useCallback(async function load() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ page: String(page), limit: "20" });
@@ -73,7 +69,11 @@ export default function AdminAILogsPage() {
       setTotal(data.total || 0);
     } catch { toast({ type: "error", title: "오류", message: "AI 로그를 불러올 수 없습니다" }); }
     setLoading(false);
-  }
+  }, [page, agentFilter, ratingOnly]);
+
+  useEffect(() => {
+    if (authChecked) load();
+  }, [authChecked, load]);
 
   if (!authChecked) return <div className="flex items-center justify-center h-64"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>;
 

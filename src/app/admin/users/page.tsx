@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
@@ -52,11 +52,7 @@ export default function AdminUsersPage() {
     contractor: { success: boolean; email: string; companyName?: string; error?: string };
   } | null>(null);
 
-  useEffect(() => {
-    if (authChecked) load();
-  }, [authChecked, tab, page]);
-
-  async function load() {
+  const load = useCallback(async function load() {
     setLoading(true);
     try {
       const params = new URLSearchParams({ type: tab, page: String(page), limit: "20" });
@@ -70,7 +66,11 @@ export default function AdminUsersPage() {
       setTotal(data.total || 0);
     } catch { toast({ type: "error", title: "오류", message: "사용자 목록을 불러올 수 없습니다" }); }
     setLoading(false);
-  }
+  }, [tab, page, search]);
+
+  useEffect(() => {
+    if (authChecked) load();
+  }, [authChecked, load]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

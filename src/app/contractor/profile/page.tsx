@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Save, Plus, X, Star, Trash2, Edit3,
   Building2, Phone, Mail, MapPin, FileText, Briefcase, Image as ImageIcon, Upload,
@@ -73,12 +73,7 @@ export default function ProfilePage() {
   const [reviewStats, setReviewStats] = useState({ totalReviews: 0, averageRating: 0 });
   const [responseText, setResponseText] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (!authChecked || !contractorId) return;
-    loadProfile();
-  }, [authChecked, contractorId]);
-
-  async function loadProfile() {
+  const loadProfile = useCallback(async function loadProfile() {
     setLoading(true);
     try {
       const [profileRes, portfolioRes, reviewRes] = await Promise.all([
@@ -121,7 +116,12 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [contractorId]);
+
+  useEffect(() => {
+    if (!authChecked || !contractorId) return;
+    loadProfile();
+  }, [authChecked, contractorId, loadProfile]);
 
   async function saveProfile() {
     setSaving(true);

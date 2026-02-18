@@ -551,7 +551,7 @@ export default function WallDrawingCanvas({
         panStart.current = { x: e.clientX, y: e.clientY };
       }
     },
-    [tool, ds.walls, ds.snapEnabled, ds.gridEnabled, ds.rooms, getMetersFromEvent, findWallAtPoint, findRoomAtPoint]
+    [tool, ds.walls, ds.snapEnabled, ds.gridEnabled, getMetersFromEvent, findWallAtPoint, findRoomAtPoint]
   );
 
   const handlePointerMove = useCallback(
