@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
         is_verified: contractor.is_verified,
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("Contractor login error:", err);
     return NextResponse.json({ error: "로그인 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

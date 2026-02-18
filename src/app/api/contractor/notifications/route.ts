@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 // GET: 사업자 알림 목록 (실제 DB 조회)
 export async function GET(req: NextRequest) {
-  const supabase = createClient();
-  const contractorId = req.nextUrl.searchParams.get("contractorId");
-
-  if (!contractorId) {
-    return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
   }
+
+  const contractorId = req.nextUrl.searchParams.get("contractorId");
+  if (!contractorId || contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+  }
+
+  const supabase = createClient();
 
   const { data, error } = await supabase
     .from("contractor_notifications")
@@ -40,6 +46,11 @@ export async function GET(req: NextRequest) {
 
 // PATCH: 알림 읽음 처리
 export async function PATCH(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const supabase = createClient();
 
   try {
@@ -48,10 +59,13 @@ export async function PATCH(req: NextRequest) {
 
     // 전체 읽음 처리
     if (markAllRead && contractorId) {
+      if (contractorId !== authContractorId) {
+        return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+      }
       await supabase
         .from("contractor_notifications")
         .update({ is_read: true })
-        .eq("contractor_id", contractorId)
+        .eq("contractor_id", authContractorId)
         .eq("is_read", false);
 
       return NextResponse.json({ success: true });
@@ -62,7 +76,8 @@ export async function PATCH(req: NextRequest) {
       await supabase
         .from("contractor_notifications")
         .update({ is_read: true })
-        .in("id", ids);
+        .in("id", ids)
+        .eq("contractor_id", authContractorId);
 
       return NextResponse.json({ success: true });
     }
@@ -72,13 +87,15 @@ export async function PATCH(req: NextRequest) {
       await supabase
         .from("contractor_notifications")
         .update({ is_read: true })
-        .eq("id", id);
+        .eq("id", id)
+        .eq("contractor_id", authContractorId);
 
       return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: "id, ids, 또는 markAllRead가 필요합니다." }, { status: 400 });
-  } catch {
+  } catch (err) {
+    console.error("Notification PATCH error:", err);
     return NextResponse.json({ error: "알림 업데이트 실패" }, { status: 500 });
   }
 }
