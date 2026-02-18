@@ -38,7 +38,7 @@ export default function ContractorDashboard() {
       try {
         const [statsRes, estimateRes, notiRes, projRes] = await Promise.all([
           fetch(`/api/contractor/stats?contractorId=${contractorId}`).catch(() => null),
-          fetch("/api/estimates"),
+          fetch("/api/estimates?status=confirmed&region="),
           fetch(`/api/contractor/notifications?contractorId=${contractorId}`).catch(() => null),
           fetch(`/api/contractor/projects?contractorId=${contractorId}&status=in_progress`).catch(() => null),
         ]);

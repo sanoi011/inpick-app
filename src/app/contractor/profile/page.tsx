@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import {
   Loader2, Save, Plus, X, Star, Trash2, Edit3,
-  Building2, Phone, Mail, MapPin, FileText, Briefcase, Image, Upload,
+  Building2, Phone, Mail, MapPin, FileText, Briefcase, Image as ImageIcon, Upload,
 } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 import { toast } from "@/components/ui/Toast";
@@ -478,7 +478,7 @@ export default function ProfilePage() {
                   </div>
                 ) : (
                   <div className="h-40 bg-gray-100 flex items-center justify-center">
-                    <Image className="w-8 h-8 text-gray-300" />
+                    <ImageIcon className="w-8 h-8 text-gray-300" />
                   </div>
                 )}
                 <div className="p-4">
@@ -503,7 +503,7 @@ export default function ProfilePage() {
 
           {portfolio.length === 0 && !showPortfolioForm && (
             <div className="text-center py-12">
-              <Image className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">포트폴리오가 없습니다</p>
               <p className="text-xs text-gray-400 mt-1">시공 사례를 추가하면 입찰 선정 확률이 높아집니다</p>
             </div>

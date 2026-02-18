@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ contract: data });
   }
 
-  const query = supabase
+  let query = supabase
     .from("contracts")
     .select(`
       id, estimate_id, bid_id, contractor_id, project_name, address,
@@ -35,11 +35,11 @@ export async function GET(request: NextRequest) {
     .limit(20);
 
   if (estimateId) {
-    query.eq("estimate_id", estimateId);
+    query = query.eq("estimate_id", estimateId);
   }
 
   if (consumerId) {
-    query.eq("consumer_id", consumerId);
+    query = query.eq("consumer_id", consumerId);
   }
 
   const { data, error } = await query;
@@ -271,10 +271,21 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, ...updates } = body;
+    const { id, ...rawUpdates } = body;
 
     if (!id) {
       return NextResponse.json({ error: "계약 ID가 필요합니다." }, { status: 400 });
+    }
+
+    // 허용된 필드만 추출
+    const ALLOWED_FIELDS = [
+      "status", "sign", "notes", "special_terms",
+      "payment_terms", "warranty_period", "warranty_terms",
+      "progress_payments", "start_date", "expected_end_date",
+    ];
+    const updates: Record<string, unknown> = {};
+    for (const key of ALLOWED_FIELDS) {
+      if (key in rawUpdates) updates[key] = rawUpdates[key];
     }
 
     // 서명 처리

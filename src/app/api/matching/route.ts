@@ -97,17 +97,17 @@ export async function POST(request: NextRequest) {
     // 입찰 가격 데이터 (같은 공종의 평균 입찰가 대비 경쟁력)
     const { data: bidData } = await supabase
       .from("bids")
-      .select("contractor_id, amount")
+      .select("contractor_id, bid_amount")
       .in("contractor_id", cIds)
-      .gt("amount", 0);
+      .gt("bid_amount", 0);
 
     const bidAmountMap = new Map<string, number[]>();
     const allBidAmounts: number[] = [];
     for (const b of bidData || []) {
       const amounts = bidAmountMap.get(b.contractor_id) || [];
-      amounts.push(b.amount);
+      amounts.push(b.bid_amount);
       bidAmountMap.set(b.contractor_id, amounts);
-      allBidAmounts.push(b.amount);
+      allBidAmounts.push(b.bid_amount);
     }
     const avgBidAmount = allBidAmounts.length > 0
       ? allBidAmounts.reduce((s, a) => s + a, 0) / allBidAmounts.length

@@ -4,8 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 // 소비자 리뷰 작성
 export async function POST(req: NextRequest) {
   try {
+    const supabaseAuth = createClient();
+    const { data: { user } } = await supabaseAuth.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+    }
+
     const body = await req.json();
-    const { contractorId, contractId, rating, title, content, reviewerId } = body;
+    const { contractorId, contractId, rating, title, content } = body;
+    const reviewerId = user.id;
 
     if (!contractorId || !rating || !content) {
       return NextResponse.json(

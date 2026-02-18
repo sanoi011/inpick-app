@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 // GET: 견적별 입찰 목록, 단일 입찰 조회, 또는 사업자별 입찰 목록
 export async function GET(request: NextRequest) {
@@ -81,9 +82,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = createClient();
 
+  // 사업자 인증 확인
+  const authContractorId = getContractorIdFromRequest(request);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { estimateId, contractorId, bidAmount, discountRate, estimatedDays, startAvailableDate, message, metadata } = body;
+    const { estimateId, bidAmount, discountRate, estimatedDays, startAvailableDate, message, metadata } = body;
+    const contractorId = authContractorId;
 
     if (!estimateId || !contractorId || !bidAmount) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
