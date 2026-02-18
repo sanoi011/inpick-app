@@ -557,12 +557,14 @@ export default function RenderingPage() {
   );
 
   // ═══════════════════════════════════════════════════
-  // 도면 없을 때: 기존 공종 탭 모드 (폴백)
+  // 도면 없을 때: 공종 탭 모드 (도면 이미지 있으면 좌측에 표시)
   // ═══════════════════════════════════════════════════
   if (!floorPlan) {
+    const hasFloorPlanImage = !!project?.floorPlanImageUrl;
+
     return (
       <div className="flex flex-col h-[calc(100vh-56px)]">
-        {/* 상단 */}
+        {/* 상단 바 */}
         <div className="bg-white border-b border-gray-200">
           <div className="flex items-center justify-between px-4 py-2.5 gap-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -593,40 +595,175 @@ export default function RenderingPage() {
               )}
             </div>
           </div>
-          <div className="flex items-center gap-0.5 px-4 pb-0 overflow-x-auto scrollbar-hide">
-            {FALLBACK_GROUPS.map((g) => {
-              const p = fallbackGroupProgress[g.id];
-              const isActive = activeGroup === g.id;
-              const isDone = p && p.done === p.total;
-              return (
-                <button
-                  key={g.id}
-                  onClick={() => setActiveGroup(g.id)}
-                  className={`relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
-                    isActive ? "text-blue-700" : "text-gray-500 hover:text-gray-700"
-                  }`}
-                >
-                  {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
-                  {g.label}
-                  {p && !isDone && (
-                    <span className="text-[10px] text-gray-400">
-                      {p.done}/{p.total}
-                    </span>
-                  )}
-                  {isActive && (
-                    <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* 공종 그룹 탭 (도면 이미지 없을 때만 상단에 표시, 이미지 있을 때는 좌측 패널) */}
+          {!hasFloorPlanImage && (
+            <div className="flex items-center gap-0.5 px-4 pb-0 overflow-x-auto scrollbar-hide">
+              {FALLBACK_GROUPS.map((g) => {
+                const p = fallbackGroupProgress[g.id];
+                const isActive = activeGroup === g.id;
+                const isDone = p && p.done === p.total;
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => setActiveGroup(g.id)}
+                    className={`relative flex items-center gap-1.5 px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors ${
+                      isActive ? "text-blue-700" : "text-gray-500 hover:text-gray-700"
+                    }`}
+                  >
+                    {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                    {g.label}
+                    {p && !isDone && (
+                      <span className="text-[10px] text-gray-400">
+                        {p.done}/{p.total}
+                      </span>
+                    )}
+                    {isActive && (
+                      <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-blue-600 rounded-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto bg-gray-50">
-          <div className="max-w-4xl mx-auto px-4 py-6">
-            {renderCategoryCards(fallbackCategories)}
+        {/* 메인 영역: 도면 이미지 있으면 좌우 분할, 없으면 단일 영역 */}
+        {hasFloorPlanImage ? (
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+            {/* 좌측: 도면 이미지 + 공종 그룹 */}
+            <div className="md:w-[420px] md:border-r border-gray-200 bg-white flex flex-col overflow-y-auto">
+              {/* 도면 이미지 */}
+              <div className="p-3 flex-shrink-0">
+                <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                  <img
+                    src={project.floorPlanImageUrl!}
+                    alt="도면"
+                    className="w-full h-auto max-h-[400px] object-contain"
+                  />
+                </div>
+                <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                  도면을 참고하여 아래 공종별 자재를 선택하세요
+                </p>
+              </div>
+
+              {/* 공종 그룹 버튼 */}
+              <div className="px-3 pb-3 flex-shrink-0">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-[11px] font-medium text-gray-500">공종 선택</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {FALLBACK_GROUPS.map((g) => {
+                    const p = fallbackGroupProgress[g.id];
+                    const isActive = activeGroup === g.id;
+                    const isDone = p && p.done === p.total;
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => setActiveGroup(g.id)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                          isActive
+                            ? "bg-blue-100 text-blue-700 border border-blue-300"
+                            : isDone
+                            ? "bg-green-50 text-green-700 border border-green-200"
+                            : p && p.done > 0
+                            ? "bg-amber-50 text-amber-700 border border-amber-200"
+                            : "bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100"
+                        }`}
+                      >
+                        {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
+                        {g.label}
+                        {!isDone && p && (
+                          <span className="text-[10px] opacity-60">
+                            {p.done}/{p.total}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 우측: 검색 + 자재 카테고리 카드 */}
+            <div className="flex-1 overflow-y-auto bg-gray-50">
+              {/* 자재 검색 바 */}
+              <div className="sticky top-0 z-10 bg-gray-50 px-4 pt-4 pb-2">
+                <div className="relative max-w-3xl mx-auto">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => handleSearch(e.target.value)}
+                    placeholder="자재 검색 (브랜드, 제품명, 규격...)"
+                    className="w-full pl-9 pr-8 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {searchQuery && (
+                    <button
+                      onClick={() => handleSearch("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded"
+                    >
+                      <X className="w-3.5 h-3.5 text-gray-400" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* 검색 결과 또는 카테고리 */}
+              {searchQuery.trim() ? (
+                <div className="max-w-3xl mx-auto px-4 pb-6">
+                  {isSearching ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-400 mr-2" />
+                      <span className="text-sm text-gray-500">검색 중...</span>
+                    </div>
+                  ) : searchResults.length > 0 ? (
+                    <div>
+                      <p className="text-xs text-gray-400 mb-4">
+                        &quot;{searchQuery}&quot; 검색 결과 {searchResults.length}건
+                      </p>
+                      {renderCategoryCards(
+                        Array.from(new Set(searchResults.map((r) => r.category.code)))
+                          .map((code) => searchResults.find((r) => r.category.code === code)!.category)
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <Search className="w-8 h-8 mx-auto text-gray-200 mb-3" />
+                      <p className="text-sm text-gray-400">&quot;{searchQuery}&quot;에 대한 검색 결과가 없습니다</p>
+                      <p className="text-xs text-gray-300 mt-1">다른 키워드로 검색해보세요</p>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="max-w-3xl mx-auto px-4 pb-6">
+                  {/* 선택된 공종 그룹 헤더 */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <h3 className="text-lg font-bold text-gray-900">
+                      {FALLBACK_GROUPS.find((g) => g.id === activeGroup)?.label}
+                    </h3>
+                    {(() => {
+                      const p = fallbackGroupProgress[activeGroup];
+                      return p ? (
+                        <span className="text-xs text-gray-400">
+                          {p.done}/{p.total} 선택됨
+                        </span>
+                      ) : null;
+                    })()}
+                  </div>
+                  {renderCategoryCards(fallbackCategories)}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        ) : (
+          /* 도면 이미지도 없을 때: 기존 단일 영역 */
+          <div className="flex-1 overflow-y-auto bg-gray-50">
+            <div className="max-w-4xl mx-auto px-4 py-6">
+              {renderCategoryCards(fallbackCategories)}
+            </div>
+          </div>
+        )}
 
         {/* 모바일 하단 */}
         <div className="md:hidden sticky bottom-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-30">

@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { id, userId, status, address, drawingId, estimateId, designState, renderingState, estimateState, rfqState } = body;
+    const { id, userId, status, address, drawingId, floorPlanImageUrl, estimateId, designState, renderingState, estimateState, rfqState } = body;
 
     if (!id || !userId) {
       return NextResponse.json({ error: "id와 userId가 필요합니다." }, { status: 400 });
@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
 
     if (address !== undefined) record.address = address;
     if (drawingId !== undefined) record.drawing_id = drawingId;
+    if (floorPlanImageUrl !== undefined) record.floor_plan_image_url = floorPlanImageUrl;
     if (estimateId !== undefined) record.estimate_id = estimateId;
     if (designState !== undefined) record.design_state = designState;
     if (renderingState !== undefined) record.rendering_state = renderingState;
@@ -100,6 +101,7 @@ export async function PATCH(request: NextRequest) {
     if (updates.status !== undefined) record.status = updates.status;
     if (updates.address !== undefined) record.address = updates.address;
     if (updates.drawingId !== undefined) record.drawing_id = updates.drawingId;
+    if (updates.floorPlanImageUrl !== undefined) record.floor_plan_image_url = updates.floorPlanImageUrl;
     if (updates.estimateId !== undefined) record.estimate_id = updates.estimateId;
     if (updates.designState !== undefined) record.design_state = updates.designState;
     if (updates.renderingState !== undefined) record.rendering_state = updates.renderingState;

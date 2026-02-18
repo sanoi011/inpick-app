@@ -248,6 +248,7 @@ export interface ConsumerProject {
   designPreferences?: DesignPreferences;
   estimateId?: string;
   drawingId?: string;
+  floorPlanImageUrl?: string; // 생성된 도면 이미지 URL (Supabase Storage 등)
   editedDimensions?: EditedDimension[];
   createdAt: string;
   updatedAt: string;

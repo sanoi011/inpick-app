@@ -7,6 +7,9 @@
 - **GitHub**: `https://github.com/sanoi011/inpick-app.git` (main 브랜치)
 - **Vercel**: GitHub 연동 자동 배포
 
+## 절대 금지 사항
+- **샘플도면 사용 금지**: `sample-59`, `sample-84a`, `sample-84b` 등 하드코딩된 샘플 도면 개념을 절대 사용하지 않음. 모든 도면은 사용자가 주소 검색 → 건물 선택 → 네이버 원본 도면 → Gemini Pro 파이프라인을 통해 실시간 생성된 도면을 사용. 도면 이미지 URL은 `ConsumerProject.floorPlanImageUrl`에 저장하여 영속적으로 관리.
+
 ## 기존 패턴 (반드시 준수)
 - **컴포넌트**: 모든 페이지 `"use client"`, React hooks로 상태 관리
 - **인증**: `localStorage`의 `contractor_token`, `contractor_id`, `contractor_name`

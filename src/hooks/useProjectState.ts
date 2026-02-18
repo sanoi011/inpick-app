@@ -79,6 +79,7 @@ function syncToSupabase(
       status: project.status,
       address: project.address || null,
       drawingId: project.drawingId || null,
+      floorPlanImageUrl: project.floorPlanImageUrl || null,
       estimateId: project.estimateId || null,
       designState,
       renderingState,
@@ -143,6 +144,7 @@ export function useProjectState(projectId: string) {
                 status: (remote.status as ConsumerProjectStatus) || localProject.status,
                 address: remote.address || localProject.address,
                 drawingId: remote.drawing_id || localProject.drawingId,
+                floorPlanImageUrl: remote.floor_plan_image_url || localProject.floorPlanImageUrl,
                 estimateId: remote.estimate_id || localProject.estimateId,
                 estimate: remote.estimate_state || localProject.estimate,
                 rfq: remote.rfq_state || localProject.rfq,
@@ -159,6 +161,7 @@ export function useProjectState(projectId: string) {
               reconstructed.status = (remote.status as ConsumerProjectStatus) || "ADDRESS_SELECTION";
               reconstructed.address = remote.address;
               reconstructed.drawingId = remote.drawing_id;
+              reconstructed.floorPlanImageUrl = remote.floor_plan_image_url;
               reconstructed.estimateId = remote.estimate_id;
               reconstructed.estimate = remote.estimate_state;
               reconstructed.rfq = remote.rfq_state;
@@ -320,6 +323,15 @@ export function useProjectState(projectId: string) {
     (drawingId: string) => {
       if (!project) return;
       saveProject({ ...project, drawingId });
+    },
+    [project, saveProject]
+  );
+
+  // 도면 이미지 URL 설정 (Supabase Storage 등 절대 URL)
+  const setFloorPlanImageUrl = useCallback(
+    (url: string) => {
+      if (!project) return;
+      saveProject({ ...project, floorPlanImageUrl: url });
     },
     [project, saveProject]
   );
@@ -492,6 +504,7 @@ export function useProjectState(projectId: string) {
     setActiveImage,
     addDecision,
     setDrawingId,
+    setFloorPlanImageUrl,
     confirmBuilding,
     addGeneratedImage,
     removeGeneratedImage,

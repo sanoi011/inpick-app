@@ -75,7 +75,7 @@ export default function FloorPlanPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences, addGeneratedImage } = useProjectState(projectId);
+  const { project, updateStatus, confirmBuilding, setEditedDimensions, setDesignPreferences, addGeneratedImage, setFloorPlanImageUrl: persistFloorPlanImageUrl } = useProjectState(projectId);
 
   // === Sidebar state ===
   const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
@@ -91,13 +91,20 @@ export default function FloorPlanPage() {
   const [generatedDesigns, setGeneratedDesigns] = useState<{room: string; label: string; imageData: string | null; description: string}[]>([]);
   const [designSlideIndex, setDesignSlideIndex] = useState(0);
   const [generatingDesign, setGeneratingDesign] = useState(false);
+  // 디자인 ↔ 도면 뷰 전환 (데이터 유지, 뷰만 전환)
+  const [showingFloorPlan, setShowingFloorPlan] = useState(false);
   const [designPrefs, setDesignPrefs] = useState<DesignPreferences>(
     project?.designPreferences || { style: "", budget: "", priorities: [], specialNotes: [] }
   );
 
   // === Viewer state ===
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);
-  const [floorPlanImageUrl, setFloorPlanImageUrl] = useState<string | null>(null);
+  const [floorPlanImageUrl, _setFloorPlanImageUrl] = useState<string | null>(null);
+  // 도면 이미지 URL 설정 시 프로젝트 상태에도 영속 저장
+  const setFloorPlanImageUrl = useCallback((url: string | null) => {
+    _setFloorPlanImageUrl(url);
+    if (url) persistFloorPlanImageUrl(url);
+  }, [persistFloorPlanImageUrl]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   // viewMode removed - 2D only
@@ -487,22 +494,21 @@ export default function FloorPlanPage() {
       .catch(() => setYoloAvailable(false));
   }, []);
 
-  // === Auto-load floor plan from project.drawingId ===
+  // === Auto-load floor plan from project ===
   useEffect(() => {
+    // 프로젝트에 저장된 도면 이미지 URL 복원 (Supabase Storage 등)
+    if (project?.floorPlanImageUrl && !floorPlanImageUrl) {
+      _setFloorPlanImageUrl(project.floorPlanImageUrl);
+    }
+
     if (project?.drawingId) {
       setLoadError(false);
-      Promise.all([
-        loadFloorPlan(project.drawingId),
-        getFloorPlanImageUrl(project.drawingId),
-      ])
-        .then(([plan, imageUrl]) => {
+      loadFloorPlan(project.drawingId)
+        .then((plan) => {
           if (plan) {
             setFloorPlan(plan);
           } else {
             setLoadError(true);
-          }
-          if (imageUrl) {
-            setFloorPlanImageUrl(imageUrl);
           }
           setLoading(false);
         })
@@ -513,7 +519,7 @@ export default function FloorPlanPage() {
     } else {
       setLoading(false);
     }
-  }, [project?.drawingId]);
+  }, [project?.drawingId, project?.floorPlanImageUrl]);
 
   // === File upload ===
   const handleFileUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1135,7 +1141,7 @@ export default function FloorPlanPage() {
                     )}
 
                     {/* AI 생성 디자인 4컷 슬라이드 뷰어 */}
-                    {generatedDesigns.length > 0 ? (
+                    {generatedDesigns.length > 0 && !showingFloorPlan ? (
                       <>
                         {/* 현재 슬라이드 이미지 */}
                         {generatedDesigns[designSlideIndex]?.imageData ? (
@@ -1202,7 +1208,7 @@ export default function FloorPlanPage() {
                         {/* 도면 썸네일 (우측 상단) → 도면 보기로 전환 */}
                         {floorPlanImageUrl && (
                           <button
-                            onClick={() => setGeneratedDesigns([])}
+                            onClick={() => setShowingFloorPlan(true)}
                             className="absolute top-3 right-3 z-20 group"
                             title="도면 보기로 전환"
                           >
@@ -1221,7 +1227,7 @@ export default function FloorPlanPage() {
                         )}
                         {!floorPlanImageUrl && floorPlan && (
                           <button
-                            onClick={() => setGeneratedDesigns([])}
+                            onClick={() => setShowingFloorPlan(true)}
                             className="absolute top-3 right-3 z-20 w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white hover:border-blue-400 hover:scale-105 transition-all"
                             title="도면 보기로 전환"
                           >
@@ -1247,10 +1253,35 @@ export default function FloorPlanPage() {
                           onChange={handleDimensionsChange}
                           editable={editingDimensions}
                         />
+                        {/* 도면 뷰에서 AI 디자인으로 돌아가기 썸네일 */}
+                        {generatedDesigns.length > 0 && showingFloorPlan && (
+                          <button
+                            onClick={() => setShowingFloorPlan(false)}
+                            className="absolute top-3 right-3 z-20 group"
+                            title="AI 디자인 보기"
+                          >
+                            <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-indigo-400 group-hover:scale-105 transition-all">
+                              {generatedDesigns[designSlideIndex]?.imageData ? (
+                                <img
+                                  src={generatedDesigns[designSlideIndex].imageData!}
+                                  alt="AI 디자인"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+                                  <Sparkles className="w-6 h-6 text-indigo-400" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[9px] bg-indigo-600/90 text-white px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                              디자인 보기
+                            </span>
+                          </button>
+                        )}
                       </>
                     ) : floorPlan ? (
                       <div
-                        className="h-full w-full transition-transform duration-300"
+                        className="h-full w-full transition-transform duration-300 relative"
                         style={mirrored ? { transform: "scaleX(-1)" } : undefined}
                       >
                         <FloorPlan2D
@@ -1259,6 +1290,32 @@ export default function FloorPlanPage() {
                           className="h-full w-full"
                           showDimensions={showDimensions}
                         />
+                        {/* 도면 뷰에서 AI 디자인으로 돌아가기 썸네일 */}
+                        {generatedDesigns.length > 0 && showingFloorPlan && (
+                          <button
+                            onClick={() => setShowingFloorPlan(false)}
+                            className="absolute top-3 right-3 z-20 group"
+                            title="AI 디자인 보기"
+                            style={mirrored ? { transform: "scaleX(-1)" } : undefined}
+                          >
+                            <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-indigo-400 group-hover:scale-105 transition-all">
+                              {generatedDesigns[designSlideIndex]?.imageData ? (
+                                <img
+                                  src={generatedDesigns[designSlideIndex].imageData!}
+                                  alt="AI 디자인"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-indigo-50">
+                                  <Sparkles className="w-6 h-6 text-indigo-400" />
+                                </div>
+                              )}
+                            </div>
+                            <span className="absolute -bottom-2 left-1/2 -translate-x-1/2 text-[9px] bg-indigo-600/90 text-white px-2 py-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                              디자인 보기
+                            </span>
+                          </button>
+                        )}
                       </div>
                     ) : null}
                 </div>

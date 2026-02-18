@@ -22,14 +22,20 @@ export const maxDuration = 300; // Vercel Pro 5분
 const MODEL = "gemini-3-pro-image-preview";
 const MAX_RETRIES = 3;
 const RATE_LIMIT_WAIT = 30000;
+// 프롬프트 버전: 변경 시 이 값을 올리면 기존 캐시 자동 무효화
+const PROMPT_VERSION = 2;
 
-const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 단위세대 실시설계 도면 스타일로 다시 그려줘.
+const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 "발코니 확장형" 단위세대 실시설계 도면 스타일로 다시 그려줘.
 
-【가장 중요한 규칙 - 확장형 레이아웃 유지】
-- 이 도면은 "확장형" 평면도야. 발코니 벽이 이미 철거되어 거실/방과 통합된 상태야.
-- 원본 도면의 공간 구조와 벽 위치를 정확히 유지해. 벽을 추가하거나 공간을 분할하지 마.
-- 발코니를 새로 만들지 마. 발코니 벽을 추가하지 마. 원본에 없는 벽을 절대 추가하지 마.
-- 원본 도면에 보이는 그대로의 방 배치, 벽 위치, 공간 크기를 유지해.
+【가장 중요한 규칙 - 발코니 확장형 변환】
+- 원본 도면이 "기본형"(발코니가 별도 공간으로 분리된 상태)이면 반드시 "확장형"으로 변환해.
+  · 거실/방과 발코니 사이의 칸막이벽(발코니 경계벽)을 제거해.
+  · 발코니 공간이 거실/방에 통합되어 외벽까지 하나의 공간이 되도록 해.
+  · 발코니였던 영역의 바닥도 해당 방과 동일한 마루 텍스처로 연결해.
+  · 발코니 확장 후에도 외벽 창문 위치는 유지해.
+- 원본 도면이 이미 "확장형"이면 그대로 유지해.
+- 거실/방 내부의 구조벽(화장실, 주방, 방 사이 벽)은 절대 제거하지 마.
+- 원본에 없는 새로운 벽을 추가하지 마.
 
 【완전히 제거】
 - 모든 텍스트/글자 (방 이름, 면적, 치수 숫자 전부)
@@ -43,12 +49,14 @@ const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 단위�
 - 구조벽(외벽): 두꺼운 검은 실선 (굵기 차이로 내벽과 구분)
 - 내벽: 약간 얇은 검은 실선
 - 벽체 내부는 검은색으로 채워서 솔리드하게 표현
-- 원본에 있는 벽만 그려. 새로운 벽을 추가하지 마.
+- 발코니 칸막이벽은 제거 (확장형 변환)
+- 그 외 원본에 있는 벽만 그려. 새로운 벽을 추가하지 마.
 
 【문 - 최신 건축도면 표기법】
 - 여닫이문: 90도 호(arc) + 문짝 선 (열리는 방향 표시)
 - 미닫이문: 벽 안에 슬라이딩 표시 (점선 또는 화살표)
 - 현관문: 다른 문보다 두꺼운 표현
+- 발코니 확장으로 칸막이벽이 제거되면 해당 문도 함께 제거
 
 【창문 - 최신 건축도면 표기법 + 열림방향】
 - 창문: 이중 평행선 사이에 유리선 표시
@@ -56,6 +64,7 @@ const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 단위�
 
 【바닥 자재 질감 (고해상도 리얼 텍스처)】
 - 모든 방/거실/침실/주방: 고급 우드 마루 텍스처 (확장형이므로 마루가 외벽까지 이어짐)
+- 발코니였던 영역도 동일한 우드 마루 텍스처로 통일
 - 욕실/화장실: 밝은 라이트 그레이 타일 텍스처
 - 현관: 밝은 그레이 타일 텍스처
 
@@ -129,7 +138,7 @@ export async function GET(request: NextRequest) {
     .eq("pyeong_no", Number(pyeongNo))
     .single();
 
-  if (data && data.status === "completed") {
+  if (data && data.status === "completed" && (data.prompt_version || 0) >= PROMPT_VERSION) {
     return NextResponse.json({
       exists: true,
       finalUrl: data.final_url || data.clean_url,
@@ -138,13 +147,14 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // 프롬프트 버전 불일치 → 캐시 무효 (재생성 필요)
   return NextResponse.json({ exists: false });
 }
 
 // POST: SSE 3-step pipeline (다운로드 → AI 클린 → 미러)
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea } = body;
+  const { complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, force } = body;
 
   if (!complexNo || !pyeongNo || !grandPlanUrl) {
     return NextResponse.json(
@@ -160,20 +170,22 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient();
 
-  // Check if already completed
-  const { data: existing } = await supabase
-    .from("generated_floorplans")
-    .select("*")
-    .eq("complex_no", complexNo)
-    .eq("pyeong_no", Number(pyeongNo))
-    .single();
+  // Check if already completed (프롬프트 버전 일치 + force 아닌 경우만)
+  if (!force) {
+    const { data: existing } = await supabase
+      .from("generated_floorplans")
+      .select("*")
+      .eq("complex_no", complexNo)
+      .eq("pyeong_no", Number(pyeongNo))
+      .single();
 
-  if (existing?.status === "completed") {
-    return NextResponse.json({
-      cached: true,
-      finalUrl: existing.final_url || existing.clean_url,
-      finalMirrorUrl: existing.final_mirror_url,
-    });
+    if (existing?.status === "completed" && (existing.prompt_version || 0) >= PROMPT_VERSION) {
+      return NextResponse.json({
+        cached: true,
+        finalUrl: existing.final_url || existing.clean_url,
+        finalMirrorUrl: existing.final_mirror_url,
+      });
+    }
   }
 
   const ai = new GoogleGenAI({ apiKey });
@@ -193,7 +205,7 @@ export async function POST(request: NextRequest) {
       };
 
       try {
-        // DB: processing 상태
+        // DB: processing 상태 (이전 캐시 덮어쓰기)
         await supabase.from("generated_floorplans").upsert(
           {
             complex_no: complexNo,
@@ -204,6 +216,7 @@ export async function POST(request: NextRequest) {
             original_url: grandPlanUrl,
             status: "processing",
             progress: 0,
+            prompt_version: PROMPT_VERSION,
           },
           { onConflict: "complex_no,pyeong_no" }
         );
@@ -267,6 +280,7 @@ export async function POST(request: NextRequest) {
             final_url: urls["clean"],
             final_mirror_url: urls["clean_mirror"],
             clean_url: urls["clean"],
+            prompt_version: PROMPT_VERSION,
             processing_time_ms: processingTime,
             updated_at: new Date().toISOString(),
           })
@@ -312,5 +326,44 @@ export async function POST(request: NextRequest) {
       "Cache-Control": "no-cache",
       Connection: "keep-alive",
     },
+  });
+}
+
+// DELETE: 기존 캐시 전체 삭제 (프롬프트 변경 시 사용)
+export async function DELETE() {
+  const supabase = createAdminClient();
+
+  // 구버전 또는 전체 삭제
+  const { data: rows } = await supabase
+    .from("generated_floorplans")
+    .select("complex_no, pyeong_no")
+    .or(`prompt_version.is.null,prompt_version.lt.${PROMPT_VERSION}`);
+
+  if (!rows || rows.length === 0) {
+    return NextResponse.json({ deleted: 0, message: "삭제할 구버전 캐시 없음" });
+  }
+
+  // Storage 파일 삭제
+  const storagePaths: string[] = [];
+  for (const row of rows) {
+    storagePaths.push(
+      `floorplans/${row.complex_no}/${row.pyeong_no}/clean.png`,
+      `floorplans/${row.complex_no}/${row.pyeong_no}/clean_mirror.png`
+    );
+  }
+
+  if (storagePaths.length > 0) {
+    await supabase.storage.from("uploads").remove(storagePaths);
+  }
+
+  // DB 행 삭제
+  await supabase
+    .from("generated_floorplans")
+    .delete()
+    .or(`prompt_version.is.null,prompt_version.lt.${PROMPT_VERSION}`);
+
+  return NextResponse.json({
+    deleted: rows.length,
+    message: `${rows.length}개 구버전 도면 캐시 삭제 완료`,
   });
 }

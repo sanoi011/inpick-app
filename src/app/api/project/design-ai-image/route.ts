@@ -40,17 +40,30 @@ export async function POST(request: NextRequest) {
     let floorPlanParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
     if (floorPlanImageUrl) {
       try {
-        const imgRes = await fetch(floorPlanImageUrl);
+        // 상대 URL이면 절대 URL로 변환 (서버사이드 fetch 필요)
+        let fetchUrl = floorPlanImageUrl;
+        if (fetchUrl.startsWith("/")) {
+          const host = request.headers.get("host") || "localhost:3001";
+          const protocol = request.headers.get("x-forwarded-proto") || "http";
+          fetchUrl = `${protocol}://${host}${fetchUrl}`;
+        }
+        console.log("[design-ai-image] Fetching floor plan from:", fetchUrl);
+        const imgRes = await fetch(fetchUrl);
         if (imgRes.ok) {
           const buffer = Buffer.from(await imgRes.arrayBuffer());
           const mimeType = imgRes.headers.get("content-type") || "image/png";
           floorPlanParts = [
             { inlineData: { mimeType, data: buffer.toString("base64") } },
           ];
+          console.log("[design-ai-image] Floor plan attached:", Math.round(buffer.length / 1024), "KB");
+        } else {
+          console.warn("[design-ai-image] Floor plan fetch failed:", imgRes.status, fetchUrl);
         }
       } catch (err) {
         console.warn("[design-ai-image] Failed to fetch floor plan:", err);
       }
+    } else {
+      console.warn("[design-ai-image] No floorPlanImageUrl provided - generating without floor plan reference");
     }
 
     // 디자인 옵션 텍스트 구성
