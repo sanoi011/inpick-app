@@ -757,11 +757,60 @@ export default function RenderingPage() {
             </div>
           </div>
         ) : (
-          /* 도면 이미지도 없을 때: 기존 단일 영역 */
+          /* 도면 이미지도 없을 때: 검색 바 + 카테고리 */
           <div className="flex-1 overflow-y-auto bg-gray-50">
-            <div className="max-w-4xl mx-auto px-4 py-6">
-              {renderCategoryCards(fallbackCategories)}
+            {/* 자재 검색 바 */}
+            <div className="sticky top-0 z-10 bg-gray-50 px-4 pt-4 pb-2">
+              <div className="relative max-w-4xl mx-auto">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  placeholder="자재 검색 (브랜드, 제품명, 규격...)"
+                  className="w-full pl-9 pr-8 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => handleSearch("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded"
+                  >
+                    <X className="w-3.5 h-3.5 text-gray-400" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {searchQuery.trim() ? (
+              <div className="max-w-4xl mx-auto px-4 pb-6">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-5 h-5 animate-spin text-blue-400 mr-2" />
+                    <span className="text-sm text-gray-500">검색 중...</span>
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-4">
+                      &quot;{searchQuery}&quot; 검색 결과 {searchResults.length}건
+                    </p>
+                    {renderCategoryCards(
+                      Array.from(new Set(searchResults.map((r) => r.category.code)))
+                        .map((code) => searchResults.find((r) => r.category.code === code)!.category)
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <Search className="w-8 h-8 mx-auto text-gray-200 mb-3" />
+                    <p className="text-sm text-gray-400">&quot;{searchQuery}&quot;에 대한 검색 결과가 없습니다</p>
+                    <p className="text-xs text-gray-300 mt-1">다른 키워드로 검색해보세요</p>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="max-w-4xl mx-auto px-4 pb-6">
+                {renderCategoryCards(fallbackCategories)}
+              </div>
+            )}
           </div>
         )}
 
