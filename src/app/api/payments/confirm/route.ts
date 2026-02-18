@@ -65,26 +65,31 @@ export async function POST(request: NextRequest) {
     // 결제 성공 → 크레딧 충전
     const creditAmount = Number(credits) || 0;
 
-    const { data: current } = await supabase
-      .from("user_credits")
-      .select("balance")
+    // 중복 결제 확인 (orderId 기반 멱등성)
+    const { data: existing } = await supabase
+      .from("credit_transactions")
+      .select("id")
       .eq("user_id", userId)
+      .eq("type", "CHARGE")
+      .contains("metadata", { orderId })
       .single();
 
-    const currentBalance = current?.balance || 0;
+    if (existing) {
+      // 이미 처리된 결제 → 성공 응답 (멱등성)
+      const { data: cur } = await supabase
+        .from("user_credits")
+        .select("balance")
+        .eq("user_id", userId)
+        .single();
+      return NextResponse.json({
+        success: true,
+        credits: creditAmount,
+        newBalance: cur?.balance || 0,
+        duplicate: true,
+      });
+    }
 
-    await supabase
-      .from("user_credits")
-      .upsert(
-        {
-          user_id: userId,
-          balance: currentBalance + creditAmount,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" }
-      );
-
-    // 트랜잭션 기록
+    // 트랜잭션 기록 먼저 (중복 방지 기준)
     await supabase.from("credit_transactions").insert({
       user_id: userId,
       amount: creditAmount,
@@ -93,12 +98,33 @@ export async function POST(request: NextRequest) {
       metadata: { paymentKey, orderId, paidAmount: amount },
     });
 
+    // 크레딧 잔액 업데이트
+    const { data: current } = await supabase
+      .from("user_credits")
+      .select("balance")
+      .eq("user_id", userId)
+      .single();
+
+    const newBalance = (current?.balance || 0) + creditAmount;
+
+    await supabase
+      .from("user_credits")
+      .upsert(
+        {
+          user_id: userId,
+          balance: newBalance,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "user_id" }
+      );
+
     return NextResponse.json({
       success: true,
       credits: creditAmount,
-      newBalance: currentBalance + creditAmount,
+      newBalance,
     });
-  } catch {
+  } catch (err) {
+    console.error("Payment confirm error:", err);
     return NextResponse.json(
       { error: "결제 확인 중 오류가 발생했습니다." },
       { status: 500 }

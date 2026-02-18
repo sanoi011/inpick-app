@@ -9,6 +9,10 @@ function getSupabase() {
   return createClient();
 }
 
+function sanitizeFilterValue(value: string): string {
+  return value.replace(/[.,()\\]/g, "");
+}
+
 export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const { searchParams } = request.nextUrl;
@@ -27,7 +31,8 @@ export async function GET(request: NextRequest) {
         .range(offset, offset + limit - 1);
 
       if (search) {
-        query = query.or(`company_name.ilike.%${search}%,email.ilike.%${search}%`);
+        const safe = sanitizeFilterValue(search);
+        query = query.or(`company_name.ilike.%${safe}%,email.ilike.%${safe}%`);
       }
 
       const { data, count, error } = await query;

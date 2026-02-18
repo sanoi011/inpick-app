@@ -101,8 +101,9 @@ export async function POST(request: NextRequest) {
       if (items && Array.isArray(items)) {
         for (let i = 0; i < items.length; i++) {
           const item = items[i];
-          const materialCost = (item.materialUnitCost || 0) * (item.quantity || 1);
-          const laborCost = (item.laborUnitCost || 0) * (item.quantity || 1);
+          const qty = Math.max(0, Number(item.quantity) || 1);
+          const materialCost = Math.max(0, Number(item.materialUnitCost) || 0) * qty;
+          const laborCost = Math.max(0, Number(item.laborUnitCost) || 0) * qty;
 
           // 간접비 계산: (자재비+노무비) × 경비율
           const expenseRate = rateMap.get("OH-EXP")?.rate || 7;
@@ -120,7 +121,7 @@ export async function POST(request: NextRequest) {
             space_name: spaceName,
             item_name: item.name,
             unit: item.unit || "식",
-            quantity: item.quantity || 1,
+            quantity: qty,
             material_cost: materialCost,
             labor_cost: laborCost,
             overhead_cost: overheadCost,

@@ -63,10 +63,24 @@ export function useCredits() {
       }
     } catch {
       // Supabase 테이블 미생성 시 localStorage 폴백
-      const stored = localStorage.getItem(`inpick_credits_${user.id}`);
-      if (stored) {
-        setCredits(JSON.parse(stored));
-      } else {
+      try {
+        const stored = localStorage.getItem(`inpick_credits_${user.id}`);
+        if (stored) {
+          setCredits(JSON.parse(stored));
+        } else {
+          const fallback: UserCredits = {
+            id: crypto.randomUUID(),
+            userId: user.id,
+            balance: 0,
+            freeGenerationsUsed: 0,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(fallback));
+          setCredits(fallback);
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse stored credits:", parseErr);
         const fallback: UserCredits = {
           id: crypto.randomUUID(),
           userId: user.id,
@@ -75,7 +89,6 @@ export function useCredits() {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(fallback));
         setCredits(fallback);
       }
     }

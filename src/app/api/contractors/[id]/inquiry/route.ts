@@ -64,7 +64,9 @@ export async function POST(
         priority: "HIGH",
         is_read: false,
       }).then(() => {}),
-    ]).catch(() => {});
+    ]).catch((err) => {
+      console.error("Inquiry side-effects error:", err);
+    });
 
     return NextResponse.json({ success: true }, { status: 201 });
   } catch (err) {

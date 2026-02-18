@@ -10,7 +10,8 @@ export async function GET(request: NextRequest) {
 
   // 검색 모드
   if (search && search.trim()) {
-    const q = `%${search.trim()}%`;
+    const safe = search.trim().replace(/[.,()\\]/g, "");
+    const q = `%${safe}%`;
     const { data, error } = await supabase
       .from("material_options")
       .select(`

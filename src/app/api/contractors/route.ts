@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
+// PostgREST 필터 구문 특수문자 이스케이프
+function sanitizeFilterValue(value: string): string {
+  return value.replace(/[.,()\\]/g, "");
+}
+
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const type = sp.get("type") || "all";
@@ -40,7 +45,8 @@ export async function GET(req: NextRequest) {
       query = query.gte("rating", minRating);
     }
     if (search.trim()) {
-      query = query.or(`company_name.ilike.%${search}%,introduction.ilike.%${search}%`);
+      const safe = sanitizeFilterValue(search.trim());
+      query = query.or(`company_name.ilike.%${safe}%,introduction.ilike.%${safe}%`);
     }
 
     // 정렬
