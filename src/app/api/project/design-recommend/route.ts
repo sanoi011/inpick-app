@@ -239,10 +239,7 @@ ${roomSummary}
   } catch (error) {
     console.error("[design-recommend] Error:", error);
     return NextResponse.json(
-      {
-        error: "디자인 추천 생성 중 오류가 발생했습니다",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "디자인 추천 생성 중 오류가 발생했습니다" },
       { status: 500 }
     );
   }

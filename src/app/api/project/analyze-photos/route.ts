@@ -358,10 +358,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[analyze-photos] Error:", error);
     return NextResponse.json(
-      {
-        error: "사진 분석 중 오류가 발생했습니다",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "사진 분석 중 오류가 발생했습니다" },
       { status: 500 }
     );
   }

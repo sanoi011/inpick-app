@@ -7,11 +7,18 @@ export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   const userId = request.nextUrl.searchParams.get("userId");
 
+  // 인증 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
   if (id) {
     const { data, error } = await supabase
       .from("consumer_projects")
       .select("*")
       .eq("id", id)
+      .eq("user_id", user.id)
       .single();
 
     if (error) {
@@ -21,10 +28,11 @@ export async function GET(request: NextRequest) {
   }
 
   if (userId) {
+    // 본인 프로젝트만 조회 가능
     const { data, error } = await supabase
       .from("consumer_projects")
       .select("id, user_id, status, address, drawing_id, estimate_id, created_at, updated_at")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
       .limit(50);
 
@@ -54,6 +62,17 @@ export async function POST(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+    }
+
+    // 기존 프로젝트가 있으면 소유권 확인
+    const { data: existing } = await supabase
+      .from("consumer_projects")
+      .select("user_id")
+      .eq("id", id)
+      .single();
+
+    if (existing && existing.user_id !== userId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const record: Record<string, unknown> = {
@@ -125,6 +144,7 @@ export async function PATCH(request: NextRequest) {
       .from("consumer_projects")
       .update(record)
       .eq("id", id)
+      .eq("user_id", user.id)
       .select()
       .single();
 

@@ -36,8 +36,10 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient();
 
-    // Generate unique filename
-    const ext = file.name.split(".").pop() || "jpg";
+    // Generate unique filename with sanitized extension
+    const ALLOWED_EXTS = ["jpg", "jpeg", "png", "webp", "pdf"];
+    const rawExt = (file.name.split(".").pop() || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    const ext = ALLOWED_EXTS.includes(rawExt) ? rawExt : "jpg";
     const timestamp = Date.now();
     const path = `contractors/${contractorId}/${folder}/${timestamp}.${ext}`;
 
@@ -59,8 +61,8 @@ export async function POST(req: NextRequest) {
           { status: 500 }
         );
       }
-      console.error("Upload error:", uploadError);
-      return NextResponse.json({ error: `업로드 실패: ${uploadError.message}` }, { status: 500 });
+      console.error("Upload error:", uploadError.message);
+      return NextResponse.json({ error: "파일 업로드에 실패했습니다" }, { status: 500 });
     }
 
     const { data: urlData } = supabase.storage

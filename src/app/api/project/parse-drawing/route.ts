@@ -236,10 +236,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[parse-drawing] Error:", error);
     return NextResponse.json(
-      {
-        error: "도면 분석 중 오류가 발생했습니다",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "도면 분석 중 오류가 발생했습니다" },
       { status: 500 }
     );
   }

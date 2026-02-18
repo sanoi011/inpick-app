@@ -53,10 +53,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("[convert-roomplan] Error:", error);
     return NextResponse.json(
-      {
-        error: "RoomPlan 데이터 변환 중 오류가 발생했습니다",
-        detail: error instanceof Error ? error.message : String(error),
-      },
+      { error: "RoomPlan 데이터 변환 중 오류가 발생했습니다" },
       { status: 500 }
     );
   }
