@@ -10,6 +10,7 @@ export async function POST(request: NextRequest) {
       companyName, representativeName, phone, email,
       licenseNumber, region, address, selectedTrades,
       experienceYears, introduction, contractorType,
+      minProjectBudget, maxProjectBudget,
     } = body;
 
     if (!companyName || !representativeName || !phone || !email) {
@@ -34,6 +35,8 @@ export async function POST(request: NextRequest) {
         is_active: true,
         contractor_type: contractorType === "general" ? "general" : "specialty",
         introduction: introduction || null,
+        min_project_budget: minProjectBudget || null,
+        max_project_budget: maxProjectBudget || null,
         metadata: { registration_status: "pending" },
       })
       .select()
@@ -60,7 +63,8 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ contractor }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Register POST error:", err);
     return NextResponse.json({ error: "등록 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

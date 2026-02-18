@@ -56,6 +56,8 @@ export async function PATCH(req: NextRequest) {
       description: "description",
       logoUrl: "logo_url",
       businessLicenseUrl: "business_license_url",
+      isPublic: "is_public",
+      contractorType: "contractor_type",
     };
 
     const dbUpdate: Record<string, unknown> = {};
