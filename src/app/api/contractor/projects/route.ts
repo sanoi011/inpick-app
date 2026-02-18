@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 const DEFAULT_PHASES = [
   "철거", "기초/설비 배관", "전기 배선", "목공", "타일/방수", "도배/도장", "마무리/검수",
 ];
 
 export async function GET(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const contractorId = req.nextUrl.searchParams.get("contractorId");
-  if (!contractorId) {
-    return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+  if (!contractorId || contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   try {
@@ -40,12 +46,21 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { contractorId, name, contractId, estimateId, address, startDate, endDate, totalBudget } = body;
 
     if (!contractorId || !name) {
       return NextResponse.json({ error: "contractorId, name 필수" }, { status: 400 });
+    }
+
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();

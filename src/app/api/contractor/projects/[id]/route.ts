@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const projectId = params.id;
 
   try {
@@ -23,6 +29,10 @@ export async function GET(
 
     if (error || !project) {
       return NextResponse.json({ error: "프로젝트를 찾을 수 없습니다" }, { status: 404 });
+    }
+
+    if (project.contractor_id !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 공정 순서 정렬
@@ -48,12 +58,28 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: { id: string } }
 ) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const projectId = params.id;
 
   try {
     const body = await req.json();
     const { action, ...data } = body;
     const supabase = createClient();
+
+    // 프로젝트 소유권 확인
+    const { data: projectOwner } = await supabase
+      .from("contractor_projects")
+      .select("contractor_id")
+      .eq("id", projectId)
+      .single();
+
+    if (!projectOwner || projectOwner.contractor_id !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
 
     // 프로젝트 상태/진행률 업데이트
     if (action === "updateProject") {
@@ -147,7 +173,7 @@ export async function PATCH(
                 });
               }
             }
-          } catch { /* 알림 실패는 무시 */ }
+          } catch (notifyErr) { console.error("Phase notification error:", notifyErr); }
         }
       }
 
