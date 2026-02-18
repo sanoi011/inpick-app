@@ -23,11 +23,12 @@ const MODEL = "gemini-3-pro-image-preview";
 const MAX_RETRIES = 3;
 const RATE_LIMIT_WAIT = 30000;
 // 프롬프트 버전: 변경 시 이 값을 올리면 기존 캐시 자동 무효화
-const PROMPT_VERSION = 2;
+const PROMPT_VERSION = 3;
 
-const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 "발코니 확장형" 단위세대 실시설계 도면 스타일로 다시 그려줘.
-
-【가장 중요한 규칙 - 발코니 확장형 변환】
+// 확장형/기본형에 따라 프롬프트 동적 생성
+function buildCleanPrompt(isExpanded: boolean): string {
+  const balconyRule = isExpanded
+    ? `【가장 중요한 규칙 - 발코니 확장형 변환】
 - 원본 도면이 "기본형"(발코니가 별도 공간으로 분리된 상태)이면 반드시 "확장형"으로 변환해.
   · 거실/방과 발코니 사이의 칸막이벽(발코니 경계벽)을 제거해.
   · 발코니 공간이 거실/방에 통합되어 외벽까지 하나의 공간이 되도록 해.
@@ -35,7 +36,33 @@ const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 "발코
   · 발코니 확장 후에도 외벽 창문 위치는 유지해.
 - 원본 도면이 이미 "확장형"이면 그대로 유지해.
 - 거실/방 내부의 구조벽(화장실, 주방, 방 사이 벽)은 절대 제거하지 마.
-- 원본에 없는 새로운 벽을 추가하지 마.
+- 원본에 없는 새로운 벽을 추가하지 마.`
+    : `【가장 중요한 규칙 - 비확장(기본형) 유지】
+- 원본 도면의 발코니 칸막이벽을 그대로 유지해. 절대 제거하지 마.
+- 발코니는 거실/방과 분리된 별도 공간으로 남겨둬.
+- 발코니와 거실/방 사이의 문도 그대로 유지해.
+- 거실/방 내부의 구조벽(화장실, 주방, 방 사이 벽)은 절대 제거하지 마.
+- 원본에 없는 새로운 벽을 추가하지 마.`;
+
+  const wallBalconyLine = isExpanded
+    ? "- 발코니 칸막이벽은 제거 (확장형 변환)"
+    : "- 발코니 칸막이벽은 그대로 유지 (기본형)";
+
+  const doorBalconyLine = isExpanded
+    ? "- 발코니 확장으로 칸막이벽이 제거되면 해당 문도 함께 제거"
+    : "- 발코니와 거실/방 사이의 문은 그대로 유지";
+
+  const floorBalconyLine = isExpanded
+    ? `- 모든 방/거실/침실/주방: 고급 우드 마루 텍스처 (확장형이므로 마루가 외벽까지 이어짐)
+- 발코니였던 영역도 동일한 우드 마루 텍스처로 통일`
+    : `- 모든 방/거실/침실/주방: 고급 우드 마루 텍스처
+- 발코니: 타일 또는 원본 바닥재 질감 유지 (거실/방과 구분)`;
+
+  const titleStyle = isExpanded ? "발코니 확장형" : "기본형(비확장)";
+
+  return `이 아파트 평면도를 최신 신축 아파트 "${titleStyle}" 단위세대 실시설계 도면 스타일로 다시 그려줘.
+
+${balconyRule}
 
 【완전히 제거】
 - 모든 텍스트/글자 (방 이름, 면적, 치수 숫자 전부)
@@ -49,28 +76,28 @@ const CLEAN_PROMPT = `이 아파트 평면도를 최신 신축 아파트 "발코
 - 구조벽(외벽): 두꺼운 검은 실선 (굵기 차이로 내벽과 구분)
 - 내벽: 약간 얇은 검은 실선
 - 벽체 내부는 검은색으로 채워서 솔리드하게 표현
-- 발코니 칸막이벽은 제거 (확장형 변환)
+${wallBalconyLine}
 - 그 외 원본에 있는 벽만 그려. 새로운 벽을 추가하지 마.
 
 【문 - 최신 건축도면 표기법】
 - 여닫이문: 90도 호(arc) + 문짝 선 (열리는 방향 표시)
 - 미닫이문: 벽 안에 슬라이딩 표시 (점선 또는 화살표)
 - 현관문: 다른 문보다 두꺼운 표현
-- 발코니 확장으로 칸막이벽이 제거되면 해당 문도 함께 제거
+${doorBalconyLine}
 
 【창문 - 최신 건축도면 표기법 + 열림방향】
 - 창문: 이중 평행선 사이에 유리선 표시
 - 모든 창문에 열리는 방향 화살표 표시
 
 【바닥 자재 질감 (고해상도 리얼 텍스처)】
-- 모든 방/거실/침실/주방: 고급 우드 마루 텍스처 (확장형이므로 마루가 외벽까지 이어짐)
-- 발코니였던 영역도 동일한 우드 마루 텍스처로 통일
+${floorBalconyLine}
 - 욕실/화장실: 밝은 라이트 그레이 타일 텍스처
 - 현관: 밝은 그레이 타일 텍스처
 
 【스타일】
 - 고해상도, 정밀한 스케일, 선명한 벽선
 - 고급 분양 카탈로그에 들어가는 단위세대 평면도 수준`;
+}
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -154,7 +181,7 @@ export async function GET(request: NextRequest) {
 // POST: SSE 3-step pipeline (다운로드 → AI 클린 → 미러)
 export async function POST(request: NextRequest) {
   const body = await request.json();
-  const { complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, force } = body;
+  const { complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, force, isExpanded } = body;
 
   if (!complexNo || !pyeongNo || !grandPlanUrl) {
     return NextResponse.json(
@@ -232,9 +259,11 @@ export async function POST(request: NextRequest) {
         send("progress", { step: 0, progress: 15, message: "원본 도면 다운로드 완료" });
 
         // ── Step 1: Gemini Pro Clean ──
-        send("progress", { step: 1, progress: 20, message: "AI 클린 처리 중... (약 60초)" });
+        const expandedLabel = isExpanded === false ? "기본형" : "확장형";
+        send("progress", { step: 1, progress: 20, message: `AI 클린 처리 중 (${expandedLabel})... (약 60초)` });
 
-        const cleanBuffer = await callGeminiPro(ai, originalBuffer, mimeType, CLEAN_PROMPT);
+        const cleanPrompt = buildCleanPrompt(isExpanded !== false);
+        const cleanBuffer = await callGeminiPro(ai, originalBuffer, mimeType, cleanPrompt);
         if (!cleanBuffer) throw new Error("클린 처리 실패 (Gemini Pro 응답 없음)");
 
         send("progress", { step: 1, progress: 70, message: "클린 처리 완료" });

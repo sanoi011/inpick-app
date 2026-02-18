@@ -106,6 +106,7 @@ export interface ProjectAddress {
   buildingType: string;
   floor?: number;
   totalFloor?: number;
+  isExpanded?: boolean; // 발코니 확장형 여부 (true=확장형, false=기본형/비확장)
 }
 
 // AI 생성 이미지

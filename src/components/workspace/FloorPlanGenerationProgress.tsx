@@ -16,6 +16,7 @@ interface Props {
   complexName?: string;
   pyeongName?: string;
   exclusiveArea?: number;
+  isExpanded?: boolean;
   onComplete: (result: GenerationResult) => void;
   onCancel: () => void;
 }
@@ -27,6 +28,7 @@ export default function FloorPlanGenerationProgress({
   complexName,
   pyeongName,
   exclusiveArea,
+  isExpanded,
   onComplete,
   onCancel,
 }: Props) {
@@ -74,6 +76,7 @@ export default function FloorPlanGenerationProgress({
             complexName,
             pyeongName,
             exclusiveArea,
+            isExpanded,
           }),
           signal: abortController.signal,
         });
@@ -154,7 +157,7 @@ export default function FloorPlanGenerationProgress({
     return () => {
       abortController.abort();
     };
-  }, [complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, retryCount]);
+  }, [complexNo, pyeongNo, grandPlanUrl, complexName, pyeongName, exclusiveArea, isExpanded, retryCount]);
 
   const handleRetry = () => {
     setError(null);

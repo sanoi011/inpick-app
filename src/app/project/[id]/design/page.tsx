@@ -122,6 +122,9 @@ export default function FloorPlanPage() {
   const [, setMultiPhotos] = useState<File[]>([]);
   const [multiPhotoUrls, setMultiPhotoUrls] = useState<string[]>([]);
 
+  // 확장형/기본형 선택 상태
+  const [pendingBuildingForExpanded, setPendingBuildingForExpanded] = useState<BuildingInfo | null>(null);
+
   // 실시간 도면 생성 상태
   const [generatingFloorPlan, setGeneratingFloorPlan] = useState<{
     complexNo: string;
@@ -130,6 +133,7 @@ export default function FloorPlanPage() {
     complexName?: string;
     pyeongName?: string;
     exclusiveArea?: number;
+    isExpanded?: boolean;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const multiFileInputRef = useRef<HTMLInputElement>(null);
@@ -216,7 +220,16 @@ export default function FloorPlanPage() {
       return;
     }
     setSelectedBuilding(building);
-    // Save to project
+    setSidebarOpen(false);
+
+    // grandPlanUrl이 있으면 확장형/기본형 선택을 먼저 요청
+    if (building.complexNo && building.pyeongNo && building.grandPlanUrl) {
+      setPendingBuildingForExpanded(building);
+      // 선택 모달이 뜸 → 사용자가 선택하면 proceedWithBuilding 호출
+      return;
+    }
+
+    // grandPlanUrl 없으면 바로 진행
     const addressData: ProjectAddress = {
       roadAddress: selectedAddress.roadAddress,
       zipCode: selectedAddress.zipCode,
@@ -232,46 +245,50 @@ export default function FloorPlanPage() {
       totalFloor: building.totalFloor,
     };
     confirmBuilding(addressData);
-    setSidebarOpen(false);
+    toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
+  }, [selectedAddress, confirmBuilding]);
 
-    // 도면 로드 우선순위: ① manifest(배치 처리 완료) → ② DB 캐시 → ③ Gemini Pro 실시간 생성
-    if (building.complexNo && building.pyeongNo) {
-      const manifestId = `naver-${building.complexNo}-${building.pyeongNo}`;
+  // 확장형/기본형 선택 후 도면 생성 진행
+  const proceedWithBuilding = useCallback((building: BuildingInfo, expanded: boolean) => {
+    if (!selectedAddress) return;
+    setPendingBuildingForExpanded(null);
 
-      // ① manifest.json에서 배치 처리된 도면 확인
-      getFloorPlanImageUrl(manifestId).then(manifestUrl => {
-        if (manifestUrl) {
-          setFloorPlanImageUrl(manifestUrl);
-          toast({ type: "success", title: "도면 로드 완료", message: "배치 처리된 도면을 불러왔습니다" });
-          return;
-        }
+    const addressData: ProjectAddress = {
+      roadAddress: selectedAddress.roadAddress,
+      zipCode: selectedAddress.zipCode,
+      buildingName: selectedAddress.buildingName,
+      dongName: building.dongName,
+      hoName: building.hoName,
+      exclusiveArea: building.exclusiveArea,
+      supplyArea: building.supplyArea,
+      roomCount: building.roomCount || 3,
+      bathroomCount: building.bathroomCount || 1,
+      buildingType: building.buildingType,
+      floor: building.floor,
+      totalFloor: building.totalFloor,
+      isExpanded: expanded,
+    };
+    confirmBuilding(addressData);
 
-        // grandPlanUrl 없으면 생성 불가
-        if (!building.grandPlanUrl) {
-          toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
-          return;
-        }
+    // 도면 로드 우선순위: ① manifest → ② DB 캐시 → ③ Gemini Pro 실시간 생성
+    const manifestId = `naver-${building.complexNo}-${building.pyeongNo}`;
 
-        // ② DB 캐시 확인
-        fetch(`/api/project/generate-floorplan?complexNo=${building.complexNo}&pyeongNo=${building.pyeongNo}`)
-          .then(res => res.json())
-          .then(data => {
-            if (data.exists) {
-              setFloorPlanImageUrl(data.finalUrl);
-              toast({ type: "success", title: "도면 로드 완료", message: "캐시된 도면을 불러왔습니다" });
-            } else {
-              // ③ Gemini Pro 실시간 생성
-              setGeneratingFloorPlan({
-                complexNo: building.complexNo!,
-                pyeongNo: building.pyeongNo!,
-                grandPlanUrl: building.grandPlanUrl!,
-                complexName: building.complexName,
-                pyeongName: building.typeName,
-                exclusiveArea: building.exclusiveArea,
-              });
-            }
-          })
-          .catch(() => {
+    getFloorPlanImageUrl(manifestId).then(manifestUrl => {
+      if (manifestUrl) {
+        setFloorPlanImageUrl(manifestUrl);
+        toast({ type: "success", title: "도면 로드 완료", message: "배치 처리된 도면을 불러왔습니다" });
+        return;
+      }
+
+      // ② DB 캐시 확인
+      fetch(`/api/project/generate-floorplan?complexNo=${building.complexNo}&pyeongNo=${building.pyeongNo}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.exists) {
+            setFloorPlanImageUrl(data.finalUrl);
+            toast({ type: "success", title: "도면 로드 완료", message: "캐시된 도면을 불러왔습니다" });
+          } else {
+            // ③ Gemini Pro 실시간 생성
             setGeneratingFloorPlan({
               complexNo: building.complexNo!,
               pyeongNo: building.pyeongNo!,
@@ -279,13 +296,23 @@ export default function FloorPlanPage() {
               complexName: building.complexName,
               pyeongName: building.typeName,
               exclusiveArea: building.exclusiveArea,
+              isExpanded: expanded,
             });
+          }
+        })
+        .catch(() => {
+          setGeneratingFloorPlan({
+            complexNo: building.complexNo!,
+            pyeongNo: building.pyeongNo!,
+            grandPlanUrl: building.grandPlanUrl!,
+            complexName: building.complexName,
+            pyeongName: building.typeName,
+            exclusiveArea: building.exclusiveArea,
+            isExpanded: expanded,
           });
-      });
-    } else {
-      toast({ type: "success", title: "건물 선택 완료", message: `${building.dongName} ${building.hoName}` });
-    }
-  }, [selectedAddress, confirmBuilding]);
+        });
+    });
+  }, [selectedAddress, confirmBuilding, setFloorPlanImageUrl]);
 
   const handleSelectUploadMode = useCallback((mode: "upload" | "lidar" | "photo" | "hand-drawing" | "draw") => {
     setUploadMode(mode);
@@ -1088,7 +1115,53 @@ export default function FloorPlanPage() {
 
         {/* Main viewer area */}
         <div className="flex-1 min-h-0">
-          {generatingFloorPlan ? (
+          {pendingBuildingForExpanded ? (
+            /* ── 확장형/기본형 선택 ── */
+            <div className="h-full flex items-center justify-center bg-gray-50/60">
+              <div className="max-w-md w-full mx-4">
+                <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6">
+                  <h3 className="text-lg font-bold text-gray-900 text-center mb-2">발코니 타입 선택</h3>
+                  <p className="text-sm text-gray-500 text-center mb-6">
+                    도면에 적용할 발코니 타입을 선택해주세요
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => proceedWithBuilding(pendingBuildingForExpanded, true)}
+                      className="group relative flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-blue-200 bg-blue-50 hover:border-blue-500 hover:bg-blue-100 transition-all"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-blue-100 group-hover:bg-blue-200 flex items-center justify-center transition-colors">
+                        <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15" />
+                        </svg>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-blue-700">확장형</p>
+                        <p className="text-[11px] text-blue-500 mt-0.5">발코니 벽 제거</p>
+                      </div>
+                      <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] font-bold bg-blue-600 text-white rounded-full">추천</span>
+                    </button>
+                    <button
+                      onClick={() => proceedWithBuilding(pendingBuildingForExpanded, false)}
+                      className="group flex flex-col items-center gap-3 p-5 rounded-xl border-2 border-gray-200 bg-gray-50 hover:border-gray-400 hover:bg-gray-100 transition-all"
+                    >
+                      <div className="w-14 h-14 rounded-xl bg-gray-100 group-hover:bg-gray-200 flex items-center justify-center transition-colors">
+                        <svg className="w-8 h-8 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75" />
+                        </svg>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-sm font-bold text-gray-700">기본형</p>
+                        <p className="text-[11px] text-gray-500 mt-0.5">발코니 벽 유지</p>
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-gray-400 text-center mt-4">
+                    대부분의 신축 아파트는 확장형으로 시공됩니다
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : generatingFloorPlan ? (
             <FloorPlanGenerationProgress
               complexNo={generatingFloorPlan.complexNo}
               pyeongNo={generatingFloorPlan.pyeongNo}
@@ -1096,6 +1169,7 @@ export default function FloorPlanPage() {
               complexName={generatingFloorPlan.complexName}
               pyeongName={generatingFloorPlan.pyeongName}
               exclusiveArea={generatingFloorPlan.exclusiveArea}
+              isExpanded={generatingFloorPlan.isExpanded}
               onComplete={(result) => {
                 setFloorPlanImageUrl(result.finalUrl);
                 setGeneratingFloorPlan(null);
