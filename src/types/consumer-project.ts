@@ -29,6 +29,23 @@ export const CONSUMER_PROJECT_STATUS_COLORS: Record<ConsumerProjectStatus, strin
   CONTRACTED: "bg-green-100 text-green-700",
 };
 
+export const STATUS_ORDER: Record<ConsumerProjectStatus, number> = {
+  ADDRESS_SELECTION: 0,
+  FLOOR_PLAN: 1,
+  AI_DESIGN: 2,
+  RENDERING: 3,
+  ESTIMATING: 4,
+  RFQ: 5,
+  CONTRACTED: 6,
+};
+
+export function isStatusAtLeast(
+  current: ConsumerProjectStatus,
+  required: ConsumerProjectStatus
+): boolean {
+  return STATUS_ORDER[current] >= STATUS_ORDER[required];
+}
+
 // 캔버스 주석
 export interface CanvasAnnotation {
   id: string;

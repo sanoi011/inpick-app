@@ -2,10 +2,48 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 // GET /api/materials?roomType=LIVING
+// GET /api/materials?search=마루
 export async function GET(request: NextRequest) {
   const supabase = createClient();
   const roomType = request.nextUrl.searchParams.get("roomType");
+  const search = request.nextUrl.searchParams.get("search");
 
+  // 검색 모드
+  if (search && search.trim()) {
+    const q = `%${search.trim()}%`;
+    const { data, error } = await supabase
+      .from("material_options")
+      .select(`
+        id, name, spec, price, unit,
+        catalog:material_room_catalog!inner (
+          id, room_type, category, part
+        )
+      `)
+      .or(`name.ilike.${q},spec.ilike.${q}`)
+      .limit(20);
+
+    if (error) {
+      return NextResponse.json({ error: "자재 검색 실패" }, { status: 500 });
+    }
+
+    const results = (data || []).map((opt: Record<string, unknown>) => {
+      const cat = opt.catalog as Record<string, unknown> | null;
+      return {
+        id: opt.id,
+        name: opt.name,
+        spec: opt.spec || "",
+        price: opt.price,
+        unit: opt.unit,
+        category: cat?.category || "",
+        part: cat?.part || "",
+        roomType: cat?.room_type || "",
+      };
+    });
+
+    return NextResponse.json({ results });
+  }
+
+  // 기존 카탈로그 조회
   const query = supabase
     .from("material_room_catalog")
     .select(`

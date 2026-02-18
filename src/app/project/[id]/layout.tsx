@@ -2,10 +2,11 @@
 
 import { useParams, usePathname } from "next/navigation";
 import Link from "next/link";
-import { Box, Package, Calculator, FileText, ArrowLeft, CheckCircle2 } from "lucide-react";
+import { Box, Package, Calculator, FileText, ArrowLeft, CheckCircle2, Lock } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { SaveButton } from "@/components/ui/SaveIndicator";
 import type { ConsumerProjectStatus } from "@/types/consumer-project";
+import { isStatusAtLeast } from "@/types/consumer-project";
 
 const TABS = [
   { label: "디자인하기", segment: "design", icon: Box },
@@ -24,6 +25,13 @@ const STATUS_TO_STEP: Record<ConsumerProjectStatus, number> = {
   CONTRACTED: 5,
 };
 
+const TAB_MIN_STATUS: Record<string, ConsumerProjectStatus> = {
+  design: "ADDRESS_SELECTION",
+  rendering: "RENDERING",
+  estimate: "ESTIMATING",
+  rfq: "RFQ",
+};
+
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const pathname = usePathname();
@@ -31,9 +39,14 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
   const { project, saveStatus, forceSave } = useProjectState(projectId);
 
   const currentStep = project ? STATUS_TO_STEP[project.status] ?? 1 : 1;
+  const projectStatus = project?.status ?? "ADDRESS_SELECTION";
 
   const isActive = (segment: string) => {
     return pathname.endsWith(`/${segment}`);
+  };
+
+  const canNavigateTab = (segment: string) => {
+    return isStatusAtLeast(projectStatus, TAB_MIN_STATUS[segment]);
   };
 
   return (
@@ -56,6 +69,24 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                 const stepNum = idx + 1;
                 const isCompleted = stepNum < currentStep;
                 const href = `/project/${projectId}/${tab.segment}`;
+                const unlocked = canNavigateTab(tab.segment);
+
+                if (!unlocked) {
+                  return (
+                    <span
+                      key={tab.segment}
+                      className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium opacity-40 cursor-not-allowed select-none"
+                      title="이전 단계를 완료해주세요"
+                    >
+                      <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">
+                        <Lock className="w-3 h-3" />
+                      </span>
+                      <tab.icon className="w-4 h-4 text-gray-300" />
+                      <span className="hidden lg:inline text-gray-400">{tab.label}</span>
+                    </span>
+                  );
+                }
+
                 return (
                   <Link
                     key={tab.segment}
@@ -101,6 +132,22 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
               const active = isActive(tab.segment);
               const stepNum = idx + 1;
               const isCompleted = stepNum < currentStep;
+              const unlocked = canNavigateTab(tab.segment);
+
+              if (!unlocked) {
+                return (
+                  <span
+                    key={tab.segment}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap opacity-40 cursor-not-allowed select-none border border-gray-200"
+                  >
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-200 text-gray-400">
+                      <Lock className="w-2.5 h-2.5" />
+                    </span>
+                    {tab.label}
+                  </span>
+                );
+              }
+
               const href = `/project/${projectId}/${tab.segment}`;
               return (
                 <Link

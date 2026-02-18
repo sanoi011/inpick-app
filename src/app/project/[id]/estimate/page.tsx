@@ -22,6 +22,7 @@ import dynamic from "next/dynamic";
 import type { RoomCostSection, CostItem } from "@/components/project/CostTable";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import type { ProjectEstimate } from "@/types/consumer-project";
+import { isStatusAtLeast } from "@/types/consumer-project";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
@@ -161,6 +162,14 @@ export default function EstimatePage() {
   const router = useRouter();
   const projectId = params.id as string;
   const { project, setEstimate } = useProjectState(projectId);
+
+  // 단계 잠금: 자재 선택 미완료 시 리다이렉트
+  useEffect(() => {
+    if (!project) return;
+    if (!isStatusAtLeast(project.status, "ESTIMATING")) {
+      router.replace(`/project/${projectId}/rendering`);
+    }
+  }, [project, projectId, router]);
 
   const [activeRoom, setActiveRoom] = useState<string | null>(null);
   const [floorPlan, setFloorPlan] = useState<ParsedFloorPlan | null>(null);

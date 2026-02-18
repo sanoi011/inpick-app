@@ -26,6 +26,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
+import { isStatusAtLeast } from "@/types/consumer-project";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -88,6 +89,14 @@ export default function RfqPage() {
   const projectId = params.id as string;
   const { project, updateRfq, updateStatus, setEstimateId } = useProjectState(projectId);
   const { user } = useAuth();
+
+  // 단계 잠금: 물량산출 미완료 시 리다이렉트
+  useEffect(() => {
+    if (!project) return;
+    if (!isStatusAtLeast(project.status, "RFQ")) {
+      router.replace(`/project/${projectId}/estimate`);
+    }
+  }, [project, projectId, router]);
 
   const [step, setStep] = useState<"form" | "sending" | "bids">(
     project?.rfq?.sentAt ? "bids" : "form"

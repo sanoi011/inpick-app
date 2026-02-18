@@ -11,14 +11,18 @@ import {
   ImageIcon,
   MapPin,
   Palette,
+  Search,
+  Loader2,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { useMaterialCatalogV2 } from "@/hooks/useMaterialCatalogV2";
 import type { SelectedMaterial } from "@/types/consumer-project";
+import { isStatusAtLeast } from "@/types/consumer-project";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import {
   getCategoriesForRoom,
+  searchProducts,
   type MaterialCategory,
   type MaterialProduct,
 } from "@/lib/data/material-catalog-v2";
@@ -50,6 +54,14 @@ export default function RenderingPage() {
   const { project, updateRendering, updateMaterial, updateStatus } =
     useProjectState(projectId);
 
+  // 단계 잠금: 디자인 미완료 시 리다이렉트
+  useEffect(() => {
+    if (!project) return;
+    if (!isStatusAtLeast(project.status, "RENDERING")) {
+      router.replace(`/project/${projectId}/design`);
+    }
+  }, [project, projectId, router]);
+
   const {
     allCategories,
     selectedProducts,
@@ -65,6 +77,10 @@ export default function RenderingPage() {
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [activeGroup, setActiveGroup] = useState("finish"); // 폴백 모드용
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ category: MaterialCategory; product: MaterialProduct }[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
 
   // 도면 로드
@@ -238,6 +254,49 @@ export default function RenderingPage() {
     router,
     projectId,
   ]);
+
+  // 자재 검색
+  const handleSearch = useCallback((query: string) => {
+    setSearchQuery(query);
+    if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    if (!query.trim()) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
+    }
+    setIsSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/materials?search=${encodeURIComponent(query.trim())}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.results && data.results.length > 0) {
+            // DB 검색 결과를 MaterialProduct 형태로 변환하여 카테고리 매칭
+            const mapped: { category: MaterialCategory; product: MaterialProduct }[] = [];
+            for (const r of data.results) {
+              const cat = allCategories.find((c) => c.nameKr === r.category || c.code === r.category);
+              if (cat) {
+                const existingProd = cat.products.find((p) => p.productName === r.name);
+                if (existingProd) {
+                  mapped.push({ category: cat, product: existingProd });
+                }
+              }
+            }
+            if (mapped.length > 0) {
+              setSearchResults(mapped);
+              setIsSearching(false);
+              return;
+            }
+          }
+        }
+      } catch {
+        // DB 검색 실패 → 로컬 폴백
+      }
+      // 로컬 폴백
+      setSearchResults(searchProducts(query.trim()));
+      setIsSearching(false);
+    }, 300);
+  }, [allCategories]);
 
   const sorted = (prods: MaterialProduct[]) => {
     const o: Record<string, number> = { economy: 0, standard: 1, premium: 2 };
@@ -753,8 +812,113 @@ export default function RenderingPage() {
 
         {/* 우측: 자재 카테고리 */}
         <div className="flex-1 overflow-y-auto bg-gray-50">
-          {selectedRoom ? (
-            <div className="max-w-3xl mx-auto px-4 py-6">
+          {/* 자재 검색 바 */}
+          <div className="sticky top-0 z-10 bg-gray-50 px-4 pt-4 pb-2">
+            <div className="relative max-w-3xl mx-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder="자재 검색 (브랜드, 제품명, 규격...)"
+                className="w-full pl-9 pr-8 py-2.5 text-sm bg-white border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => handleSearch("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 검색 결과 */}
+          {searchQuery.trim() ? (
+            <div className="max-w-3xl mx-auto px-4 pb-6">
+              {isSearching ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-400 mr-2" />
+                  <span className="text-sm text-gray-500">검색 중...</span>
+                </div>
+              ) : searchResults.length > 0 ? (
+                <div>
+                  <p className="text-xs text-gray-400 mb-4">
+                    &quot;{searchQuery}&quot; 검색 결과 {searchResults.length}건
+                  </p>
+                  <div className="space-y-6">
+                    {/* 카테고리별 그룹핑 */}
+                    {Array.from(new Set(searchResults.map((r) => r.category.code))).map((catCode) => {
+                      const catResults = searchResults.filter((r) => r.category.code === catCode);
+                      const cat = catResults[0].category;
+                      return (
+                        <section key={catCode}>
+                          <div className="flex items-center gap-2 mb-3">
+                            <h3 className="text-sm font-bold text-gray-900">{cat.nameKr}</h3>
+                            {selectedProducts[cat.code] && <CheckCircle2 className="w-4 h-4 text-green-500" />}
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {catResults.map(({ product }) => {
+                              const isSelected = selectedProducts[cat.code] === product.id;
+                              const grade = GRADE[product.priceGrade];
+                              return (
+                                <button
+                                  key={product.id}
+                                  onClick={() => handleSelect(cat, product)}
+                                  className={`group relative text-left rounded-xl border-2 transition-all ${
+                                    isSelected
+                                      ? "border-blue-500 bg-white shadow-md"
+                                      : "border-gray-200 bg-white hover:border-gray-300 hover:shadow-sm"
+                                  }`}
+                                >
+                                  <div className={`relative w-full aspect-[4/3] rounded-t-[10px] overflow-hidden ${isSelected ? "bg-blue-50" : "bg-gray-50"}`}>
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                      <ImageIcon className={`w-8 h-8 ${isSelected ? "text-blue-200" : "text-gray-200"}`} />
+                                      <span className="text-[10px] text-gray-300 mt-1">자재 이미지</span>
+                                    </div>
+                                    <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}>
+                                      {grade.label}
+                                    </div>
+                                    {isSelected && (
+                                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center shadow">
+                                        <Check className="w-4 h-4 text-white" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="p-3">
+                                    <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                                    <p className={`text-sm font-bold mb-1 leading-snug ${isSelected ? "text-blue-800" : "text-gray-800"}`}>
+                                      {product.productName}
+                                    </p>
+                                    <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{product.spec}</p>
+                                    <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
+                                      <div>
+                                        <span className="text-base font-extrabold text-gray-900">{product.unitPrice.toLocaleString()}</span>
+                                        <span className="text-[10px] text-gray-400 ml-0.5">원/{product.unit}</span>
+                                      </div>
+                                      <span className="text-[10px] text-gray-400">시공 {product.laborPrice.toLocaleString()}</span>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <Search className="w-8 h-8 mx-auto text-gray-200 mb-3" />
+                  <p className="text-sm text-gray-400">&quot;{searchQuery}&quot;에 대한 검색 결과가 없습니다</p>
+                  <p className="text-xs text-gray-300 mt-1">다른 키워드로 검색해보세요</p>
+                </div>
+              )}
+            </div>
+          ) : selectedRoom ? (
+            <div className="max-w-3xl mx-auto px-4 pb-6">
               {/* 방 헤더 */}
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">

@@ -1142,3 +1142,24 @@ export function getProductById(productId: string): { category: MaterialCategory;
   }
   return null;
 }
+
+// 로컬 카탈로그 검색 (DB 폴백용)
+export function searchProducts(query: string): { category: MaterialCategory; product: MaterialProduct }[] {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  const results: { category: MaterialCategory; product: MaterialProduct }[] = [];
+  for (const cat of MATERIAL_CATEGORIES) {
+    for (const p of cat.products) {
+      if (
+        p.brand.toLowerCase().includes(q) ||
+        p.productName.toLowerCase().includes(q) ||
+        p.spec.toLowerCase().includes(q) ||
+        cat.nameKr.includes(q) ||
+        p.tags.some((t) => t.includes(q))
+      ) {
+        results.push({ category: cat, product: p });
+      }
+    }
+  }
+  return results.slice(0, 20);
+}
