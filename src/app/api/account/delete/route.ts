@@ -3,13 +3,23 @@ import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: NextRequest) {
   try {
+    const supabase = createClient();
+
+    // 인증 확인: 본인만 삭제 가능
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+    }
+
     const { userId } = await request.json();
 
     if (!userId) {
       return NextResponse.json({ error: "userId is required" }, { status: 400 });
     }
 
-    const supabase = createClient();
+    if (userId !== user.id) {
+      return NextResponse.json({ error: "자신의 계정만 삭제할 수 있습니다" }, { status: 403 });
+    }
 
     // 1. 소비자 프로젝트 데이터 삭제 (soft delete - status 변경)
     await supabase

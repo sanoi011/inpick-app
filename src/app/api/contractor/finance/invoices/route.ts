@@ -106,6 +106,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
+    const amountNum = Number(amount);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return NextResponse.json({ error: "청구 금액은 양수여야 합니다" }, { status: 400 });
+    }
+
     const supabase = createClient();
 
     // 자동 번호 생성: INV-YYYYMMDD-SEQ
@@ -119,8 +124,8 @@ export async function POST(req: NextRequest) {
     const seq = String((count || 0) + 1).padStart(3, "0");
     const invoiceNumber = `INV-${today}-${seq}`;
 
-    const tax = Math.round(amount * 0.1);
-    const total = amount + tax;
+    const tax = Math.round(amountNum * 0.1);
+    const total = amountNum + tax;
 
     const { data, error } = await supabase
       .from("invoices")
@@ -130,7 +135,7 @@ export async function POST(req: NextRequest) {
         contract_id: contractId || null,
         invoice_number: invoiceNumber,
         description: description || null,
-        amount,
+        amount: amountNum,
         tax,
         total,
         status: "draft",

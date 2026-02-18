@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({ messages: (data || []).reverse() });
-  } catch {
+  } catch (err) {
+    console.error("Chat GET error:", err);
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }
@@ -100,7 +101,8 @@ export async function POST(req: NextRequest) {
       .eq("id", roomId);
 
     return NextResponse.json({ message }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Chat POST error:", err);
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }
@@ -135,7 +137,8 @@ export async function PATCH(req: NextRequest) {
       .eq("is_read", false);
 
     return NextResponse.json({ success: true });
-  } catch {
+  } catch (err) {
+    console.error("Chat PATCH error:", err);
     return NextResponse.json({ error: "서버 오류" }, { status: 500 });
   }
 }

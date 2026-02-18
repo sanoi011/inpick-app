@@ -16,9 +16,24 @@ export async function POST(request: NextRequest) {
     const { paymentKey, orderId, amount, credits } = body;
     const userId = user.id;
 
-    if (!paymentKey || !orderId || !amount) {
+    if (!paymentKey || !orderId || !amount || !credits) {
       return NextResponse.json(
         { error: "필수 파라미터가 누락되었습니다." },
+        { status: 400 }
+      );
+    }
+
+    const amountNum = Number(amount);
+    const creditsNum = Number(credits);
+    if (!Number.isFinite(amountNum) || amountNum <= 0) {
+      return NextResponse.json(
+        { error: "결제 금액이 유효하지 않습니다." },
+        { status: 400 }
+      );
+    }
+    if (!Number.isFinite(creditsNum) || creditsNum <= 0) {
+      return NextResponse.json(
+        { error: "크레딧 수량이 유효하지 않습니다." },
         { status: 400 }
       );
     }
@@ -40,7 +55,7 @@ export async function POST(request: NextRequest) {
           Authorization: `Basic ${Buffer.from(secretKey + ":").toString("base64")}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ paymentKey, orderId, amount: Number(amount) }),
+        body: JSON.stringify({ paymentKey, orderId, amount: amountNum }),
       }
     );
 
@@ -55,7 +70,7 @@ export async function POST(request: NextRequest) {
     // Toss 응답에서 실제 결제 금액 검증
     const confirmData = await confirmRes.json();
     const paidAmount = confirmData.totalAmount;
-    if (paidAmount !== Number(amount)) {
+    if (paidAmount !== amountNum) {
       return NextResponse.json(
         { error: "결제 금액이 일치하지 않습니다." },
         { status: 400 }
@@ -63,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 결제 성공 → 크레딧 충전
-    const creditAmount = Number(credits) || 0;
+    const creditAmount = creditsNum;
 
     // 중복 결제 확인 (orderId 기반 멱등성)
     const { data: existing } = await supabase
