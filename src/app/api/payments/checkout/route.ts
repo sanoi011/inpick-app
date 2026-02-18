@@ -92,7 +92,8 @@ export async function POST(request: NextRequest) {
       successUrl: `${origin}/payments/success?orderId=${orderId}&amount=${pkg.price}&credits=${pkg.credits}`,
       failUrl: `${origin}/payments/fail`,
     });
-  } catch {
+  } catch (err) {
+    console.error("Checkout POST error:", err);
     return NextResponse.json(
       { error: "결제 세션 생성 실패" },
       { status: 500 }

@@ -17,6 +17,16 @@ export async function POST(
 
     const supabase = createClient();
 
+    // consumerId가 제공된 경우 인증된 사용자와 일치하는지 확인
+    let verifiedConsumerId = null;
+    if (consumerId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && user.id === consumerId) {
+        verifiedConsumerId = consumerId;
+      }
+      // 인증 안 된 경우 consumerId 무시 (비회원 문의 허용)
+    }
+
     // 업체 존재 확인
     const { data: contractor, error: contractorErr } = await supabase
       .from("specialty_contractors")
@@ -34,7 +44,7 @@ export async function POST(
       .from("contractor_inquiries")
       .insert({
         contractor_id: contractorId,
-        consumer_id: consumerId || null,
+        consumer_id: verifiedConsumerId,
         consumer_name: consumerName,
         consumer_phone: consumerPhone,
         consumer_email: consumerEmail || null,

@@ -97,6 +97,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
     }
 
+    const bidAmountNum = Number(bidAmount);
+    if (!Number.isFinite(bidAmountNum) || bidAmountNum <= 0) {
+      return NextResponse.json({ error: "입찰 금액은 양수여야 합니다." }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("bids")
       .insert({
@@ -151,10 +156,11 @@ export async function POST(request: NextRequest) {
           reference_id: data.id,
         });
       }
-    } catch { /* silent */ }
+    } catch (notifyErr) { console.error("Bid notification error:", notifyErr); }
 
     return NextResponse.json({ bid: data }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Bid POST error:", err);
     return NextResponse.json({ error: "입찰 등록 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
@@ -162,6 +168,12 @@ export async function POST(request: NextRequest) {
 // PATCH: 입찰 상태 변경 (선정/미선정)
 export async function PATCH(request: NextRequest) {
   const supabase = createClient();
+
+  // 소비자 인증 확인 (입찰 선정/미선정은 소비자 액션)
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
 
   try {
     const { id, status } = await request.json();
@@ -172,6 +184,22 @@ export async function PATCH(request: NextRequest) {
 
     if (!["pending", "selected", "rejected"].includes(status)) {
       return NextResponse.json({ error: "유효하지 않은 상태입니다." }, { status: 400 });
+    }
+
+    // 입찰의 견적 소유자 확인
+    const { data: bid } = await supabase
+      .from("bids")
+      .select("estimate_id, estimates(user_id)")
+      .eq("id", id)
+      .single();
+
+    if (!bid) {
+      return NextResponse.json({ error: "입찰을 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    const estimateOwner = (bid.estimates as unknown as { user_id: string })?.user_id;
+    if (estimateOwner && estimateOwner !== user.id) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const { data, error } = await supabase
@@ -201,7 +229,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ bid: data });
-  } catch {
+  } catch (err) {
+    console.error("Bid PATCH error:", err);
     return NextResponse.json({ error: "입찰 상태 변경 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

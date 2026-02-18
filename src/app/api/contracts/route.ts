@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 // GET: 계약 조회
 export async function GET(request: NextRequest) {
@@ -7,6 +8,14 @@ export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get("id");
   const estimateId = request.nextUrl.searchParams.get("estimateId");
   const consumerId = request.nextUrl.searchParams.get("consumerId");
+
+  // 인증 확인 (소비자 또는 사업자)
+  const { data: { user } } = await supabase.auth.getUser();
+  const authContractorId = getContractorIdFromRequest(request);
+
+  if (!user && !authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
 
   if (id) {
     const { data, error } = await supabase
@@ -21,7 +30,20 @@ export async function GET(request: NextRequest) {
     if (error) {
       return NextResponse.json({ error: "계약을 찾을 수 없습니다." }, { status: 404 });
     }
+
+    // 소유권 확인: 소비자 또는 사업자만 조회 가능
+    const isConsumer = user && data.consumer_id === user.id;
+    const isContractor = authContractorId && data.contractor_id === authContractorId;
+    if (!isConsumer && !isContractor) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
+
     return NextResponse.json({ contract: data });
+  }
+
+  // consumerId 필터 시 본인 확인
+  if (consumerId && (!user || user.id !== consumerId)) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   let query = supabase
@@ -40,6 +62,11 @@ export async function GET(request: NextRequest) {
 
   if (consumerId) {
     query = query.eq("consumer_id", consumerId);
+  }
+
+  // 사업자는 자기 계약만 조회
+  if (authContractorId && !consumerId && !estimateId) {
+    query = query.eq("contractor_id", authContractorId);
   }
 
   const { data, error } = await query;
@@ -226,8 +253,8 @@ export async function POST(request: NextRequest) {
               .from("contractor_projects")
               .update({ schedule_generated_at: new Date().toISOString() })
               .eq("id", autoProject.id);
-          } catch {
-            // 공정표 생성 실패해도 무시
+          } catch (scheduleErr) {
+            console.error("Schedule generation error:", scheduleErr);
           }
         }
 
@@ -240,8 +267,8 @@ export async function POST(request: NextRequest) {
         });
         projectCreated = true;
       }
-    } catch {
-      // 프로젝트 자동 생성 실패 시 무시 (계약은 이미 성공)
+    } catch (projectErr) {
+      console.error("Auto project creation error:", projectErr);
     }
 
     // 소비자 알림: 계약 생성
@@ -257,10 +284,11 @@ export async function POST(request: NextRequest) {
           reference_id: contract.id,
         });
       }
-    } catch { /* silent */ }
+    } catch (notifyErr) { console.error("Contract notification error:", notifyErr); }
 
     return NextResponse.json({ contract, projectCreated }, { status: 201 });
-  } catch {
+  } catch (err) {
+    console.error("Contract POST error:", err);
     return NextResponse.json({ error: "계약 생성 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
@@ -269,12 +297,37 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const supabase = createClient();
 
+  // 인증 확인 (소비자 또는 사업자)
+  const { data: { user } } = await supabase.auth.getUser();
+  const authContractorId = getContractorIdFromRequest(request);
+
+  if (!user && !authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
     const { id, ...rawUpdates } = body;
 
     if (!id) {
       return NextResponse.json({ error: "계약 ID가 필요합니다." }, { status: 400 });
+    }
+
+    // 소유권 확인
+    const { data: contractOwner } = await supabase
+      .from("contracts")
+      .select("consumer_id, contractor_id")
+      .eq("id", id)
+      .single();
+
+    if (!contractOwner) {
+      return NextResponse.json({ error: "계약을 찾을 수 없습니다." }, { status: 404 });
+    }
+
+    const isConsumer = user && contractOwner.consumer_id === user.id;
+    const isContractor = authContractorId && contractOwner.contractor_id === authContractorId;
+    if (!isConsumer && !isContractor) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     // 허용된 필드만 추출
@@ -331,7 +384,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ contract: data });
-  } catch {
+  } catch (err) {
+    console.error("Contract PATCH error:", err);
     return NextResponse.json({ error: "계약 업데이트 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
