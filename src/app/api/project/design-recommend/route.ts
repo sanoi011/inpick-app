@@ -140,9 +140,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!preferences || !preferences.style) {
+    if (!preferences || !preferences.style || !preferences.budget) {
       return NextResponse.json(
-        { error: "디자인 선호도(스타일)가 필요합니다." },
+        { error: "디자인 선호도(스타일, 예산)가 필요합니다." },
+        { status: 400 }
+      );
+    }
+
+    // 예산 유효성 검증
+    if (!BUDGET_MAP[preferences.budget]) {
+      return NextResponse.json(
+        { error: "유효하지 않은 예산 옵션입니다." },
         { status: 400 }
       );
     }

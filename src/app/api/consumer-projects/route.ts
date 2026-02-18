@@ -41,12 +41,19 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = createClient();
 
+  // 소비자 인증 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { id, userId, status, address, drawingId, floorPlanImageUrl, estimateId, designState, renderingState, estimateState, rfqState } = body;
+    const { id, status, address, drawingId, floorPlanImageUrl, estimateId, designState, renderingState, estimateState, rfqState } = body;
+    const userId = user.id;
 
-    if (!id || !userId) {
-      return NextResponse.json({ error: "id와 userId가 필요합니다." }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
     }
 
     const record: Record<string, unknown> = {
@@ -84,6 +91,12 @@ export async function POST(request: NextRequest) {
 // PATCH: 부분 업데이트
 export async function PATCH(request: NextRequest) {
   const supabase = createClient();
+
+  // 소비자 인증 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
 
   try {
     const body = await request.json();

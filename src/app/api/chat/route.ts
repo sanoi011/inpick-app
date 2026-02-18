@@ -47,10 +47,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "필수 필드 누락" }, { status: 400 });
     }
 
+    // senderName 길이 제한
+    const safeSenderName = senderName ? String(senderName).substring(0, 100) : null;
+
     // 채팅방 존재 확인 및 자동 생성
     const { data: room } = await supabase
       .from("chat_rooms")
-      .select("id")
+      .select("id, consumer_id, contractor_id")
       .eq("id", roomId)
       .single();
 
@@ -61,6 +64,12 @@ export async function POST(req: NextRequest) {
         consumer_id: senderType === "consumer" ? senderId : null,
         contractor_id: senderType === "contractor" ? senderId : null,
       });
+    } else {
+      // 기존 채팅방이면 참가자인지 확인
+      const isParticipant = room.consumer_id === senderId || room.contractor_id === senderId;
+      if (!isParticipant) {
+        return NextResponse.json({ error: "채팅방 참가자가 아닙니다" }, { status: 403 });
+      }
     }
 
     // 메시지 저장
@@ -70,7 +79,7 @@ export async function POST(req: NextRequest) {
         room_id: roomId,
         sender_id: senderId,
         sender_type: senderType,
-        sender_name: senderName || null,
+        sender_name: safeSenderName,
         content,
         message_type: messageType || "text",
       })
@@ -105,6 +114,17 @@ export async function PATCH(req: NextRequest) {
 
     if (!roomId || !readerId) {
       return NextResponse.json({ error: "roomId, readerId 필요" }, { status: 400 });
+    }
+
+    // 채팅방 참가자 확인
+    const { data: room } = await supabase
+      .from("chat_rooms")
+      .select("consumer_id, contractor_id")
+      .eq("id", roomId)
+      .single();
+
+    if (room && room.consumer_id !== readerId && room.contractor_id !== readerId) {
+      return NextResponse.json({ error: "채팅방 참가자가 아닙니다" }, { status: 403 });
     }
 
     await supabase

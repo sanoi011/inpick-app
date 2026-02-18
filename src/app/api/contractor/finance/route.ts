@@ -55,15 +55,17 @@ export async function GET(req: NextRequest) {
       .eq("contractor_id", contractorId)
       .in("status", ["sent", "overdue"]);
 
-    const today = now.toISOString().split("T")[0];
+    const todayStr = now.toISOString().split("T")[0];
+    const todayMs = new Date(todayStr).getTime();
     const receivables = { total: 0, current: 0, overdue30: 0, overdue60: 0, overdue90: 0 };
     for (const inv of unpaid || []) {
       const t = inv.total || 0;
       receivables.total += t;
-      if (!inv.due_date || inv.due_date >= today) {
+      const dueDateMs = inv.due_date ? new Date(inv.due_date).getTime() : todayMs;
+      if (!inv.due_date || dueDateMs >= todayMs) {
         receivables.current += t;
       } else {
-        const daysOverdue = Math.floor((new Date(today).getTime() - new Date(inv.due_date).getTime()) / 86400000);
+        const daysOverdue = Math.floor((todayMs - dueDateMs) / 86400000);
         if (daysOverdue <= 30) receivables.overdue30 += t;
         else if (daysOverdue <= 60) receivables.overdue60 += t;
         else receivables.overdue90 += t;

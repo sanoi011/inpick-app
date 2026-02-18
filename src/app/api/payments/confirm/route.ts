@@ -5,11 +5,18 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   const supabase = createClient();
 
+  // 소비자 인증 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { paymentKey, orderId, amount, credits, userId } = body;
+    const { paymentKey, orderId, amount, credits } = body;
+    const userId = user.id;
 
-    if (!paymentKey || !orderId || !amount || !userId) {
+    if (!paymentKey || !orderId || !amount) {
       return NextResponse.json(
         { error: "필수 파라미터가 누락되었습니다." },
         { status: 400 }
@@ -41,6 +48,16 @@ export async function POST(request: NextRequest) {
       const errData = await confirmRes.json();
       return NextResponse.json(
         { error: errData.message || "결제 확인 실패" },
+        { status: 400 }
+      );
+    }
+
+    // Toss 응답에서 실제 결제 금액 검증
+    const confirmData = await confirmRes.json();
+    const paidAmount = confirmData.totalAmount;
+    if (paidAmount !== Number(amount)) {
+      return NextResponse.json(
+        { error: "결제 금액이 일치하지 않습니다." },
         { status: 400 }
       );
     }

@@ -201,6 +201,14 @@ export function useProjectState(projectId: string) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId, user?.id]);
 
+  // 언마운트 시 pending 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
+    };
+  }, []);
+
   // 프로젝트 저장 (localStorage 즉시 + Supabase background)
   const saveProject = useCallback(
     (updated: ConsumerProject) => {

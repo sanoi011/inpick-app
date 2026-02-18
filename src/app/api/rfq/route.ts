@@ -47,9 +47,16 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const supabase = createClient();
 
+  // 소비자 인증 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await request.json();
-    const { projectId, address, estimateData, rfqPreferences, userId } = body;
+    const { projectId, address, estimateData, rfqPreferences } = body;
+    const userId = user.id;
 
     if (!projectId || !address || !estimateData) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
