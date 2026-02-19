@@ -1663,6 +1663,43 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   - 다운로드: `INPICK_계약서_{id}_{date}.pdf`
 - `src/app/contract/[id]/page.tsx` - 기존 import 연동 완료
 
+## 완료된 작업 (2026-02-20) - P3 품질 검증 + AI 통합
+
+### P3-1: 59㎡/84A㎡ E2E 물량산출 검증 확장
+- `scripts/verify-all-types-qty.ts` 실행 → ALL PASS (3가지 타입 모두 통과)
+  - 59㎡: 6,433만원 (110 아이템, 16/17 공종, 미매칭 0)
+  - 84A㎡: 7,983만원 (157 아이템, 16/17 공종, 미매칭 0)
+  - 84B㎡: 6,813만원 (107 아이템, 16/17 공종, 미매칭 0)
+
+### P3-2: DXF 파서 Ground Truth 비교 검증
+- `scripts/verify-ground-truth.ts` (신규) - 16개 검증 항목 × 3개 타입 = 48/48 ALL PASS
+  - 총면적, 방 수, 필수 방 타입, 욕실/침실 수, 방 면적 범위
+  - 폴리곤-면적 정합, 면적 합산, 문/창문 수, 필수 설비
+  - 벽체 유효성, 설비 roomId, 문 connectedRooms, 좌표 범위
+  - DXF 비교 프레임워크 준비 (ODA File Converter 필요)
+
+### P3-3: Gemini AI 통합 (OpenAI → Gemini 전환 완료)
+- **모든 AI API를 OpenAI에서 Gemini로 전환** (통일된 `@google/genai` SDK 사용)
+- `src/app/api/project/generate-image/route.ts` - 모델명 수정 (`gemini-2.0-flash-exp`)
+- `src/app/api/project/design-recommend/route.ts` - OpenAI `gpt-4o` → Gemini `gemini-2.0-flash`
+- `src/app/api/project/analyze-photos/route.ts` - OpenAI `gpt-4o` Vision → Gemini `gemini-2.0-flash` multimodal
+- `src/app/api/project/gemini-status/route.ts` - `isOpenAIConfigured` → `isGeminiConfigured`
+- `src/lib/services/gemini-floorplan-parser.ts` - OpenAI `gpt-4o` → Gemini 모델 체인 (`gemini-2.5-flash` → `2.0-flash` → `2.0-flash-lite`)
+- `src/lib/embedding.ts` - OpenAI `text-embedding-3-small` → Gemini `text-embedding-004`
+- **결과**: `src/lib/openai-client.ts`는 미사용 파일로 남음 (참조 0건)
+
+### P3-4: 도면 인식 정확도 추가 개선
+- `src/lib/services/polygon-repair.ts` (개선)
+  - **Step 4 강화**: Gap Detection에서 실제 갭 채우기 구현 (0.3m 이내 변 끝점 자동 스냅)
+    - `pointToSegmentClosest()`, `segmentPairClosest()` 기하학 유틸 추가
+    - 가장 가까운 변 쌍 탐색 → 중점으로 정점 스냅
+  - **Step 4.5 신규**: Room Area Clamping (비현실적 면적 자동 보정)
+    - BATHROOM ≤ 8m², ENTRANCE ≤ 10m², UTILITY ≤ 8m²
+    - DRESSROOM ≤ 8m², BALCONY ≤ 12m², CORRIDOR ≤ 15m²
+    - 초과 시 폴리곤 중심 기준 스케일 축소
+  - `recalcRoomGeometry()` 공통 함수 추출 (바운딩박스+면적+중심점 재계산)
+- 검증: Ground Truth 48/48 PASS, QTY ALL PASS 유지
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -1672,7 +1709,7 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 4. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
-- DXF 파서 실행 및 Ground Truth 비교 검증
-- Gemini AI 이미지 생성 실제 테스트 (API 키 발급 후)
+- DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
+- Gemini AI 이미지 생성 실제 테스트 (API 키 발급 완료, 테스트 필요)
 - 84B 타입 E2E 워크플로우 검증 확장 (59㎡, 84A㎡)
-- 도면 인식 정확도 추가 개선
+- `src/lib/openai-client.ts` 미사용 파일 정리 (삭제 가능)

@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { isOpenAIConfigured } from "@/lib/openai-client";
+import { isGeminiConfigured } from "@/lib/gemini-client";
 
 export async function GET() {
-  const configured = isOpenAIConfigured();
+  const configured = isGeminiConfigured();
 
   return NextResponse.json({
     status: configured ? "configured" : "mock",

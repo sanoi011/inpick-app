@@ -2,7 +2,7 @@
 // POST /api/project/analyze-photos - 다중 사진 → GPT-4o Vision → 추정 평면도
 
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
+import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import type { ParsedFloorPlan, RoomType } from "@/types/floorplan";
 
 export const maxDuration = 60;
@@ -192,19 +192,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // OpenAI 미설정 시 Mock
-    if (!isOpenAIConfigured()) {
+    // Gemini 미설정 시 Mock
+    if (!isGeminiConfigured()) {
       const floorPlan = getMockPhotoFloorPlan(approximateArea, roomCount);
       return NextResponse.json({
         floorPlan,
         confidence: 0.3,
         method: "mock",
-        warnings: ["OpenAI API 키가 설정되지 않아 추정 데이터를 반환합니다"],
+        warnings: ["AI API 키가 설정되지 않아 추정 데이터를 반환합니다"],
         detectedRooms: [],
       });
     }
 
-    const client = getOpenAIClient();
+    const client = getGeminiClient();
     if (!client) {
       return NextResponse.json(
         { error: "AI 클라이언트 초기화 실패" },
@@ -212,21 +212,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 사진 → base64 image_url 파트
-    type ContentPart = { type: "text"; text: string } | { type: "image_url"; image_url: { url: string } };
-    const imageContentParts: ContentPart[] = [];
+    // 사진 → base64 inlineData 파트
+    const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
     for (const photo of photos) {
       if (photo.size > 10 * 1024 * 1024) continue; // 10MB 초과 스킵
       const buffer = Buffer.from(await photo.arrayBuffer());
       const base64 = buffer.toString("base64");
       const mime = photo.type || "image/jpeg";
-      imageContentParts.push({
-        type: "image_url",
-        image_url: { url: `data:${mime};base64,${base64}` },
+      imageParts.push({
+        inlineData: { mimeType: mime, data: base64 },
       });
     }
 
-    if (imageContentParts.length === 0) {
+    if (imageParts.length === 0) {
       return NextResponse.json(
         { error: "유효한 사진이 없습니다." },
         { status: 400 }
@@ -235,32 +233,28 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: PHOTO_ANALYSIS_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(PHOTO_SCHEMA, null, 2),
-        },
-        {
-          role: "user",
-          content: [
-            ...imageContentParts,
-            {
-              type: "text",
-              text: `위 ${imageContentParts.length}장의 실내 사진을 분석하여 추정 평면도를 JSON으로 생성하세요.
+    const userPrompt = `위 ${imageParts.length}장의 실내 사진을 분석하여 추정 평면도를 JSON으로 생성하세요.
 대략적 면적: ${approximateArea}㎡, 예상 방 수: ${roomCount}개
-각 사진에서 보이는 공간, 벽, 문, 창문, 설비를 식별하고 공간 배치를 추정하세요.`,
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.2,
-      max_tokens: 8192,
+각 사진에서 보이는 공간, 벽, 문, 창문, 설비를 식별하고 공간 배치를 추정하세요.`;
+
+    const response = await client.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{
+        role: "user",
+        parts: [
+          ...imageParts,
+          { text: PHOTO_ANALYSIS_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(PHOTO_SCHEMA, null, 2) + "\n\n" + userPrompt },
+        ],
+      }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: PHOTO_SCHEMA,
+        temperature: 0.2,
+        maxOutputTokens: 8192,
+      },
     });
 
-    const text = response.choices[0]?.message?.content || "";
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     let parsed: { rooms?: PhotoRoom[]; doors?: PhotoDoor[]; windows?: PhotoWindow[]; detectedRooms?: { name: string; features?: string[] }[] };
 
     try {
@@ -336,8 +330,8 @@ export async function POST(request: NextRequest) {
 
     // 신뢰도 (사진 기반은 도면 대비 낮음)
     let confidence = 0.4;
-    if (imageContentParts.length >= 5) confidence += 0.1;
-    if (imageContentParts.length >= 10) confidence += 0.1;
+    if (imageParts.length >= 5) confidence += 0.1;
+    if (imageParts.length >= 10) confidence += 0.1;
     if (rooms.length >= 4) confidence += 0.05;
     if (doors.length > 0) confidence += 0.05;
 

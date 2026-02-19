@@ -201,50 +201,56 @@ function removeCollinearFromAllRooms(rooms: RoomData[]): { rooms: RoomData[]; re
 // ─── Step 4: Gap Detection & Fill ───
 // 근거: Kreo Pipeline 토폴로지 분석 - 방을 연결된 그래프로 검증
 
+// 점에서 선분까지의 최소 거리 + 가장 가까운 선분 위의 점
+function pointToSegmentClosest(p: Point, a: Point, b: Point): { dist: number; closest: Point } {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq < 0.0001) return { dist: Math.sqrt((p.x - a.x) ** 2 + (p.y - a.y) ** 2), closest: { ...a } };
+
+  let t = ((p.x - a.x) * dx + (p.y - a.y) * dy) / lenSq;
+  t = Math.max(0, Math.min(1, t));
+  const closest = { x: a.x + t * dx, y: a.y + t * dy };
+  const dist = Math.sqrt((p.x - closest.x) ** 2 + (p.y - closest.y) ** 2);
+  return { dist, closest };
+}
+
+// 두 선분 간 최소 거리 및 가장 가까운 점 쌍
+function segmentPairClosest(a1: Point, a2: Point, b1: Point, b2: Point): {
+  dist: number; ptA: Point; ptB: Point;
+} {
+  const candidates = [
+    { ...pointToSegmentClosest(a1, b1, b2), src: a1 as Point, side: 'a' as const },
+    { ...pointToSegmentClosest(a2, b1, b2), src: a2 as Point, side: 'a' as const },
+    { ...pointToSegmentClosest(b1, a1, a2), src: b1 as Point, side: 'b' as const },
+    { ...pointToSegmentClosest(b2, a1, a2), src: b2 as Point, side: 'b' as const },
+  ];
+  let best = candidates[0];
+  for (let i = 1; i < candidates.length; i++) {
+    if (candidates[i].dist < best.dist) best = candidates[i];
+  }
+  return {
+    dist: best.dist,
+    ptA: best.side === 'a' ? best.src : best.closest,
+    ptB: best.side === 'b' ? best.src : best.closest,
+  };
+}
+
 function detectAndFillGaps(rooms: RoomData[]): { rooms: RoomData[]; filledGaps: number } {
   if (rooms.length < 2) return { rooms, filledGaps: 0 };
 
   let filledGaps = 0;
+  const round = (v: number) => Math.round(v * 1000) / 1000;
 
-  // 방 바운딩 박스 갱신
+  // 방 바운딩 박스 + 면적 + 중심점 갱신
   for (const room of rooms) {
     if (room.polygon && room.polygon.length >= 3) {
-      const xs = room.polygon.map(p => p.x);
-      const ys = room.polygon.map(p => p.y);
-      const minX = Math.min(...xs);
-      const minY = Math.min(...ys);
-      const maxX = Math.max(...xs);
-      const maxY = Math.max(...ys);
-
-      room.position = {
-        x: Math.round(minX * 1000) / 1000,
-        y: Math.round(minY * 1000) / 1000,
-        width: Math.round((maxX - minX) * 1000) / 1000,
-        height: Math.round((maxY - minY) * 1000) / 1000,
-      };
-
-      // 면적 재계산 (Shoelace)
-      let area = 0;
-      const n = room.polygon.length;
-      for (let i = 0; i < n; i++) {
-        const j = (i + 1) % n;
-        area += room.polygon[i].x * room.polygon[j].y;
-        area -= room.polygon[j].x * room.polygon[i].y;
-      }
-      room.area = Math.round(Math.abs(area) / 2 * 100) / 100;
-
-      // 중심점 재계산
-      let cx = 0, cy = 0;
-      for (const p of room.polygon) { cx += p.x; cy += p.y; }
-      room.center = {
-        x: Math.round(cx / n * 1000) / 1000,
-        y: Math.round(cy / n * 1000) / 1000,
-      };
+      recalcRoomGeometry(room);
     }
   }
 
-  // 인접 관계 그래프 구축 (방 간 최소 거리)
-  const ADJACENCY_THRESHOLD = 0.5; // 0.5m 이내면 인접
+  // 인접 관계 그래프 구축 + 갭 실제 채우기
+  const GAP_FILL_THRESHOLD = 0.3; // 0.3m 이내 갭은 자동으로 채움
 
   for (let i = 0; i < rooms.length; i++) {
     for (let j = i + 1; j < rooms.length; j++) {
@@ -252,35 +258,104 @@ function detectAndFillGaps(rooms: RoomData[]): { rooms: RoomData[]; filledGaps: 
       const rj = rooms[j];
       if (!ri.polygon || !rj.polygon) continue;
 
-      // 각 방의 변(edge)과 다른 방의 변 사이 최소 거리 확인
-      let minEdgeDist = Infinity;
+      // 각 방의 변(edge) 쌍 중 가장 가까운 것 찾기
+      let bestDist = Infinity;
+      let bestEdgeA = -1, bestEdgeB = -1;
+      let bestPtA: Point = { x: 0, y: 0 }, bestPtB: Point = { x: 0, y: 0 };
 
       for (let a = 0; a < ri.polygon.length; a++) {
         const a1 = ri.polygon[a];
         const a2 = ri.polygon[(a + 1) % ri.polygon.length];
-        const amx = (a1.x + a2.x) / 2;
-        const amy = (a1.y + a2.y) / 2;
 
         for (let b = 0; b < rj.polygon.length; b++) {
           const b1 = rj.polygon[b];
           const b2 = rj.polygon[(b + 1) % rj.polygon.length];
-          const bmx = (b1.x + b2.x) / 2;
-          const bmy = (b1.y + b2.y) / 2;
 
-          const d = Math.sqrt((amx - bmx) ** 2 + (amy - bmy) ** 2);
-          if (d < minEdgeDist) minEdgeDist = d;
+          const { dist, ptA, ptB } = segmentPairClosest(a1, a2, b1, b2);
+          if (dist < bestDist) {
+            bestDist = dist;
+            bestEdgeA = a;
+            bestEdgeB = b;
+            bestPtA = ptA;
+            bestPtB = ptB;
+          }
         }
       }
 
-      // 갭이 있지만 가까운 경우 → 가까운 변 끝점을 스냅
-      if (minEdgeDist > 0.05 && minEdgeDist < ADJACENCY_THRESHOLD) {
-        // 이미 vertex snapping에서 처리되었을 수 있으므로 카운트만
+      // 갭이 있지만 작은 경우 → 가까운 변의 정점을 중점으로 스냅
+      if (bestDist > 0.02 && bestDist < GAP_FILL_THRESHOLD && bestEdgeA >= 0 && bestEdgeB >= 0) {
+        const midX = round((bestPtA.x + bestPtB.x) / 2);
+        const midY = round((bestPtA.y + bestPtB.y) / 2);
+
+        // 각 변의 가까운 끝점을 중점으로 이동
+        const aVerts = [bestEdgeA, (bestEdgeA + 1) % ri.polygon.length];
+        const bVerts = [bestEdgeB, (bestEdgeB + 1) % rj.polygon.length];
+
+        for (const vi of aVerts) {
+          const p = ri.polygon[vi];
+          const d = Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2);
+          if (d < GAP_FILL_THRESHOLD) {
+            ri.polygon[vi] = { x: midX, y: midY };
+          }
+        }
+        for (const vi of bVerts) {
+          const p = rj.polygon[vi];
+          const d = Math.sqrt((p.x - midX) ** 2 + (p.y - midY) ** 2);
+          if (d < GAP_FILL_THRESHOLD) {
+            rj.polygon[vi] = { x: midX, y: midY };
+          }
+        }
         filledGaps++;
       }
     }
   }
 
+  // 갱신 후 재계산
+  for (const room of rooms) {
+    if (room.polygon && room.polygon.length >= 3) {
+      recalcRoomGeometry(room);
+    }
+  }
+
   return { rooms, filledGaps };
+}
+
+// 방의 바운딩박스, 면적, 중심점 재계산
+function recalcRoomGeometry(room: RoomData): void {
+  if (!room.polygon || room.polygon.length < 3) return;
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+
+  const xs = room.polygon.map(p => p.x);
+  const ys = room.polygon.map(p => p.y);
+  const minX = Math.min(...xs);
+  const minY = Math.min(...ys);
+  const maxX = Math.max(...xs);
+  const maxY = Math.max(...ys);
+
+  room.position = {
+    x: round(minX),
+    y: round(minY),
+    width: round(maxX - minX),
+    height: round(maxY - minY),
+  };
+
+  // Shoelace 면적
+  let area = 0;
+  const n = room.polygon.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += room.polygon[i].x * room.polygon[j].y;
+    area -= room.polygon[j].x * room.polygon[i].y;
+  }
+  room.area = Math.round(Math.abs(area) / 2 * 100) / 100;
+
+  // 중심점
+  let cx = 0, cy = 0;
+  for (const p of room.polygon) { cx += p.x; cy += p.y; }
+  room.center = {
+    x: round(cx / n),
+    y: round(cy / n),
+  };
 }
 
 // ─── Connectivity Check (연결성 검증) ───
@@ -374,6 +449,48 @@ function validateAreaProportions(rooms: RoomData[], totalArea?: number): string[
   }
 
   return warnings;
+}
+
+// ─── Step 4.5: Room Area Clamping (비현실적 면적 보정) ───
+// 근거: 한국 아파트 실측 데이터 - 방 타입별 현실적 면적 범위
+
+// 방 타입별 최대 허용 면적 (m²)
+const ROOM_AREA_MAX: Record<string, number> = {
+  BATHROOM: 8,      // 욕실은 절대 8m² 초과 불가
+  ENTRANCE: 10,     // 현관은 10m² 초과 불가
+  UTILITY: 8,       // 다용도실은 8m² 초과 불가
+  DRESSROOM: 8,     // 드레스룸은 8m² 초과 불가
+  BALCONY: 12,      // 발코니는 12m² 초과 불가
+  CORRIDOR: 15,     // 복도는 15m² 초과 불가
+};
+
+function clampRoomAreas(rooms: RoomData[]): { rooms: RoomData[]; clampedCount: number } {
+  let clampedCount = 0;
+  const round = (v: number) => Math.round(v * 1000) / 1000;
+
+  for (const room of rooms) {
+    const maxArea = ROOM_AREA_MAX[room.type];
+    if (!maxArea) continue;
+    if (room.area <= maxArea) continue;
+    if (!room.polygon || room.polygon.length < 3) continue;
+
+    // 폴리곤 스케일 축소 (중심점 기준)
+    const scaleFactor = Math.sqrt(maxArea / room.area);
+    let cx = 0, cy = 0;
+    for (const p of room.polygon) { cx += p.x; cy += p.y; }
+    cx /= room.polygon.length;
+    cy /= room.polygon.length;
+
+    room.polygon = room.polygon.map(p => ({
+      x: round(cx + (p.x - cx) * scaleFactor),
+      y: round(cy + (p.y - cy) * scaleFactor),
+    }));
+
+    recalcRoomGeometry(room);
+    clampedCount++;
+  }
+
+  return { rooms, clampedCount };
 }
 
 // ─── Step 5: Proportional Area Correction (비율 보정) ───
@@ -539,12 +656,18 @@ export function repairFloorPlanTopology(
   const isConnected = checkConnectivity(gaps.rooms);
   repairLog.push(`[연결성] ${isConnected ? '모든 방 연결됨' : '분리된 방 존재!'}`);
 
+  // Step 4.5: Room Area Clamping (비현실적 면적 보정)
+  const clamped = clampRoomAreas(gaps.rooms);
+  if (clamped.clampedCount > 0) {
+    repairLog.push(`[Step 4.5] 면적 클램핑: ${clamped.clampedCount}개 방 최대면적 초과 → 축소 보정`);
+  }
+
   // Area Proportion Validation
-  const areaWarnings = validateAreaProportions(gaps.rooms, knownArea);
+  const areaWarnings = validateAreaProportions(clamped.rooms, knownArea);
   repairLog.push(...areaWarnings);
 
   // Step 5: Proportional Area Correction (격자형 최후 보정)
-  let correctedRooms = gaps.rooms;
+  let correctedRooms = clamped.rooms;
   if (knownArea && knownArea > 30) {
     const correction = correctProportions(gaps.rooms, knownArea);
     correctedRooms = correction.rooms;

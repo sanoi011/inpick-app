@@ -2,7 +2,7 @@
 // POST /api/project/design-recommend - AI 디자인 추천 (스타일/예산/우선순위 → 방별 추천)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
+import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 
 export const maxDuration = 60;
@@ -155,8 +155,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // OpenAI 미설정 시 Mock
-    if (!isOpenAIConfigured()) {
+    // Gemini 미설정 시 Mock
+    if (!isGeminiConfigured()) {
       const result = getMockRecommendation(floorPlan, preferences);
       return NextResponse.json({
         ...result,
@@ -165,7 +165,7 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const client = getOpenAIClient();
+    const client = getGeminiClient();
     if (!client) {
       const result = getMockRecommendation(floorPlan, preferences);
       return NextResponse.json({
@@ -182,16 +182,7 @@ export async function POST(request: NextRequest) {
 
     const startTime = Date.now();
 
-    const response = await client.chat.completions.create({
-      model: "gpt-4o",
-      messages: [
-        {
-          role: "system",
-          content: DESIGN_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(DESIGN_SCHEMA, null, 2),
-        },
-        {
-          role: "user",
-          content: `## 평면도 정보
+    const userPrompt = `## 평면도 정보
 총 면적: ${floorPlan.totalArea}㎡
 공간 목록:
 ${roomSummary}
@@ -202,15 +193,23 @@ ${roomSummary}
 - 우선순위: ${preferences.priorities.join(", ")}
 
 위 정보를 바탕으로 방별 인테리어 디자인을 추천하세요.
-각 방의 roomId는 평면도의 room id를 그대로 사용하세요.`,
-        },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.3,
-      max_tokens: 8192,
+각 방의 roomId는 평면도의 room id를 그대로 사용하세요.`;
+
+    const response = await client.models.generateContent({
+      model: "gemini-2.0-flash",
+      contents: [{
+        role: "user",
+        parts: [{ text: DESIGN_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(DESIGN_SCHEMA, null, 2) + "\n\n" + userPrompt }],
+      }],
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: DESIGN_SCHEMA,
+        temperature: 0.3,
+        maxOutputTokens: 8192,
+      },
     });
 
-    const text = response.choices[0]?.message?.content || "";
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     let result: DesignRecommendation;
 
     try {

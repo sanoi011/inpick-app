@@ -1,7 +1,7 @@
 // src/lib/services/gemini-floorplan-parser.ts
-// GPT-4o Vision 기반 건축 도면 인식 엔진
+// Gemini Vision 기반 건축 도면 인식 엔진
 
-import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
+import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import type {
   ParsedFloorPlan,
   RoomData,
@@ -947,8 +947,8 @@ export async function extractFloorPlanFromImage(
   const startTime = Date.now();
   const warnings: string[] = [];
 
-  if (!isOpenAIConfigured()) {
-    warnings.push("OpenAI API 키가 설정되지 않아 Mock 데이터를 반환합니다");
+  if (!isGeminiConfigured()) {
+    warnings.push("Gemini API 키가 설정되지 않아 Mock 데이터를 반환합니다");
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.3,
@@ -958,9 +958,9 @@ export async function extractFloorPlanFromImage(
     };
   }
 
-  const client = getOpenAIClient();
+  const client = getGeminiClient();
   if (!client) {
-    warnings.push("OpenAI 클라이언트 초기화 실패");
+    warnings.push("Gemini 클라이언트 초기화 실패");
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.3,
@@ -989,13 +989,13 @@ export async function extractFloorPlanFromImage(
     }
   }
 
-  // 모델 폴백 순서: gpt-4o → gpt-4o-mini
-  const MODELS = ["gpt-4o", "gpt-4o-mini"];
+  // 모델 폴백 순서: gemini-2.5-flash → gemini-2.0-flash → gemini-2.0-flash-lite
+  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
 
   // JSON 스키마 문자열 (시스템 프롬프트에 포함)
   const JSON_SCHEMA_STR = JSON.stringify(JSON_SCHEMA, null, 2);
 
-  // OpenAI Vision 호출 함수 (재시도용)
+  // Gemini Vision 호출 함수 (재시도용)
   async function callVisionModel(extraPrompt?: string, temp: number = 0.1): Promise<GeminiRawResult | null> {
     let text = "";
     let lastError: unknown = null;
@@ -1008,34 +1008,23 @@ export async function extractFloorPlanFromImage(
     for (const modelName of MODELS) {
       try {
         console.log(`[floorplan-parser] Trying model: ${modelName}${extraPrompt ? " (retry)" : ""}`);
-        const response = await client!.chat.completions.create({
+        const response = await client!.models.generateContent({
           model: modelName,
-          messages: [
-            {
-              role: "system",
-              content: systemPrompt,
-            },
-            {
-              role: "user",
-              content: [
-                {
-                  type: "image_url",
-                  image_url: {
-                    url: `data:${mimeType};base64,${imageBase64}`,
-                  },
-                },
-                {
-                  type: "text",
-                  text: buildUserPrompt(options),
-                },
-              ],
-            },
-          ],
-          response_format: { type: "json_object" },
-          temperature: temp,
-          max_tokens: 16384,
+          contents: [{
+            role: "user",
+            parts: [
+              { inlineData: { mimeType, data: imageBase64 } },
+              { text: systemPrompt + "\n\n" + buildUserPrompt(options) },
+            ],
+          }],
+          config: {
+            responseMimeType: "application/json",
+            temperature: temp,
+            maxOutputTokens: 16384,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         });
-        text = response.choices[0]?.message?.content || "";
+        text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
         console.log(`[floorplan-parser] Success with model: ${modelName}`);
         break;
       } catch (modelError) {
