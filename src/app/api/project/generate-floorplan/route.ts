@@ -20,7 +20,7 @@ function createAdminClient() {
   return createServerClient();
 }
 
-export const maxDuration = 300; // Vercel Pro 5분
+export const maxDuration = 10;
 
 const MODEL = "gemini-2.0-flash-exp";
 const MAX_RETRIES = 3;

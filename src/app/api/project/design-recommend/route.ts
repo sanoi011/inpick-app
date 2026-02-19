@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
 import type { ParsedFloorPlan } from "@/types/floorplan";
 
-export const maxDuration = 60;
+export const maxDuration = 10;
 
 interface DesignPreferences {
   style: string;       // 모던, 북유럽, 클래식, 미니멀, 내추럴

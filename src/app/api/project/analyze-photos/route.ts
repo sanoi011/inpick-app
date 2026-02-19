@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIClient, isOpenAIConfigured } from "@/lib/openai-client";
 import type { ParsedFloorPlan, RoomType } from "@/types/floorplan";
 
-export const maxDuration = 60;
+export const maxDuration = 10;
 
 const PHOTO_ANALYSIS_PROMPT = `당신은 한국 아파트 실내 사진 분석 전문가입니다.
 여러 장의 실내 사진을 분석하여 추정 평면도를 생성하세요.

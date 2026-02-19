@@ -24,7 +24,7 @@ const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
     )
   : null;
 
-export const maxDuration = 60; // Vercel 60초 타임아웃
+export const maxDuration = 10;
 
 export async function POST(request: NextRequest) {
   try {
