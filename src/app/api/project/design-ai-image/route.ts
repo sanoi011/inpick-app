@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 
-export const maxDuration = 10;
+export const maxDuration = 120;
 
 const IMAGE_GEN_MODEL = "gemini-3-pro-image-preview";
 
