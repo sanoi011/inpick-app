@@ -4,7 +4,7 @@ drawings/
 reference/
 e2e/
 test-results/
-supabase/
+/supabase/
 *.py
 *.pdf
 *.dwg
