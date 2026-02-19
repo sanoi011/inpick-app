@@ -47,7 +47,6 @@
     "typescript": "^5"
   },
   "optionalDependencies": {
-    "canvas": "^2.11.2",
     "pdfjs-dist": "^3.11.174",
     "pdf-parse": "^1.1.1"
   }

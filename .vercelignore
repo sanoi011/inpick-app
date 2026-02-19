@@ -1,0 +1,13 @@
+python/
+scripts/
+drawings/
+reference/
+e2e/
+test-results/
+supabase/
+*.py
+*.mjs
+*.pdf
+*.dwg
+*.dxf
+runs/
