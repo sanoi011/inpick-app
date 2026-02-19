@@ -6,7 +6,6 @@ e2e/
 test-results/
 supabase/
 *.py
-*.mjs
 *.pdf
 *.dwg
 *.dxf
