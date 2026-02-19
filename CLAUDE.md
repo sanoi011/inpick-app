@@ -1626,12 +1626,49 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `72b381a` | Round 12: 계약/입찰 인증+소유권 검증 |
 | `2e03df9` | 사업자 디렉토리 기능 보완 |
 
+## 완료된 작업 (2026-02-20) - P2 결제/필터/PDF
+
+### P2-7: Toss Payments 실결제 연동 강화
+- `src/app/api/payments/webhook/route.ts` (신규) - Toss 웹훅 엔드포인트
+  - PAYMENT_STATUS_CHANGED 이벤트 처리 (DONE/CANCELED/ABORTED/EXPIRED)
+  - DONE: 멱등성 크레딧 충전 (중복 방지)
+  - CANCELED/EXPIRED: pending 트랜잭션 실패 기록
+  - 항상 200 OK 반환 (재시도 방지)
+- `src/app/api/payments/history/route.ts` (신규) - 결제/크레딧 이력 조회
+  - GET: 소비자 인증 필수, type(CHARGE/SPEND) 필터, 페이지네이션
+  - 현재 잔액 포함 응답
+- `src/app/api/payments/checkout/route.ts` (수정) - 인증 강화
+  - userId 파라미터 → supabase.auth.getUser() 인증으로 교체
+  - 미인증 시 401 반환
+
+### P2-8: 사업자 디렉토리 검색/필터 고도화
+- `src/app/api/contractors/route.ts` (수정) - 서버사이드 필터 추가
+  - `verifiedOnly` - 인증업체만 필터
+  - `minBudget` / `maxBudget` - 예산 범위 필터
+  - `minExperience` - 최소 경력년수 필터 (공종과 연동)
+  - 공종 필터 서버사이드 전환 (기존 클라이언트사이드 → contractor_trades 선조회 후 IN 필터)
+  - 빈 결과 시 조기 반환 (불필요한 쿼리 방지)
+
+### P2-9: 계약서 PDF 생성
+- `src/lib/pdf/contract-pdf-generator.ts` (신규, ~280줄) - jsPDF 기반 계약서 PDF
+  - NanumGothic 한국어 폰트 런타임 로딩
+  - INPICK 브랜딩 헤더 + 파란색 강조선
+  - 공정위 실내건축공사 표준계약서 양식 (표준약관 제10096호 준용)
+  - 계약 정보 테이블 (공사명/장소/기간/금액/계약일)
+  - 갑(소비자) / 을(시공사) 정보 박스
+  - 결제 일정 테이블 (착공/중도1차/중도2차/잔금)
+  - 계약 일반조건 11개 조항
+  - 전자서명 섹션 (서명일시 표시)
+  - 자동 페이지 넘김 + INPICK 푸터 + 페이지 번호
+  - 다운로드: `INPICK_계약서_{id}_{date}.pdf`
+- `src/app/contract/[id]/page.tsx` - 기존 import 연동 완료
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
 1. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
 2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`
+3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
 4. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
