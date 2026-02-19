@@ -5,13 +5,25 @@ import { createClient } from "@/lib/supabase/server";
 export async function POST(request: NextRequest) {
   const supabase = createClient();
 
+  // 소비자 인증 확인
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json(
+      { error: "로그인이 필요합니다" },
+      { status: 401 }
+    );
+  }
+
   try {
     const body = await request.json();
-    const { packageId, userId } = body;
+    const { packageId } = body;
+    const userId = user.id;
 
-    if (!packageId || !userId) {
+    if (!packageId) {
       return NextResponse.json(
-        { error: "packageId와 userId가 필요합니다." },
+        { error: "packageId가 필요합니다." },
         { status: 400 }
       );
     }

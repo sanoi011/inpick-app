@@ -16,6 +16,10 @@ export async function GET(req: NextRequest) {
   const search = sp.get("search") || "";
   const page = Math.max(1, Number(sp.get("page")) || 1);
   const pageSize = 12;
+  const minBudget = Number(sp.get("minBudget")) || 0;
+  const maxBudget = Number(sp.get("maxBudget")) || 0;
+  const minExperience = Number(sp.get("minExperience")) || 0;
+  const verifiedOnly = sp.get("verifiedOnly") === "true";
 
   try {
     const supabase = createClient();
@@ -48,6 +52,42 @@ export async function GET(req: NextRequest) {
       const safe = sanitizeFilterValue(search.trim());
       query = query.or(`company_name.ilike.%${safe}%,introduction.ilike.%${safe}%`);
     }
+    if (verifiedOnly) {
+      query = query.eq("is_verified", true);
+    }
+    if (minBudget > 0) {
+      query = query.gte("min_project_budget", minBudget);
+    }
+    if (maxBudget > 0) {
+      query = query.lte("max_project_budget", maxBudget);
+    }
+
+    // 공종 필터: 서버사이드 (trade가 있으면 먼저 해당 공종의 contractor ID를 조회)
+    if (trade) {
+      let tradeQuery = supabase
+        .from("contractor_trades")
+        .select("contractor_id")
+        .eq("trade_code", trade);
+
+      if (minExperience > 0) {
+        tradeQuery = tradeQuery.gte("experience_years", minExperience);
+      }
+
+      const { data: tradeData } = await tradeQuery;
+      const contractorIds = (tradeData || []).map((t: Record<string, unknown>) => t.contractor_id as string);
+
+      if (contractorIds.length === 0) {
+        return NextResponse.json({
+          contractors: [],
+          total: 0,
+          page,
+          pageSize,
+          totalPages: 0,
+        });
+      }
+
+      query = query.in("id", contractorIds);
+    }
 
     // 정렬
     if (sort === "rating") {
@@ -74,14 +114,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "조회 실패" }, { status: 500 });
     }
 
-    // 공종 필터 (trade JOIN 후 클라이언트 측 필터링)
-    let contractors = data || [];
-    if (trade) {
-      contractors = contractors.filter((c: Record<string, unknown>) => {
-        const trades = c.contractor_trades as Record<string, unknown>[];
-        return trades?.some((t) => t.trade_code === trade);
-      });
-    }
+    const contractors = data || [];
 
     // 응답 변환
     const mapped = contractors.map((c: Record<string, unknown>) => {
