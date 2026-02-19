@@ -22,6 +22,14 @@ const nextConfig = {
     ],
   },
   webpack: (config, { isServer, webpack }) => {
+    // canvas is an optional peer dep of pdfjs-dist (native module, not available on Vercel)
+    // Ignore it so webpack doesn't fail when resolving pdfjs-dist dependencies
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^canvas$/,
+      })
+    );
+
     if (isServer) {
       // Server: onnxruntime-web is browser-only, ignore completely
       config.plugins.push(
