@@ -17,7 +17,7 @@ export function calculateTileQty(
     items.push({
       tradeCode: '05_TILE', itemCode: '05.FLOOR',
       itemName: '바닥 타일',
-      specification: '포세린타일 300×300 (논슬립) + 접착제 + 줄눈',
+      specification: '포세린타일 600×600 (논슬립)',
       unit: 'SQM',
       rawQuantity: round(room.wetArea.floorTileArea),
       surchargeRate: tileRate,
@@ -30,7 +30,7 @@ export function calculateTileQty(
     items.push({
       tradeCode: '05_TILE', itemCode: '05.WALL',
       itemName: '벽 타일',
-      specification: `포세린타일 300×600 + 접착제 + 줄눈 (H=${room.wetArea.wallTileHeight}mm)`,
+      specification: `포세린타일 300×600 (H=${room.wetArea.wallTileHeight}mm)`,
       unit: 'SQM',
       rawQuantity: round(room.wetArea.wallTileArea),
       surchargeRate: tileRate,
@@ -39,23 +39,23 @@ export function calculateTileQty(
       calculationBasis: `${room.roomName} 벽타일 ${round(room.wetArea.wallTileArea)}㎡ (전타일)`,
     });
 
-    // 타일 접착제 (약 5kg/㎡)
+    // 타일 접착제 (3.5kg/㎡ — 포세린타일 표준)
     const totalTile = room.wetArea.floorTileArea + room.wetArea.wallTileArea;
-    const adhesiveKg = totalTile * 5;
+    const adhesiveKg = totalTile * 3.5;
     items.push({
       tradeCode: '05_TILE', itemCode: '05.ADHESIVE',
       itemName: '타일 접착제',
-      specification: '플렉스 타일 접착제 (약 5kg/㎡)',
+      specification: '플렉스 타일 접착제 (3.5kg/㎡)',
       unit: 'KG',
       rawQuantity: round(adhesiveKg, 1),
       surchargeRate: SURCHARGE_RATES.TILE_ADHESIVE,
       finalQuantity: applyRate(adhesiveKg, SURCHARGE_RATES.TILE_ADHESIVE),
       roomId: room.roomId, roomName: room.roomName,
-      calculationBasis: `타일면적 ${round(totalTile)}㎡ × 5kg/㎡`,
+      calculationBasis: `타일면적 ${round(totalTile)}㎡ × 3.5kg/㎡`,
     });
 
-    // 줄눈재 (약 0.5kg/㎡)
-    const groutKg = totalTile * 0.5;
+    // 줄눈재 (0.3kg/㎡ — 줄눈 폭 3~5mm 기준)
+    const groutKg = totalTile * 0.3;
     items.push({
       tradeCode: '05_TILE', itemCode: '05.GROUT',
       itemName: '줄눈재',
@@ -65,7 +65,7 @@ export function calculateTileQty(
       surchargeRate: SURCHARGE_RATES.TILE_GROUT,
       finalQuantity: applyRate(groutKg, SURCHARGE_RATES.TILE_GROUT),
       roomId: room.roomId, roomName: room.roomName,
-      calculationBasis: `타일면적 × 0.5kg/㎡`,
+      calculationBasis: `타일면적 ${round(totalTile)}㎡ × 0.3kg/㎡`,
     });
   }
 
