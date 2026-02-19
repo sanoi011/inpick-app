@@ -92,7 +92,7 @@ export const DEFAULT_UNIT_PRICES: UnitPrice[] = [
   // ───────────────────────────────────────────
   { itemCode: '10.DOOR_SINGLE_DOOR', itemName: '외여닫이문', unit: 'SET', materialCost: 250000, laborCost: 130000, totalUnitCost: 380000, source: '2025 ABS 방문 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 창호공사' },
   { itemCode: '10.DOOR_SLIDING_DOOR', itemName: '미닫이문', unit: 'SET', materialCost: 320000, laborCost: 150000, totalUnitCost: 470000, source: '2025 슬라이딩 도어 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 창호공사' },
-  { itemCode: '10.DOOR_ENTRANCE_DOOR', itemName: '현관문', unit: 'SET', materialCost: 550000, laborCost: 200000, totalUnitCost: 750000, source: '2025 방화문 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 창호공사' },
+  { itemCode: '10.DOOR_ENTRANCE_DOOR', itemName: '현관문', unit: 'SET', materialCost: 600000, laborCost: 250000, totalUnitCost: 850000, source: '2025 중급 방화문 (도어록 포함)', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 창호공사' },
 
   // ───────────────────────────────────────────
   // 11. 잡철
@@ -116,7 +116,7 @@ export const DEFAULT_UNIT_PRICES: UnitPrice[] = [
   { itemCode: '13.TOILET', itemName: '양변기', unit: 'EA', materialCost: 320000, laborCost: 130000, totalUnitCost: 450000, source: '2025 TOTO/대림 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
   { itemCode: '13.BASIN_CABINET', itemName: '세면대(하부장)', unit: 'EA', materialCost: 400000, laborCost: 120000, totalUnitCost: 520000, source: '2025 하부장 세트 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
   { itemCode: '13.BASIN', itemName: '세면대', unit: 'EA', materialCost: 200000, laborCost: 80000, totalUnitCost: 280000, source: '2025 벽걸이 세면대', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
-  { itemCode: '13.SHOWER_BOOTH', itemName: '샤워부스', unit: 'EA', materialCost: 500000, laborCost: 200000, totalUnitCost: 700000, source: '2025 유리 파티션 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
+  { itemCode: '13.SHOWER_BOOTH', itemName: '샤워부스', unit: 'EA', materialCost: 500000, laborCost: 250000, totalUnitCost: 750000, source: '2025 강화유리 파티션 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
   { itemCode: '13.BATHTUB', itemName: '욕조', unit: 'EA', materialCost: 600000, laborCost: 250000, totalUnitCost: 850000, source: '2025 FRP 욕조 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
   { itemCode: '13.BIDET', itemName: '비데', unit: 'EA', materialCost: 350000, laborCost: 70000, totalUnitCost: 420000, source: '2025 전자식 비데 중급', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02 위생도기' },
 
@@ -146,9 +146,8 @@ export const DEFAULT_UNIT_PRICES: UnitPrice[] = [
   // ───────────────────────────────────────────
   // 16. 걸레받이/몰딩
   // ───────────────────────────────────────────
-  { itemCode: '16.BASEBOARD', itemName: '걸레받이', unit: 'LM', materialCost: 6000, laborCost: 7000, totalUnitCost: 13000, source: '2025 PVC 걸레받이 60mm', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02' },
-  { itemCode: '16.TILE_BASEBOARD', itemName: '타일 걸레받이', unit: 'LM', materialCost: 10000, laborCost: 12000, totalUnitCost: 22000, source: '2025 타일 걸레받이 100mm', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02' },
-  { itemCode: '16.CROWN', itemName: '크라운 몰딩', unit: 'LM', materialCost: 12000, laborCost: 12000, totalUnitCost: 24000, source: '2025 PU 크라운 몰딩', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02' },
+  { itemCode: '16.BASEBOARD', itemName: '걸레받이', unit: 'LM', materialCost: 3500, laborCost: 3500, totalUnitCost: 7000, source: '2025 PVC/MDF필름 걸레받이 80mm', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02' },
+  { itemCode: '16.CROWN', itemName: '크라운 몰딩', unit: 'LM', materialCost: 4000, laborCost: 4000, totalUnitCost: 8000, source: '2025 PS/PU 크라운 몰딩', updatedAt: '2025-03', priceGrade: 'standard', priceReference: '물가협회 2025-02' },
 
   // ───────────────────────────────────────────
   // 17. 정리

@@ -239,6 +239,10 @@ export function adaptParsedFloorPlan(
     };
   });
 
+  // 6. 기본 설비 자동 생성 (도면에 누락된 경우)
+  const defaultFixtures = generateDefaultFixtures(rooms, fixtures);
+  const allFixtures = [...fixtures, ...defaultFixtures];
+
   return {
     id: projectId,
     name: projectName,
@@ -246,6 +250,133 @@ export function adaptParsedFloorPlan(
     rooms,
     walls,
     openings: [...doorOpenings, ...windowOpenings],
-    fixtures,
+    fixtures: allFixtures,
   };
+}
+
+/**
+ * 방의 폴리곤 바운딩박스에서 장변/단변 계산 (mm 단위)
+ */
+function getRoomDimensions(room: Room): { longSide: number; shortSide: number; area: number } {
+  if (!room.polygon || room.polygon.length < 3) {
+    return { longSide: 3000, shortSide: 2000, area: 6000000 };
+  }
+  const xs = room.polygon.map(p => p.x);
+  const ys = room.polygon.map(p => p.y);
+  const w = Math.max(...xs) - Math.min(...xs);
+  const h = Math.max(...ys) - Math.min(...ys);
+  return {
+    longSide: Math.max(w, h),
+    shortSide: Math.min(w, h),
+    area: w * h,
+  };
+}
+
+/**
+ * 도면에 누락된 기본 설비 자동 생성
+ * 방의 실제 크기에 비례하여 설비 치수를 동적으로 산출
+ *
+ * 한국 아파트 실측 기준:
+ * - 주방 캐비닛: 주방 장변의 70~80% (I형), 장변+단변의 50% (L형)
+ * - 신발장: 현관 장변의 60~70%
+ * - 붙박이장: 방 단변의 50~70%
+ * - 에어컨: 방 면적 10m² 이상 시 1대
+ */
+function generateDefaultFixtures(rooms: Room[], existingFixtures: Fixture[]): Fixture[] {
+  const defaults: Fixture[] = [];
+  let fixtureIdx = existingFixtures.length;
+
+  const hasType = (type: string) => existingFixtures.some(f => f.type === type);
+  const hasTypeInRoom = (type: string, roomId: string) =>
+    existingFixtures.some(f => f.type === type && f.roomId === roomId);
+
+  const makeFixture = (
+    type: string, roomId: string, widthMm: number, heightMm: number,
+    posX: number, posY: number
+  ): Fixture => {
+    const utilities = getFixtureUtilities(type);
+    return {
+      id: `fixture-auto-${fixtureIdx++}`,
+      type,
+      roomId,
+      boundingBox: { x: posX, y: posY, width: Math.round(widthMm), height: Math.round(heightMm) },
+      constructionStatus: 'NEW' as const,
+      ...utilities,
+    };
+  };
+
+  for (const room of rooms) {
+    const cx = room.center?.x ?? room.polygon[0]?.x ?? 0;
+    const cy = room.center?.y ?? room.polygon[0]?.y ?? 0;
+    const dim = getRoomDimensions(room);
+
+    // 주방: 캐비닛 길이 = 장변의 75% (최소 2m, 최대 5m)
+    if (room.type === 'KITCHEN') {
+      const cabinetLength = Math.max(2000, Math.min(5000, dim.longSide * 0.75));
+
+      if (!hasType('KITCHEN_UPPER_CABINET')) {
+        defaults.push(makeFixture('KITCHEN_UPPER_CABINET', room.id, cabinetLength, 350, cx, cy));
+      }
+      if (!hasType('KITCHEN_LOWER_CABINET')) {
+        defaults.push(makeFixture('KITCHEN_LOWER_CABINET', room.id, cabinetLength, 600, cx, cy + 400));
+      }
+      if (!hasType('KITCHEN_COUNTER')) {
+        defaults.push(makeFixture('KITCHEN_COUNTER', room.id, cabinetLength, 600, cx, cy + 400));
+      }
+      if (!hasType('RANGE_HOOD')) {
+        defaults.push(makeFixture('RANGE_HOOD', room.id, 600, 500, cx + cabinetLength / 2, cy));
+      }
+    }
+
+    // 현관: 신발장 길이 = 장변의 65% (최소 1.0m, 최대 2.0m)
+    if (room.type === 'ENTRANCE' && !hasType('SHOE_CABINET')) {
+      const shoeLen = Math.max(1000, Math.min(2000, dim.longSide * 0.65));
+      defaults.push(makeFixture('SHOE_CABINET', room.id, shoeLen, 400, cx, cy));
+    }
+
+    // 드레스룸: 붙박이장 = 장변의 70% (최소 1.2m, 최대 3.0m)
+    if (room.type === 'DRESSROOM' && !hasTypeInRoom('WARDROBE', room.id)) {
+      const wardrobeLen = Math.max(1200, Math.min(3000, dim.longSide * 0.7));
+      defaults.push(makeFixture('WARDROBE', room.id, wardrobeLen, 600, cx, cy));
+    }
+
+    // 안방: 붙박이장 = 단변의 60% (최소 1.5m, 최대 3.0m) + 에어컨
+    if (room.type === 'MASTER_BEDROOM') {
+      if (!hasTypeInRoom('WARDROBE', room.id)) {
+        const wardrobeLen = Math.max(1500, Math.min(3000, dim.shortSide * 0.6));
+        defaults.push(makeFixture('WARDROBE', room.id, wardrobeLen, 600, cx, cy));
+      }
+      if (!hasTypeInRoom('AC_INDOOR', room.id)) {
+        defaults.push(makeFixture('AC_INDOOR', room.id, 900, 300, cx, cy));
+      }
+    }
+
+    // 거실: 에어컨 (면적 10m² 이상)
+    if (room.type === 'LIVING_ROOM' && !hasTypeInRoom('AC_INDOOR', room.id)) {
+      if (dim.area >= 10_000_000) { // 10m² = 10,000,000 mm²
+        defaults.push(makeFixture('AC_INDOOR', room.id, 900, 300, cx, cy));
+      }
+    }
+
+    // 일반 침실: 면적 8m² 이상이면 에어컨
+    if (room.type === 'BEDROOM' && !hasTypeInRoom('AC_INDOOR', room.id)) {
+      if (dim.area >= 8_000_000) { // 8m²
+        defaults.push(makeFixture('AC_INDOOR', room.id, 900, 300, cx, cy));
+      }
+    }
+  }
+
+  // 전체: 보일러(1ea)
+  if (!hasType('BOILER')) {
+    const utilityRoom = rooms.find(r => r.type === 'UTILITY')
+      || rooms.find(r => r.type === 'BALCONY')
+      || rooms[0];
+    if (utilityRoom) {
+      const cx = utilityRoom.center?.x ?? utilityRoom.polygon[0]?.x ?? 0;
+      const cy = utilityRoom.center?.y ?? utilityRoom.polygon[0]?.y ?? 0;
+      defaults.push(makeFixture('BOILER', utilityRoom.id, 400, 600, cx, cy));
+    }
+  }
+
+  return defaults;
 }

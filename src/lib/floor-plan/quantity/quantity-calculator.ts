@@ -78,7 +78,7 @@ export function calculateAllQuantities(
     ...calculateSanitaryQty(project),
     ...calculateElectricalQty(project, surfaces),
     ...calculateFixtureQty(project),
-    ...calculateBaseboardMoldingQty(surfaces),
+    ...calculateBaseboardMoldingQty(surfaces, project.fixtures),
     ...calculateCleanupQty(surfaces),
   ];
 
