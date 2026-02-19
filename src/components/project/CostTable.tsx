@@ -195,7 +195,7 @@ export default function CostTable({
       {/* 총합계 바 */}
       <div className="mt-4 bg-slate-800 text-white rounded-md overflow-hidden">
         <div className="px-5 py-3 flex items-center justify-between border-b border-slate-600">
-          <div className="flex items-center gap-6 text-xs">
+          <div className="flex items-center gap-3 sm:gap-6 text-xs flex-wrap">
             <span className="text-slate-400">재료비 <span className="text-slate-200 font-semibold tabular-nums ml-1">{formatNumber(totalMat)}</span></span>
             <span className="text-slate-400">노무비 <span className="text-slate-200 font-semibold tabular-nums ml-1">{formatNumber(totalLab)}</span></span>
             <span className="text-slate-400">경비 <span className="text-slate-200 font-semibold tabular-nums ml-1">{formatNumber(totalOvh)}</span></span>

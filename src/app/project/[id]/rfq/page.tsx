@@ -630,7 +630,7 @@ export default function RfqPage() {
                           </div>
 
                           {trades.length > 0 && (
-                            <div className="flex gap-1 mb-2">
+                            <div className="flex flex-wrap gap-1 mb-2">
                               {trades.map((t) => (
                                 <span key={t.trade_code} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">
                                   {t.trade_name}
@@ -645,10 +645,10 @@ export default function RfqPage() {
                             </p>
                           )}
 
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                             <button
                               onClick={() => handleSelectBid(bid.id)}
-                              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2 text-xs font-medium rounded-lg transition-colors ${
+                              className={`flex-1 flex items-center justify-center gap-1 px-3 py-2.5 text-xs font-medium rounded-lg transition-colors ${
                                 isSelected
                                   ? "bg-green-600 text-white"
                                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -662,7 +662,7 @@ export default function RfqPage() {
                                 "업체 선택"
                               )}
                             </button>
-                            <button className="flex items-center gap-1 px-3 py-2 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
+                            <button className="flex items-center justify-center gap-1 px-3 py-2.5 text-xs text-gray-500 border border-gray-200 rounded-lg hover:bg-gray-50">
                               <Phone className="w-3.5 h-3.5" /> 연락하기
                             </button>
                           </div>

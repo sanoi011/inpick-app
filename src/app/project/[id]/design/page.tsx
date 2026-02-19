@@ -1049,7 +1049,7 @@ export default function FloorPlanPage() {
       <aside className={`
         ${sidebarOpen ? "fixed inset-y-0 left-0 z-40 mt-14" : "hidden"}
         md:relative md:flex md:mt-0
-        flex-col w-[380px] bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0 shadow-sm
+        flex-col w-full max-w-[380px] md:w-[380px] bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0 shadow-sm
       `}>
         <AddressSearchPanel
           onSelectAddress={handleSelectAddress}
