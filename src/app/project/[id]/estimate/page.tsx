@@ -17,6 +17,8 @@ import {
   Layers,
   AlertTriangle,
   Ruler,
+  Plus,
+  X,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import dynamic from "next/dynamic";
@@ -191,9 +193,8 @@ export default function EstimatePage() {
     }
   }, [project?.drawingId]);
 
-  // 사용자 선택 자재 (향후 자재별 단가 반영 시 활용)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const _userMaterials = useMemo(
+  // 사용자 선택 자재 (AI 디자인 자재 연동)
+  const userMaterials = useMemo(
     () => project?.rendering?.materials || [],
     [project?.rendering?.materials]
   );
@@ -213,7 +214,10 @@ export default function EstimatePage() {
       try {
         const fpp = adaptParsedFloorPlan(floorPlan, projectId, '인테리어 공사');
         const qtyResult = calculateAllQuantities(fpp);
-        estResult = calculateEstimate(qtyResult);
+        estResult = calculateEstimate(qtyResult, {
+          ceilingHeight,
+          materialOverrides: userMaterials.length > 0 ? userMaterials : undefined,
+        });
 
         secs = viewMode === "trade"
           ? convertToTradeSections(estResult)
@@ -253,7 +257,66 @@ export default function EstimatePage() {
       summary: smry,
       engineResult: estResult,
     };
-  }, [useEngine, floorPlan, projectId, viewMode]);
+  }, [useEngine, floorPlan, projectId, viewMode, ceilingHeight, userMaterials]);
+
+  // 편집 가능한 sections 상태 (내역 추가/삭제용)
+  const [editedSections, setEditedSections] = useState<RoomCostSection[] | null>(null);
+  const [addFormSection, setAddFormSection] = useState<string | null>(null);
+  const [addForm, setAddForm] = useState({ category: '', productName: '', spec: '', unit: 'm²', quantity: '', materialCost: '', laborCost: '' });
+
+  // 엔진 결과가 바뀌면 편집 상태 초기화
+  useEffect(() => {
+    setEditedSections(null);
+  }, [sections]);
+
+  const activeSections = editedSections || sections;
+
+  const handleAddItem = useCallback((sectionName: string) => {
+    setAddFormSection(sectionName);
+    setAddForm({ category: '', productName: '', spec: '', unit: 'm²', quantity: '', materialCost: '', laborCost: '' });
+  }, []);
+
+  const handleConfirmAdd = useCallback(() => {
+    if (!addFormSection || !addForm.productName || !addForm.quantity) return;
+    const qty = Number(addForm.quantity) || 0;
+    const matCost = Number(addForm.materialCost) || 0;
+    const labCost = Number(addForm.laborCost) || 0;
+    const overhead = Math.round((matCost + labCost) * 0.1);
+
+    const newItem: CostItem = {
+      id: `custom-${Date.now()}`,
+      category: addForm.category || '추가',
+      part: '',
+      productName: addForm.productName,
+      method: '시공',
+      spec: addForm.spec,
+      unit: addForm.unit,
+      quantity: qty,
+      materialCost: matCost,
+      laborCost: labCost,
+      overhead,
+      total: matCost + labCost + overhead,
+    };
+
+    const base = editedSections || [...sections];
+    const updated = base.map(s => {
+      if (s.roomName !== addFormSection) return s;
+      const items = [...s.items, newItem];
+      return { ...s, items, subtotal: items.reduce((sum, i) => sum + i.total, 0) };
+    });
+    setEditedSections(updated);
+    setAddFormSection(null);
+  }, [addFormSection, addForm, editedSections, sections]);
+
+  const handleDeleteItem = useCallback((sectionName: string, itemId: string) => {
+    const base = editedSections || [...sections];
+    const updated = base.map(s => {
+      if (s.roomName !== sectionName) return s;
+      const items = s.items.filter(i => i.id !== itemId);
+      return { ...s, items, subtotal: items.reduce((sum, i) => sum + i.total, 0) };
+    }).filter(s => s.items.length > 0);
+    setEditedSections(updated);
+  }, [editedSections, sections]);
 
   // 물량산출 결과 로깅 (fire-and-forget, 1회만)
   const [qtyLogged, setQtyLogged] = useState(false);
@@ -275,13 +338,30 @@ export default function EstimatePage() {
   }, [engineResult, qtyLogged, projectId, floorPlan]);
 
   const filteredSections = activeRoom
-    ? sections.filter((s) => s.roomName === activeRoom)
-    : sections;
+    ? activeSections.filter((s) => s.roomName === activeRoom)
+    : activeSections;
+
+  // 편집된 sections 기반 합계 재계산
+  const activeGrandTotal = editedSections
+    ? editedSections.reduce((sum, s) => sum + s.subtotal, 0)
+    : grandTotal;
 
   // 견적 저장 + 다음 단계
   const handleSaveAndNext = useCallback(() => {
+    const saveSections = activeSections;
+    const saveMaterial = editedSections
+      ? saveSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.materialCost, 0), 0)
+      : totalMaterial;
+    const saveLabor = editedSections
+      ? saveSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.laborCost, 0), 0)
+      : totalLabor;
+    const saveOverhead = editedSections
+      ? saveSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.overhead, 0), 0)
+      : totalOverhead;
+    const saveGrandTotal = editedSections ? activeGrandTotal : grandTotal;
+
     const estimate: ProjectEstimate = {
-      items: sections.flatMap((s) =>
+      items: saveSections.flatMap((s) =>
         s.items.map((item) => ({
           id: item.id,
           roomId: "",
@@ -298,10 +378,10 @@ export default function EstimatePage() {
           total: item.total,
         }))
       ),
-      totalMaterialCost: totalMaterial,
-      totalLaborCost: totalLabor,
-      totalExpense: totalOverhead,
-      grandTotal,
+      totalMaterialCost: saveMaterial,
+      totalLaborCost: saveLabor,
+      totalExpense: saveOverhead,
+      grandTotal: saveGrandTotal,
       createdAt: new Date().toISOString(),
     };
 
@@ -311,7 +391,7 @@ export default function EstimatePage() {
     setTimeout(() => {
       router.push(`/project/${projectId}/rfq`);
     }, 500);
-  }, [sections, totalMaterial, totalLabor, totalOverhead, grandTotal, setEstimate, router, projectId]);
+  }, [activeSections, editedSections, totalMaterial, totalLabor, totalOverhead, grandTotal, activeGrandTotal, setEstimate, router, projectId]);
 
   if (loading) {
     return (
@@ -377,7 +457,7 @@ export default function EstimatePage() {
           )}
           <button
             onClick={handleSaveAndNext}
-            disabled={sections.length === 0}
+            disabled={activeSections.length === 0}
             className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saved ? (
@@ -394,7 +474,7 @@ export default function EstimatePage() {
       </div>
 
       {/* 모바일 요약 토글 */}
-      {sections.length > 0 && (
+      {activeSections.length > 0 && (
         <button
           onClick={() => setShowMobileSummary(!showMobileSummary)}
           className="md:hidden flex items-center justify-between w-full px-4 py-2 bg-white border-b border-gray-200 text-sm"
@@ -547,7 +627,7 @@ export default function EstimatePage() {
 
         {/* 우측: 견적 테이블 */}
         <div className="flex-1 overflow-y-auto p-4">
-          {sections.length === 0 ? (
+          {activeSections.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-gray-400">
                 <Calculator className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -597,7 +677,7 @@ export default function EstimatePage() {
                 >
                   전체
                 </button>
-                {sections.map((s) => {
+                {activeSections.map((s) => {
                   const Icon = ROOM_ICONS[s.roomName] || Home;
                   return (
                     <button
@@ -621,8 +701,119 @@ export default function EstimatePage() {
                 </span>
               </div>
 
+              {/* 내역 추가 폼 */}
+              {addFormSection && (
+                <div className="mb-4 p-4 bg-white border border-blue-200 rounded-xl shadow-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-sm font-semibold text-gray-900">내역 추가 — {addFormSection}</h4>
+                    <button onClick={() => setAddFormSection(null)} className="text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">공종</label>
+                      <select
+                        value={addForm.category}
+                        onChange={(e) => setAddForm(f => ({ ...f, category: e.target.value }))}
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      >
+                        <option value="">선택</option>
+                        {Object.values(TRADE_NAMES).map(name => (
+                          <option key={name} value={name}>{name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">품명 *</label>
+                      <input
+                        value={addForm.productName}
+                        onChange={(e) => setAddForm(f => ({ ...f, productName: e.target.value }))}
+                        placeholder="품명 입력"
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">규격</label>
+                      <input
+                        value={addForm.spec}
+                        onChange={(e) => setAddForm(f => ({ ...f, spec: e.target.value }))}
+                        placeholder="규격"
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">단위</label>
+                      <select
+                        value={addForm.unit}
+                        onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      >
+                        <option value="m²">m²</option>
+                        <option value="m">m</option>
+                        <option value="개">개</option>
+                        <option value="세트">세트</option>
+                        <option value="식">식</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">수량 *</label>
+                      <input
+                        type="number"
+                        value={addForm.quantity}
+                        onChange={(e) => setAddForm(f => ({ ...f, quantity: e.target.value }))}
+                        placeholder="0"
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">재료비 (원)</label>
+                      <input
+                        type="number"
+                        value={addForm.materialCost}
+                        onChange={(e) => setAddForm(f => ({ ...f, materialCost: e.target.value }))}
+                        placeholder="0"
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-gray-500 mb-0.5 block">노무비 (원)</label>
+                      <input
+                        type="number"
+                        value={addForm.laborCost}
+                        onChange={(e) => setAddForm(f => ({ ...f, laborCost: e.target.value }))}
+                        placeholder="0"
+                        className="w-full text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <button
+                      onClick={() => setAddFormSection(null)}
+                      className="px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      취소
+                    </button>
+                    <button
+                      onClick={handleConfirmAdd}
+                      disabled={!addForm.productName || !addForm.quantity}
+                      className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    >
+                      <Plus className="w-3 h-3" /> 추가
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* 견적 테이블 */}
-              <CostTable sections={filteredSections} />
+              <CostTable
+                sections={filteredSections}
+                editable={false}
+                onAddItem={handleAddItem}
+                onDeleteItem={handleDeleteItem}
+              />
             </>
           )}
         </div>

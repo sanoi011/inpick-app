@@ -5,10 +5,16 @@ import { useContractorAuth } from "@/hooks/useContractorAuth";
 import {
   Loader2, Gavel, ChevronDown, ChevronUp, Send,
   MapPin, Calendar, Ruler, DollarSign, Clock,
-  FileText, CheckCircle2, XCircle, Filter,
+  FileText, CheckCircle2, XCircle, Filter, Eye,
 } from "lucide-react";
 import { BID_STATUS_LABELS, BID_STATUS_COLORS, type BidStatus } from "@/types/bid";
 import { toast } from "@/components/ui/Toast";
+import dynamic from "next/dynamic";
+import type { RoomCostSection, CostItem } from "@/components/project/CostTable";
+
+const CostTable = dynamic(() => import("@/components/project/CostTable"), {
+  loading: () => <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>,
+});
 
 interface RfqData {
   specialNotes?: string;
@@ -99,6 +105,87 @@ export default function BidsPage() {
   });
   const [submitting, setSubmitting] = useState(false);
 
+  // 견적 상세 항목 상태
+  const [estimateItems, setEstimateItems] = useState<Map<string, RoomCostSection[]>>(new Map());
+  const [loadingItems, setLoadingItems] = useState<string | null>(null);
+  const [editedEstimates, setEditedEstimates] = useState<Map<string, RoomCostSection[]>>(new Map());
+  const [showEstimateDetail, setShowEstimateDetail] = useState<string | null>(null);
+
+  // 견적 상세 항목 조회
+  const loadEstimateItems = useCallback(async (estimateId: string) => {
+    if (estimateItems.has(estimateId)) {
+      setShowEstimateDetail(showEstimateDetail === estimateId ? null : estimateId);
+      return;
+    }
+    setLoadingItems(estimateId);
+    try {
+      const res = await fetch(`/api/estimates?id=${estimateId}`);
+      const data = await res.json();
+      const items = data.estimate?.estimate_items || [];
+
+      // estimate_items → RoomCostSection[] 변환
+      const roomMap = new Map<string, CostItem[]>();
+      for (const item of items) {
+        const key = item.space_name || "공통";
+        if (!roomMap.has(key)) roomMap.set(key, []);
+        roomMap.get(key)!.push({
+          id: item.id,
+          category: (item.item_name || "").split(" - ")[0] || "기타",
+          part: (item.item_name || "").split(" - ")[1] || "",
+          productName: (item.item_name || "").split(" - ")[2] || item.item_name || "",
+          method: "시공",
+          spec: "",
+          unit: item.unit || "식",
+          quantity: item.quantity || 1,
+          materialCost: item.material_cost || 0,
+          laborCost: item.labor_cost || 0,
+          overhead: item.overhead_cost || 0,
+          total: item.subtotal || 0,
+        });
+      }
+
+      const sections: RoomCostSection[] = [];
+      for (const [roomName, costItems] of Array.from(roomMap.entries())) {
+        sections.push({
+          roomName,
+          items: costItems,
+          subtotal: costItems.reduce((sum, i) => sum + i.total, 0),
+        });
+      }
+
+      setEstimateItems(prev => new Map(prev).set(estimateId, sections));
+      setShowEstimateDetail(estimateId);
+    } catch {
+      toast({ type: "error", title: "오류", message: "견적 상세를 불러올 수 없습니다" });
+    } finally {
+      setLoadingItems(null);
+    }
+  }, [estimateItems, showEstimateDetail]);
+
+  // 사업자 단가 수정
+  const handleEditPrice = useCallback((estimateId: string, sectionName: string, itemId: string, field: 'materialCost' | 'laborCost', value: number) => {
+    const base = editedEstimates.get(estimateId) || estimateItems.get(estimateId) || [];
+    const updated = base.map(s => {
+      if (s.roomName !== sectionName) return s;
+      const items = s.items.map(item => {
+        if (item.id !== itemId) return item;
+        const newItem = { ...item, [field]: value };
+        newItem.overhead = Math.round((newItem.materialCost + newItem.laborCost) * 0.1);
+        newItem.total = newItem.materialCost + newItem.laborCost + newItem.overhead;
+        return newItem;
+      });
+      return { ...s, items, subtotal: items.reduce((sum, i) => sum + i.total, 0) };
+    });
+    setEditedEstimates(prev => new Map(prev).set(estimateId, updated));
+  }, [editedEstimates, estimateItems]);
+
+  // 수정된 견적 합계 계산
+  const getCustomTotal = useCallback((estimateId: string): number => {
+    const sections = editedEstimates.get(estimateId) || estimateItems.get(estimateId);
+    if (!sections) return 0;
+    return sections.reduce((sum, s) => sum + s.subtotal, 0);
+  }, [editedEstimates, estimateItems]);
+
   const loadData = useCallback(async () => {
     if (!contractorId) return;
     setLoading(true);
@@ -165,6 +252,22 @@ export default function BidsPage() {
     if (!contractorId || !bidForm.bidAmount) return;
     setSubmitting(true);
     try {
+      // 수정된 견적이 있으면 customEstimate로 포함
+      const editedSections = editedEstimates.get(estimateId);
+      const customEstimate = editedSections ? {
+        items: editedSections.flatMap(s => s.items.map(item => ({
+          itemId: item.id,
+          roomName: s.roomName,
+          category: item.category,
+          productName: item.productName,
+          materialCost: item.materialCost,
+          laborCost: item.laborCost,
+          overhead: item.overhead,
+          total: item.total,
+        }))),
+        grandTotal: editedSections.reduce((sum, s) => sum + s.subtotal, 0),
+      } : undefined;
+
       const res = await fetch("/api/bids", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -179,12 +282,14 @@ export default function BidsPage() {
           metadata: {
             highlights: bidForm.highlights ? bidForm.highlights.split(",").map(s => s.trim()).filter(Boolean) : [],
             warranty_months: Number(bidForm.warrantyMonths) || 12,
+            ...(customEstimate ? { customEstimate } : {}),
           },
         }),
       });
       if (res.ok) {
         setBidFormId(null);
         setBidForm({ bidAmount: "", discountRate: "", estimatedDays: "30", startAvailableDate: "", message: "", highlights: "", warrantyMonths: "12" });
+        toast({ type: "success", title: "입찰 완료", message: "입찰서가 제출되었습니다" });
         loadData();
       }
     } catch { toast({ type: "error", title: "오류", message: "입찰 제출에 실패했습니다" }); } finally { setSubmitting(false); }
@@ -334,6 +439,48 @@ export default function BidsPage() {
                     </div>
                   )}
 
+                  {/* 견적 상세 보기 버튼 + CostTable */}
+                  <div className="mb-4">
+                    <button
+                      onClick={() => loadEstimateItems(est.id)}
+                      disabled={loadingItems === est.id}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    >
+                      {loadingItems === est.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                      {showEstimateDetail === est.id ? "견적 상세 접기" : "견적 상세 보기"}
+                    </button>
+
+                    {showEstimateDetail === est.id && (estimateItems.has(est.id) || editedEstimates.has(est.id)) && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-semibold text-gray-900">소비자 견적 내역</h4>
+                          {!est.my_bid && tab === "available" && (
+                            <span className="text-xs text-blue-600">재료비/노무비를 수정하여 입찰할 수 있습니다</span>
+                          )}
+                        </div>
+                        <CostTable
+                          sections={editedEstimates.get(est.id) || estimateItems.get(est.id) || []}
+                          editable={!est.my_bid && tab === "available"}
+                          onEditPrice={(sectionName, itemId, field, value) =>
+                            handleEditPrice(est.id, sectionName, itemId, field, value)
+                          }
+                        />
+                        {editedEstimates.has(est.id) && (
+                          <div className="mt-2 flex items-center justify-between px-4 py-2 bg-amber-50 border border-amber-200 rounded-lg">
+                            <span className="text-xs text-amber-700">단가가 수정되었습니다</span>
+                            <span className="text-sm font-bold text-amber-900">
+                              수정 합계: {fmt(getCustomTotal(est.id))}원
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* 내 입찰 정보 */}
                   {est.my_bid && (
                     <div className="bg-blue-50 rounded-lg p-4 mb-4">
@@ -409,9 +556,17 @@ export default function BidsPage() {
                           </div>
                         </div>
                       ) : (
-                        <button onClick={() => setBidFormId(est.id)}
+                        <button onClick={() => {
+                          setBidFormId(est.id);
+                          // 수정된 견적이 있으면 자동으로 bidAmount 설정
+                          if (editedEstimates.has(est.id)) {
+                            setBidForm(f => ({ ...f, bidAmount: String(getCustomTotal(est.id)) }));
+                          } else if (est.grand_total) {
+                            setBidForm(f => ({ ...f, bidAmount: String(est.grand_total) }));
+                          }
+                        }}
                           className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 flex items-center justify-center gap-1.5">
-                          <Gavel className="w-4 h-4" /> 입찰하기
+                          <Gavel className="w-4 h-4" /> {editedEstimates.has(est.id) ? "수정된 견적으로 입찰하기" : "입찰하기"}
                         </button>
                       )}
                     </>

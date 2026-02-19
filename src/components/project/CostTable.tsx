@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
 
 export interface CostItem {
   id: string;
@@ -28,13 +28,24 @@ export interface RoomCostSection {
 interface CostTableProps {
   sections: RoomCostSection[];
   className?: string;
+  editable?: boolean;
+  onAddItem?: (sectionName: string) => void;
+  onDeleteItem?: (sectionName: string, itemId: string) => void;
+  onEditPrice?: (sectionName: string, itemId: string, field: 'materialCost' | 'laborCost', value: number) => void;
 }
 
 function formatNumber(n: number): string {
   return n.toLocaleString("ko-KR");
 }
 
-export default function CostTable({ sections, className = "" }: CostTableProps) {
+export default function CostTable({
+  sections,
+  className = "",
+  editable = false,
+  onAddItem,
+  onDeleteItem,
+  onEditPrice,
+}: CostTableProps) {
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(
     new Set(sections.map((s) => s.roomName))
   );
@@ -75,6 +86,7 @@ export default function CostTable({ sections, className = "" }: CostTableProps) 
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
+                      {onDeleteItem && <th className="px-1 py-2 w-8"></th>}
                       <th className="px-2 py-2 text-left font-semibold text-gray-600 w-16">구분</th>
                       <th className="px-2 py-2 text-left font-semibold text-gray-600 w-16">부위</th>
                       <th className="px-2 py-2 text-left font-semibold text-gray-600 min-w-[100px]">품명</th>
@@ -91,6 +103,17 @@ export default function CostTable({ sections, className = "" }: CostTableProps) 
                   <tbody>
                     {section.items.map((item) => (
                       <tr key={item.id} className="border-b border-gray-100 hover:bg-blue-50/30">
+                        {onDeleteItem && (
+                          <td className="px-1 py-2 text-center">
+                            <button
+                              onClick={() => onDeleteItem(section.roomName, item.id)}
+                              className="text-gray-300 hover:text-red-500 transition-colors"
+                              title="항목 삭제"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </td>
+                        )}
                         <td className="px-2 py-2 text-gray-600">{item.category}</td>
                         <td className="px-2 py-2 text-gray-600">{item.part}</td>
                         <td className="px-2 py-2 font-medium text-gray-900">{item.productName}</td>
@@ -98,15 +121,38 @@ export default function CostTable({ sections, className = "" }: CostTableProps) 
                         <td className="px-2 py-2 text-gray-500">{item.spec}</td>
                         <td className="px-2 py-2 text-center text-gray-600">{item.unit}</td>
                         <td className="px-2 py-2 text-right text-gray-900">{item.quantity}</td>
-                        <td className="px-2 py-2 text-right text-gray-900">{formatNumber(item.materialCost)}</td>
-                        <td className="px-2 py-2 text-right text-gray-900">{formatNumber(item.laborCost)}</td>
+                        {editable ? (
+                          <>
+                            <td className="px-1 py-1">
+                              <input
+                                type="number"
+                                value={item.materialCost}
+                                onChange={(e) => onEditPrice?.(section.roomName, item.id, 'materialCost', Number(e.target.value) || 0)}
+                                className="w-full text-right text-xs bg-blue-50 border border-blue-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              />
+                            </td>
+                            <td className="px-1 py-1">
+                              <input
+                                type="number"
+                                value={item.laborCost}
+                                onChange={(e) => onEditPrice?.(section.roomName, item.id, 'laborCost', Number(e.target.value) || 0)}
+                                className="w-full text-right text-xs bg-blue-50 border border-blue-200 rounded px-1 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400"
+                              />
+                            </td>
+                          </>
+                        ) : (
+                          <>
+                            <td className="px-2 py-2 text-right text-gray-900">{formatNumber(item.materialCost)}</td>
+                            <td className="px-2 py-2 text-right text-gray-900">{formatNumber(item.laborCost)}</td>
+                          </>
+                        )}
                         <td className="px-2 py-2 text-right text-gray-900">{formatNumber(item.overhead)}</td>
                         <td className="px-2 py-2 text-right font-semibold text-gray-900">{formatNumber(item.total)}</td>
                       </tr>
                     ))}
                     {/* 소계 */}
                     <tr className="bg-gray-50 font-semibold">
-                      <td colSpan={7} className="px-2 py-2 text-gray-700 text-right">소계</td>
+                      <td colSpan={onDeleteItem ? 8 : 7} className="px-2 py-2 text-gray-700 text-right">소계</td>
                       <td className="px-2 py-2 text-right text-gray-900">
                         {formatNumber(section.items.reduce((s, i) => s + i.materialCost, 0))}
                       </td>
@@ -123,7 +169,10 @@ export default function CostTable({ sections, className = "" }: CostTableProps) 
                   </tbody>
                 </table>
                 {/* 내역 추가 버튼 */}
-                <button className="w-full flex items-center justify-center gap-1 py-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors">
+                <button
+                  onClick={() => onAddItem?.(section.roomName)}
+                  className="w-full flex items-center justify-center gap-1 py-2 text-xs text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                >
                   <Plus className="w-3 h-3" /> 내역 추가
                 </button>
               </div>

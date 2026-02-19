@@ -4,6 +4,27 @@ import type { QuantityItem, TradeCode } from './types';
 import { round, TRADE_NAMES } from './types';
 import type { QuantityResult } from './quantity-calculator';
 import { findUnitPrice } from './unit-price-db';
+import type { SelectedMaterial } from '@/types/consumer-project';
+
+// 자재 카테고리 → 공종 itemCode 매핑 (AI 디자인 자재 연동용)
+const CATEGORY_TO_ITEM_MAP: Record<string, string[]> = {
+  'FLOORING': ['07.MAIN'],
+  'WALLPAPER': ['08.WALLPAPER'],
+  'PAINT': ['08.PAINT'],
+  'CEILING': ['09.GYPSUM', '09.PAINT'],
+  'DOOR_ROOM': ['10.DOOR_SINGLE_DOOR'],
+  'SLIDING_PARTITION': ['10.DOOR_SLIDING_DOOR'],
+  'ENTRY_DOOR': ['10.DOOR_ENTRANCE_DOOR'],
+  'TOILET': ['13.TOILET'],
+  'VANITY': ['13.BASIN_CABINET', '13.BASIN'],
+  'SHOWER_BATH': ['13.SHOWER_BOOTH', '13.BATHTUB'],
+  'BATH_TILE': ['05.FLOOR', '05.WALL'],
+  'KITCHEN_SINK': ['15.KITCHEN_SINK'],
+  'KITCHEN_CABINET': ['15.KITCHEN_UPPER_CABINET', '15.KITCHEN_LOWER_CABINET'],
+  'KITCHEN_TILE': ['05.FLOOR', '05.WALL'],
+  'BASEBOARD': ['16.BASEBOARD'],
+  'LIGHTING': ['14.LIGHT'],
+};
 
 // ─── 견적 라인 ───
 
@@ -44,6 +65,9 @@ export interface EstimateSummary {
   vatAmount: number;
   grandTotal: number;
 
+  heightSurcharge: boolean;
+  ceilingHeight: number;
+
   byTrade: Record<TradeCode, {
     tradeName: string;
     materialAmount: number;
@@ -75,41 +99,68 @@ export function calculateEstimate(
     overheadRate?: number;
     profitRate?: number;
     vatRate?: number;
+    ceilingHeight?: number;
+    materialOverrides?: SelectedMaterial[];
   } = {}
 ): EstimateResult {
-  const { overheadRate = 6, profitRate = 5, vatRate = 10 } = options;
+  const { overheadRate = 6, profitRate = 5, vatRate = 10, ceilingHeight = 2200, materialOverrides } = options;
+  const heightSurcharge = ceilingHeight > 2500;
+  const laborMultiplier = heightSurcharge ? 1.5 : 1.0;
+
+  // 자재 오버라이드 인덱스 구축 (categoryCode → SelectedMaterial)
+  const overrideIndex = new Map<string, SelectedMaterial>();
+  if (materialOverrides) {
+    for (const mat of materialOverrides) {
+      if (mat.categoryCode && mat.confirmed) {
+        const itemCodes = CATEGORY_TO_ITEM_MAP[mat.categoryCode];
+        if (itemCodes) {
+          for (const code of itemCodes) {
+            overrideIndex.set(code, mat);
+          }
+        }
+      }
+    }
+  }
 
   const lines: EstimateLine[] = [];
   const unmatchedItems: QuantityItem[] = [];
 
   // Step 1: 물량 x 단가 = 금액
   for (const item of qtyResult.items) {
-    const price = findUnitPrice(item.itemCode);
+    const basePrice = findUnitPrice(item.itemCode);
 
-    if (!price) {
+    if (!basePrice) {
       unmatchedItems.push(item);
       continue;
     }
 
+    // 자재 오버라이드 적용
+    const override = overrideIndex.get(item.itemCode);
+    const matCostPerUnit = override?.unitPrice ?? basePrice.materialCost;
+    const labCostPerUnit = override?.laborPrice ?? basePrice.laborCost;
+    const source = override
+      ? `${override.materialName} (${override.priceSource || '사용자 선택'})`
+      : basePrice.source;
+
     const qty = item.finalQuantity;
-    const matAmt = round(qty * price.materialCost);
-    const labAmt = round(qty * price.laborCost);
+    const matAmt = round(qty * matCostPerUnit);
+    const labAmt = round(qty * labCostPerUnit * laborMultiplier);
 
     lines.push({
       tradeCode: item.tradeCode,
       itemCode: item.itemCode,
-      itemName: item.itemName,
-      specification: item.specification,
+      itemName: override ? override.materialName : item.itemName,
+      specification: override ? override.specification : item.specification,
       unit: item.unit,
       quantity: qty,
-      materialCost: price.materialCost,
-      laborCost: price.laborCost,
-      unitCost: price.totalUnitCost,
+      materialCost: matCostPerUnit,
+      laborCost: round(labCostPerUnit * laborMultiplier),
+      unitCost: matCostPerUnit + round(labCostPerUnit * laborMultiplier),
       materialAmount: matAmt,
       laborAmount: labAmt,
       totalAmount: matAmt + labAmt,
       roomName: item.roomName,
-      priceSource: price.source,
+      priceSource: source,
     });
   }
 
@@ -153,6 +204,7 @@ export function calculateEstimate(
       overheadRate, overheadAmount,
       profitRate, profitAmount,
       subtotal, vatRate, vatAmount, grandTotal,
+      heightSurcharge, ceilingHeight,
       byTrade, byRoom,
     },
     unmatchedItems,
