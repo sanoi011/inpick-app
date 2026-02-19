@@ -21,8 +21,38 @@ export async function preprocessFloorPlanImage(
   imageBuffer: Buffer,
   source: ImageSource = "pdf"
 ): Promise<PreprocessResult> {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { createCanvas, loadImage } = require("canvas");
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let canvasModule: { createCanvas: (...args: any[]) => any; loadImage: (...args: any[]) => any } | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    canvasModule = require("canvas");
+  } catch {
+    // canvas not available (Vercel 환경) → sharp 사용하여 기본 처리
+    console.warn("[image-preprocessor] canvas not available, using sharp fallback");
+    const sharp = (await import("sharp")).default;
+    const metadata = await sharp(imageBuffer).metadata();
+    const origW = metadata.width || 1024;
+    const origH = metadata.height || 1024;
+    let newW = origW;
+    let newH = origH;
+    if (origW > MAX_DIMENSION || origH > MAX_DIMENSION) {
+      const scale = Math.min(MAX_DIMENSION / origW, MAX_DIMENSION / origH);
+      newW = Math.round(origW * scale);
+      newH = Math.round(origH * scale);
+    }
+    const processed = await sharp(imageBuffer)
+      .resize(newW, newH, { fit: "inside" })
+      .png()
+      .toBuffer();
+    return {
+      base64: processed.toString("base64"),
+      mimeType: "image/png",
+      width: newW,
+      height: newH,
+    };
+  }
+
+  const { createCanvas, loadImage } = canvasModule!;
 
   // Buffer → Image
   const img = await loadImage(imageBuffer);

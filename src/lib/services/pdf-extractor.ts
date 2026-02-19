@@ -1,11 +1,16 @@
 // src/lib/services/pdf-extractor.ts
 // PDF → PNG 변환 (서버사이드, pdfjs-dist 사용)
+// canvas와 pdfjs-dist는 optionalDependencies (Vercel 환경에서 미설치 가능)
 
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
-
-// 서버사이드에서는 worker 비활성화
-if (typeof window === "undefined") {
-  GlobalWorkerOptions.workerSrc = "";
+let pdfjsLib: typeof import("pdfjs-dist") | null = null;
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  pdfjsLib = require("pdfjs-dist");
+  if (typeof window === "undefined" && pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+  }
+} catch {
+  console.warn("[pdf-extractor] pdfjs-dist not available, PDF extraction disabled");
 }
 
 export interface PdfPageResult {
@@ -32,8 +37,12 @@ export async function extractPagesFromPdf(
   targetDpi = 200,
   maxPages = 10
 ): Promise<PdfExtractionResult> {
+  if (!pdfjsLib) {
+    throw new Error("pdfjs-dist not available in this environment");
+  }
+
   const data = new Uint8Array(pdfBuffer);
-  const pdf = await getDocument({
+  const pdf = await pdfjsLib.getDocument({
     data,
     disableFontFace: true,
     useSystemFonts: false,
@@ -47,10 +56,16 @@ export async function extractPagesFromPdf(
     const page = await pdf.getPage(i);
     const viewport = page.getViewport({ scale: targetDpi / 72 }); // 72 DPI 기준 스케일
 
-    // Node.js 환경에서 canvas 사용
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { createCanvas } = require("canvas");
-    const canvas = createCanvas(viewport.width, viewport.height);
+    // Node.js 환경에서 canvas 사용 (optional dependency)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let createCanvasFn: (...args: any[]) => any;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      createCanvasFn = require("canvas").createCanvas;
+    } catch {
+      throw new Error("canvas package not available for PDF rendering");
+    }
+    const canvas = createCanvasFn(viewport.width, viewport.height);
     const ctx = canvas.getContext("2d");
 
     // 배경 흰색
