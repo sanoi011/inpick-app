@@ -466,6 +466,15 @@ export function useProjectState(projectId: string) {
     [project, saveProject]
   );
 
+  // 원자적 다중 필드 업데이트 (레이스 컨디션 방지)
+  const updateProject = useCallback(
+    (updates: Partial<ConsumerProject>) => {
+      if (!project) return;
+      saveProject({ ...project, ...updates });
+    },
+    [project, saveProject]
+  );
+
   // RFQ 업데이트
   const updateRfq = useCallback(
     (rfqUpdate: Partial<ProjectRfq>) => {
@@ -531,6 +540,7 @@ export function useProjectState(projectId: string) {
     updateMaterial,
     setEstimate,
     setEstimateId,
+    updateProject,
     updateRfq,
     setDesignPreferences,
     setEditedDimensions,

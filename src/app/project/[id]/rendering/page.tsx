@@ -77,7 +77,7 @@ export default function RenderingPage() {
   const params = useParams();
   const router = useRouter();
   const projectId = params.id as string;
-  const { project, updateRendering, updateMaterial, updateStatus } =
+  const { project, updateMaterial, updateProject } =
     useProjectState(projectId);
 
   // 단계 잠금: 디자인 미완료 시 리다이렉트
@@ -277,18 +277,20 @@ export default function RenderingPage() {
       subMaterials: item.product.subItems,
       confirmed: true,
     }));
-    updateRendering({
-      views: project?.rendering?.views || [],
-      materials,
-      allConfirmed: true,
+    // 원자적 업데이트: rendering + status를 한번에 저장 (레이스 컨디션 방지)
+    updateProject({
+      rendering: {
+        views: project?.rendering?.views || [],
+        materials,
+        allConfirmed: true,
+      },
+      status: "ESTIMATING" as import("@/types/consumer-project").ConsumerProjectStatus,
     });
-    updateStatus("ESTIMATING");
     router.push(`/project/${projectId}/estimate`);
   }, [
     selectedSummary,
-    updateRendering,
+    updateProject,
     project?.rendering?.views,
-    updateStatus,
     router,
     projectId,
   ]);

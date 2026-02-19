@@ -38,17 +38,6 @@
   {
     "complexNo": "142785",
     "complexName": "네이처뷰",
-    "pyeongNo": 1,
-    "pyeongName": "74A",
-    "exclusiveArea": 51.88,
-    "supplyArea": 74.09,
-    "imagePath": "/floorplans/images/142785-네이처뷰/74A_51.88m2.jpg",
-    "processed": false,
-    "sourceType": "original"
-  },
-  {
-    "complexNo": "142785",
-    "complexName": "네이처뷰",
     "pyeongNo": 4,
     "pyeongName": "74A1",
     "exclusiveArea": 51.88,
@@ -58,17 +47,6 @@
     "processed": true,
     "sourceType": "final",
     "isExpanded": true
-  },
-  {
-    "complexNo": "142785",
-    "complexName": "네이처뷰",
-    "pyeongNo": 2,
-    "pyeongName": "85A",
-    "exclusiveArea": 59.69,
-    "supplyArea": 85.24,
-    "imagePath": "/floorplans/images/142785-네이처뷰/85A_59.69m2.jpg",
-    "processed": false,
-    "sourceType": "original"
   },
   {
     "complexNo": "142785",
@@ -86,17 +64,6 @@
   {
     "complexNo": "142785",
     "complexName": "네이처뷰",
-    "pyeongNo": 3,
-    "pyeongName": "85B",
-    "exclusiveArea": 59.99,
-    "supplyArea": 85.67,
-    "imagePath": "/floorplans/images/142785-네이처뷰/85B_59.99m2.jpg",
-    "processed": false,
-    "sourceType": "original"
-  },
-  {
-    "complexNo": "142785",
-    "complexName": "네이처뷰",
     "pyeongNo": 6,
     "pyeongName": "85B1",
     "exclusiveArea": 59.99,
@@ -106,27 +73,5 @@
     "processed": true,
     "sourceType": "final",
     "isExpanded": true
-  },
-  {
-    "complexNo": "135826",
-    "complexName": "호반써밋그랜드파크3BL",
-    "pyeongNo": 1,
-    "pyeongName": "115A",
-    "exclusiveArea": 84.97,
-    "supplyArea": 115.7,
-    "imagePath": "/floorplans/images/135826-호반써밋그랜드파크3BL/115A_84.97m2.jpg",
-    "processed": false,
-    "sourceType": "original"
-  },
-  {
-    "complexNo": "135826",
-    "complexName": "호반써밋그랜드파크3BL",
-    "pyeongNo": 2,
-    "pyeongName": "116B",
-    "exclusiveArea": 84.98,
-    "supplyArea": 116.59,
-    "imagePath": "/floorplans/images/135826-호반써밋그랜드파크3BL/116B_84.98m2.jpg",
-    "processed": false,
-    "sourceType": "original"
   }
 ]
