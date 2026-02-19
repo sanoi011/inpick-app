@@ -227,8 +227,11 @@ export default function BidsPage() {
           total_area_m2: ((b.estimates as Record<string, unknown>)?.total_area_m2 as number) || 0,
           grand_total: ((b.estimates as Record<string, unknown>)?.grand_total as number) || 0,
           address: ((b.estimates as Record<string, unknown>)?.address as string) || "",
+          region: ((b.estimates as Record<string, unknown>)?.region as string) || "",
+          rfq_data: ((b.estimates as Record<string, unknown>)?.rfq_data as Record<string, unknown>) || null,
+          consumer_project_id: ((b.estimates as Record<string, unknown>)?.consumer_project_id as string) || "",
           created_at: b.created_at as string,
-          updated_at: b.updated_at as string || b.created_at as string,
+          updated_at: (b.updated_at as string) || (b.created_at as string),
           my_bid: {
             id: b.id as string,
             bid_amount: b.bid_amount as number,

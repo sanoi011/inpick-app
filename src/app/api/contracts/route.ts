@@ -286,6 +286,12 @@ export async function POST(request: NextRequest) {
       }
     } catch (notifyErr) { console.error("Contract notification error:", notifyErr); }
 
+    // 견적 상태를 completed로 최종 전환
+    await supabase
+      .from("estimates")
+      .update({ status: "completed" })
+      .eq("id", estimate.id);
+
     return NextResponse.json({ contract, projectCreated }, { status: 201 });
   } catch (err) {
     console.error("Contract POST error:", err);

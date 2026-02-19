@@ -264,10 +264,10 @@ export default function EstimatePage() {
   const [addFormSection, setAddFormSection] = useState<string | null>(null);
   const [addForm, setAddForm] = useState({ category: '', productName: '', spec: '', unit: 'm²', quantity: '', materialCost: '', laborCost: '' });
 
-  // 엔진 결과가 바뀌면 편집 상태 초기화
+  // 엔진 파라미터가 바뀌면 편집 상태 초기화 (뷰모드 변경은 제외)
   useEffect(() => {
     setEditedSections(null);
-  }, [sections]);
+  }, [ceilingHeight, floorPlan, userMaterials]);
 
   const activeSections = editedSections || sections;
 

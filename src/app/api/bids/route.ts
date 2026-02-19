@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       .from("bids")
       .select(`
         *,
-        estimates (id, title, status, project_type, space_type, total_area_m2, grand_total, address)
+        estimates (id, title, status, project_type, space_type, total_area_m2, grand_total, address, rfq_data, region, consumer_project_id)
       `)
       .eq("contractor_id", contractorId)
       .order("created_at", { ascending: false });
@@ -142,19 +142,33 @@ export async function POST(request: NextRequest) {
         .select("user_id, consumer_project_id")
         .eq("id", estimateId)
         .single();
-      if (estimate?.user_id) {
+      let notifyUserId = estimate?.user_id;
+
+      // user_id 없으면 consumer_projects에서 소유자 조회
+      if (!notifyUserId && estimate?.consumer_project_id) {
+        const { data: cp } = await supabase
+          .from("consumer_projects")
+          .select("user_id")
+          .eq("id", estimate.consumer_project_id)
+          .single();
+        notifyUserId = cp?.user_id || null;
+      }
+
+      if (notifyUserId) {
         const companyName = data.specialty_contractors?.company_name || "업체";
         await supabase.from("consumer_notifications").insert({
-          user_id: estimate.user_id,
+          user_id: notifyUserId,
           type: "BID_RECEIVED",
           title: "새 입찰이 도착했습니다",
           message: `${companyName}에서 입찰서를 보냈습니다`,
           priority: "HIGH",
-          link: estimate.consumer_project_id
+          link: estimate?.consumer_project_id
             ? `/project/${estimate.consumer_project_id}/rfq`
             : undefined,
           reference_id: data.id,
         });
+      } else {
+        console.warn("Bid notification skipped: no user_id for estimate", estimateId);
       }
     } catch (notifyErr) { console.error("Bid notification error:", notifyErr); }
 
@@ -224,7 +238,7 @@ export async function PATCH(request: NextRequest) {
 
       await supabase
         .from("estimates")
-        .update({ status: "completed" })
+        .update({ status: "in_progress" })
         .eq("id", data.estimate_id);
     }
 
