@@ -359,6 +359,7 @@ export async function generateEstimatePdf(options: EstimatePdfOptions): Promise<
   const notes = engineSummary
     ? [
         "17개 공종 정밀 물량산출 엔진 적용",
+        `층고: ${engineSummary.ceilingHeight}mm${engineSummary.heightSurcharge ? " (2500mm 초과 노무비 1.5배 할증)" : ""}`,
         "단가: 2025년 서울 실거래 기준",
         `일반관리비: 직접공사비 x ${engineSummary.overheadRate}%`,
         `이윤: (직접공사비+관리비) x ${engineSummary.profitRate}%`,

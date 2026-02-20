@@ -1700,6 +1700,37 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
   - `recalcRoomGeometry()` 공통 함수 추출 (바운딩박스+면적+중심점 재계산)
 - 검증: Ground Truth 48/48 PASS, QTY ALL PASS 유지
 
+## 완료된 작업 (2026-02-20) - P4 물량산출 엔진 개선 + 코드 정리
+
+### P4 물량산출 5개 Phase (사전 구현 확인 완료)
+- **Phase 1**: unit-price-db.ts 단가 현실화 — 이미 2025년 서울 실거래 기준 60+ 항목, priceGrade/priceReference 필드 포함
+- **Phase 2**: estimate-calculator.ts 높이할증 — ceilingHeight > 2500mm → laborCost × 1.5배 이미 구현
+- **Phase 3**: AI 자재 오버라이드 — CATEGORY_TO_ITEM_MAP + materialOverrides 파라미터 이미 구현
+- **Phase 4**: CostTable 내역 추가/삭제 — editable/onAddItem/onDeleteItem/onEditPrice 이미 구현
+- **Phase 5**: 사업자 견적 수정 입찰 — CostTable(editable) + customEstimate 메타데이터 이미 구현
+
+### QTY 엔진 검증 결과 (ALL PASS)
+| 타입 | 총견적 | 아이템 | 공종 | 미매칭 |
+|------|--------|--------|------|--------|
+| 59㎡ | 6,433만원 | 110개 | 16/17 | 0 |
+| 84A㎡ | 7,983만원 | 157개 | 16/17 | 0 |
+| 84B㎡ | 6,813만원 | 107개 | 16/17 | 0 |
+
+### 코드 정리
+- ~~`src/lib/openai-client.ts`~~ 삭제 (미사용, 참조 0건)
+- `openai` npm 패키지 제거 (`npm uninstall openai`)
+- 모든 AI API는 `@google/genai` (Gemini) 사용으로 통일
+- console.log 31건 → 모두 서버사이드 `[module-name]` 프리픽스, 프로덕션 디버깅용 유지
+
+### 견적서 PDF 개선
+- `src/lib/pdf/estimate-pdf-generator.ts` - 층고 할증 정보 추가
+  - `층고: {n}mm (2500mm 초과 노무비 1.5배 할증)` 표시
+
+### 소비자 기능 확인 (이미 구현됨)
+- `src/components/ui/NotificationBell.tsx` - 알림 벨 (실시간 Supabase Realtime + 미읽음 카운트)
+- `src/app/notifications/page.tsx` - 알림 전체보기 (필터/읽음처리/실시간)
+- `src/app/account/page.tsx` - 내 계정 (프로필/알림설정/비밀번호/계정삭제)
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
@@ -1712,4 +1743,3 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
 - Gemini AI 이미지 생성 실제 테스트 (API 키 발급 완료, 테스트 필요)
 - 84B 타입 E2E 워크플로우 검증 확장 (59㎡, 84A㎡)
-- `src/lib/openai-client.ts` 미사용 파일 정리 (삭제 가능)
