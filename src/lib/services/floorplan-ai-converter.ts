@@ -14,7 +14,7 @@ import type {
   FixtureData,
   DimensionData,
 } from '@/types/floorplan';
-import type { FloorplanAIResult } from './floorplan-ai-client';
+import type { FloorplanAIResult, PdfParserV47Result } from './floorplan-ai-client';
 
 // mm → m
 function mmToM(mm: number): number {
@@ -335,6 +335,133 @@ export function convertFloorplanAIResult(
     doors,
     windows,
     fixtures,
+    dimensions,
+  };
+}
+
+
+/**
+ * v4.7 PdfParserV47Result → ParsedFloorPlan 변환
+ *
+ * v4.7 서비스는 mm 단위의 project_json을 반환하며,
+ * opening_subtypes와 scale 정보를 포함한다.
+ */
+export function convertPdfParserV47Result(
+  result: PdfParserV47Result,
+  knownArea?: number,
+): ParsedFloorPlan {
+  const project = result.project;
+  const mm_per_px = project.meta.mm_per_px || 5.0;
+
+  // --- Rooms ---
+  const rooms: RoomData[] = project.rooms.map((r, i) => {
+    const type = classifyRoomType(r.name) || (r.type as RoomType) || 'LIVING';
+    const centerM = r.center_px
+      ? { x: r.center_px[0] * mm_per_px / 1000, y: r.center_px[1] * mm_per_px / 1000 }
+      : { x: 0, y: 0 };
+
+    return {
+      id: r.id || `room-${i}`,
+      type,
+      name: r.name || type,
+      area: r.area_m2 || 0,
+      position: {
+        x: centerM.x - 1.5,
+        y: centerM.y - 1.5,
+        width: 3.0,
+        height: 3.0,
+      },
+      center: centerM,
+      material: getRoomMaterial(type),
+    };
+  });
+
+  // --- Walls ---
+  const walls: WallData[] = project.walls.map((w, i) => {
+    const thicknessMm = w.thickness_mm || 150;
+    const isExterior = thicknessMm >= 200;
+
+    return {
+      id: w.id || `wall-${i}`,
+      start: { x: w.x0_mm / 1000, y: w.y0_mm / 1000 },
+      end: { x: w.x1_mm / 1000, y: w.y1_mm / 1000 },
+      thickness: thicknessMm / 1000,
+      isExterior,
+      wallType: isExterior ? 'exterior' as const : 'interior' as const,
+      isLoadBearing: isExterior,
+    };
+  });
+
+  // --- Openings → Doors + Windows ---
+  const doors: DoorData[] = [];
+  const windows: WindowData[] = [];
+
+  // subtype lookup
+  const subtypeLookup = new Map<string, { subtype: string; confidence: number }>();
+  for (const st of project.opening_subtypes || []) {
+    subtypeLookup.set(st.id, { subtype: st.subtype, confidence: st.confidence });
+  }
+
+  for (const o of project.openings || []) {
+    const centerX = ((o.x0 + o.x1) / 2) * mm_per_px / 1000;
+    const centerY = ((o.y0 + o.y1) / 2) * mm_per_px / 1000;
+    const widthM = (o.widthMm || 900) / 1000;
+    const st = subtypeLookup.get(o.id);
+
+    if (o.type === 'door') {
+      let doorType: 'swing' | 'sliding' | 'folding' | 'entrance' = 'swing';
+      if (st?.subtype === 'entrance') doorType = 'entrance';
+      else if (st?.subtype === 'balcony_door') doorType = 'sliding';
+
+      doors.push({
+        id: o.id,
+        position: { x: centerX, y: centerY },
+        width: widthM,
+        rotation: 0,
+        type: doorType,
+        connectedRooms: ['', ''],
+      });
+    } else {
+      windows.push({
+        id: o.id,
+        position: { x: centerX, y: centerY },
+        width: widthM,
+        height: 1.2,
+        rotation: 0,
+        wallId: '',
+      });
+    }
+  }
+
+  // --- Dimensions from OCR ---
+  const dimensions: DimensionData[] = [];
+  for (const w of project.ocr_words || []) {
+    const dimMatch = w.text.match(/^(\d{3,5})$/);
+    if (dimMatch) {
+      const valueMm = parseInt(dimMatch[1], 10);
+      if (valueMm >= 100 && valueMm <= 20000) {
+        const [x0, y0, x1, y1] = w.bbox;
+        dimensions.push({
+          id: `dim-v47-${dimensions.length}`,
+          startPoint: { x: x0 * mm_per_px / 1000, y: ((y0 + y1) / 2) * mm_per_px / 1000 },
+          endPoint: { x: x1 * mm_per_px / 1000, y: ((y0 + y1) / 2) * mm_per_px / 1000 },
+          valueMm,
+          label: w.text,
+        });
+      }
+    }
+  }
+
+  // --- totalArea ---
+  const totalArea = knownArea || rooms.reduce((sum, r) => sum + r.area, 0);
+
+  return {
+    totalArea: Math.round(totalArea * 100) / 100,
+    rooms,
+    walls,
+    doors,
+    windows,
+    fixtures: [],
     dimensions,
   };
 }

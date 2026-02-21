@@ -13,8 +13,8 @@ import {
 import type { ImageSource } from "@/lib/services/image-preprocessor";
 import { extractPdfVectors } from "@/lib/services/pymupdf-extractor";
 import type { VectorHints } from "@/lib/services/pymupdf-extractor";
-import { callFloorplanAI } from "@/lib/services/floorplan-ai-client";
-import { convertFloorplanAIResult } from "@/lib/services/floorplan-ai-converter";
+import { callFloorplanAI, callPdfParserV47 } from "@/lib/services/floorplan-ai-client";
+import { convertFloorplanAIResult, convertPdfParserV47Result } from "@/lib/services/floorplan-ai-converter";
 import { enhancedFuse } from "@/lib/services/enhanced-fusion";
 
 const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -142,8 +142,8 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2단계: Gemini Vision + floorplan-ai 병렬 실행
-    const [geminiSettled, aiSettled] = await Promise.allSettled([
+    // 2단계: Gemini Vision + floorplan-ai + v4.7 pdf_parser 병렬 실행
+    const [geminiSettled, aiSettled, v47Settled] = await Promise.allSettled([
       extractFloorPlanFromImage(imageBase64, imageMimeType, {
         knownAreaM2: knownArea,
         sourceType: sourceType as "pdf" | "photo" | "scan" | "hand_drawing",
@@ -152,6 +152,7 @@ export async function POST(request: NextRequest) {
         sampleType: sampleType || undefined,
       }),
       callFloorplanAI(fileBuffer, file.name),
+      callPdfParserV47(fileBuffer, file.name),
     ]);
 
     // Gemini 결과 추출
@@ -166,13 +167,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // floorplan-ai 결과 변환
+    // floorplan-ai 결과 변환 (legacy 또는 v4.7)
     const aiRawResult = aiSettled.status === "fulfilled" ? aiSettled.value : null;
-    const aiParsedPlan = aiRawResult
-      ? convertFloorplanAIResult(aiRawResult, knownArea)
-      : null;
+    const v47RawResult = v47Settled.status === "fulfilled" ? v47Settled.value : null;
 
-    if (aiParsedPlan) {
+    // v4.7 결과가 있으면 우선 사용, 없으면 legacy 사용
+    let aiParsedPlan = null;
+    if (v47RawResult && v47RawResult.success) {
+      aiParsedPlan = convertPdfParserV47Result(v47RawResult, knownArea);
+      console.log(`[parse-drawing] pdf-parser-v47: ${aiParsedPlan.rooms.length} rooms, ${aiParsedPlan.walls.length} walls, ${aiParsedPlan.doors.length} doors`);
+    } else if (aiRawResult) {
+      aiParsedPlan = convertFloorplanAIResult(aiRawResult, knownArea);
       console.log(`[parse-drawing] floorplan-ai: ${aiParsedPlan.rooms.length} rooms, ${aiParsedPlan.walls.length} walls, ${aiParsedPlan.doors.length} doors`);
     }
 
@@ -225,9 +230,14 @@ export async function POST(request: NextRequest) {
         vectorMethod: "pymupdf_hybrid",
       } : {}),
       aiPipelineUsed: !!aiParsedPlan,
+      aiPipelineVersion: v47RawResult?.success ? 'v4.7' : (aiRawResult ? 'legacy' : null),
       ...(aiParsedPlan ? {
         aiPipelineStats: fusionResult.stats,
         aiPipelineSources: fusionResult.sources,
+      } : {}),
+      ...(v47RawResult?.success ? {
+        v47Scale: v47RawResult.scale,
+        v47OpeningSubtypes: v47RawResult.opening_subtypes,
       } : {}),
       ...(result.repairMetrics ? {
         repairMetrics: result.repairMetrics,

@@ -58,3 +58,9 @@ python/floorplan-ai/outputs/
 python/floorplan-ai/__pycache__/
 python/floorplan-ai/data/
 python/floorplan-ai/src/__pycache__/
+
+# v4.7 services/pdf_parser artifacts
+services/pdf_parser/models/*.pt
+services/pdf_parser/outputs/
+services/pdf_parser/__pycache__/
+services/pdf_parser/**/__pycache__/
