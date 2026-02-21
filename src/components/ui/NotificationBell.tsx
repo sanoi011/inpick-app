@@ -130,7 +130,7 @@ export function NotificationBell() {
               {notifications.map((n) => (
                 <Link
                   key={n.id}
-                  href={n.link || "/notifications"}
+                  href={n.link || "/mypage/notifications"}
                   onClick={() => setOpen(false)}
                   className={`px-4 py-3 flex items-start gap-3 hover:bg-gray-50 border-l-4 ${
                     CONSUMER_NOTIFICATION_PRIORITY_COLORS[n.priority]
@@ -150,7 +150,7 @@ export function NotificationBell() {
           )}
 
           <Link
-            href="/notifications"
+            href="/mypage/notifications"
             onClick={() => setOpen(false)}
             className="block px-4 py-2.5 text-center text-xs text-blue-600 font-medium hover:bg-gray-50 border-t border-gray-100"
           >

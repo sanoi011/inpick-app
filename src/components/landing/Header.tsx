@@ -17,8 +17,8 @@ const COLORS = {
 const NAV_LINKS = [
   { label: "서비스 소개", href: "#features" },
   { label: "업체 찾기", href: "/find-contractors" },
+  { label: "커뮤니티", href: "/community" },
   { label: "이용 요금", href: "#pricing" },
-  { label: "자주 묻는 질문", href: "#faq" },
 ];
 
 import { useState, useEffect } from "react";
@@ -64,33 +64,33 @@ export default function Header({
         initial={{ y: -20, opacity: 0, scale: 0.95 }}
         animate={{
           y: 0, opacity: 1, scale: 1,
-          maxWidth: isScrolled ? "48rem" : "72rem",
+          maxWidth: isScrolled ? "64rem" : "72rem",
           backgroundColor: isScrolled ? colors.navBg : "transparent",
           borderRadius: isScrolled ? "9999px" : "16px",
           boxShadow: isScrolled ? "0 4px 20px -4px rgb(0 0 0 / 0.1)" : "none",
-          paddingLeft: isScrolled ? "16px" : "24px",
-          paddingRight: isScrolled ? "16px" : "24px",
+          paddingLeft: isScrolled ? "20px" : "24px",
+          paddingRight: isScrolled ? "20px" : "24px",
         }}
         transition={{ type: "spring", stiffness: 150, damping: 20, mass: 1 }}
         className="mx-auto flex items-center justify-between py-2.5 backdrop-blur-md"
         style={{ border: isScrolled ? `1px solid ${colors.navBorder}` : "1px solid transparent" }}
       >
         <a className="flex shrink-0 items-center gap-2" href="/" title={`${brandName} 홈`}>
-          <span className="text-xl font-bold text-blue-600">INPICK</span>
+          <span className="text-xl font-bold text-blue-600 whitespace-nowrap">INPICK</span>
         </a>
 
-        <div className="hidden md:flex items-center gap-6">
+        <div className="hidden md:flex items-center gap-5">
           {navLinks.map((link) => (
-            <a key={link.href} href={link.href} className="text-sm font-medium transition-colors hover:opacity-70" style={{ color: colors.text }}>
+            <a key={link.href} href={link.href} className="text-sm font-medium transition-colors hover:opacity-70 whitespace-nowrap" style={{ color: colors.text }}>
               {link.label}
             </a>
           ))}
         </div>
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2 shrink-0">
           <LocaleSwitcher />
           {!authLoading && !user && (
-            <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+            <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
               style={{ color: colors.textMuted }}
               whileHover={{ scale: 1.02, color: colors.text }} whileTap={{ scale: 0.98 }}>
               로그인
@@ -102,7 +102,7 @@ export default function Header({
             <div className="relative">
               <motion.button
                 onClick={() => setShowUserMenu((v) => !v)}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors"
+                className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
                 style={{ color: colors.text }}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               >
@@ -111,11 +111,8 @@ export default function Header({
               </motion.button>
               {showUserMenu && (
                 <div className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl border border-gray-200 shadow-lg py-1 z-50">
-                  <a href="/projects" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 프로젝트</a>
-                  <a href="/contracts" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계약</a>
+                  <a href="/mypage" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">마이페이지</a>
                   <a href="/find-contractors" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">업체 찾기</a>
-                  <a href="/notifications" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">알림</a>
-                  <a href="/account" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">내 계정</a>
                   <button
                     onClick={() => { setShowUserMenu(false); signOut(); }}
                     className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -127,12 +124,12 @@ export default function Header({
             </div>
             </>
           )}
-          <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+          <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             style={{ backgroundColor: colors.buttonSecondaryBg, border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {contactButtonText}
           </motion.a>
-          <motion.a href={startButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors"
+          <motion.a href={startButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
             style={{ backgroundColor: colors.buttonPrimaryBg, color: colors.buttonPrimaryText }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {startButtonText}
@@ -184,25 +181,13 @@ export default function Header({
                         <User className="w-4 h-4 inline mr-1" />
                         {user.user_metadata?.full_name || user.email?.split("@")[0]}
                       </div>
-                      <a href="/projects" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
+                      <a href="/mypage" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
                         onClick={() => setMobileMenuOpen(false)}>
-                        내 프로젝트
-                      </a>
-                      <a href="/contracts" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
-                        onClick={() => setMobileMenuOpen(false)}>
-                        내 계약
+                        마이페이지
                       </a>
                       <a href="/find-contractors" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
                         onClick={() => setMobileMenuOpen(false)}>
                         업체 찾기
-                      </a>
-                      <a href="/notifications" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
-                        onClick={() => setMobileMenuOpen(false)}>
-                        알림
-                      </a>
-                      <a href="/account" className="rounded-full px-4 py-3 text-center text-sm font-medium text-gray-700 border border-gray-200"
-                        onClick={() => setMobileMenuOpen(false)}>
-                        내 계정
                       </a>
                       <button
                         onClick={() => { setMobileMenuOpen(false); signOut(); }}

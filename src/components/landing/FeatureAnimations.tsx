@@ -1,208 +1,186 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import {
-  Sparkles, Bot, Send,
-  Building2, Shield, Star, FileCheck, Award, ChevronRight,
-  Database, ArrowRight, RefreshCw, TrendingUp,
-  Maximize, Layers, PaintBucket,
-} from "lucide-react";
+import { useState, useEffect } from "react";
 
 // ─── 1. AI 상담 애니메이션 ─────────────────────────────
-// 프롬프트 입력 → AI 응답 → 완성된 디자인 이미지
-
-const AI_PROMPTS = [
-  "거실을 모던한 스타일로 바꾸고 싶어요",
-  "화이트 톤 마루 + 그레이 벽지로요",
-];
-
-const AI_RESPONSES = [
-  "네, 모던 스타일 거실을 추천드릴게요!",
-  "강마루 화이트오크 + 실크벽지 추천합니다",
-  "예상 견적: 1,850만원 (25평 기준)",
-];
+// 클린 대시보드 스타일 — 입력 → 분석 → 결과 플로우
 
 export function AIConsultAnimation() {
-  const [phase, setPhase] = useState(0); // 0: typing, 1: AI respond, 2: design reveal, 3: reset pause
-  const [charIdx, setCharIdx] = useState(0);
-  const [msgIdx, setMsgIdx] = useState(0);
-  const [messages, setMessages] = useState<{ role: "user" | "ai"; text: string; visible: boolean }[]>([]);
-  const [showDesign, setShowDesign] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout>>();
+  const [phase, setPhase] = useState(0);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    const tick = () => {
-      if (phase === 0) {
-        // User typing
-        const prompt = AI_PROMPTS[msgIdx % AI_PROMPTS.length];
-        if (charIdx < prompt.length) {
-          setCharIdx((c) => c + 1);
-          timerRef.current = setTimeout(tick, 8 + Math.random() * 8);
-        } else {
-          // Finish typing → add message
-          setMessages((prev) => [...prev, { role: "user", text: prompt, visible: true }]);
-          setCharIdx(0);
-          setPhase(1);
-          timerRef.current = setTimeout(tick, 250);
-        }
-      } else if (phase === 1) {
-        // AI responds one by one
-        if (msgIdx < AI_RESPONSES.length) {
-          setMessages((prev) => [...prev, { role: "ai", text: AI_RESPONSES[msgIdx], visible: true }]);
-          setMsgIdx((i) => i + 1);
-          timerRef.current = setTimeout(tick, 350);
-        } else {
-          setPhase(2);
-          setShowDesign(true);
-          timerRef.current = setTimeout(tick, 1500);
-        }
-      } else if (phase === 2) {
-        // Show design, then reset
-        setPhase(3);
-        timerRef.current = setTimeout(tick, 600);
-      } else {
-        // Reset
-        setMessages([]);
-        setCharIdx(0);
-        setMsgIdx(0);
-        setShowDesign(false);
-        setPhase(0);
-        timerRef.current = setTimeout(tick, 200);
-      }
-    };
-    timerRef.current = setTimeout(tick, 300);
-    return () => clearTimeout(timerRef.current);
-  }, [phase, charIdx, msgIdx]);
+    const interval = setInterval(() => {
+      setPhase((p) => (p + 1) % 60);
+    }, 120);
+    return () => clearInterval(interval);
+  }, []);
 
-  const currentTyping = phase === 0 ? AI_PROMPTS[msgIdx % AI_PROMPTS.length].slice(0, charIdx) : "";
+  useEffect(() => {
+    if (phase < 15) setProgress(Math.round((phase / 14) * 30));
+    else if (phase < 35) setProgress(30 + Math.round(((phase - 15) / 19) * 50));
+    else if (phase < 50) setProgress(80 + Math.round(((phase - 35) / 14) * 20));
+    else setProgress(100);
+  }, [phase]);
+
+  const isAnalyzing = phase >= 10 && phase < 40;
+  const showResult = phase >= 42;
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl overflow-hidden p-4 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
-        <div className="w-7 h-7 rounded-lg bg-blue-500 flex items-center justify-center">
-          <Bot className="w-4 h-4 text-white" />
-        </div>
-        <span className="text-white/90 text-sm font-medium">INPICK AI 상담</span>
-        <span className="ml-auto flex items-center gap-1 text-green-400 text-xs">
-          <span className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" /> 온라인
-        </span>
-      </div>
+    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)" }}>
+      {/* Grid pattern */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.04]">
+        <defs>
+          <pattern id="grid-ai" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-ai)" />
+      </svg>
 
-      {/* Chat area */}
-      <div className="flex-1 overflow-hidden space-y-2 relative">
-        {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"} animate-slideUp`}
-          >
-            <div
-              className={`max-w-[85%] px-3 py-2 rounded-2xl text-xs leading-relaxed ${
-                msg.role === "user"
-                  ? "bg-blue-500 text-white rounded-br-md"
-                  : "bg-white/10 text-white/90 rounded-bl-md"
-              }`}
-            >
-              {msg.role === "ai" && <Sparkles className="w-3 h-3 text-yellow-400 inline mr-1" />}
-              {msg.text}
-            </div>
+      <div className="relative h-full p-5 flex flex-col">
+        {/* Header bar */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Design Analysis</span>
           </div>
-        ))}
+          <span className="text-[10px] font-mono text-slate-500">{progress}%</span>
+        </div>
 
-        {/* Design reveal overlay */}
-        {showDesign && (
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/95 to-transparent flex items-end justify-center pb-4 animate-fadeIn">
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 border border-white/20 w-[90%]">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-4 h-4 text-yellow-400" />
-                <span className="text-white text-xs font-semibold">AI 디자인 완성</span>
+        {/* Progress bar */}
+        <div className="h-[3px] bg-slate-700/50 rounded-full mb-5 overflow-hidden">
+          <div className="h-full rounded-full transition-all duration-300 ease-out"
+            style={{
+              width: `${progress}%`,
+              background: "linear-gradient(90deg, #3B82F6, #06B6D4)",
+            }} />
+        </div>
+
+        {/* Main visualization area */}
+        <div className="flex-1 flex gap-3">
+          {/* Left: Input fields */}
+          <div className="w-[42%] flex flex-col gap-2">
+            {["공간 유형", "선호 스타일", "예산 범위", "면적"].map((label, i) => (
+              <div key={label}
+                className="rounded-lg px-3 py-2 transition-all duration-500"
+                style={{
+                  backgroundColor: phase > i * 3 ? "rgba(59,130,246,0.08)" : "rgba(255,255,255,0.02)",
+                  border: `1px solid ${phase > i * 3 ? "rgba(59,130,246,0.2)" : "rgba(255,255,255,0.05)"}`,
+                }}>
+                <span className="text-[9px] text-slate-500 block mb-0.5">{label}</span>
+                <div className="h-2.5 rounded-sm overflow-hidden"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.03)",
+                    width: phase > i * 3 + 2 ? "100%" : "0%",
+                  }}>
+                  <div className="h-full rounded-sm transition-all duration-700"
+                    style={{
+                      width: phase > i * 3 + 2 ? `${60 + i * 10}%` : "0%",
+                      background: "linear-gradient(90deg, rgba(59,130,246,0.3), rgba(6,182,212,0.3))",
+                    }} />
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {["bg-amber-700/60", "bg-stone-400/60", "bg-slate-500/60"].map((bg, i) => (
-                  <div key={i} className={`${bg} rounded-lg aspect-square flex items-center justify-center animate-scaleIn`} style={{ animationDelay: `${i * 150}ms` }}>
-                    <span className="text-white/80 text-[9px]">{["마루", "벽지", "천장"][i]}</span>
+            ))}
+          </div>
+
+          {/* Right: Analysis visualization */}
+          <div className="flex-1 flex flex-col gap-2">
+            {/* Processing node graph */}
+            <div className="flex-1 rounded-lg p-3 relative overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              {isAnalyzing && (
+                <svg className="absolute inset-0 w-full h-full">
+                  {/* Animated connection lines */}
+                  {[0, 1, 2].map((i) => (
+                    <line key={i}
+                      x1={`${20 + i * 15}%`} y1={`${30 + i * 15}%`}
+                      x2={`${50 + i * 10}%`} y2={`${25 + i * 20}%`}
+                      stroke="rgba(59,130,246,0.2)" strokeWidth="1"
+                      strokeDasharray="4 4"
+                      className="anim-dash" />
+                  ))}
+                  {/* Nodes */}
+                  {[
+                    { cx: "25%", cy: "35%", r: 4 },
+                    { cx: "45%", cy: "25%", r: 5 },
+                    { cx: "65%", cy: "50%", r: 4 },
+                    { cx: "35%", cy: "65%", r: 3 },
+                    { cx: "75%", cy: "35%", r: 6 },
+                    { cx: "55%", cy: "70%", r: 3 },
+                  ].map((n, i) => (
+                    <circle key={i} cx={n.cx} cy={n.cy} r={n.r}
+                      fill={i === 4 ? "rgba(6,182,212,0.6)" : "rgba(59,130,246,0.4)"}
+                      className="anim-pulse-node"
+                      style={{ animationDelay: `${i * 0.3}s` }} />
+                  ))}
+                </svg>
+              )}
+
+              {showResult && (
+                <div className="absolute inset-0 flex items-center justify-center anim-fade-in">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-white mb-1 tracking-tight"
+                      style={{ fontFeatureSettings: "'tnum'" }}>1,850
+                      <span className="text-sm font-normal text-slate-400 ml-1">만원</span>
+                    </div>
+                    <div className="text-[10px] text-cyan-400/80 font-medium">견적 산출 완료</div>
                   </div>
-                ))}
-              </div>
-              <div className="mt-2 text-center">
-                <span className="text-lg font-bold text-white">1,850</span>
-                <span className="text-white/60 text-xs ml-0.5">만원</span>
-              </div>
+                </div>
+              )}
+
+              {!isAnalyzing && !showResult && (
+                <div className="h-full flex items-center justify-center">
+                  <span className="text-[10px] text-slate-600">AI 분석 대기</span>
+                </div>
+              )}
+            </div>
+
+            {/* Bottom metric cards */}
+            <div className="flex gap-1.5">
+              {[
+                { label: "자재", value: "42", unit: "항목" },
+                { label: "공종", value: "17", unit: "개" },
+                { label: "정확도", value: "98", unit: "%" },
+              ].map((m) => (
+                <div key={m.label}
+                  className="flex-1 rounded-lg px-2 py-1.5 text-center transition-all duration-500"
+                  style={{
+                    backgroundColor: showResult ? "rgba(59,130,246,0.06)" : "rgba(255,255,255,0.02)",
+                    border: `1px solid ${showResult ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.04)"}`,
+                  }}>
+                  <div className="text-xs font-semibold text-white/80"
+                    style={{ opacity: showResult ? 1 : 0.3, transition: "opacity 0.5s" }}>
+                    {showResult ? m.value : "—"}
+                  </div>
+                  <div className="text-[8px] text-slate-500">{m.label}</div>
+                </div>
+              ))}
             </div>
           </div>
-        )}
-      </div>
-
-      {/* Suggested prompts */}
-      {messages.length === 0 && phase === 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5 animate-fadeIn">
-          {["모던 거실 리모델링", "욕실 타일 추천", "25평 전체 견적"].map((tag) => (
-            <span
-              key={tag}
-              className="px-2.5 py-1 rounded-full text-[10px] font-medium bg-gradient-to-r from-blue-500/20 to-violet-500/20 text-blue-300 border border-blue-400/20 backdrop-blur-sm"
-            >
-              <Sparkles className="w-2.5 h-2.5 inline mr-0.5 -mt-px" />
-              {tag}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Input area — gradient border wrapper */}
-      <div className="mt-3 p-[1px] rounded-xl bg-gradient-to-r from-blue-500 via-violet-500 to-fuchsia-500 animate-gradientShift">
-        <div className="flex items-center gap-3 bg-slate-800/95 backdrop-blur-sm rounded-[11px] px-4 py-3.5">
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center flex-shrink-0">
-            <Sparkles className="w-3.5 h-3.5 text-white" />
-          </div>
-          <span className="flex-1 text-sm text-white/70 min-h-[20px] leading-relaxed">
-            {currentTyping}
-            {phase === 0 && <span className="animate-blink text-white/90">|</span>}
-            {phase !== 0 && "어떤 인테리어를 원하세요?"}
-          </span>
-          <button className="w-8 h-8 rounded-lg bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/25">
-            <Send className="w-4 h-4 text-white" />
-          </button>
         </div>
       </div>
 
       <style jsx>{`
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateY(12px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { opacity: 0; transform: scale(0.8); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        @keyframes blink {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0; }
-        }
-        @keyframes gradientShift {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-        .animate-slideUp { animation: slideUp 0.3s ease-out; }
-        .animate-fadeIn { animation: fadeIn 0.6s ease-out; }
-        .animate-scaleIn { animation: scaleIn 0.4s ease-out both; }
-        .animate-blink { animation: blink 0.8s infinite; }
-        .animate-gradientShift { background-size: 200% 200%; animation: gradientShift 3s ease infinite; }
+        @keyframes dash { to { stroke-dashoffset: -24; } }
+        @keyframes pulseNode { 0%, 100% { opacity: 0.4; transform: scale(1); } 50% { opacity: 1; transform: scale(1.3); } }
+        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
+        .anim-dash { animation: dash 1.5s linear infinite; }
+        .anim-pulse-node { animation: pulseNode 2s ease-in-out infinite; }
+        .anim-fade-in { animation: fadeIn 0.6s ease-out; }
       `}</style>
     </div>
   );
 }
 
 // ─── 2. 실시간 단가연동 애니메이션 ──────────────────────
-// 3대 공식 기관에서 데이터가 중앙으로 흘러오는 모션
+// 데이터 스트림 시각화 — 3개 소스에서 중앙으로 흐르는 파이프라인
 
 const SOURCES = [
-  { name: "한국물가협회", icon: Database, color: "blue", label: "자재 단가" },
-  { name: "대한건설협회", icon: TrendingUp, color: "indigo", label: "노임 단가" },
-  { name: "조달청", icon: Building2, color: "violet", label: "관급 단가" },
+  { name: "한국물가협회", label: "자재", color: "#3B82F6" },
+  { name: "대한건설협회", label: "노임", color: "#6366F1" },
+  { name: "조달청", label: "관급", color: "#8B5CF6" },
 ];
 
 const PRICE_ITEMS = [
@@ -217,257 +195,270 @@ const PRICE_ITEMS = [
 export function PriceSyncAnimation() {
   const [activeSource, setActiveSource] = useState(0);
   const [priceIdx, setPriceIdx] = useState(0);
-  const [updating, setUpdating] = useState(false);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveSource((prev) => (prev + 1) % 3);
-      setUpdating(true);
-      setTimeout(() => {
+      setTick((t) => t + 1);
+      if (tick % 15 === 0) {
+        setActiveSource((prev) => (prev + 1) % 3);
         setPriceIdx((prev) => (prev + 1) % PRICE_ITEMS.length);
-        setUpdating(false);
-      }, 600);
-    }, 2000);
+      }
+    }, 130);
     return () => clearInterval(interval);
-  }, []);
+  }, [tick]);
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl overflow-hidden p-4 flex flex-col">
-      {/* Sources row */}
-      <div className="flex justify-between gap-2 mb-4">
-        {SOURCES.map((src, i) => {
-          const Icon = src.icon;
-          const isActive = activeSource === i;
-          const colors: Record<string, string> = {
-            blue: isActive ? "bg-blue-500 text-white shadow-lg shadow-blue-200" : "bg-blue-50 text-blue-600",
-            indigo: isActive ? "bg-indigo-500 text-white shadow-lg shadow-indigo-200" : "bg-indigo-50 text-indigo-600",
-            violet: isActive ? "bg-violet-500 text-white shadow-lg shadow-violet-200" : "bg-violet-50 text-violet-600",
-          };
-          return (
-            <div key={i} className="flex flex-col items-center gap-1.5 flex-1">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500 ${colors[src.color]}`}>
-                <Icon className="w-5 h-5" />
-              </div>
-              <span className="text-[9px] text-gray-500 font-medium text-center leading-tight">{src.name}</span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)" }}>
+      {/* Grid */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.04]">
+        <defs>
+          <pattern id="grid-ps" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-ps)" />
+      </svg>
 
-      {/* Data flow arrows */}
-      <div className="flex justify-center mb-3 relative h-6">
-        {[0, 1, 2].map((i) => (
-          <div key={i} className="absolute" style={{ left: `${17 + i * 33}%` }}>
-            <div
-              className={`flex flex-col items-center transition-opacity duration-300 ${activeSource === i ? "opacity-100" : "opacity-20"}`}
-            >
-              <div className="w-0.5 h-3 bg-blue-400 rounded-full" />
-              <ChevronRight className="w-3 h-3 text-blue-500 rotate-90 -mt-0.5" />
-            </div>
+      <div className="relative h-full p-5 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-emerald-400 anim-status-pulse" />
+            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Live Data Feed</span>
           </div>
-        ))}
-      </div>
-
-      {/* Central price display */}
-      <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm p-3 relative overflow-hidden">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-1.5">
-            <RefreshCw className={`w-3.5 h-3.5 text-blue-500 ${updating ? "animate-spin" : ""}`} />
-            <span className="text-xs font-semibold text-gray-800">실시간 단가 업데이트</span>
-          </div>
-          <span className="text-[10px] text-green-600 bg-green-50 px-2 py-0.5 rounded-full font-medium">LIVE</span>
+          <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            SYNCED
+          </span>
         </div>
 
-        {/* Price items with scroll effect */}
-        <div className="space-y-1.5">
+        {/* Source indicators */}
+        <div className="flex gap-2 mb-4">
+          {SOURCES.map((src, i) => (
+            <div key={i}
+              className="flex-1 rounded-lg px-2.5 py-2 transition-all duration-500"
+              style={{
+                backgroundColor: activeSource === i ? `${src.color}10` : "rgba(255,255,255,0.02)",
+                border: `1px solid ${activeSource === i ? `${src.color}30` : "rgba(255,255,255,0.05)"}`,
+              }}>
+              <div className="flex items-center gap-1.5 mb-1">
+                <div className="w-1.5 h-1.5 rounded-full transition-colors duration-300"
+                  style={{ backgroundColor: activeSource === i ? src.color : "rgba(255,255,255,0.15)" }} />
+                <span className="text-[8px] text-slate-500 font-medium">{src.label}</span>
+              </div>
+              <span className="text-[9px] text-slate-400 leading-none">{src.name}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Data stream visualization */}
+        <div className="h-5 mb-3 flex items-center justify-center">
+          <svg className="w-full h-5" viewBox="0 0 300 20">
+            {/* Flowing particles */}
+            {[0, 1, 2, 3, 4].map((i) => (
+              <circle key={i} r="2"
+                fill={SOURCES[activeSource].color}
+                opacity={0.4 + (i * 0.12)}
+                className="anim-flow-dot"
+                style={{ animationDelay: `${i * 0.3}s` }}>
+                <animate attributeName="cx" from="40" to="260" dur="1.5s"
+                  repeatCount="indefinite" begin={`${i * 0.3}s`} />
+                <animate attributeName="cy" from="10" to="10" dur="1.5s"
+                  repeatCount="indefinite" begin={`${i * 0.3}s`} />
+              </circle>
+            ))}
+            {/* Track line */}
+            <line x1="40" y1="10" x2="260" y2="10"
+              stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+          </svg>
+        </div>
+
+        {/* Price table */}
+        <div className="flex-1 rounded-lg overflow-hidden"
+          style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          {/* Table header */}
+          <div className="flex items-center px-3 py-1.5"
+            style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+            <span className="flex-1 text-[9px] text-slate-500 font-medium">품목</span>
+            <span className="w-24 text-right text-[9px] text-slate-500 font-medium">단가</span>
+            <span className="w-10 text-right text-[9px] text-slate-500 font-medium">단위</span>
+          </div>
+          {/* Table rows */}
           {[0, 1, 2, 3].map((offset) => {
             const item = PRICE_ITEMS[(priceIdx + offset) % PRICE_ITEMS.length];
-            const isNew = offset === 0 && updating;
+            const isHighlighted = offset === 0;
             return (
-              <div
-                key={`${priceIdx}-${offset}`}
-                className={`flex items-center justify-between py-1.5 px-2 rounded-lg transition-all duration-500 ${
-                  isNew ? "bg-blue-50 border border-blue-200" : offset === 0 ? "bg-gray-50" : ""
-                }`}
-              >
-                <span className={`text-[11px] ${offset === 0 ? "font-semibold text-gray-800" : "text-gray-600"}`}>
+              <div key={`${priceIdx}-${offset}`}
+                className="flex items-center px-3 py-2 transition-all duration-500"
+                style={{
+                  backgroundColor: isHighlighted ? `${SOURCES[activeSource].color}08` : "transparent",
+                  borderBottom: "1px solid rgba(255,255,255,0.03)",
+                }}>
+                <span className={`flex-1 text-[10px] ${isHighlighted ? "text-white/80" : "text-slate-400"}`}>
                   {item.name}
                 </span>
-                <div className="flex items-center gap-1">
-                  <span className={`text-[11px] font-bold ${isNew ? "text-blue-600" : "text-gray-900"}`}>
-                    {isNew ? "..." : `${item.price}원`}
-                  </span>
-                  <span className="text-[9px] text-gray-400">/{item.unit}</span>
-                </div>
+                <span className={`w-24 text-right text-[10px] font-mono ${isHighlighted ? "text-cyan-400" : "text-slate-300"}`}>
+                  ₩{item.price}
+                </span>
+                <span className="w-10 text-right text-[9px] text-slate-500">/{item.unit}</span>
               </div>
             );
           })}
         </div>
-
-        {/* Shimmer on update */}
-        {updating && (
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-100/40 to-transparent animate-shimmer" />
-        )}
       </div>
 
       <style jsx>{`
-        @keyframes shimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-        .animate-shimmer { animation: shimmer 0.8s ease-out; }
+        @keyframes statusPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+        .anim-status-pulse { animation: statusPulse 2s ease-in-out infinite; }
+        .anim-flow-dot { opacity: 0; animation: flowFade 1.5s ease-in-out infinite; }
+        @keyframes flowFade { 0% { opacity: 0; } 30% { opacity: 0.6; } 70% { opacity: 0.6; } 100% { opacity: 0; } }
       `}</style>
     </div>
   );
 }
 
 // ─── 3. 3D 견적뷰어 애니메이션 ──────────────────────────
-// 견적 항목이 자동 스크롤되며 보이는 모션
+// 아이소메트릭 공간 + 데이터 오버레이
 
-const ESTIMATE_ROWS = [
-  { room: "거실", trade: "바닥재", item: "강마루 화이트오크", qty: "16.2m²", price: "680,400" },
-  { room: "거실", trade: "도배", item: "실크벽지 (LG하우시스)", qty: "48.5m²", price: "412,250" },
-  { room: "거실", trade: "천장", item: "텍스 천장 도배", qty: "16.2m²", price: "129,600" },
-  { room: "안방", trade: "바닥재", item: "강마루 내추럴오크", qty: "11.4m²", price: "478,800" },
-  { room: "안방", trade: "도배", item: "합지벽지 (신한)", qty: "38.2m²", price: "248,300" },
-  { room: "욕실", trade: "방수", item: "우레탄 방수 (바닥+벽)", qty: "8.2m²", price: "697,000" },
-  { room: "욕실", trade: "타일", item: "300x600 포세린 타일", qty: "22.6m²", price: "1,017,000" },
-  { room: "욕실", trade: "위생", item: "양변기 (TOTO)", qty: "1대", price: "450,000" },
-  { room: "주방", trade: "타일", item: "600x600 벽 타일", qty: "6.8m²", price: "306,000" },
-  { room: "주방", trade: "설비", item: "싱크대 교체", qty: "1식", price: "1,200,000" },
-  { room: "현관", trade: "타일", item: "포세린 바닥타일", qty: "3.4m²", price: "153,000" },
-  { room: "현관", trade: "도배", item: "합지벽지", qty: "12.1m²", price: "78,650" },
+const ROOMS_DATA = [
+  { label: "거실", area: "29.4", cost: "680" },
+  { label: "안방", area: "14.2", cost: "478" },
+  { label: "욕실", area: "5.8", cost: "697" },
+  { label: "주방", area: "8.6", cost: "306" },
 ];
 
 export function EstimateViewerAnimation() {
-  const [scrollY, setScrollY] = useState(0);
   const [activeRoom, setActiveRoom] = useState(0);
-  const rooms = ["거실", "안방", "욕실", "주방"];
+  const [rotation, setRotation] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setScrollY((prev) => {
-        const next = prev + 1;
-        if (next > ESTIMATE_ROWS.length * 32) return 0;
-        return next;
-      });
-    }, 50);
+      setActiveRoom((prev) => (prev + 1) % ROOMS_DATA.length);
+    }, 2500);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveRoom((prev) => (prev + 1) % rooms.length);
-    }, 3000);
+      setRotation((r) => (r + 0.5) % 360);
+    }, 50);
     return () => clearInterval(interval);
-  }, [rooms.length]);
+  }, []);
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-white rounded-xl overflow-hidden border border-gray-200 flex flex-col">
-      {/* 3D mockup header */}
-      <div className="bg-slate-800 px-3 py-2 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Layers className="w-4 h-4 text-white/80" />
-          <span className="text-xs font-semibold text-white/90">INPICK 3D 견적 뷰어</span>
+    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)" }}>
+      {/* Grid */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.04]">
+        <defs>
+          <pattern id="grid-ev" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-ev)" />
+      </svg>
+
+      <div className="relative h-full p-5 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-blue-400" />
+            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">3D Viewer</span>
+          </div>
+          <div className="flex gap-1.5">
+            {["2D", "3D"].map((m) => (
+              <span key={m}
+                className="px-2 py-0.5 rounded text-[9px] font-medium"
+                style={{
+                  backgroundColor: m === "3D" ? "rgba(59,130,246,0.15)" : "rgba(255,255,255,0.03)",
+                  color: m === "3D" ? "#60A5FA" : "rgba(255,255,255,0.3)",
+                  border: `1px solid ${m === "3D" ? "rgba(59,130,246,0.25)" : "rgba(255,255,255,0.05)"}`,
+                }}>
+                {m}
+              </span>
+            ))}
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <Maximize className="w-3 h-3 text-white/50" />
-          <PaintBucket className="w-3 h-3 text-white/50" />
-        </div>
-      </div>
 
-      {/* Split view: 3D preview + estimate */}
-      <div className="flex-1 flex min-h-0">
-        {/* Left: 3D room mockup */}
-        <div className="w-[45%] bg-gradient-to-br from-gray-100 to-gray-200 relative overflow-hidden border-r border-gray-200">
-          {/* Simple room wireframe */}
-          <svg viewBox="0 0 200 160" className="w-full h-full">
-            {/* Floor */}
-            <polygon points="30,100 170,100 190,140 10,140" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="0.5" />
-            {/* Back wall */}
-            <polygon points="30,30 170,30 170,100 30,100" fill="#F3F4F6" stroke="#9CA3AF" strokeWidth="0.5" />
-            {/* Left wall */}
-            <polygon points="10,140 30,100 30,30 10,50" fill="#E5E7EB" stroke="#9CA3AF" strokeWidth="0.5" />
-
-            {/* Room highlight */}
-            <rect
-              x={40 + activeRoom * 30}
-              y={50}
-              width={35}
-              height={45}
-              fill="rgba(59,130,246,0.15)"
-              stroke="#3B82F6"
-              strokeWidth="1"
-              strokeDasharray="3 2"
-              className="transition-all duration-700"
-            />
-
-            {/* Room label */}
-            <text
-              x={57 + activeRoom * 30}
-              y={76}
-              textAnchor="middle"
-              className="fill-blue-600 text-[8px] font-semibold transition-all duration-700"
-            >
-              {rooms[activeRoom]}
-            </text>
+        {/* Isometric 3D room visualization */}
+        <div className="flex-1 flex items-center justify-center relative mb-3">
+          <svg viewBox="0 0 260 180" className="w-full h-full max-h-[140px]">
+            {/* Isometric floor plan */}
+            {[
+              { x: 30, y: 80, w: 100, h: 60, room: 0, color: "#3B82F6" },
+              { x: 130, y: 80, w: 60, h: 60, room: 1, color: "#6366F1" },
+              { x: 30, y: 140, w: 60, h: 30, room: 2, color: "#06B6D4" },
+              { x: 90, y: 140, w: 70, h: 30, room: 3, color: "#8B5CF6" },
+            ].map((r, i) => {
+              const isActive = activeRoom === r.room;
+              const isoX = r.x + r.y * 0.5;
+              const isoY = r.y * 0.35 - r.x * 0.15 + 50;
+              return (
+                <g key={i}>
+                  {/* Floor */}
+                  <rect x={isoX} y={isoY} width={r.w * 0.6} height={r.h * 0.35}
+                    fill={isActive ? `${r.color}25` : "rgba(255,255,255,0.03)"}
+                    stroke={isActive ? `${r.color}50` : "rgba(255,255,255,0.08)"}
+                    strokeWidth={isActive ? 1.5 : 0.5}
+                    rx="2"
+                    className="transition-all duration-500" />
+                  {/* Wall hint */}
+                  {isActive && (
+                    <>
+                      <line x1={isoX} y1={isoY} x2={isoX} y2={isoY - 18}
+                        stroke={`${r.color}40`} strokeWidth="1" strokeDasharray="2 2" />
+                      <line x1={isoX + r.w * 0.6} y1={isoY} x2={isoX + r.w * 0.6} y2={isoY - 18}
+                        stroke={`${r.color}40`} strokeWidth="1" strokeDasharray="2 2" />
+                    </>
+                  )}
+                  {/* Label */}
+                  <text x={isoX + r.w * 0.3} y={isoY + r.h * 0.2}
+                    textAnchor="middle"
+                    className={`text-[8px] font-medium transition-all duration-500`}
+                    fill={isActive ? r.color : "rgba(255,255,255,0.25)"}>
+                    {ROOMS_DATA[r.room].label}
+                  </text>
+                </g>
+              );
+            })}
+            {/* Rotating compass */}
+            <g transform={`translate(225, 30) rotate(${rotation})`}>
+              <circle r="12" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
+              <line x1="0" y1="-10" x2="0" y2="10" stroke="rgba(59,130,246,0.3)" strokeWidth="0.5" />
+              <line x1="-10" y1="0" x2="10" y2="0" stroke="rgba(59,130,246,0.3)" strokeWidth="0.5" />
+              <circle r="2" fill="rgba(59,130,246,0.5)" />
+            </g>
           </svg>
         </div>
 
-        {/* Right: scrolling estimate */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* Tabs */}
-          <div className="flex border-b border-gray-200">
-            {rooms.map((room, i) => (
-              <button
-                key={room}
-                className={`flex-1 text-[9px] py-1.5 font-medium transition-colors ${
-                  activeRoom === i ? "text-blue-600 border-b-2 border-blue-600 bg-blue-50/50" : "text-gray-400"
-                }`}
-              >
-                {room}
-              </button>
-            ))}
+        {/* Room detail bar */}
+        <div className="rounded-lg px-4 py-3 flex items-center justify-between transition-all duration-500"
+          style={{
+            backgroundColor: "rgba(255,255,255,0.02)",
+            border: "1px solid rgba(255,255,255,0.05)",
+          }}>
+          <div>
+            <span className="text-xs font-semibold text-white/80">{ROOMS_DATA[activeRoom].label}</span>
+            <span className="text-[10px] text-slate-500 ml-2">{ROOMS_DATA[activeRoom].area}m²</span>
           </div>
-
-          {/* Table header */}
-          <div className="flex items-center px-2 py-1 bg-gray-50 border-b border-gray-100 text-[8px] text-gray-500 font-medium">
-            <span className="w-[30%]">공종</span>
-            <span className="w-[35%]">품명</span>
-            <span className="w-[15%] text-right">수량</span>
-            <span className="w-[20%] text-right">금액</span>
+          <div className="text-right">
+            <span className="text-sm font-bold text-white/90 font-mono">{ROOMS_DATA[activeRoom].cost}</span>
+            <span className="text-[10px] text-slate-500 ml-0.5">만원</span>
           </div>
+        </div>
 
-          {/* Scrolling rows */}
-          <div className="flex-1 overflow-hidden relative">
-            <div
-              className="transition-transform duration-100 ease-linear"
-              style={{ transform: `translateY(-${scrollY}px)` }}
-            >
-              {[...ESTIMATE_ROWS, ...ESTIMATE_ROWS].map((row, i) => (
-                <div
-                  key={i}
-                  className={`flex items-center px-2 py-1.5 border-b border-gray-50 ${
-                    row.room === rooms[activeRoom] ? "bg-blue-50/30" : ""
-                  }`}
-                >
-                  <span className="w-[30%] text-[8px] text-gray-500">{row.trade}</span>
-                  <span className="w-[35%] text-[8px] text-gray-800 truncate">{row.item}</span>
-                  <span className="w-[15%] text-[8px] text-gray-500 text-right">{row.qty}</span>
-                  <span className="w-[20%] text-[9px] text-gray-900 font-semibold text-right">{row.price}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Gradient overlay */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white to-transparent pointer-events-none" />
-          </div>
-
-          {/* Total */}
-          <div className="px-2 py-1.5 bg-blue-600 flex items-center justify-between">
-            <span className="text-[9px] text-blue-100">총 견적</span>
-            <span className="text-sm font-bold text-white">18,520,000원</span>
-          </div>
+        {/* Room selector dots */}
+        <div className="flex items-center justify-center gap-2 mt-3">
+          {ROOMS_DATA.map((_, i) => (
+            <div key={i}
+              className="rounded-full transition-all duration-300"
+              style={{
+                width: activeRoom === i ? 16 : 6,
+                height: 6,
+                backgroundColor: activeRoom === i ? "#3B82F6" : "rgba(255,255,255,0.1)",
+              }} />
+          ))}
         </div>
       </div>
     </div>
@@ -475,156 +466,203 @@ export function EstimateViewerAnimation() {
 }
 
 // ─── 4. 전문업체 매칭 애니메이션 ─────────────────────────
-// 사업자등록증 → 면허 → 포트폴리오 → 검증 완료
+// 레이더 차트 스타일 스코어링 시스템
 
-const VERIFY_STEPS = [
-  {
-    title: "사업자등록증",
-    icon: FileCheck,
-    color: "blue",
-    detail: "인테리어 종합건설업",
-    sub: "사업자번호: 123-45-*****",
-  },
-  {
-    title: "건설업 면허",
-    icon: Shield,
-    color: "emerald",
-    detail: "실내건축공사업 면허",
-    sub: "면허번호: 서울-인테리어-2024-***",
-  },
-  {
-    title: "시공 포트폴리오",
-    icon: Star,
-    color: "amber",
-    detail: "84m² 아파트 시공 42건",
-    sub: "평균 평점: 4.8 / 5.0",
-  },
-  {
-    title: "검증 완료",
-    icon: Award,
-    color: "violet",
-    detail: "INPICK 인증 전문업체",
-    sub: "종합 신뢰도: 96점",
-  },
+const SCORE_LABELS = ["거리", "평점", "가격", "경력", "일정", "신뢰"];
+const SCORE_DATA = [
+  [85, 92, 78, 95, 88, 96],
+  [72, 88, 95, 80, 92, 90],
+  [90, 76, 82, 88, 70, 94],
 ];
 
 export function ContractorMatchAnimation() {
-  const [step, setStep] = useState(0);
-  const [verifying, setVerifying] = useState(false);
-  const [verified, setVerified] = useState<number[]>([]);
+  const [activeContractor, setActiveContractor] = useState(0);
+  const [fillProgress, setFillProgress] = useState(0);
+  const [scanAngle, setScanAngle] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setVerifying(true);
-      setTimeout(() => {
-        setVerified((prev) => {
-          const next = [...prev, step];
-          return next;
-        });
-        setVerifying(false);
-
-        setTimeout(() => {
-          setStep((prev) => {
-            const next = (prev + 1) % VERIFY_STEPS.length;
-            if (next === 0) {
-              setVerified([]);
-            }
-            return next;
-          });
-        }, 800);
-      }, 1200);
-    }, 2500);
+      setActiveContractor((prev) => (prev + 1) % SCORE_DATA.length);
+      setFillProgress(0);
+    }, 3500);
     return () => clearInterval(interval);
-  }, [step]);
+  }, []);
 
-  const current = VERIFY_STEPS[step];
-  const Icon = current.icon;
-  const colorMap: Record<string, { bg: string; border: string; text: string; iconBg: string; progress: string }> = {
-    blue: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-700", iconBg: "bg-blue-500", progress: "bg-blue-500" },
-    emerald: { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", iconBg: "bg-emerald-500", progress: "bg-emerald-500" },
-    amber: { bg: "bg-amber-50", border: "border-amber-200", text: "text-amber-700", iconBg: "bg-amber-500", progress: "bg-amber-500" },
-    violet: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", iconBg: "bg-violet-500", progress: "bg-violet-500" },
-  };
-  const colors = colorMap[current.color];
+  useEffect(() => {
+    if (fillProgress < 100) {
+      const timer = setTimeout(() => setFillProgress((p) => Math.min(p + 4, 100)), 30);
+      return () => clearTimeout(timer);
+    }
+  }, [fillProgress]);
+
+  useEffect(() => {
+    const interval = setInterval(() => setScanAngle((a) => (a + 2) % 360), 30);
+    return () => clearInterval(interval);
+  }, []);
+
+  const scores = SCORE_DATA[activeContractor];
+  const totalScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+
+  // Generate radar polygon points
+  const radarPoints = scores.map((score, i) => {
+    const adjustedScore = (score * fillProgress) / 100;
+    const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+    const r = (adjustedScore / 100) * 50;
+    return `${60 + r * Math.cos(angle)},${60 + r * Math.sin(angle)}`;
+  }).join(" ");
 
   return (
-    <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-gray-50 to-indigo-50 rounded-xl overflow-hidden p-4 flex flex-col">
-      {/* Header */}
-      <div className="text-center mb-3">
-        <span className="text-[10px] text-gray-500 font-medium">업체 검증 프로세스</span>
-      </div>
+    <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden"
+      style={{ background: "linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #0F172A 100%)" }}>
+      {/* Grid */}
+      <svg className="absolute inset-0 w-full h-full opacity-[0.04]">
+        <defs>
+          <pattern id="grid-cm" width="24" height="24" patternUnits="userSpaceOnUse">
+            <path d="M 24 0 L 0 0 0 24" fill="none" stroke="white" strokeWidth="0.5" />
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#grid-cm)" />
+      </svg>
 
-      {/* Progress dots */}
-      <div className="flex items-center justify-center gap-3 mb-4">
-        {VERIFY_STEPS.map((s, i) => {
-          const StepIcon = s.icon;
-          const isVerified = verified.includes(i);
-          const isCurrent = i === step;
-          return (
-            <div key={i} className="flex items-center gap-1.5">
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500 ${
-                isVerified
-                  ? "bg-green-500 text-white scale-100"
-                  : isCurrent
-                  ? `${colorMap[s.color].iconBg} text-white scale-110`
-                  : "bg-gray-200 text-gray-400 scale-100"
-              }`}>
-                {isVerified ? (
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                    <path d="M5 13l4 4L19 7" />
-                  </svg>
-                ) : (
-                  <StepIcon className="w-4 h-4" />
-                )}
+      <div className="relative h-full p-5 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-violet-400" />
+            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Matching Score</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {SCORE_DATA.map((_, i) => (
+              <div key={i}
+                className="w-5 h-5 rounded-md flex items-center justify-center text-[9px] font-medium transition-all duration-300"
+                style={{
+                  backgroundColor: activeContractor === i ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.03)",
+                  color: activeContractor === i ? "#A78BFA" : "rgba(255,255,255,0.2)",
+                  border: `1px solid ${activeContractor === i ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.05)"}`,
+                }}>
+                {String.fromCharCode(65 + i)}
               </div>
-              {i < 3 && <ArrowRight className={`w-3 h-3 ${isVerified ? "text-green-400" : "text-gray-300"}`} />}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Current verification card */}
-      <div className={`flex-1 rounded-xl border-2 ${colors.border} ${colors.bg} p-4 flex flex-col items-center justify-center transition-all duration-500 relative overflow-hidden`}>
-        <div className={`w-12 h-12 rounded-xl ${colors.iconBg} flex items-center justify-center mb-3 shadow-lg`}>
-          <Icon className="w-6 h-6 text-white" />
+            ))}
+          </div>
         </div>
-        <span className={`text-sm font-bold ${colors.text} mb-1`}>{current.title}</span>
-        <span className="text-xs text-gray-600 mb-0.5">{current.detail}</span>
-        <span className="text-[10px] text-gray-400">{current.sub}</span>
 
-        {/* Verification progress bar */}
-        {verifying && (
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gray-200">
-            <div className={`h-full ${colors.progress} animate-fillBar rounded-r-full`} />
+        {/* Main content */}
+        <div className="flex-1 flex gap-4 min-h-0">
+          {/* Radar chart */}
+          <div className="flex-1 flex items-center justify-center">
+            <svg viewBox="0 0 120 120" className="w-full h-full max-w-[150px] max-h-[150px]">
+              {/* Radar grid rings */}
+              {[20, 35, 50].map((r) => (
+                <polygon key={r}
+                  points={Array.from({ length: 6 }).map((_, i) => {
+                    const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                    return `${60 + r * Math.cos(angle)},${60 + r * Math.sin(angle)}`;
+                  }).join(" ")}
+                  fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="0.5" />
+              ))}
+              {/* Axis lines */}
+              {Array.from({ length: 6 }).map((_, i) => {
+                const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                return (
+                  <line key={i}
+                    x1="60" y1="60"
+                    x2={60 + 52 * Math.cos(angle)}
+                    y2={60 + 52 * Math.sin(angle)}
+                    stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+                );
+              })}
+              {/* Scan line */}
+              <line x1="60" y1="60"
+                x2={60 + 55 * Math.cos((scanAngle * Math.PI) / 180 - Math.PI / 2)}
+                y2={60 + 55 * Math.sin((scanAngle * Math.PI) / 180 - Math.PI / 2)}
+                stroke="rgba(139,92,246,0.15)" strokeWidth="0.5" />
+              {/* Data polygon */}
+              <polygon points={radarPoints}
+                fill="rgba(139,92,246,0.1)" stroke="rgba(139,92,246,0.5)" strokeWidth="1.5" />
+              {/* Data points */}
+              {scores.map((score, i) => {
+                const adjustedScore = (score * fillProgress) / 100;
+                const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                const r = (adjustedScore / 100) * 50;
+                return (
+                  <circle key={i}
+                    cx={60 + r * Math.cos(angle)}
+                    cy={60 + r * Math.sin(angle)}
+                    r="2.5" fill="#A78BFA" />
+                );
+              })}
+              {/* Labels */}
+              {SCORE_LABELS.map((label, i) => {
+                const angle = (Math.PI * 2 * i) / 6 - Math.PI / 2;
+                return (
+                  <text key={i}
+                    x={60 + 58 * Math.cos(angle)}
+                    y={60 + 58 * Math.sin(angle)}
+                    textAnchor="middle" dominantBaseline="middle"
+                    className="text-[7px]"
+                    fill="rgba(255,255,255,0.35)">
+                    {label}
+                  </text>
+                );
+              })}
+              {/* Center score */}
+              <text x="60" y="58" textAnchor="middle"
+                className="text-sm font-bold" fill="white"
+                style={{ opacity: fillProgress > 80 ? 1 : 0 }}>
+                {totalScore}
+              </text>
+              <text x="60" y="68" textAnchor="middle"
+                className="text-[7px]" fill="rgba(255,255,255,0.4)"
+                style={{ opacity: fillProgress > 80 ? 1 : 0 }}>
+                종합점수
+              </text>
+            </svg>
           </div>
-        )}
 
-        {/* Verified stamp */}
-        {verified.includes(step) && !verifying && (
-          <div className="absolute top-3 right-3 animate-stampIn">
-            <div className="bg-green-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-full flex items-center gap-0.5">
-              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
-                <path d="M5 13l4 4L19 7" />
-              </svg>
-              확인
+          {/* Score bars */}
+          <div className="w-[38%] flex flex-col justify-center gap-1.5">
+            {SCORE_LABELS.map((label, i) => {
+              const score = scores[i];
+              const barWidth = (score * fillProgress) / 100;
+              return (
+                <div key={label}>
+                  <div className="flex justify-between mb-0.5">
+                    <span className="text-[9px] text-slate-500">{label}</span>
+                    <span className="text-[9px] font-mono text-slate-400"
+                      style={{ opacity: fillProgress > 50 ? 1 : 0, transition: "opacity 0.3s" }}>
+                      {Math.round((score * fillProgress) / 100)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.04)" }}>
+                    <div className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${barWidth}%`,
+                        background: `linear-gradient(90deg, ${score >= 90 ? "#8B5CF6" : score >= 80 ? "#6366F1" : "#3B82F6"}, ${score >= 90 ? "#A78BFA" : score >= 80 ? "#818CF8" : "#60A5FA"})`,
+                      }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Bottom verification badges */}
+        <div className="flex gap-2 mt-3">
+          {["사업자등록", "건설면허", "포트폴리오", "인증완료"].map((badge, i) => (
+            <div key={badge}
+              className="flex-1 rounded-md py-1.5 text-center transition-all duration-500"
+              style={{
+                backgroundColor: fillProgress > 20 + i * 20 ? "rgba(139,92,246,0.06)" : "rgba(255,255,255,0.02)",
+                border: `1px solid ${fillProgress > 20 + i * 20 ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.04)"}`,
+              }}>
+              <span className="text-[8px] font-medium transition-colors duration-500"
+                style={{ color: fillProgress > 20 + i * 20 ? "rgba(167,139,250,0.8)" : "rgba(255,255,255,0.15)" }}>
+                {badge}
+              </span>
             </div>
-          </div>
-        )}
+          ))}
+        </div>
       </div>
-
-      <style jsx>{`
-        @keyframes fillBar {
-          from { width: 0%; }
-          to { width: 100%; }
-        }
-        @keyframes stampIn {
-          0% { opacity: 0; transform: scale(2) rotate(-12deg); }
-          50% { opacity: 1; transform: scale(0.9) rotate(-12deg); }
-          100% { opacity: 1; transform: scale(1) rotate(-12deg); }
-        }
-        .animate-fillBar { animation: fillBar 1.2s ease-out; }
-        .animate-stampIn { animation: stampIn 0.4s ease-out; }
-      `}</style>
     </div>
   );
 }
