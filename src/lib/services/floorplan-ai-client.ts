@@ -3,15 +3,16 @@
  *
  * 호출 우선순위:
  * 1. FLOORPLAN_AI_URL 환경변수 → HTTP POST (FastAPI 서버)
- * 2. 폴백: child_process로 run_pipeline.py 실행
- * 3. 둘 다 실패 → null (graceful)
+ * 2. PDF_PARSER_V47_URL → v4.7 services/pdf_parser 서버
+ * 3. 폴백: child_process로 run_pipeline.py 실행
+ * 4. 둘 다 실패 → null (graceful)
  */
 import { spawn } from 'child_process';
 import { writeFile, unlink } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
-// Python floorplan-ai 파이프라인 원시 출력 타입
+// Python floorplan-ai 파이프라인 원시 출력 타입 (v4.6 legacy)
 export interface FloorplanAIResult {
   vector_data: {
     version: string;
@@ -57,7 +58,82 @@ export interface FloorplanAIResult {
   };
 }
 
+// v4.7 services/pdf_parser 출력 타입
+export interface PdfParserV47Result {
+  success: boolean;
+  project: {
+    meta: {
+      version: string;
+      input_type: string;
+      dpi: number;
+      page_size: [number, number];
+      mm_per_px: number | null;
+      scale_method: string;
+      scale_status: string;
+      degraded?: boolean;
+    };
+    walls: {
+      id: string;
+      x0_mm: number;
+      y0_mm: number;
+      x1_mm: number;
+      y1_mm: number;
+      thickness_mm: number;
+      lenMm: number;
+    }[];
+    rooms: {
+      id: string;
+      name: string;
+      type: string;
+      center_px: [number, number];
+      area_m2: number;
+    }[];
+    openings: {
+      id: string;
+      type: string;
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+      widthMm: number;
+    }[];
+    opening_subtypes: {
+      id: string;
+      base_type: string;
+      subtype: string;
+      confidence: number;
+      reasoning: string;
+    }[];
+    ocr_words: {
+      text: string;
+      conf: number;
+      bbox: [number, number, number, number];
+    }[];
+  };
+  scale: {
+    mm_per_px: number | null;
+    method: string;
+    status: string;
+  };
+  opening_subtypes: {
+    id: string;
+    base_type: string;
+    subtype: string;
+    confidence: number;
+  }[];
+  timing: Record<string, number>;
+  warnings: string[];
+  processingTimeMs: number;
+  error?: string;
+}
+
+// Union type for either response format
+export type FloorplanAIResponse =
+  | { format: 'legacy'; data: FloorplanAIResult }
+  | { format: 'v47'; data: PdfParserV47Result };
+
 const FLOORPLAN_AI_URL = process.env.FLOORPLAN_AI_URL;
+const PDF_PARSER_V47_URL = process.env.PDF_PARSER_V47_URL;
 
 const PYTHON_PATHS = [
   'C:\\Users\\User\\AppData\\Local\\Programs\\Python\\Python312\\python.exe',
@@ -187,6 +263,48 @@ async function callViaChildProcess(
 }
 
 /**
+ * v4.7 services/pdf_parser HTTP 호출
+ */
+async function callViaV47Http(
+  imageBuffer: Buffer,
+  filename: string,
+): Promise<PdfParserV47Result | null> {
+  if (!PDF_PARSER_V47_URL) return null;
+
+  try {
+    const formData = new FormData();
+    const blob = new Blob([new Uint8Array(imageBuffer)]);
+    formData.append('file', blob, filename);
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 45000);
+
+    const response = await fetch(`${PDF_PARSER_V47_URL}/api/v1/recognize`, {
+      method: 'POST',
+      body: formData,
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    if (!response.ok) {
+      console.warn(`[pdf-parser-v47] HTTP ${response.status}: ${response.statusText}`);
+      return null;
+    }
+
+    const data = await response.json();
+    // v4.7 응답에는 "project" 필드가 있음
+    if (data.project && data.success !== undefined) {
+      return data as PdfParserV47Result;
+    }
+    return null;
+  } catch (err) {
+    console.warn('[pdf-parser-v47] HTTP call failed:', err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+/**
  * floorplan-ai 파이프라인 호출 (HTTP 우선, child_process 폴백)
  * 실패 시 null 반환 (graceful degradation)
  */
@@ -204,4 +322,45 @@ export async function callFloorplanAI(
   // 2. child_process 폴백
   console.log('[floorplan-ai] Trying child_process fallback...');
   return callViaChildProcess(imageBuffer, filename);
+}
+
+/**
+ * v4.7 PDF Parser 호출
+ * PDF_PARSER_V47_URL 환경변수 설정 필요 (예: http://localhost:8101)
+ */
+export async function callPdfParserV47(
+  imageBuffer: Buffer,
+  filename: string,
+): Promise<PdfParserV47Result | null> {
+  const result = await callViaV47Http(imageBuffer, filename);
+  if (result) {
+    console.log(`[pdf-parser-v47] Success: ${result.project.rooms.length} rooms, ${result.project.walls.length} walls`);
+  }
+  return result;
+}
+
+/**
+ * 두 서비스 모두 호출 (가용한 서비스만)
+ * 반환: legacy FloorplanAIResult 또는 v4.7 PdfParserV47Result
+ */
+export async function callFloorplanAIAny(
+  imageBuffer: Buffer,
+  filename: string,
+): Promise<FloorplanAIResponse | null> {
+  // v4.7 우선 시도 (더 완전한 파이프라인)
+  if (PDF_PARSER_V47_URL) {
+    const v47 = await callViaV47Http(imageBuffer, filename);
+    if (v47 && v47.success) {
+      console.log('[floorplan-ai] v4.7 call succeeded');
+      return { format: 'v47', data: v47 };
+    }
+  }
+
+  // 기존 서비스 폴백
+  const legacy = await callFloorplanAI(imageBuffer, filename);
+  if (legacy) {
+    return { format: 'legacy', data: legacy };
+  }
+
+  return null;
 }
