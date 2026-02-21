@@ -120,6 +120,7 @@ export default function ContractorDetailPage() {
           <div className="flex flex-col sm:flex-row items-start gap-4">
             {/* 로고 */}
             {c.logo_url ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={c.logo_url} alt={c.company_name} className="w-20 h-20 rounded-xl object-cover border border-gray-100" />
             ) : (
               <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-2xl">
@@ -256,6 +257,7 @@ export default function ContractorDetailPage() {
                 {portfolio.map((p) => (
                   <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     {p.image_urls?.[0] && (
+                      /* eslint-disable-next-line @next/next/no-img-element */
                       <img
                         src={p.image_urls[0]}
                         alt={p.title}
@@ -282,6 +284,7 @@ export default function ContractorDetailPage() {
                       {p.image_urls?.length > 1 && (
                         <div className="flex gap-1 mt-2">
                           {p.image_urls.slice(1, 4).map((url, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
                             <img key={i} src={url} alt="" className="w-12 h-12 rounded object-cover" />
                           ))}
                           {p.image_urls.length > 4 && (

@@ -391,6 +391,7 @@ export default function ProfilePage() {
                   <FileText className="w-4 h-4" /> PDF 파일 열기
                 </a>
               ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={profile.businessLicenseUrl} alt="사업자등록증" className="max-w-xs rounded" onError={e => (e.currentTarget.style.display = "none")} />
               )}
             </div>
@@ -441,6 +442,7 @@ export default function ProfilePage() {
                   <div className="flex gap-2 mt-2 flex-wrap">
                     {portfolioImageUrls.map((url, i) => (
                       <div key={i} className="relative w-16 h-16 rounded border border-gray-200 overflow-hidden">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={url} alt="" className="w-full h-full object-cover" />
                         <button onClick={() => setPortfolioImageUrls(prev => prev.filter((_, j) => j !== i))}
                           className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center text-xs">
@@ -465,6 +467,7 @@ export default function ProfilePage() {
               <div key={item.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden relative">
                 {item.images && item.images.length > 0 ? (
                   <div className="h-40 bg-gray-100 overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={typeof item.images[0] === "string" ? item.images[0] : ""}
                       alt={item.title}

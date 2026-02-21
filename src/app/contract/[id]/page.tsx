@@ -255,6 +255,7 @@ function ContractPart3({ contract }: { contract: Contract }) {
           </h4>
           {floorPlanUrl ? (
             <div className="rounded-lg border border-gray-200 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={floorPlanUrl} alt="평면도" className="w-full h-auto max-h-[400px] object-contain bg-gray-50" />
             </div>
           ) : (
@@ -273,6 +274,7 @@ function ContractPart3({ contract }: { contract: Contract }) {
             </h4>
             <div className="flex gap-3 overflow-x-auto pb-2">
               {designImages.map((url, idx) => (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   key={idx}
                   src={url}

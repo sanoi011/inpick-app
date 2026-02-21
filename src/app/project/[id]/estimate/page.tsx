@@ -24,13 +24,14 @@ import { useProjectState } from "@/hooks/useProjectState";
 import dynamic from "next/dynamic";
 import type { RoomCostSection, CostItem } from "@/components/project/CostTable";
 import type { ParsedFloorPlan } from "@/types/floorplan";
-import type { ProjectEstimate } from "@/types/consumer-project";
+import type { ProjectEstimate, SelectedMaterial } from "@/types/consumer-project";
 import { isStatusAtLeast } from "@/types/consumer-project";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
 import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
 import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
+import { generateSyntheticFloorPlan } from "@/lib/floor-plan/quantity/synthetic-floorplan";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-blue-500" /></div>,
@@ -165,10 +166,11 @@ export default function EstimatePage() {
   const projectId = params.id as string;
   const { project, setEstimate } = useProjectState(projectId);
 
-  // 단계 잠금: 자재 선택 미완료 시 리다이렉트
+  // 단계 잠금: 최소 RENDERING 단계 이상이어야 접근 가능
+  // (자재 미선택 시에도 AI 추천으로 자동 생성하므로 RENDERING부터 허용)
   useEffect(() => {
     if (!project) return;
-    if (!isStatusAtLeast(project.status, "ESTIMATING")) {
+    if (!isStatusAtLeast(project.status, "RENDERING")) {
       router.replace(`/project/${projectId}/rendering`);
     }
   }, [project, projectId, router]);
@@ -181,7 +183,12 @@ export default function EstimatePage() {
   const [viewMode, setViewMode] = useState<"room" | "trade">("room");
   const [ceilingHeight, setCeilingHeight] = useState(2200); // mm 기본값
 
-  // 도면 로드
+  // AI 자재 추천 상태
+  const [aiMaterials, setAiMaterials] = useState<SelectedMaterial[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiDesignConcept, setAiDesignConcept] = useState<string>("");
+
+  // 도면 로드 (실제 도면 or 합성 평면도)
   useEffect(() => {
     if (project?.drawingId) {
       loadFloorPlan(project.drawingId).then((plan) => {
@@ -189,21 +196,79 @@ export default function EstimatePage() {
         setLoading(false);
       });
     } else {
+      // 도면 없을 때: 면적 기반 합성 평면도 생성
+      const area = project?.address?.exclusiveArea || 84;
+      const roomCount = project?.address?.roomCount;
+      const bathroomCount = project?.address?.bathroomCount;
+      const synthetic = generateSyntheticFloorPlan(area, roomCount, bathroomCount);
+      setFloorPlan(synthetic);
       setLoading(false);
     }
-  }, [project?.drawingId]);
+  }, [project?.drawingId, project?.address?.exclusiveArea, project?.address?.roomCount, project?.address?.bathroomCount]);
 
   // 사용자 선택 자재 (AI 디자인 자재 연동)
-  const userMaterials = useMemo(
+  const manualMaterials = useMemo(
     () => project?.rendering?.materials || [],
     [project?.rendering?.materials]
   );
 
+  // AI 자재 추천 자동 호출 (사용자 선택 자재가 없을 때)
+  const [aiRequested, setAiRequested] = useState(false);
+  useEffect(() => {
+    if (aiRequested || manualMaterials.length > 0 || aiLoading || aiMaterials.length > 0) return;
+    if (!project) return;
+    setAiRequested(true);
+    setAiLoading(true);
+
+    fetch("/api/project/estimate-materials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        floorPlanImageUrl: project.floorPlanImageUrl || null,
+        designPreferences: project.designPreferences || { style: "모던", budget: "standard", priorities: [] },
+        area: project.address?.exclusiveArea || 84,
+        roomCount: project.address?.roomCount || 3,
+      }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.materials && data.materials.length > 0) {
+          // AIMaterial[] → SelectedMaterial[] 변환
+          const converted: SelectedMaterial[] = data.materials.map((m: { categoryCode: string; category: string; materialName: string; brand: string; specification: string; unitPrice: number; laborPrice: number; unit: string; priceGrade: string }, i: number) => ({
+            id: `ai-${m.categoryCode}-${i}`,
+            roomId: "",
+            roomName: "",
+            category: m.category,
+            categoryCode: m.categoryCode,
+            part: m.category,
+            materialName: m.materialName,
+            specification: m.specification,
+            unitPrice: m.unitPrice,
+            laborPrice: m.laborPrice,
+            unit: m.unit,
+            brand: m.brand,
+            priceGrade: m.priceGrade as "economy" | "standard" | "premium",
+            priceSource: "AI 추천",
+            confirmed: true,
+          }));
+          setAiMaterials(converted);
+          if (data.designConcept) setAiDesignConcept(data.designConcept);
+        }
+      })
+      .catch(() => { /* silent fallback - engine will use default prices */ })
+      .finally(() => setAiLoading(false));
+  }, [project, manualMaterials.length, aiRequested, aiLoading, aiMaterials.length]);
+
+  // 최종 자재: 사용자 선택 우선, 없으면 AI 추천
+  const userMaterials = manualMaterials.length > 0 ? manualMaterials : aiMaterials;
+
   // 높이 할증 여부
   const isHeightSurcharge = ceilingHeight > 2500;
 
-  // QTY 엔진 기반 견적 생성
+  // QTY 엔진 기반 견적 생성 (합성 평면도 포함하므로 항상 사용 가능)
   const useEngine = !!floorPlan;
+  const isSyntheticPlan = !project?.drawingId && !!floorPlan;
+  const isAiMaterialsUsed = manualMaterials.length === 0 && aiMaterials.length > 0;
 
   const { sections, totalMaterial, totalLabor, totalOverhead, grandTotal, summary, engineResult } = useMemo(() => {
     let secs: RoomCostSection[];
@@ -393,10 +458,15 @@ export default function EstimatePage() {
     }, 500);
   }, [activeSections, editedSections, totalMaterial, totalLabor, totalOverhead, grandTotal, activeGrandTotal, setEstimate, router, projectId]);
 
-  if (loading) {
+  if (loading || aiLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
+          <p className="text-sm text-gray-500">
+            {aiLoading ? "AI가 자재를 추천하고 있습니다..." : "도면 데이터를 불러오는 중..."}
+          </p>
+        </div>
       </div>
     );
   }
@@ -422,9 +492,14 @@ export default function EstimatePage() {
               <CheckCircle2 className="w-3 h-3" /> 17개 공종 산출
             </span>
           )}
-          {!useEngine && floorPlan && (
-            <span className="hidden sm:inline px-2 py-0.5 bg-amber-50 text-amber-700 text-xs font-medium rounded-full">
-              기본 단가 적용
+          {isSyntheticPlan && (
+            <span className="hidden sm:inline px-2 py-0.5 bg-cyan-50 text-cyan-700 text-xs font-medium rounded-full">
+              면적 기반 추정
+            </span>
+          )}
+          {isAiMaterialsUsed && (
+            <span className="hidden sm:flex px-2 py-0.5 bg-purple-50 text-purple-700 text-xs font-medium rounded-full items-center gap-1">
+              <CheckCircle2 className="w-3 h-3" /> AI 자재 추천
             </span>
           )}
         </div>
@@ -576,6 +651,20 @@ export default function EstimatePage() {
             </div>
           )}
 
+          {/* AI 자재 추천 컨셉 */}
+          {isAiMaterialsUsed && aiDesignConcept && (
+            <div className="p-4 border-b border-gray-200">
+              <div className="flex items-center gap-1.5 mb-2">
+                <Calculator className="w-3.5 h-3.5 text-purple-500" />
+                <span className="text-xs font-semibold text-purple-700">AI 자재 추천</span>
+              </div>
+              <p className="text-[11px] text-gray-600 leading-relaxed">{aiDesignConcept}</p>
+              <p className="text-[10px] text-gray-400 mt-2">
+                {aiMaterials.length}개 자재 카테고리 자동 추천 적용
+              </p>
+            </div>
+          )}
+
           {/* 산출 기준 */}
           <div className="p-4">
             <p className="text-xs font-semibold text-gray-600 mb-2">산출 기준</p>
@@ -617,7 +706,21 @@ export default function EstimatePage() {
                 </div>
               </div>
             )}
-            <div className="mt-3 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
+            {isSyntheticPlan && (
+              <div className="mt-2 px-3 py-2 bg-cyan-50 rounded-lg border border-cyan-200">
+                <p className="text-[10px] text-cyan-700">
+                  ※ 도면 미등록 - {project?.address?.exclusiveArea || 84}㎡ 표준 배치 기반 추정 견적입니다.
+                </p>
+              </div>
+            )}
+            {isAiMaterialsUsed && (
+              <div className="mt-2 px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
+                <p className="text-[10px] text-purple-700">
+                  ※ AI 추천 자재가 적용되었습니다. 자재 선택 탭에서 직접 변경할 수 있습니다.
+                </p>
+              </div>
+            )}
+            <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
               <p className="text-[10px] text-amber-700">
                 ※ 본 견적은 참고 금액이며, 실제 시공 시 현장 상황에 따라 변동됩니다.
               </p>
@@ -630,17 +733,9 @@ export default function EstimatePage() {
           {activeSections.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-gray-400">
-                <Calculator className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-medium">견적 데이터가 없습니다</p>
-                <p className="text-xs mt-1">
-                  이전 단계에서 자재를 선택해주세요
-                </p>
-                <button
-                  onClick={() => router.push(`/project/${projectId}/rendering`)}
-                  className="mt-4 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
-                >
-                  자재 선택으로 이동
-                </button>
+                <Loader2 className="w-12 h-12 mx-auto mb-3 opacity-30 animate-spin" />
+                <p className="text-sm font-medium">견적을 준비하고 있습니다...</p>
+                <p className="text-xs mt-1">잠시만 기다려주세요</p>
               </div>
             </div>
           ) : (

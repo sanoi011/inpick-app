@@ -798,6 +798,7 @@ export default function FloorPlanPage() {
             <p className="text-sm text-gray-500">공간 구조를 인식하고 3D 매스 모델을 생성합니다...</p>
             {uploadedFile && (
               <div className="mt-6 max-w-xs mx-auto">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={uploadedFile} alt="분석 중인 도면" className="w-full rounded-lg opacity-50" />
               </div>
             )}
@@ -882,6 +883,7 @@ export default function FloorPlanPage() {
                 <p className="text-xs text-gray-500 mb-2">{multiPhotoUrls.length}장 선택됨</p>
                 <div className="grid grid-cols-5 gap-2">
                   {multiPhotoUrls.slice(0, 10).map((url, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img key={i} src={url} alt={`사진 ${i + 1}`} className="w-full h-16 object-cover rounded-lg border border-gray-200" />
                   ))}
                   {multiPhotoUrls.length > 10 && (
@@ -932,6 +934,7 @@ export default function FloorPlanPage() {
             </label>
             {uploadedFile && (
               <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={uploadedFile} alt="업로드된 손도면" className="w-full max-h-48 object-contain rounded-lg" />
               </div>
             )}
@@ -1003,6 +1006,7 @@ export default function FloorPlanPage() {
 
               {uploadedFile && (
                 <div className="mt-6 p-4 bg-white rounded-xl border border-gray-200">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={uploadedFile} alt="업로드된 도면" className="w-full max-h-48 object-contain rounded-lg" />
                 </div>
               )}
@@ -1225,6 +1229,7 @@ export default function FloorPlanPage() {
                       <>
                         {/* 현재 슬라이드 이미지 */}
                         {generatedDesigns[designSlideIndex]?.imageData ? (
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             src={generatedDesigns[designSlideIndex].imageData!}
                             alt={`AI 생성 디자인 - ${generatedDesigns[designSlideIndex].label}`}
@@ -1293,6 +1298,7 @@ export default function FloorPlanPage() {
                             title="도면 보기로 전환"
                           >
                             <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-blue-400 group-hover:scale-105 transition-all">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={floorPlanImageUrl}
                                 alt="도면"
@@ -1321,6 +1327,7 @@ export default function FloorPlanPage() {
                       </>
                     ) : floorPlanImageUrl ? (
                       <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={floorPlanImageUrl}
                           alt="평면도"
@@ -1342,6 +1349,7 @@ export default function FloorPlanPage() {
                           >
                             <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-indigo-400 group-hover:scale-105 transition-all">
                               {generatedDesigns[designSlideIndex]?.imageData ? (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={generatedDesigns[designSlideIndex].imageData!}
                                   alt="AI 디자인"
@@ -1380,6 +1388,7 @@ export default function FloorPlanPage() {
                           >
                             <div className="w-20 h-20 rounded-xl border-2 border-white/80 shadow-xl overflow-hidden bg-white group-hover:border-indigo-400 group-hover:scale-105 transition-all">
                               {generatedDesigns[designSlideIndex]?.imageData ? (
+                                // eslint-disable-next-line @next/next/no-img-element
                                 <img
                                   src={generatedDesigns[designSlideIndex].imageData!}
                                   alt="AI 디자인"
@@ -1521,6 +1530,7 @@ export default function FloorPlanPage() {
                     >
                       <p className="whitespace-pre-wrap">{msg.content || "..."}</p>
                       {msg.images && msg.images.map((imgSrc, i) => (
+                        // eslint-disable-next-line @next/next/no-img-element
                         <img
                           key={i}
                           src={imgSrc}

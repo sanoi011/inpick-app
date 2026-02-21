@@ -18,6 +18,7 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
       {/* 상단: 로고 + 기본 정보 */}
       <div className="flex items-start gap-3 mb-3">
         {contractor.logoUrl ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={contractor.logoUrl}
             alt={contractor.companyName}
@@ -87,6 +88,7 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
         <div className="flex gap-1.5 mb-3">
           {contractor.portfolioThumbnails.slice(0, 3).map((url, i) => (
             <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={url} alt="" className="w-full h-full object-cover" />
             </div>
           ))}

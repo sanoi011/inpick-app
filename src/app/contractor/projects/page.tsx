@@ -546,6 +546,7 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle, projectId, contra
               <div className="flex gap-2 flex-wrap">
                 {phase.photos.map((photo, idx) => (
                   <div key={idx} className="relative group w-16 h-16 rounded-lg overflow-hidden border border-gray-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={photo.url} alt={photo.fileName || `사진 ${idx + 1}`} className="w-full h-full object-cover" />
                     <button onClick={() => handlePhotoDelete(idx)}
                       className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

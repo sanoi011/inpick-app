@@ -707,6 +707,7 @@ export default function RenderingPage() {
                   />
                 ) : (
                   <div className="rounded-xl overflow-hidden border border-gray-200 bg-gray-50">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={project.floorPlanImageUrl!}
                       alt="도면"
@@ -1004,6 +1005,7 @@ export default function RenderingPage() {
                   </div>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {roomDesignImages.map((img) => (
+                      // eslint-disable-next-line @next/next/no-img-element
                       <img
                         key={img.id}
                         src={img.imageData}
