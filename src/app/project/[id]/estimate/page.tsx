@@ -170,8 +170,8 @@ export default function EstimatePage() {
   // (자재 미선택 시에도 AI 추천으로 자동 생성하므로 RENDERING부터 허용)
   useEffect(() => {
     if (!project) return;
-    if (!isStatusAtLeast(project.status, "RENDERING")) {
-      router.replace(`/project/${projectId}/rendering`);
+    if (!isStatusAtLeast(project.status, "FLOOR_PLAN")) {
+      router.replace(`/project/${projectId}/home`);
     }
   }, [project, projectId, router]);
 
@@ -220,9 +220,13 @@ export default function EstimatePage() {
     setAiRequested(true);
     setAiLoading(true);
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+
     fetch("/api/project/estimate-materials", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
       body: JSON.stringify({
         floorPlanImageUrl: project.floorPlanImageUrl || null,
         designPreferences: project.designPreferences || { style: "모던", budget: "standard", priorities: [] },
@@ -256,7 +260,7 @@ export default function EstimatePage() {
         }
       })
       .catch(() => { /* silent fallback - engine will use default prices */ })
-      .finally(() => setAiLoading(false));
+      .finally(() => { clearTimeout(timeout); setAiLoading(false); });
   }, [project, manualMaterials.length, aiRequested, aiLoading, aiMaterials.length]);
 
   // 최종 자재: 사용자 선택 우선, 없으면 AI 추천
@@ -458,14 +462,12 @@ export default function EstimatePage() {
     }, 500);
   }, [activeSections, editedSections, totalMaterial, totalLabor, totalOverhead, grandTotal, activeGrandTotal, setEstimate, router, projectId]);
 
-  if (loading || aiLoading) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
         <div className="text-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">
-            {aiLoading ? "AI가 자재를 추천하고 있습니다..." : "도면 데이터를 불러오는 중..."}
-          </p>
+          <p className="text-sm text-gray-500">도면 데이터를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -497,7 +499,12 @@ export default function EstimatePage() {
               면적 기반 추정
             </span>
           )}
-          {isAiMaterialsUsed && (
+          {aiLoading && (
+            <span className="hidden sm:flex px-2 py-0.5 bg-purple-50 text-purple-600 text-xs font-medium rounded-full items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> AI 자재 추천 중...
+            </span>
+          )}
+          {!aiLoading && isAiMaterialsUsed && (
             <span className="hidden sm:flex px-2 py-0.5 bg-purple-50 text-purple-700 text-xs font-medium rounded-full items-center gap-1">
               <CheckCircle2 className="w-3 h-3" /> AI 자재 추천
             </span>

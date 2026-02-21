@@ -204,7 +204,7 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
     const startTime = Date.now();
 
     const response = await client.models.generateContent({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.1-pro",
       contents: [{
         role: "user",
         parts: [

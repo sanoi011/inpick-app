@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 
       // Gemini 스트리밍 호출
       const response = await client.models.generateContentStream({
-        model: "gemini-2.0-flash",
+        model: "gemini-3.1-pro",
         contents: geminiContents,
         config: {
           systemInstruction,
