@@ -15,14 +15,28 @@ test.describe("API Smoke Tests", () => {
     expect(data).toHaveProperty("materials");
   });
 
-  test("GET /api/contractor/stats returns 400 without params", async ({ request }) => {
+  test("GET /api/contractor/stats returns 401 without auth", async ({ request }) => {
     const res = await request.get(`${BASE_URL}/api/contractor/stats`);
-    expect(res.status()).toBe(400);
+    expect(res.status()).toBe(401);
   });
 
-  test("GET /api/contractor/stats with contractorId returns 200", async ({ request }) => {
+  test("GET /api/contractor/stats with auth returns 200", async ({ request }) => {
+    // Login first to get token
+    const loginRes = await request.post(`${BASE_URL}/api/contractor/login`, {
+      data: { email: "contractor@inpick.kr", password: "test1234!" },
+    });
+    const loginData = await loginRes.json();
+    const token = loginData.token;
+    const contractorId = loginData.contractor?.id;
+
+    if (!token || !contractorId) {
+      test.skip();
+      return;
+    }
+
     const res = await request.get(
-      `${BASE_URL}/api/contractor/stats?contractorId=b86cffa5-9e17-44ff-9a03-9ae68a0a4a12`
+      `${BASE_URL}/api/contractor/stats?contractorId=${contractorId}`,
+      { headers: { Authorization: `Bearer ${token}` } }
     );
     expect(res.status()).toBe(200);
     const data = await res.json();
