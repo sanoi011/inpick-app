@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
 각 사진에서 보이는 공간, 벽, 문, 창문, 설비를 식별하고 공간 배치를 추정하세요.`;
 
     const response = await client.models.generateContent({
-      model: "gemini-3.1-pro",
+      model: "gemini-3.1-pro-preview",
       contents: [{
         role: "user",
         parts: [

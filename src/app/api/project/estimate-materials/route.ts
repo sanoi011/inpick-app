@@ -203,22 +203,34 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
 
     const startTime = Date.now();
 
-    const response = await client.models.generateContent({
-      model: "gemini-3.1-pro",
-      contents: [{
-        role: "user",
-        parts: [
-          ...imageParts,
-          { text: MATERIAL_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(MATERIAL_SCHEMA, null, 2) + "\n\n" + userPrompt },
-        ],
-      }],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: MATERIAL_SCHEMA,
-        temperature: 0.3,
-        maxOutputTokens: 8192,
-      },
-    });
+    let response;
+    try {
+      response = await client.models.generateContent({
+        model: "gemini-3.1-pro-preview",
+        contents: [{
+          role: "user",
+          parts: [
+            ...imageParts,
+            { text: MATERIAL_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(MATERIAL_SCHEMA, null, 2) + "\n\n" + userPrompt },
+          ],
+        }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: MATERIAL_SCHEMA,
+          temperature: 0.3,
+          maxOutputTokens: 8192,
+        },
+      });
+    } catch (apiError) {
+      console.error("[estimate-materials] Gemini API error:", apiError);
+      const materials = getMockMaterials(budget);
+      return NextResponse.json({
+        materials,
+        designConcept: `${style} 스타일 기본 추천 (AI 모델 호출 실패)`,
+        method: "mock",
+        warnings: ["AI 모델 호출 실패 - 기본 추천 데이터 반환"],
+      });
+    }
 
     const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
     let parsed: { materials?: AIMaterial[]; designConcept?: string };

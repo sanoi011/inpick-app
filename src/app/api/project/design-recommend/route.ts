@@ -196,7 +196,7 @@ ${roomSummary}
 각 방의 roomId는 평면도의 room id를 그대로 사용하세요.`;
 
     const response = await client.models.generateContent({
-      model: "gemini-3.1-pro",
+      model: "gemini-3.1-pro-preview",
       contents: [{
         role: "user",
         parts: [{ text: DESIGN_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(DESIGN_SCHEMA, null, 2) + "\n\n" + userPrompt }],
