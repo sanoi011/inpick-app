@@ -1360,8 +1360,13 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260218000000_construction_schedule.sql` | Supabase 적용 완료 |
 | `20260218100000_fix_schedule_tasks_rls.sql` | Supabase 적용 완료 |
 | `20260220000000_floor_plan_collection.sql` | Supabase 적용 완료 |
+| `20260219000000_contractor_directory.sql` | Supabase 적용 완료 |
+| `20260219100000_contractor_password.sql` | Supabase 적용 완료 |
+| `20260219100001_contract_notes.sql` | Supabase 적용 완료 |
+| `20260219100002_contact_inquiries.sql` | Supabase 적용 완료 |
 | `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
 | `20260222400000_add_segmentation_mask.sql` | Supabase 적용 완료 |
+| `20260222500000_consumer_projects_delete_policy.sql` | Supabase 적용 완료 |
 
 ## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
 
@@ -1820,20 +1825,13 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - `estimates.consumer_project_id` → null 설정 (소프트 링크 정리, 견적 데이터 보존)
 - localStorage `inpick_project_{id}` 키 삭제 (소비자 측)
 
-## DB 마이그레이션 현황 (추가)
-| 파일 | 상태 |
-|------|------|
-| `20260222500000_consumer_projects_delete_policy.sql` | **Supabase 적용 필요** |
-
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase 마이그레이션 적용** - `20260222500000_consumer_projects_delete_policy.sql` (DELETE RLS 정책)
-2. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
-3. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
-4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-5. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
-6. **ODA File Converter 설치** (DWG→DXF 변환용)
+1. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
+2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
+4. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
