@@ -76,12 +76,12 @@ export default function Header({
         style={{ border: isScrolled ? `1px solid ${colors.navBorder}` : "1px solid transparent" }}
       >
         <a className="flex shrink-0 items-center gap-2" href="/" title={`${brandName} 홈`}>
-          <span className="text-xl font-bold text-blue-600 whitespace-nowrap">INPICK</span>
+          <span className={`text-xl font-bold whitespace-nowrap transition-colors duration-300 ${isScrolled ? "text-blue-600" : "text-white"}`}>INPICK</span>
         </a>
 
         <div className="hidden md:flex items-center gap-5">
           {navLinks.map((link) => (
-            <a key={link.href} href={link.href} className="text-sm font-medium transition-colors hover:opacity-70 whitespace-nowrap" style={{ color: colors.text }}>
+            <a key={link.href} href={link.href} className={`text-sm font-medium transition-colors hover:opacity-70 whitespace-nowrap ${isScrolled ? "" : "!text-white/80 hover:!text-white"}`} style={{ color: isScrolled ? colors.text : undefined }}>
               {link.label}
             </a>
           ))}
@@ -91,8 +91,8 @@ export default function Header({
           <LocaleSwitcher />
           {!authLoading && !user && (
             <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-              style={{ color: colors.textMuted }}
-              whileHover={{ scale: 1.02, color: colors.text }} whileTap={{ scale: 0.98 }}>
+              style={{ color: isScrolled ? colors.textMuted : "rgba(255,255,255,0.7)" }}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
               로그인
             </motion.a>
           )}
@@ -103,7 +103,7 @@ export default function Header({
               <motion.button
                 onClick={() => setShowUserMenu((v) => !v)}
                 className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-                style={{ color: colors.text }}
+                style={{ color: isScrolled ? colors.text : "#FFFFFF" }}
                 whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
               >
                 <User className="w-4 h-4" />
@@ -125,18 +125,22 @@ export default function Header({
             </>
           )}
           <motion.a href={contactButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-            style={{ backgroundColor: colors.buttonSecondaryBg, border: `1px solid ${colors.buttonSecondaryBorder}`, color: colors.buttonSecondaryText }}
+            style={{
+              backgroundColor: isScrolled ? colors.buttonSecondaryBg : "rgba(255,255,255,0.1)",
+              border: isScrolled ? `1px solid ${colors.buttonSecondaryBorder}` : "1px solid rgba(255,255,255,0.2)",
+              color: isScrolled ? colors.buttonSecondaryText : "#FFFFFF",
+            }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {contactButtonText}
           </motion.a>
           <motion.a href={startButtonHref} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-            style={{ backgroundColor: colors.buttonPrimaryBg, color: colors.buttonPrimaryText }}
+            style={{ backgroundColor: isScrolled ? colors.buttonPrimaryBg : "#FFFFFF", color: isScrolled ? colors.buttonPrimaryText : "#0a0a0f" }}
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
             {startButtonText}
           </motion.a>
         </div>
 
-        <button type="button" className="md:hidden inline-flex items-center justify-center rounded-full p-2" style={{ color: colors.text }}
+        <button type="button" className={`md:hidden inline-flex items-center justify-center rounded-full p-2 transition-colors ${isScrolled ? "" : "text-white"}`} style={{ color: isScrolled ? colors.text : undefined }}
           onClick={() => setMobileMenuOpen(true)} aria-label="메뉴 열기">
           <Menu className="h-5 w-5" />
         </button>

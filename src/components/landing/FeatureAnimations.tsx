@@ -319,32 +319,56 @@ export function PriceSyncAnimation() {
 }
 
 // ─── 3. 3D 견적뷰어 애니메이션 ──────────────────────────
-// 아이소메트릭 공간 + 데이터 오버레이
+// VR-like 3D 인테리어 공간 + 견적 데이터 오버레이
 
-const ROOMS_DATA = [
-  { label: "거실", area: "29.4", cost: "680" },
-  { label: "안방", area: "14.2", cost: "478" },
-  { label: "욕실", area: "5.8", cost: "697" },
-  { label: "주방", area: "8.6", cost: "306" },
+const ROOMS_3D = [
+  { label: "거실", area: "29.4", cost: "680", floor: "linear-gradient(135deg, #8B7355 0%, #A0896C 50%, #8B7355 100%)", wall: "linear-gradient(180deg, #E8E0D4 0%, #D4C8B8 100%)", accent: "#3B82F6" },
+  { label: "안방", area: "14.2", cost: "478", floor: "linear-gradient(135deg, #6B8A6B 0%, #7FA07F 50%, #5D7A5D 100%)", wall: "linear-gradient(180deg, #DDE5DD 0%, #C8D4C8 100%)", accent: "#6366F1" },
+  { label: "욕실", area: "5.8", cost: "697", floor: "linear-gradient(135deg, #5A7A8A 0%, #6B8B9A 50%, #4A6A7A 100%)", wall: "linear-gradient(180deg, #D0DDE5 0%, #B8C8D4 100%)", accent: "#06B6D4" },
+  { label: "주방", area: "8.6", cost: "306", floor: "linear-gradient(135deg, #7A6A5A 0%, #8A7A6A 50%, #6A5A4A 100%)", wall: "linear-gradient(180deg, #E5DDD4 0%, #D4C8BC 100%)", accent: "#8B5CF6" },
+];
+
+const ESTIMATE_ITEMS = [
+  { trade: "바닥재", item: "강마루 (화이트오크)", qty: "29.4m²", cost: "123만" },
+  { trade: "도배", item: "실크벽지 (LG하우시스)", qty: "86.2m²", cost: "73만" },
+  { trade: "타일", item: "포세린 (600×600)", qty: "14.4m²", cost: "65만" },
+  { trade: "천장", item: "텍스 + LED 조명", qty: "29.4m²", cost: "88만" },
+  { trade: "전기", item: "콘센트·스위치 교체", qty: "28개소", cost: "56만" },
+  { trade: "목공", item: "걸레받이 + 몰딩", qty: "42.6m", cost: "34만" },
 ];
 
 export function EstimateViewerAnimation() {
   const [activeRoom, setActiveRoom] = useState(0);
-  const [rotation, setRotation] = useState(0);
+  const [rotY, setRotY] = useState(-25);
+  const [scrollIdx, setScrollIdx] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setActiveRoom((prev) => (prev + 1) % ROOMS_DATA.length);
-    }, 2500);
+      setActiveRoom((prev) => (prev + 1) % ROOMS_3D.length);
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
+  // Gentle rotation oscillation
   useEffect(() => {
     const interval = setInterval(() => {
-      setRotation((r) => (r + 0.5) % 360);
+      setRotY(() => {
+        const t = Date.now() / 3000;
+        return -25 + Math.sin(t) * 8;
+      });
     }, 50);
     return () => clearInterval(interval);
   }, []);
+
+  // Auto-scroll estimate items
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setScrollIdx((prev) => (prev + 1) % ESTIMATE_ITEMS.length);
+    }, 1200);
+    return () => clearInterval(interval);
+  }, []);
+
+  const room = ROOMS_3D[activeRoom];
 
   return (
     <div className="relative w-full aspect-[4/3] rounded-xl overflow-hidden"
@@ -361,13 +385,13 @@ export function EstimateViewerAnimation() {
 
       <div className="relative h-full p-5 flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">3D Viewer</span>
+            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">3D Estimate Viewer</span>
           </div>
           <div className="flex gap-1.5">
-            {["2D", "3D"].map((m) => (
+            {["2D", "3D", "VR"].map((m) => (
               <span key={m}
                 className="px-2 py-0.5 rounded text-[9px] font-medium"
                 style={{
@@ -381,86 +405,221 @@ export function EstimateViewerAnimation() {
           </div>
         </div>
 
-        {/* Isometric 3D room visualization */}
-        <div className="flex-1 flex items-center justify-center relative mb-3">
-          <svg viewBox="0 0 260 180" className="w-full h-full max-h-[140px]">
-            {/* Isometric floor plan */}
-            {[
-              { x: 30, y: 80, w: 100, h: 60, room: 0, color: "#3B82F6" },
-              { x: 130, y: 80, w: 60, h: 60, room: 1, color: "#6366F1" },
-              { x: 30, y: 140, w: 60, h: 30, room: 2, color: "#06B6D4" },
-              { x: 90, y: 140, w: 70, h: 30, room: 3, color: "#8B5CF6" },
-            ].map((r, i) => {
-              const isActive = activeRoom === r.room;
-              const isoX = r.x + r.y * 0.5;
-              const isoY = r.y * 0.35 - r.x * 0.15 + 50;
-              return (
-                <g key={i}>
-                  {/* Floor */}
-                  <rect x={isoX} y={isoY} width={r.w * 0.6} height={r.h * 0.35}
-                    fill={isActive ? `${r.color}25` : "rgba(255,255,255,0.03)"}
-                    stroke={isActive ? `${r.color}50` : "rgba(255,255,255,0.08)"}
-                    strokeWidth={isActive ? 1.5 : 0.5}
-                    rx="2"
-                    className="transition-all duration-500" />
-                  {/* Wall hint */}
-                  {isActive && (
+        {/* 3D Room + Estimate split */}
+        <div className="flex-1 flex gap-2 min-h-0">
+          {/* Left: 3D VR Room */}
+          <div className="flex-1 rounded-lg overflow-hidden relative"
+            style={{ perspective: "600px", backgroundColor: "rgba(0,0,0,0.3)" }}>
+            {/* 3D Room container */}
+            <div className="absolute inset-0 flex items-center justify-center"
+              style={{ perspectiveOrigin: "50% 45%" }}>
+              <div className="ev-room-container" style={{
+                width: "85%", height: "80%",
+                transformStyle: "preserve-3d",
+                transform: `rotateX(12deg) rotateY(${rotY}deg)`,
+                transition: "transform 0.1s linear",
+              }}>
+                {/* Floor */}
+                <div className="ev-floor" style={{
+                  position: "absolute", width: "100%", height: "100%",
+                  background: room.floor,
+                  transform: "rotateX(90deg) translateZ(-60px)",
+                  boxShadow: "inset 0 0 30px rgba(0,0,0,0.2)",
+                }}>
+                  {/* Floor pattern (wood lines) */}
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} style={{
+                      position: "absolute", left: 0, right: 0,
+                      top: `${12.5 * i}%`, height: "1px",
+                      background: "rgba(0,0,0,0.08)",
+                    }} />
+                  ))}
+                </div>
+
+                {/* Back wall */}
+                <div className="ev-wall-back" style={{
+                  position: "absolute", width: "100%", height: "120px",
+                  background: room.wall,
+                  transform: "translateZ(-60px) translateY(-30px)",
+                }}>
+                  {/* Window on back wall */}
+                  <div style={{
+                    position: "absolute", left: "15%", top: "15%",
+                    width: "35%", height: "55%",
+                    border: "3px solid rgba(255,255,255,0.4)",
+                    borderRadius: "2px",
+                    background: "linear-gradient(135deg, rgba(135,206,250,0.3), rgba(176,224,230,0.2))",
+                    boxShadow: "inset 0 0 20px rgba(135,206,250,0.15)",
+                  }}>
+                    <div style={{ position: "absolute", left: "50%", top: 0, bottom: 0, width: "2px", background: "rgba(255,255,255,0.3)" }} />
+                    <div style={{ position: "absolute", top: "50%", left: 0, right: 0, height: "2px", background: "rgba(255,255,255,0.3)" }} />
+                  </div>
+                  {/* Wall art / frame */}
+                  <div style={{
+                    position: "absolute", right: "10%", top: "20%",
+                    width: "22%", height: "40%",
+                    border: "2px solid rgba(0,0,0,0.15)",
+                    borderRadius: "1px",
+                    background: "linear-gradient(135deg, rgba(139,92,246,0.15), rgba(59,130,246,0.1))",
+                  }} />
+                </div>
+
+                {/* Left wall */}
+                <div className="ev-wall-left" style={{
+                  position: "absolute", width: "120px", height: "120px",
+                  background: `linear-gradient(90deg, ${room.wall.includes("E8E0D4") ? "#D4C8B8" : room.wall.includes("DDE5DD") ? "#C0CEC0" : room.wall.includes("D0DDE5") ? "#B0C0CC" : "#C8BEB4"}, ${room.wall.includes("E8E0D4") ? "#E8E0D4" : room.wall.includes("DDE5DD") ? "#DDE5DD" : room.wall.includes("D0DDE5") ? "#D0DDE5" : "#E5DDD4"})`,
+                  transform: "rotateY(90deg) translateZ(-1px) translateY(-30px)",
+                  transformOrigin: "left center",
+                }}>
+                  {/* Door */}
+                  <div style={{
+                    position: "absolute", right: "10%", bottom: 0,
+                    width: "35%", height: "75%",
+                    background: "linear-gradient(180deg, rgba(139,115,85,0.4), rgba(139,115,85,0.6))",
+                    borderRadius: "2px 2px 0 0",
+                    border: "2px solid rgba(139,115,85,0.3)",
+                  }}>
+                    <div style={{
+                      position: "absolute", right: "12%", top: "45%",
+                      width: "6px", height: "6px",
+                      borderRadius: "50%",
+                      background: "rgba(255,215,0,0.6)",
+                    }} />
+                  </div>
+                </div>
+
+                {/* Furniture silhouettes (sofa for living, bed for bedroom, etc.) */}
+                <div className="ev-furniture" style={{
+                  position: "absolute", width: "100%", height: "100%",
+                  transform: "rotateX(90deg) translateZ(-58px)",
+                }}>
+                  {activeRoom === 0 && (
                     <>
-                      <line x1={isoX} y1={isoY} x2={isoX} y2={isoY - 18}
-                        stroke={`${r.color}40`} strokeWidth="1" strokeDasharray="2 2" />
-                      <line x1={isoX + r.w * 0.6} y1={isoY} x2={isoX + r.w * 0.6} y2={isoY - 18}
-                        stroke={`${r.color}40`} strokeWidth="1" strokeDasharray="2 2" />
+                      {/* Sofa */}
+                      <div style={{ position: "absolute", left: "55%", top: "55%", width: "35%", height: "18%", background: "rgba(100,80,60,0.5)", borderRadius: "4px", boxShadow: "2px 2px 4px rgba(0,0,0,0.2)" }} />
+                      {/* Coffee table */}
+                      <div style={{ position: "absolute", left: "60%", top: "38%", width: "20%", height: "12%", background: "rgba(80,65,50,0.4)", borderRadius: "2px" }} />
+                      {/* Rug */}
+                      <div style={{ position: "absolute", left: "50%", top: "30%", width: "40%", height: "35%", background: "rgba(150,130,110,0.2)", borderRadius: "4px" }} />
                     </>
                   )}
-                  {/* Label */}
-                  <text x={isoX + r.w * 0.3} y={isoY + r.h * 0.2}
-                    textAnchor="middle"
-                    className={`text-[8px] font-medium transition-all duration-500`}
-                    fill={isActive ? r.color : "rgba(255,255,255,0.25)"}>
-                    {ROOMS_DATA[r.room].label}
-                  </text>
-                </g>
-              );
-            })}
-            {/* Rotating compass */}
-            <g transform={`translate(225, 30) rotate(${rotation})`}>
-              <circle r="12" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="0.5" />
-              <line x1="0" y1="-10" x2="0" y2="10" stroke="rgba(59,130,246,0.3)" strokeWidth="0.5" />
-              <line x1="-10" y1="0" x2="10" y2="0" stroke="rgba(59,130,246,0.3)" strokeWidth="0.5" />
-              <circle r="2" fill="rgba(59,130,246,0.5)" />
-            </g>
-          </svg>
-        </div>
+                  {activeRoom === 1 && (
+                    <>
+                      {/* Bed */}
+                      <div style={{ position: "absolute", left: "25%", top: "30%", width: "50%", height: "40%", background: "rgba(200,200,220,0.4)", borderRadius: "4px", boxShadow: "2px 2px 4px rgba(0,0,0,0.15)" }}>
+                        <div style={{ position: "absolute", left: "10%", top: "5%", width: "80%", height: "25%", background: "rgba(255,255,255,0.3)", borderRadius: "3px" }} />
+                      </div>
+                      {/* Nightstand */}
+                      <div style={{ position: "absolute", left: "15%", top: "40%", width: "8%", height: "10%", background: "rgba(100,80,60,0.4)", borderRadius: "2px" }} />
+                    </>
+                  )}
+                  {activeRoom === 2 && (
+                    <>
+                      {/* Bathtub */}
+                      <div style={{ position: "absolute", left: "15%", top: "20%", width: "30%", height: "55%", background: "rgba(200,220,230,0.5)", borderRadius: "8px", border: "2px solid rgba(180,200,210,0.4)" }} />
+                      {/* Sink */}
+                      <div style={{ position: "absolute", left: "60%", top: "15%", width: "20%", height: "15%", background: "rgba(220,230,240,0.5)", borderRadius: "50% 50% 4px 4px" }} />
+                      {/* Toilet */}
+                      <div style={{ position: "absolute", left: "65%", top: "60%", width: "14%", height: "20%", background: "rgba(220,230,240,0.5)", borderRadius: "4px 4px 50% 50%" }} />
+                    </>
+                  )}
+                  {activeRoom === 3 && (
+                    <>
+                      {/* Counter */}
+                      <div style={{ position: "absolute", left: "10%", top: "10%", width: "80%", height: "15%", background: "rgba(160,150,140,0.5)", borderRadius: "2px" }} />
+                      {/* Island */}
+                      <div style={{ position: "absolute", left: "30%", top: "50%", width: "40%", height: "18%", background: "rgba(140,130,120,0.4)", borderRadius: "3px" }} />
+                      {/* Sink dots */}
+                      <div style={{ position: "absolute", left: "40%", top: "13%", width: "10%", height: "8%", background: "rgba(180,200,210,0.5)", borderRadius: "50%" }} />
+                    </>
+                  )}
+                </div>
 
-        {/* Room detail bar */}
-        <div className="rounded-lg px-4 py-3 flex items-center justify-between transition-all duration-500"
-          style={{
-            backgroundColor: "rgba(255,255,255,0.02)",
-            border: "1px solid rgba(255,255,255,0.05)",
-          }}>
-          <div>
-            <span className="text-xs font-semibold text-white/80">{ROOMS_DATA[activeRoom].label}</span>
-            <span className="text-[10px] text-slate-500 ml-2">{ROOMS_DATA[activeRoom].area}m²</span>
+                {/* Ambient glow */}
+                <div style={{
+                  position: "absolute", inset: 0,
+                  background: `radial-gradient(ellipse at 30% 30%, ${room.accent}15 0%, transparent 60%)`,
+                  pointerEvents: "none",
+                }} />
+              </div>
+            </div>
+
+            {/* Room label overlay */}
+            <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md"
+              style={{ backgroundColor: `${room.accent}20`, border: `1px solid ${room.accent}40` }}>
+              <span className="text-[10px] font-semibold" style={{ color: room.accent }}>{room.label}</span>
+              <span className="text-[9px] text-slate-400 ml-1.5">{room.area}m²</span>
+            </div>
+
+            {/* VR cursor indicator */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+              <div className="w-5 h-5 border border-white/20 rounded-full flex items-center justify-center ev-pulse-ring">
+                <div className="w-1.5 h-1.5 rounded-full bg-white/40" />
+              </div>
+            </div>
           </div>
-          <div className="text-right">
-            <span className="text-sm font-bold text-white/90 font-mono">{ROOMS_DATA[activeRoom].cost}</span>
-            <span className="text-[10px] text-slate-500 ml-0.5">만원</span>
+
+          {/* Right: Estimate data */}
+          <div className="w-[42%] flex flex-col gap-1.5">
+            {/* Cost summary */}
+            <div className="rounded-lg px-3 py-2"
+              style={{ backgroundColor: `${room.accent}10`, border: `1px solid ${room.accent}25` }}>
+              <div className="text-[9px] text-slate-500 mb-0.5">예상 견적</div>
+              <div className="flex items-baseline gap-1">
+                <span className="text-lg font-bold text-white/90 font-mono">{room.cost}</span>
+                <span className="text-[10px] text-slate-400">만원</span>
+              </div>
+            </div>
+
+            {/* Scrolling estimate items */}
+            <div className="flex-1 rounded-lg overflow-hidden"
+              style={{ backgroundColor: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)" }}>
+              <div className="px-2.5 py-1.5" style={{ borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
+                <span className="text-[9px] text-slate-500 font-medium">공종별 내역</span>
+              </div>
+              {[0, 1, 2, 3].map((offset) => {
+                const item = ESTIMATE_ITEMS[(scrollIdx + offset) % ESTIMATE_ITEMS.length];
+                const isTop = offset === 0;
+                return (
+                  <div key={`${scrollIdx}-${offset}`}
+                    className="px-2.5 py-1.5 transition-all duration-500"
+                    style={{
+                      backgroundColor: isTop ? `${room.accent}08` : "transparent",
+                      borderBottom: "1px solid rgba(255,255,255,0.03)",
+                    }}>
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] font-medium" style={{ color: isTop ? room.accent : "rgba(255,255,255,0.5)" }}>{item.trade}</span>
+                      <span className="text-[9px] font-mono" style={{ color: isTop ? "#67E8F9" : "rgba(255,255,255,0.35)" }}>₩{item.cost}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] text-slate-500 truncate mr-2">{item.item}</span>
+                      <span className="text-[8px] text-slate-600 whitespace-nowrap">{item.qty}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
 
         {/* Room selector dots */}
-        <div className="flex items-center justify-center gap-2 mt-3">
-          {ROOMS_DATA.map((_, i) => (
+        <div className="flex items-center justify-center gap-2 mt-2">
+          {ROOMS_3D.map((r, i) => (
             <div key={i}
               className="rounded-full transition-all duration-300"
               style={{
                 width: activeRoom === i ? 16 : 6,
                 height: 6,
-                backgroundColor: activeRoom === i ? "#3B82F6" : "rgba(255,255,255,0.1)",
+                backgroundColor: activeRoom === i ? r.accent : "rgba(255,255,255,0.1)",
               }} />
           ))}
         </div>
       </div>
+
+      <style jsx>{`
+        @keyframes pulseRing { 0%, 100% { opacity: 0.4; transform: translate(-50%,-50%) scale(1); } 50% { opacity: 0.8; transform: translate(-50%,-50%) scale(1.2); } }
+        .ev-pulse-ring { animation: pulseRing 2s ease-in-out infinite; }
+      `}</style>
     </div>
   );
 }
