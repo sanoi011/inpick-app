@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Upload, Camera, FileImage, Loader2,
   AlertTriangle, Smartphone, PenTool, ImagePlus, Info, Menu, X,
-  Send, Sparkles, MessageSquare, Palette, ChevronRight, ChevronLeft,
+  Send, Sparkles, MessageSquare, Palette, ChevronRight, ChevronLeft, ExternalLink,
 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
@@ -810,36 +810,105 @@ export default function FloorPlanPage() {
     if (uploadMode === "lidar") {
       return (
         <div className="h-full flex items-center justify-center bg-gray-50 p-8 overflow-y-auto">
-          <div className="max-w-lg w-full">
-            <div className="text-center mb-8">
+          <div className="max-w-lg w-full space-y-4">
+            <div className="text-center mb-6">
               <div className="w-20 h-20 bg-violet-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Smartphone className="w-10 h-10 text-violet-500" />
               </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">LiDAR 스캔 데이터 업로드</h2>
-              <p className="text-sm text-gray-500">iPhone/iPad의 RoomPlan으로 스캔한 JSON 파일을 업로드하세요</p>
+              <h2 className="text-xl font-bold text-gray-900 mb-2">LiDAR 3D 스캔으로 도면 생성</h2>
+              <p className="text-sm text-gray-500">iPhone/iPad의 LiDAR 센서로 공간을 스캔하면 정밀한 도면을 자동 생성합니다</p>
             </div>
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
+
+            {/* Step 1: 기기 확인 */}
+            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
               <div className="flex items-start gap-3">
-                <Info className="w-5 h-5 text-violet-600 flex-shrink-0 mt-0.5" />
-                <div className="text-sm text-violet-800">
-                  <p className="font-medium mb-1">스캔 방법</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs text-violet-700">
-                    <li>iPhone 12 Pro 이상 또는 iPad Pro에서 3D 스캔 앱 실행</li>
-                    <li>방을 천천히 돌며 벽면, 문, 창문을 스캔</li>
-                    <li>스캔 완료 후 JSON 내보내기</li>
-                    <li>내보낸 JSON 파일을 아래에 업로드</li>
+                <div className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">1</div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-1">LiDAR 지원 기기 확인</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                    <div className="bg-white rounded-lg p-2 border">
+                      <p className="font-medium">iPhone</p>
+                      <p className="text-gray-500">12 Pro / 13 Pro / 14 Pro / 15 Pro / 16 Pro 이상</p>
+                    </div>
+                    <div className="bg-white rounded-lg p-2 border">
+                      <p className="font-medium">iPad</p>
+                      <p className="text-gray-500">iPad Pro 2020년 이후 모델</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 2: 앱 설치 */}
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">2</div>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-gray-900 mb-2">3D 스캔 앱 설치 (무료)</p>
+                  <div className="space-y-2">
+                    <a href="https://apps.apple.com/app/3d-scanner-app/id1419913995" target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 bg-white rounded-lg p-3 border border-violet-200 hover:border-violet-400 transition-colors">
+                      <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white text-xs font-bold">3D</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">3d Scanner App</p>
+                        <p className="text-xs text-gray-500">RoomPlan 기반 무료 앱, JSON 내보내기 지원</p>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                    </a>
+                    <a href="https://apps.apple.com/app/polycam-lidar-3d-scanner/id1532482376" target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-3 bg-white rounded-lg p-3 border border-violet-200 hover:border-violet-400 transition-colors">
+                      <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center text-white text-xs font-bold">P</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">Polycam - LiDAR 3D Scanner</p>
+                        <p className="text-xs text-gray-500">높은 정밀도, JSON/USDZ 내보내기</p>
+                      </div>
+                      <ExternalLink className="w-4 h-4 text-violet-500 flex-shrink-0" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: 스캔 방법 */}
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">3</div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900 mb-2">공간 스캔하기 (약 5~10분)</p>
+                  <ol className="list-decimal list-inside space-y-1.5 text-xs text-violet-800">
+                    <li>앱을 열고 <strong>Room Scan</strong> 모드 선택</li>
+                    <li>현관문에서 시작, 기기를 천천히 좌우로 움직이며 벽면 인식</li>
+                    <li>각 방으로 이동하며 문, 창문, 벽이 인식될 때까지 스캔</li>
+                    <li>모든 방을 돌면 스캔 완료</li>
+                    <li>완료 후 <strong>Export &rarr; JSON</strong> 형식으로 내보내기</li>
+                    <li>내보낸 파일을 이 기기로 전송 (AirDrop/메일/클라우드)</li>
                   </ol>
                 </div>
               </div>
             </div>
-            <label className="flex flex-col items-center gap-3 p-8 bg-white border-2 border-dashed border-violet-300 rounded-xl hover:border-violet-500 hover:bg-violet-50/50 cursor-pointer transition-colors">
-              <Upload className="w-10 h-10 text-violet-400" />
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-700">RoomPlan JSON 파일 업로드</p>
-                <p className="text-xs text-gray-400 mt-1">.json 파일</p>
+
+            {/* Step 4: 파일 업로드 */}
+            <div className="bg-white border-2 border-violet-300 rounded-xl p-4">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="w-6 h-6 rounded-full bg-violet-600 text-white flex items-center justify-center text-xs font-bold flex-shrink-0">4</div>
+                <div>
+                  <p className="text-sm font-bold text-gray-900">스캔 데이터 업로드</p>
+                  <p className="text-xs text-gray-500 mt-0.5">내보낸 JSON 파일을 아래에 업로드하세요</p>
+                </div>
               </div>
-              <input type="file" accept=".json" onChange={handleRoomPlanUpload} className="hidden" />
-            </label>
+              <label className="flex flex-col items-center gap-3 p-6 bg-violet-50 border-2 border-dashed border-violet-300 rounded-xl hover:border-violet-500 hover:bg-violet-100/50 cursor-pointer transition-colors">
+                <Upload className="w-8 h-8 text-violet-400" />
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-700">RoomPlan JSON 파일 업로드</p>
+                  <p className="text-xs text-gray-400 mt-1">.json 파일</p>
+                </div>
+                <input type="file" accept=".json" onChange={handleRoomPlanUpload} className="hidden" />
+              </label>
+            </div>
+
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
+              <p className="text-xs text-amber-800"><strong>TIP:</strong> LiDAR 스캔은 벽, 문, 창문 위치를 mm 단위로 정확히 측정하므로 가장 정밀한 도면을 생성합니다.</p>
+            </div>
           </div>
         </div>
       );
