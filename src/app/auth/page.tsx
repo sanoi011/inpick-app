@@ -88,10 +88,15 @@ function ConsumerAuthForm() {
     setError("");
     setOauthLoading(provider);
     try {
+      const returnUrl = searchParams.get("returnUrl");
+      const callbackUrl = returnUrl
+        ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
+        : `${window.location.origin}/auth/callback`;
+
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
       });
       if (error) {

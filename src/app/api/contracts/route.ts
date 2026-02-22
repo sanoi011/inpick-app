@@ -341,6 +341,7 @@ export async function PATCH(request: NextRequest) {
       "status", "sign", "notes", "special_terms",
       "payment_terms", "warranty_period", "warranty_terms",
       "progress_payments", "start_date", "expected_end_date",
+      "consumer_signature_image", "contractor_signature_image",
     ];
     const updates: Record<string, unknown> = {};
     for (const key of ALLOWED_FIELDS) {

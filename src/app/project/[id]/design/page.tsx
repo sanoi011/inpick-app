@@ -80,7 +80,6 @@ export default function FloorPlanPage() {
   // === Sidebar state ===
   const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
   const [selectedBuilding, setSelectedBuilding] = useState<BuildingInfo | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [uploadMode, setUploadMode] = useState<"upload" | "lidar" | "photo" | "hand-drawing" | "draw" | null>(null);
   // AI 채팅 상태
   const [aiMessages, setAiMessages] = useState<{ id: string; role: "user" | "assistant"; content: string; images?: string[] }[]>([]);
@@ -154,6 +153,17 @@ export default function FloorPlanPage() {
   const [editableDimensions, setEditableDimensions] = useState<EditableDimension[]>([]);
   const imageContainerRef = useRef<HTMLDivElement>(null);
 
+  // 모바일 사이드바 접기 상태 (early return 전에 선언)
+  const [mobileSidebarCollapsed, setMobileSidebarCollapsed] = useState(false);
+
+  // 모바일: 도면이 확보되면 사이드바 자동 접기
+  useEffect(() => {
+    const hasData = !!(floorPlan || floorPlanImageUrl || generatingFloorPlan);
+    if (hasData && typeof window !== "undefined" && window.innerWidth < 768) {
+      setMobileSidebarCollapsed(true);
+    }
+  }, [floorPlan, floorPlanImageUrl, generatingFloorPlan]);
+
   // Load saved dimensions from project state
   useEffect(() => {
     if (project?.editedDimensions && project.editedDimensions.length > 0) {
@@ -214,7 +224,7 @@ export default function FloorPlanPage() {
     }
     setSelectedAddress(addr);
     setSelectedBuilding(null);
-    setSidebarOpen(true); // Keep sidebar open on mobile
+    setMobileSidebarCollapsed(false); // Keep sidebar open on mobile
   }, []);
 
   const handleSelectBuilding = useCallback((building: BuildingInfo) => {
@@ -223,7 +233,7 @@ export default function FloorPlanPage() {
       return;
     }
     setSelectedBuilding(building);
-    setSidebarOpen(false);
+    setMobileSidebarCollapsed(true);
 
     // grandPlanUrl이 있으면 확장형/기본형 선택을 먼저 요청
     if (building.complexNo && building.pyeongNo && building.grandPlanUrl) {
@@ -319,7 +329,7 @@ export default function FloorPlanPage() {
 
   const handleSelectUploadMode = useCallback((mode: "upload" | "lidar" | "photo" | "hand-drawing" | "draw") => {
     setUploadMode(mode);
-    setSidebarOpen(false);
+    setMobileSidebarCollapsed(true);
   }, []);
 
   // 디자인 옵션 변경
@@ -1100,30 +1110,25 @@ export default function FloorPlanPage() {
     );
   }
 
+  // 모바일: 도면이 확보되면 사이드바 자동 접기
+  const hasFloorPlanData = !!(floorPlan || floorPlanImageUrl || generatingFloorPlan);
+
   return (
-    <div className="flex h-[calc(100vh-56px)]">
-      {/* Mobile sidebar toggle */}
-      <button
-        onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="md:hidden fixed top-16 left-2 z-50 p-2 bg-white rounded-lg shadow-md border border-gray-200"
-      >
-        {sidebarOpen ? <X className="w-5 h-5 text-gray-600" /> : <Menu className="w-5 h-5 text-gray-600" />}
-      </button>
-
-      {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black/50 z-30"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Left sidebar */}
+    <div className="flex flex-col md:flex-row h-[calc(100vh-56px)]">
+      {/* Left sidebar - 모바일: 상단 접이식 패널, 데스크톱: 좌측 사이드바 */}
       <aside className={`
-        ${sidebarOpen ? "fixed inset-y-0 left-0 z-40 mt-14" : "hidden"}
-        md:relative md:flex md:mt-0
-        flex-col w-full max-w-[420px] md:w-1/3 md:min-w-[360px] md:max-w-[480px] bg-white border-r border-gray-100 overflow-y-auto flex-shrink-0 shadow-sm
+        flex flex-col w-full
+        md:w-1/3 md:min-w-[360px] md:max-w-[480px]
+        bg-white border-b md:border-b-0 md:border-r border-gray-100 flex-shrink-0 shadow-sm
+        ${mobileSidebarCollapsed ? "max-h-0 overflow-hidden md:max-h-none md:overflow-y-auto" : "max-h-[50vh] overflow-y-auto md:max-h-none"}
+        transition-all duration-300 ease-in-out
       `}>
+        {/* 모바일 사이드바 헤더 (데스크톱 숨김) */}
+        <div className="md:hidden flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
+          <span className="text-xs font-bold text-gray-600">
+            {!selectedAddress ? "주소 검색" : !hasFloorPlanData ? "건물 선택 · 도면 입력" : "설정"}
+          </span>
+        </div>
         <AddressSearchPanel
           onSelectAddress={handleSelectAddress}
           selectedAddress={selectedAddress}
@@ -1256,6 +1261,24 @@ export default function FloorPlanPage() {
 
       {/* Right canvas area */}
       <div className="flex-1 flex flex-col min-w-0 relative">
+        {/* 모바일 사이드바 토글 버튼 (데스크톱 숨김) */}
+        <button
+          onClick={() => setMobileSidebarCollapsed(!mobileSidebarCollapsed)}
+          className="md:hidden flex items-center justify-center gap-2 px-4 py-2 bg-white border-b border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          {mobileSidebarCollapsed ? (
+            <>
+              <Menu className="w-4 h-4" />
+              {!hasFloorPlanData ? "주소 검색 · 도면 입력 열기" : "설정 열기"}
+            </>
+          ) : (
+            <>
+              <X className="w-4 h-4" />
+              접기
+            </>
+          )}
+        </button>
+
         {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-white border-b border-gray-200 shadow-sm">
           <div className="flex items-center gap-3 min-w-0">

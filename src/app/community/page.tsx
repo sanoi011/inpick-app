@@ -13,12 +13,19 @@ import {
   Bookmark,
   MessageCircle,
   TrendingUp,
+  PenTool,
+  Star,
+  Layers,
+  DollarSign,
+  Building2,
+  HelpCircle,
 } from "lucide-react";
 import {
   STYLE_OPTIONS,
   ROOM_TYPE_OPTIONS,
   TRENDING_TAGS,
   MOCK_POSTS,
+  BOARD_LIST,
   CommunityPost,
 } from "@/types/community";
 
@@ -29,6 +36,15 @@ const TABS = [
   { label: "지도", href: "/community/map", icon: MapPin },
   { label: "라이브러리", href: "/community/library", icon: BookOpen },
 ];
+
+const BOARD_ICONS: Record<string, { icon: typeof Compass; color: string; bg: string }> = {
+  free: { icon: PenTool, color: "text-blue-600", bg: "bg-blue-50" },
+  review: { icon: Star, color: "text-amber-600", bg: "bg-amber-50" },
+  material: { icon: Layers, color: "text-emerald-600", bg: "bg-emerald-50" },
+  price: { icon: DollarSign, color: "text-rose-600", bg: "bg-rose-50" },
+  contractor: { icon: Building2, color: "text-violet-600", bg: "bg-violet-50" },
+  question: { icon: HelpCircle, color: "text-indigo-600", bg: "bg-indigo-50" },
+};
 
 const TOP_POSTS = MOCK_POSTS.slice()
   .sort((a, b) => b.likes - a.likes)
@@ -68,10 +84,35 @@ export default function CommunityExplorePage() {
         </div>
       </div>
 
+      {/* Category Cards Grid */}
+      <div className="bg-white border-b border-gray-100">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            {BOARD_LIST.map((board) => {
+              const meta = BOARD_ICONS[board.slug] || { icon: MessageSquare, color: "text-gray-600", bg: "bg-gray-50" };
+              const Icon = meta.icon;
+              return (
+                <Link
+                  key={board.slug}
+                  href={`/community/talk?board=${board.slug}`}
+                  className={`flex flex-col items-center gap-1.5 rounded-xl ${meta.bg} p-3 sm:p-4 transition-all hover:scale-105 hover:shadow-md`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-white shadow-sm`}>
+                    <Icon className={`w-5 h-5 ${meta.color}`} />
+                  </div>
+                  <span className="text-xs sm:text-sm font-bold text-gray-900">{board.name}</span>
+                  <span className="text-[10px] sm:text-xs text-gray-500">{board.threadCount.toLocaleString()}개 글</span>
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
       {/* Tab Navigation */}
       <div className="border-b bg-white sticky top-0 z-30">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 overflow-x-auto scrollbar-hide -mb-px">
+          <nav className="flex gap-1.5 overflow-x-auto scrollbar-hide py-2">
             {TABS.map((tab) => {
               const active = tab.href === "/community";
               const Icon = tab.icon;
@@ -79,13 +120,13 @@ export default function CommunityExplorePage() {
                 <Link
                   key={tab.href}
                   href={tab.href}
-                  className={`flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     active
-                      ? "border-violet-600 text-violet-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
+                      ? "bg-violet-600 text-white shadow-sm"
+                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
                 >
-                  <Icon className="h-4 w-4" />
+                  <Icon className={`h-4 w-4 ${active ? "text-white" : ""}`} />
                   {tab.label}
                 </Link>
               );
@@ -108,16 +149,16 @@ export default function CommunityExplorePage() {
         </div>
 
         {/* Filters */}
-        <div className="mb-4 flex flex-wrap gap-2">
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-medium text-gray-500">스타일:</span>
+        <div className="mb-4 flex flex-col sm:flex-row gap-3">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs sm:text-sm font-bold text-gray-500 mr-1">스타일</span>
             {STYLE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setStyleFilter(opt.value)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   styleFilter === opt.value
-                    ? "bg-violet-600 text-white"
+                    ? "bg-violet-600 text-white shadow-sm"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >
@@ -125,15 +166,15 @@ export default function CommunityExplorePage() {
               </button>
             ))}
           </div>
-          <div className="flex items-center gap-1">
-            <span className="text-xs font-medium text-gray-500">공간:</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-xs sm:text-sm font-bold text-gray-500 mr-1">공간</span>
             {ROOM_TYPE_OPTIONS.map((opt) => (
               <button
                 key={opt.value}
                 onClick={() => setRoomFilter(opt.value)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
                   roomFilter === opt.value
-                    ? "bg-violet-600 text-white"
+                    ? "bg-violet-600 text-white shadow-sm"
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                 }`}
               >

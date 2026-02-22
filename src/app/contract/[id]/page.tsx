@@ -17,6 +17,7 @@ import type { ConstructionSchedule } from "@/types/construction-schedule";
 import { ScheduleOverview } from "@/components/schedule/ScheduleOverview";
 import { generateContractPdf } from "@/lib/pdf/contract-pdf-generator";
 import { toast } from "@/components/ui/Toast";
+import SignaturePad from "@/components/contract/SignaturePad";
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -354,15 +355,44 @@ function ContractPart3({ contract }: { contract: Contract }) {
 
 function ContractPart4({ contract, onSign, contractor }: {
   contract: Contract;
-  onSign: (type: 'consumer' | 'contractor') => void;
+  onSign: (type: 'consumer' | 'contractor', signatureImage?: string) => void;
   contractor?: Record<string, string>;
 }) {
+  const [signingType, setSigningType] = useState<'consumer' | 'contractor' | null>(null);
+  // 서명 이미지 (로컬 캐시)
+  const [consumerSigImage, setConsumerSigImage] = useState<string | null>(
+    (contract as unknown as Record<string, unknown>).consumer_signature_image as string | null
+  );
+  const [contractorSigImage, setContractorSigImage] = useState<string | null>(
+    (contract as unknown as Record<string, unknown>).contractor_signature_image as string | null
+  );
+
+  const handleSignatureComplete = (dataUrl: string) => {
+    if (signingType === "consumer") {
+      setConsumerSigImage(dataUrl);
+    } else {
+      setContractorSigImage(dataUrl);
+    }
+    onSign(signingType!, dataUrl);
+    setSigningType(null);
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
         <Pen className="w-4 h-4 text-indigo-600" />
         <h3 className="text-sm font-bold text-gray-900">제4부: 전자서명</h3>
       </div>
+
+      {/* 서명 패드 모달 */}
+      {signingType && (
+        <SignaturePad
+          onComplete={handleSignatureComplete}
+          onCancel={() => setSigningType(null)}
+          width={Math.min(400, typeof window !== "undefined" ? window.innerWidth - 80 : 400)}
+          height={200}
+        />
+      )}
 
       <div className="p-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -371,10 +401,15 @@ function ContractPart4({ contract, onSign, contractor }: {
             contract.consumerSignature ? "border-green-300 bg-green-50" : "border-dashed border-gray-300"
           }`}>
             <p className="text-xs font-bold text-gray-500 mb-1">갑 (소비자)</p>
-            <p className="text-[10px] text-gray-400 mb-4">발주자 서명</p>
+            <p className="text-[10px] text-gray-400 mb-3">발주자 서명</p>
             {contract.consumerSignature ? (
               <div className="flex flex-col items-center gap-2">
-                <CheckCircle2 className="w-10 h-10 text-green-500" />
+                {consumerSigImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={consumerSigImage} alt="소비자 서명" className="h-16 object-contain border border-gray-200 rounded-lg bg-white p-1" />
+                ) : (
+                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                )}
                 <p className="text-xs font-medium text-green-700">서명 완료</p>
                 <p className="text-[10px] text-gray-400">
                   {new Date(contract.consumerSignature).toLocaleDateString("ko-KR")} {new Date(contract.consumerSignature).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
@@ -382,9 +417,10 @@ function ContractPart4({ contract, onSign, contractor }: {
               </div>
             ) : (
               <button
-                onClick={() => onSign("consumer")}
-                className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"
+                onClick={() => setSigningType("consumer")}
+                className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
               >
+                <Pen className="w-4 h-4" />
                 소비자 서명하기
               </button>
             )}
@@ -395,10 +431,15 @@ function ContractPart4({ contract, onSign, contractor }: {
             contract.contractorSignature ? "border-green-300 bg-green-50" : "border-dashed border-gray-300"
           }`}>
             <p className="text-xs font-bold text-gray-500 mb-1">을 (시공사)</p>
-            <p className="text-[10px] text-gray-400 mb-4">수급인 서명</p>
+            <p className="text-[10px] text-gray-400 mb-3">수급인 서명</p>
             {contract.contractorSignature ? (
               <div className="flex flex-col items-center gap-2">
-                <CheckCircle2 className="w-10 h-10 text-green-500" />
+                {contractorSigImage ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={contractorSigImage} alt="시공사 서명" className="h-16 object-contain border border-gray-200 rounded-lg bg-white p-1" />
+                ) : (
+                  <CheckCircle2 className="w-10 h-10 text-green-500" />
+                )}
                 <p className="text-xs font-medium text-green-700">서명 완료</p>
                 <p className="text-[10px] text-gray-400">
                   {new Date(contract.contractorSignature).toLocaleDateString("ko-KR")} {new Date(contract.contractorSignature).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
@@ -406,9 +447,10 @@ function ContractPart4({ contract, onSign, contractor }: {
               </div>
             ) : (
               <button
-                onClick={() => onSign("contractor")}
-                className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                onClick={() => setSigningType("contractor")}
+                className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
               >
+                <Pen className="w-4 h-4" />
                 시공사 서명하기
               </button>
             )}
@@ -718,12 +760,17 @@ function ContractDetailContent() {
     })();
   }, [contract?.id]);
 
-  const handleSign = useCallback(async (type: 'consumer' | 'contractor') => {
+  const handleSign = useCallback(async (type: 'consumer' | 'contractor', signatureImage?: string) => {
     if (!contract) return;
+    const payload: Record<string, unknown> = { id: contract.id, sign: type };
+    if (signatureImage) {
+      const fieldName = type === "consumer" ? "consumer_signature_image" : "contractor_signature_image";
+      payload[fieldName] = signatureImage;
+    }
     const res = await fetch("/api/contracts", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: contract.id, sign: type }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.contract) {

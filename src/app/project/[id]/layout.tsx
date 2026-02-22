@@ -1,8 +1,10 @@
 "use client";
 
-import { useParams, usePathname } from "next/navigation";
+import { useEffect } from "react";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Box, Package, Calculator, FileText, ArrowLeft, CheckCircle2, Lock } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 import { useProjectState } from "@/hooks/useProjectState";
 import { SaveButton } from "@/components/ui/SaveIndicator";
 import type { ConsumerProjectStatus } from "@/types/consumer-project";
@@ -35,8 +37,27 @@ const TAB_MIN_STATUS: Record<string, ConsumerProjectStatus> = {
 export default function ProjectLayout({ children }: { children: React.ReactNode }) {
   const params = useParams();
   const pathname = usePathname();
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const projectId = params.id as string;
   const { project, saveStatus, forceSave } = useProjectState(projectId);
+
+  useEffect(() => {
+    if (!authLoading && !user) {
+      router.push(`/auth?returnUrl=${encodeURIComponent(pathname)}`);
+    }
+  }, [authLoading, user, router, pathname]);
+
+  if (authLoading || !user) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="mt-3 text-sm text-gray-500">로그인 확인 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   const currentStep = project ? STATUS_TO_STEP[project.status] ?? 1 : 1;
   const projectStatus = project?.status ?? "ADDRESS_SELECTION";
