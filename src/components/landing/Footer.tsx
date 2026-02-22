@@ -11,11 +11,11 @@ const HOME_LINKS = [
 
 const COMPANY_INFO = {
   copyright: "Copyright © 2026 AIOD. All rights reserved.",
-  businessNumber: "사업자등록번호: 예비창업패키지 참여 중",
+  businessNumber: "사업자등록번호: -",
   ceo: "회사명: AIOD | 플랫폼명: INPICK",
   email: "이메일: tjsqhs011@naver.com",
-  phone: "대표: 선우빈",
-  address: "소재지: 서울특별시",
+  phone: "대표: 김선본",
+  address: "소재지: 대전광역시",
 };
 
 const LEGAL_LINKS = [
@@ -64,10 +64,11 @@ export default function LandingFooter() {
               <p>{COMPANY_INFO.phone}</p>
               <p>{COMPANY_INFO.address}</p>
             </div>
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap gap-4 items-center">
               {LEGAL_LINKS.map((link) => (
                 <a key={link.label} href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</a>
               ))}
+              <a href="/admin" className="text-sm text-gray-600 hover:text-gray-400 transition-colors">관리자</a>
             </div>
           </div>
         </motion.div>
