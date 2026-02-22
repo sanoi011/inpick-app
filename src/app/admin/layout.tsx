@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, Users, FolderKanban, FileText, DollarSign,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
-  Library,
+  Library, ExternalLink,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -110,6 +110,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <p className="text-[10px] text-gray-500 truncate">{adminEmail}</p>
             </div>
           )}
+          <Link
+            href="/"
+            target="_blank"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 w-full transition-colors"
+          >
+            <ExternalLink className="w-5 h-5 text-gray-500" />
+            메인 웹사이트
+          </Link>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-400 hover:bg-gray-800 hover:text-gray-200 w-full transition-colors"

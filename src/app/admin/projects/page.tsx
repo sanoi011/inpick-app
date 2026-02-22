@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { FolderKanban, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { FolderKanban, Loader2, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -47,6 +47,28 @@ export default function AdminProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm(`프로젝트(${id.slice(0, 8)})를 삭제하시겠습니까?\n연결된 견적 참조도 정리됩니다.`)) return;
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/admin/projects?id=${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        toast({ type: "error", title: "삭제 실패", message: data.error || "프로젝트를 삭제할 수 없습니다" });
+      } else {
+        toast({ type: "success", title: "삭제 완료", message: "프로젝트가 삭제되었습니다" });
+        load();
+      }
+    } catch {
+      toast({ type: "error", title: "오류", message: "프로젝트 삭제 중 오류가 발생했습니다" });
+    }
+    setDeletingId(null);
+  };
 
   const load = useCallback(async function load() {
     setLoading(true);
@@ -104,11 +126,12 @@ export default function AdminProjectsPage() {
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">상태</th>
                 <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">주소</th>
                 <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">업데이트</th>
+                <th className="w-10 px-2"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {projects.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
+                <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
                   <FolderKanban className="w-8 h-8 mx-auto mb-2 text-gray-300" />프로젝트가 없습니다
                 </td></tr>
               ) : projects.map((p) => (
@@ -128,10 +151,20 @@ export default function AdminProjectsPage() {
                       {(p.address as { roadAddress?: string })?.roadAddress || "-"}
                     </td>
                     <td className="px-4 py-3 text-sm text-right text-gray-400">{new Date(p.updated_at).toLocaleString("ko-KR")}</td>
+                    <td className="px-2 text-center">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
+                        disabled={deletingId === p.id}
+                        className="p-1.5 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        title="삭제"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </td>
                   </tr>
                   {expandedId === p.id && (
                     <tr key={`${p.id}-detail`}>
-                      <td colSpan={6} className="px-4 py-4 bg-gray-50">
+                      <td colSpan={7} className="px-4 py-4 bg-gray-50">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                           <div>
                             <p className="font-medium text-gray-700 mb-1">Address</p>

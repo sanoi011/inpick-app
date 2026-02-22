@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Plus, MapPin, Clock, FolderOpen, RefreshCw, FileSignature, ArrowRight,
+  Plus, MapPin, Clock, FolderOpen, RefreshCw, FileSignature, ArrowRight, Trash2,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/Toast";
@@ -82,6 +82,31 @@ export default function MyPageProjects() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [visibleCount, setVisibleCount] = useState(10);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`"${name}" 프로젝트를 삭제하시겠습니까?\n삭제된 프로젝트는 복구할 수 없습니다.`)) return;
+    setDeletingId(id);
+    try {
+      // 서버 삭제 (로그인 상태)
+      if (user) {
+        const res = await fetch(`/api/consumer-projects?id=${id}`, { method: "DELETE" });
+        if (!res.ok) {
+          const data = await res.json();
+          toast({ type: "error", title: "삭제 실패", message: data.error || "프로젝트를 삭제할 수 없습니다" });
+          setDeletingId(null);
+          return;
+        }
+      }
+      // localStorage 삭제
+      localStorage.removeItem(`inpick_project_${id}`);
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+      toast({ type: "success", title: "삭제 완료", message: "프로젝트가 삭제되었습니다" });
+    } catch {
+      toast({ type: "error", title: "오류", message: "프로젝트 삭제 중 오류가 발생했습니다" });
+    }
+    setDeletingId(null);
+  };
 
   const loadProjects = useCallback(() => {
     setLoading(true);
@@ -203,16 +228,27 @@ export default function MyPageProjects() {
               if (status === "RENDERING") return `/project/${p.id}/rendering`;
               return `/project/${p.id}/design`;
             };
+            const displayName = p.address?.buildingName || p.address?.roadAddress || "새 프로젝트";
             return (
               <div key={p.id} className={`bg-white border rounded-xl p-5 transition-all ${isContracted ? "border-green-200 hover:border-green-300 hover:shadow-sm" : "border-gray-200 hover:border-blue-300 hover:shadow-sm"}`}>
                 <button onClick={() => router.push(getTargetUrl())} className="w-full text-left">
                   <div className="flex items-start justify-between mb-2">
                     <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {p.address?.buildingName || p.address?.roadAddress || "새 프로젝트"}
+                      {displayName}
                     </h3>
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${CONSUMER_PROJECT_STATUS_COLORS[status] || "bg-gray-100 text-gray-700"}`}>
-                      {CONSUMER_PROJECT_STATUS_LABELS[status] || status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${CONSUMER_PROJECT_STATUS_COLORS[status] || "bg-gray-100 text-gray-700"}`}>
+                        {CONSUMER_PROJECT_STATUS_LABELS[status] || status}
+                      </span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDelete(p.id, String(displayName)); }}
+                        disabled={deletingId === p.id}
+                        className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        title="프로젝트 삭제"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {p.address?.roadAddress && (
                     <p className="text-xs text-gray-500 flex items-center gap-1 mb-2">

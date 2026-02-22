@@ -107,6 +107,48 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// DELETE: 프로젝트 삭제
+export async function DELETE(request: NextRequest) {
+  const supabase = createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return NextResponse.json({ error: "로그인이 필요합니다" }, { status: 401 });
+  }
+
+  try {
+    const id = request.nextUrl.searchParams.get("id");
+    if (!id) {
+      return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+    }
+
+    // 소유권 확인 후 삭제
+    const { data, error } = await supabase
+      .from("consumer_projects")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id")
+      .single();
+
+    if (error || !data) {
+      return NextResponse.json({ error: "프로젝트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
+    }
+
+    // 연결된 estimates의 consumer_project_id 정리 (soft link)
+    await supabase
+      .from("estimates")
+      .update({ consumer_project_id: null })
+      .eq("consumer_project_id", id)
+      .then(() => {});
+
+    return NextResponse.json({ success: true, deletedId: data.id });
+  } catch (err) {
+    console.error("Delete consumer project error:", err);
+    return NextResponse.json({ error: "프로젝트 삭제 중 오류" }, { status: 500 });
+  }
+}
+
 // PATCH: 부분 업데이트
 export async function PATCH(request: NextRequest) {
   const supabase = createClient();
