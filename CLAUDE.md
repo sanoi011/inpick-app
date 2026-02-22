@@ -1796,14 +1796,44 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - 향후 Python 서비스 필요 시 별도 서버 (Railway/Render/AWS, 월 $5~20)
 - Vercel Hobby 플랜 API 타임아웃 10초 제한 → 도면 생성 API 실사용 시 **Pro 플랜($20/월) 권장**
 
+## 완료된 작업 (2026-02-22) - 프로젝트 삭제 기능 + 관리자 메인 웹 링크
+
+### 프로젝트 삭제 기능 (소비자 + 관리자)
+- `src/app/api/consumer-projects/route.ts` (수정) - DELETE 메서드 추가
+  - 소비자 인증 (`supabase.auth.getUser()`) + 소유권 검증 (`user_id` 일치)
+  - 삭제 후 연결된 `estimates.consumer_project_id` null 정리
+- `src/app/api/admin/projects/route.ts` (수정) - DELETE 메서드 추가
+  - 관리자 인증 (Bearer 토큰), 어떤 프로젝트든 삭제 가능
+  - 삭제 전 연결된 estimates 참조 정리
+- `src/app/mypage/projects/page.tsx` (수정) - 소비자 프로젝트 목록에 삭제 버튼 추가
+  - 휴지통 아이콘 (Trash2), confirm 다이얼로그, 서버+localStorage 동시 삭제
+  - 삭제 중 비활성화, 성공/실패 토스트 알림
+- `src/app/admin/projects/page.tsx` (수정) - 관리자 프로젝트 테이블에 삭제 컬럼 추가
+  - 행마다 삭제 버튼, confirm 다이얼로그, 삭제 후 목록 자동 새로고침
+- `supabase/migrations/20260222500000_consumer_projects_delete_policy.sql` (신규)
+  - `Users can delete own projects` RLS DELETE 정책
+- `src/app/admin/layout.tsx` (수정) - 사이드바 하단에 "메인 웹사이트" 링크 추가
+  - ExternalLink 아이콘, `target="_blank"`으로 새 탭에서 `/` 열림
+
+### 삭제 시 데이터 처리
+- `consumer_projects` 레코드 하드 삭제 (복구 불가)
+- `estimates.consumer_project_id` → null 설정 (소프트 링크 정리, 견적 데이터 보존)
+- localStorage `inpick_project_{id}` 키 삭제 (소비자 측)
+
+## DB 마이그레이션 현황 (추가)
+| 파일 | 상태 |
+|------|------|
+| `20260222500000_consumer_projects_delete_policy.sql` | **Supabase 적용 필요** |
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
-2. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
-3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-4. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
-5. **ODA File Converter 설치** (DWG→DXF 변환용)
+1. **Supabase 마이그레이션 적용** - `20260222500000_consumer_projects_delete_policy.sql` (DELETE RLS 정책)
+2. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
+3. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
+4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+5. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
+6. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
