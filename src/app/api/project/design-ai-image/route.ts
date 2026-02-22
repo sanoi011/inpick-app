@@ -5,12 +5,12 @@ export const maxDuration = 120;
 
 const IMAGE_GEN_MODEL = "gemini-3-pro-image-preview";
 
-// 4컷 방별 렌더링 대상
+// 4컷 방별 렌더링 대상 + 구조 데이터 기본값
 const ROOMS_TO_RENDER = [
-  { key: "living", label: "거실", promptKR: "거실 (리빙룸)" },
-  { key: "kitchen", label: "부엌", promptKR: "주방 (키친)" },
-  { key: "bedroom", label: "침실", promptKR: "안방 (메인 침실)" },
-  { key: "bathroom", label: "욕실", promptKR: "욕실 (바스룸)" },
+  { key: "living", label: "거실", promptKR: "거실 (리빙룸)", defaultWindow: "One large window on the south wall (balcony side)", defaultDoor: "One closed door connecting to hallway" },
+  { key: "kitchen", label: "부엌", promptKR: "주방 (키친)", defaultWindow: "No windows", defaultDoor: "Open passage connecting to living room" },
+  { key: "bedroom", label: "침실", promptKR: "안방 (메인 침실)", defaultWindow: "One window on the exterior wall", defaultDoor: "One closed door on the hallway side" },
+  { key: "bathroom", label: "욕실", promptKR: "욕실 (바스룸)", defaultWindow: "No windows", defaultDoor: "One closed door" },
 ] as const;
 
 interface RoomImage {
@@ -85,20 +85,46 @@ export async function POST(request: NextRequest) {
 
     // 4개 방에 대해 병렬 이미지 생성
     const roomPromises = ROOMS_TO_RENDER.map(async (room): Promise<RoomImage> => {
+      // 창문 유무 판단
+      const isWindowless = room.defaultWindow === "No windows";
+      const windowStatus = room.defaultWindow;
+      const doorStatus = room.defaultDoor;
+
+      // 네거티브 프롬프트 구성
+      const negativeItems = [
+        "missing walls", "broken layout", "incorrect structural proportions",
+        "see-through walls", "extra doors", "open layout", "merged rooms", "hallway visible",
+      ];
+      if (isWindowless) {
+        negativeItems.push("windows", "natural light", "sunlight", "daylight", "sun rays", "outdoor view", "glass wall to outside", "sky", "exterior");
+      }
+
       const prompt = [
-        "당신은 한국 아파트 인테리어 디자인 전문가입니다.",
+        // ── System Role & Strict Constraints ──
+        "[System Role & Strict Constraints]",
+        "You are a highly precise architectural visualizer. Your absolute priority is to obey the structural data provided. You must NOT alter, invent, or remove structural elements (walls, windows, doors) for aesthetic reasons.",
         "",
+        "1. Structural Integrity: Maintain all solid walls. Do NOT create open layouts where walls exist. Do NOT show other rooms through walls. Doors must be clearly defined and closed.",
+        "2. Strict Window Control: DO NOT add windows to the scene unless explicitly stated in the structural data.",
+        isWindowless
+          ? "3. Lighting Direction: This room is WINDOWLESS. Use exceptionally bright, studio-quality artificial lighting (LEDs, cove lighting, spotlights) to make the space look as bright and beautiful as natural light, but absolutely NO windows, NO sun rays, and NO outdoor views."
+          : "3. Lighting Direction: This room has a window. Follow the exact window location provided. The camera should focus on the interior, and natural light can cast from off-screen if the window is not directly in the camera's view.",
+        "",
+        // ── Floor Plan Structural Data ──
+        "[Floor Plan Structural Data]",
+        `- Room Type: ${room.promptKR}`,
+        `- Window Status: ${windowStatus}`,
+        `- Door Status: ${doorStatus}`,
         floorPlanParts.length > 0
-          ? "첨부된 평면도를 반드시 참고하세요. 이 도면의 공간 구조(방 배치, 크기, 동선)를 정확히 반영하여 디자인하세요."
+          ? "- Reference: See the attached floor plan image. Accurately reflect the spatial structure (room layout, size, circulation) shown in this drawing."
           : "",
         floorPlanContext
-          ? `[공간 구성]\n${floorPlanContext}`
+          ? `- Spatial Layout:\n${floorPlanContext}`
           : "",
         "",
-        `지금 생성할 공간: **${room.promptKR}**`,
-        `이 아파트의 ${room.promptKR} 공간만을 포토리얼리스틱하게 렌더링해주세요.`,
-        "",
-        prefsText ? `[디자인 옵션]\n${prefsText}` : "",
+        // ── User Design Request ──
+        "[User Design Request]",
+        prefsText ? prefsText : "",
         conversationSummary
           ? `[사용자와의 대화 요약]\n${conversationSummary}`
           : "",
@@ -106,12 +132,14 @@ export async function POST(request: NextRequest) {
           ? `[선택된 자재]\n${materialContext}`
           : "",
         "",
-        "요구사항:",
-        `- ${room.promptKR}을 중심으로 한 투시도(perspective view) 렌더링`,
-        "- 실제 고급 아파트 모델하우스 사진처럼 리얼하게",
-        "- 자연광이 들어오는 밝고 따뜻한 느낌",
-        "- 가구, 소품, 조명까지 포함한 완성된 디자인",
-        "- 한국 아파트 인테리어 트렌드 반영",
+        // ── Render Instructions ──
+        `Render in highly realistic, 8k resolution, architectural photography style.`,
+        `Generate a perspective view rendering of this ${room.promptKR}.`,
+        "- Must look like a real high-end Korean apartment model house photograph",
+        "- Include furniture, accessories, and lighting for a complete design",
+        "- Reflect current Korean apartment interior trends",
+        "",
+        `[Negative Prompt - AVOID these]: ${negativeItems.join(", ")}`,
         "",
         `${room.promptKR}에 사용된 자재, 가구, 색상 등을 한국어로 2~3문장으로 간단히 설명해주세요.`,
       ]

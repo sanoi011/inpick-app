@@ -95,21 +95,50 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        // 방 정보에서 창문 유무 판단
+        const roomLower = (roomContext || prompt || "").toLowerCase();
+        const isWindowless = roomLower.includes("욕실") || roomLower.includes("bathroom") || roomLower.includes("화장실");
+        const negativeItems = [
+          "missing walls", "broken layout", "incorrect structural proportions",
+          "see-through walls", "extra doors", "open layout", "merged rooms", "hallway visible",
+        ];
+        if (isWindowless) {
+          negativeItems.push("windows", "natural light", "sunlight", "daylight", "sun rays", "outdoor view", "glass wall to outside", "sky", "exterior");
+        }
+
         const fullPrompt = [
-          "Generate a photorealistic interior design image of a Korean apartment room.",
-          "The image should look like a professional interior design photograph with realistic lighting, materials, and furnishings.",
+          // ── System Role & Strict Constraints ──
+          "[System Role & Strict Constraints]",
+          "You are a highly precise architectural visualizer. Your absolute priority is to obey the structural data provided. You must NOT alter, invent, or remove structural elements (walls, windows, doors) for aesthetic reasons.",
+          "",
+          "1. Structural Integrity: Maintain all solid walls. Do NOT create open layouts where walls exist. Do NOT show other rooms through walls. Doors must be clearly defined and closed.",
+          "2. Strict Window Control: DO NOT add windows to the scene unless explicitly stated in the structural data.",
+          isWindowless
+            ? "3. Lighting Direction: This room is WINDOWLESS. Use exceptionally bright, studio-quality artificial lighting (LEDs, cove lighting, spotlights) to make the space look as bright and beautiful as natural light, but absolutely NO windows, NO sun rays, and NO outdoor views."
+            : "3. Lighting Direction: Follow the exact window location if provided. The camera should focus on the interior, and natural light can cast from off-screen if the window is not directly in the camera's view.",
+          "",
+          // ── Floor Plan Structural Data ──
+          "[Floor Plan Structural Data]",
           floorPlanParts.length > 0
-            ? "첨부된 평면도를 반드시 참고하세요. 이 도면의 공간 구조(방 배치, 크기, 동선)를 정확히 반영하여 디자인하세요."
+            ? "- Reference: See the attached floor plan image. Accurately reflect the spatial structure shown in this drawing."
             : "",
-          roomContext ? `Room info: ${roomContext}` : "",
-          floorPlanContext ? `Floor plan context: ${floorPlanContext}` : "",
+          roomContext ? `- Room info: ${roomContext}` : "",
+          floorPlanContext ? `- Spatial Layout: ${floorPlanContext}` : "",
+          "",
+          // ── User Design Request ──
+          "[User Design Request]",
           `Design request: ${prompt}`,
-          "Style: High-quality architectural photography, natural lighting, realistic materials and textures.",
+          "",
+          "Render in highly realistic, 8k resolution, architectural photography style.",
+          "Must look like a real high-end Korean apartment model house photograph.",
+          "Include furniture, accessories, and lighting for a complete design.",
+          "",
+          `[Negative Prompt - AVOID these]: ${negativeItems.join(", ")}`,
         ].filter(Boolean).join("\n");
 
-        // gemini-2.5-flash-image 이미지 생성
+        // gemini-3-pro-image-preview 이미지 생성
         const response = await client.models.generateContent({
-          model: "gemini-2.5-flash-image",
+          model: "gemini-3-pro-image-preview",
           contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
           config: {
             responseModalities: ["IMAGE", "TEXT"],
