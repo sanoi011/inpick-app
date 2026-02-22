@@ -107,10 +107,9 @@ export async function POST(request: NextRequest) {
           "Style: High-quality architectural photography, natural lighting, realistic materials and textures.",
         ].filter(Boolean).join("\n");
 
-        // gemini-2.0-flash-exp 이미지 생성 지원
-        // 폴백 체인: imagen-3.0-generate-002 → gemini-2.0-flash-exp
+        // gemini-2.5-flash-image 이미지 생성
         const response = await client.models.generateContent({
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-2.5-flash-image",
           contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
           config: {
             responseModalities: ["IMAGE", "TEXT"],
