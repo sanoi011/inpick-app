@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createToken } from "@/lib/contractor-auth";
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -23,8 +24,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "등록되지 않은 이메일입니다." }, { status: 401 });
     }
 
-    // 간단한 토큰 생성 (email + timestamp base64)
-    const token = Buffer.from(`${contractor.id}:${contractor.email}:${Date.now()}`).toString("base64");
+    // HMAC-SHA256 서명 토큰 생성 (7일 유효)
+    const token = createToken(contractor.id, contractor.email);
 
     return NextResponse.json({
       token,
