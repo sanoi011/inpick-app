@@ -1731,13 +1731,79 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - `src/app/notifications/page.tsx` - 알림 전체보기 (필터/읽음처리/실시간)
 - `src/app/account/page.tsx` - 내 계정 (프로필/알림설정/비밀번호/계정삭제)
 
+## 완료된 작업 (2026-02-22) - Footer 수정 + 루트 정리
+
+### Footer 회사정보 수정
+- `src/components/landing/Footer.tsx` (수정)
+  - 대표: 선우빈 → **김선본**
+  - 소재지: 서울특별시 → **대전광역시**
+  - 사업자등록번호: 예비창업패키지 참여 중 → **-**
+  - 개인정보처리방침/이용약관 옆에 **관리자 링크** (`/admin`) 추가
+  - 관리자 링크 스타일: `text-gray-600` (눈에 띄지 않게)
+
+### 루트 디렉토리 테스트 파일 정리
+- 30개 테스트 이미지 파일 삭제 (~12MB)
+  - `_clean_floorplan_ref.png`, `_combined_elevation.png`, `_design_living.png` 등 `_*.png` 28개
+  - `365.png`, `_pro_test_original.jpg`, `nul` (빈 파일)
+
+## 프로젝트 규모 현황 (2026-02-22 기준)
+
+### 코드베이스
+| 항목 | 수량 |
+|------|------|
+| TypeScript/TSX 파일 | 300개 |
+| API 라우트 | 70+개 |
+| DB 마이그레이션 | 26개 |
+| Python 서비스 | 2개 (floorplan-ai, pdf_parser) |
+| E2E 테스트 | 33개 |
+
+### 페이지 구성
+| 영역 | 페이지 수 | 상태 |
+|------|----------|------|
+| 소비자 워크플로우 | 6탭 + 부속 페이지 | 완료 |
+| 사업자 페이지 | 8개 | 완료 |
+| 관리자 페이지 | 11개 | 완료 |
+| 공통 (랜딩/인증 등) | 10+개 | 완료 |
+
+### 인프라 현황
+| 서비스 | 상태 | 비고 |
+|--------|------|------|
+| **Vercel** | 운영 중 (Hobby, 무료) | `inpick-app.vercel.app` |
+| **GitHub** | `sanoi011/inpick-app` (public) | main 브랜치, 자동 배포 |
+| **Supabase** | 운영 중 | DB + Auth + Storage + Realtime |
+| **Google Gemini API** | 연동 완료 | 도면 인식/AI 디자인/임베딩 |
+| **Toss Payments** | Mock 모드 | 키 미발급 |
+| **커스텀 도메인** | 미설정 | `inpick-app.vercel.app` 사용 중 |
+
+## 커스텀 도메인 이전 계획
+
+### 필요 작업 (순서대로)
+1. **도메인 구매** - `inpick.kr` 또는 `inpick.co.kr` (가비아/후이즈, 1~3만원/년)
+2. **Vercel 도메인 연결** - Settings → Domains → DNS 레코드 설정 (CNAME/A), SSL 자동 발급
+3. **코드 URL 수정** (3곳 하드코딩)
+   - `src/app/layout.tsx:18` - `metadataBase` → `https://www.inpick.kr`
+   - `src/app/sitemap.ts:3` - `BASE_URL` → `https://www.inpick.kr`
+   - `src/app/robots.ts:10` - sitemap URL → `https://www.inpick.kr/sitemap.xml`
+4. **Supabase 설정 변경**
+   - Authentication → URL Configuration → Site URL: `https://www.inpick.kr`
+   - Redirect URLs: `https://www.inpick.kr/auth/callback` 추가
+   - Google OAuth 콘솔 → Authorized redirect URIs 새 도메인 추가
+5. **Toss Payments** - 웹훅 URL을 새 도메인으로 등록
+
+### 참고사항
+- OAuth 콜백(`src/app/auth/page.tsx`)은 `window.location.origin` 사용 → 도메인 변경 시 자동 대응
+- Python 서비스(`floorplan-ai`, `pdf_parser`)는 Vercel에서 실행 불가 → 현재 Gemini 단독 폴백으로 동작
+- 향후 Python 서비스 필요 시 별도 서버 (Railway/Render/AWS, 월 $5~20)
+- Vercel Hobby 플랜 API 타임아웃 10초 제한 → 도면 생성 API 실사용 시 **Pro 플랜($20/월) 권장**
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
-2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
-4. **ODA File Converter 설치** (DWG→DXF 변환용)
+1. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
+2. **Supabase 마이그레이션 적용** - `20260219000000_contractor_directory.sql` (contractor_inquiries 테이블 등)
+3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+4. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
+5. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
