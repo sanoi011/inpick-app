@@ -1120,7 +1120,7 @@ export default function FloorPlanPage() {
         flex flex-col w-full
         md:w-1/3 md:min-w-[360px] md:max-w-[480px]
         bg-white border-b md:border-b-0 md:border-r border-gray-100 flex-shrink-0 shadow-sm
-        ${mobileSidebarCollapsed ? "max-h-0 overflow-hidden md:max-h-none md:overflow-y-auto" : "max-h-[50vh] overflow-y-auto md:max-h-none"}
+        ${mobileSidebarCollapsed ? "max-h-0 overflow-hidden md:max-h-none md:overflow-y-auto" : "max-h-[60vh] overflow-y-auto md:max-h-none"}
         transition-all duration-300 ease-in-out
       `}>
         {/* 모바일 사이드바 헤더 (데스크톱 숨김) */}

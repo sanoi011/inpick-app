@@ -148,7 +148,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
           </div>
 
           {/* 모바일 탭 */}
-          <nav className="md:hidden flex items-center gap-1 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
+          <nav className="md:hidden flex items-center gap-1.5 pb-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide">
             {TABS.map((tab, idx) => {
               const active = isActive(tab.segment);
               const stepNum = idx + 1;
@@ -159,10 +159,10 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                 return (
                   <span
                     key={tab.segment}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap opacity-40 cursor-not-allowed select-none border border-gray-200 snap-start"
+                    className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-full text-xs font-medium whitespace-nowrap opacity-40 cursor-not-allowed select-none border border-gray-200 snap-start"
                   >
-                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-200 text-gray-400">
-                      <Lock className="w-2.5 h-2.5" />
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-200 text-gray-400">
+                      <Lock className="w-3 h-3" />
                     </span>
                     {tab.label}
                   </span>
@@ -175,7 +175,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                   key={tab.segment}
                   href={href}
                   className={`
-                    flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors snap-start
+                    flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-full text-xs font-medium whitespace-nowrap transition-colors snap-start
                     ${active
                       ? "bg-blue-50 text-blue-700 border border-blue-200"
                       : "text-gray-500 border border-gray-200"
@@ -183,7 +183,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                   `}
                 >
                   <span className={`
-                    w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold
+                    w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold
                     ${isCompleted
                       ? "bg-green-500 text-white"
                       : active
@@ -192,7 +192,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                     }
                   `}>
                     {isCompleted ? (
-                      <CheckCircle2 className="w-3 h-3" />
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                     ) : (
                       stepNum
                     )}

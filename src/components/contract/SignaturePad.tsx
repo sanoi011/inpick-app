@@ -16,6 +16,13 @@ export default function SignaturePad({ onComplete, onCancel, width = 400, height
   const [hasDrawn, setHasDrawn] = useState(false);
   const lastPoint = useRef<{ x: number; y: number } | null>(null);
 
+  // iOS 배경 스크롤 방지
+  useEffect(() => {
+    const original = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = original; };
+  }, []);
+
   // 캔버스 DPI 보정
   useEffect(() => {
     const canvas = canvasRef.current;

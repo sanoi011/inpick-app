@@ -78,7 +78,7 @@ function ContractPart1({ contract, contractor }: {
               </span>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-gray-200 grid grid-cols-2 gap-6">
+            <div className="mt-6 pt-4 border-t border-gray-200 grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
                 <h4 className="text-xs font-bold text-gray-500 mb-2">갑 (소비자)</h4>
                 <div className="space-y-1 text-xs text-gray-700">
@@ -389,7 +389,7 @@ function ContractPart4({ contract, onSign, contractor }: {
         <SignaturePad
           onComplete={handleSignatureComplete}
           onCancel={() => setSigningType(null)}
-          width={Math.min(400, typeof window !== "undefined" ? window.innerWidth - 80 : 400)}
+          width={Math.min(400, typeof window !== "undefined" ? window.innerWidth - 48 : 400)}
           height={200}
         />
       )}
@@ -458,7 +458,7 @@ function ContractPart4({ contract, onSign, contractor }: {
         </div>
 
         {contract.signedAt && (
-          <div className="mt-5 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+          <div className="mt-5 p-4 bg-green-50 border border-green-200 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:justify-between">
             <div className="flex items-center gap-2">
               <Shield className="w-5 h-5 text-green-600" />
               <div>

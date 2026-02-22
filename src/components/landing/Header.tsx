@@ -143,7 +143,7 @@ export default function Header({
           </motion.a>
         </div>
 
-        <button type="button" className={`md:hidden inline-flex items-center justify-center rounded-full p-2 transition-colors ${isScrolled ? "" : "text-white"}`} style={{ color: isScrolled ? colors.text : undefined }}
+        <button type="button" className={`md:hidden inline-flex items-center justify-center rounded-full p-3 min-w-[44px] min-h-[44px] transition-colors ${isScrolled ? "" : "text-white"}`} style={{ color: isScrolled ? colors.text : undefined }}
           onClick={() => setMobileMenuOpen(true)} aria-label="메뉴 열기">
           <Menu className="h-5 w-5" />
         </button>
@@ -160,7 +160,7 @@ export default function Header({
                 <span className="text-xl font-bold text-blue-600">INPICK</span>
                 <div className="flex items-center gap-2">
                   <LocaleSwitcher />
-                  <button type="button" className="rounded-full p-2" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기">
+                  <button type="button" className="rounded-full p-3 min-w-[44px] min-h-[44px]" onClick={() => setMobileMenuOpen(false)} aria-label="메뉴 닫기">
                     <X className="h-5 w-5" style={{ color: colors.text }} />
                   </button>
                 </div>
@@ -169,7 +169,7 @@ export default function Header({
                 <div className="border-b pb-6" style={{ borderColor: colors.navBorder }}>
                   <div className="flex flex-col gap-4">
                     {navLinks.map((link) => (
-                      <a key={link.href} href={link.href} className="text-lg font-medium" style={{ color: colors.text }} onClick={() => setMobileMenuOpen(false)}>
+                      <a key={link.href} href={link.href} className="text-lg font-medium py-2 min-h-[44px] flex items-center" style={{ color: colors.text }} onClick={() => setMobileMenuOpen(false)}>
                         {link.label}
                         {link.label === "커뮤니티" && (
                           <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold bg-violet-500 text-white rounded-full leading-none align-middle">NEW</span>
