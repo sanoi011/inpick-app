@@ -66,6 +66,54 @@ export function verifyToken(token: string): TokenPayload | null {
   }
 }
 
+// ─── Reset Token (1시간 만료, purpose: reset) ───
+
+const RESET_TOKEN_EXPIRY_HOURS = 1;
+
+interface ResetTokenPayload {
+  sub: string;
+  email: string;
+  purpose: "reset";
+  iat: number;
+  exp: number;
+}
+
+export function createResetToken(contractorId: string, email: string): string {
+  const now = Math.floor(Date.now() / 1000);
+  const payload: ResetTokenPayload = {
+    sub: contractorId,
+    email,
+    purpose: "reset",
+    iat: now,
+    exp: now + RESET_TOKEN_EXPIRY_HOURS * 3600,
+  };
+  const payloadStr = base64url(JSON.stringify(payload));
+  const signature = sign(payloadStr);
+  return `${payloadStr}.${signature}`;
+}
+
+export function verifyResetToken(token: string): ResetTokenPayload | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 2) return null;
+
+    const [payloadStr, signature] = parts;
+    const expectedSig = sign(payloadStr);
+    if (signature !== expectedSig) return null;
+
+    const payload: ResetTokenPayload = JSON.parse(
+      Buffer.from(payloadStr, "base64url").toString()
+    );
+
+    if (payload.purpose !== "reset") return null;
+    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+
+    return payload;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Request Auth Helper ───
 
 export function getContractorIdFromRequest(request: Request): string | null {

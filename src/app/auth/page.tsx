@@ -12,6 +12,7 @@ function ConsumerAuthForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
+  const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -108,6 +109,71 @@ function ConsumerAuthForm() {
       setOauthLoading(null);
     }
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    if (!email) { setError("이메일을 입력해주세요."); return; }
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      if (error) {
+        setError(error.message);
+      } else {
+        setMessage("비밀번호 재설정 이메일을 발송했습니다. 이메일을 확인해주세요.");
+      }
+    } catch {
+      setError("이메일 발송 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (forgotMode) {
+    return (
+      <>
+        {error && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            {message}
+          </div>
+        )}
+        <h3 className="text-lg font-semibold text-neutral-900 mb-2">비밀번호 찾기</h3>
+        <p className="text-sm text-neutral-500 mb-6">가입한 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
+        <form onSubmit={handleForgotPassword} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
+            <input
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+              placeholder="이메일을 입력하세요"
+              className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+              required autoFocus
+            />
+          </div>
+          <button
+            type="submit" disabled={loading}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+          >
+            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+            재설정 이메일 보내기
+          </button>
+        </form>
+        <button
+          onClick={() => { setForgotMode(false); setError(""); setMessage(""); }}
+          className="mt-4 w-full text-sm text-neutral-500 hover:text-neutral-700"
+        >
+          로그인으로 돌아가기
+        </button>
+      </>
+    );
+  }
 
   return (
     <>
@@ -220,6 +286,17 @@ function ConsumerAuthForm() {
           {isSignUp ? "회원가입" : "로그인"}
         </button>
       </form>
+
+      {!isSignUp && (
+        <div className="mt-4 text-center">
+          <button
+            onClick={() => { setForgotMode(true); setError(""); setMessage(""); }}
+            className="text-sm text-neutral-500 hover:text-blue-600 transition-colors"
+          >
+            비밀번호를 잊으셨나요?
+          </button>
+        </div>
+      )}
     </>
   );
 }
@@ -232,6 +309,8 @@ function ContractorAuthForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [forgotMode, setForgotMode] = useState(false);
+  const [message, setMessage] = useState("");
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -263,6 +342,76 @@ function ContractorAuthForm() {
       setLoading(false);
     }
   };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    if (!email) { setError("이메일을 입력해주세요."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("올바른 이메일 형식을 입력해주세요."); return; }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/contractor/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await res.json();
+      setMessage(data.message || "비밀번호 재설정 이메일을 발송했습니다.");
+      // 개발용: resetUrl이 있으면 콘솔에 표시
+      if (data.resetUrl) {
+        console.log("[dev] Reset URL:", data.resetUrl);
+      }
+    } catch {
+      setError("서버 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (forgotMode) {
+    return (
+      <>
+        {error && (
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {error}
+          </div>
+        )}
+        {message && (
+          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
+            {message}
+          </div>
+        )}
+        <h3 className="text-lg font-semibold text-neutral-900 mb-2">비밀번호 찾기</h3>
+        <p className="text-sm text-neutral-500 mb-6">등록된 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
+        <form onSubmit={handleForgotPassword} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <input
+                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                placeholder="info@company.com" autoFocus
+              />
+            </div>
+          </div>
+          <button
+            type="submit" disabled={loading || !email}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> 처리중...</> : "재설정 이메일 보내기"}
+          </button>
+        </form>
+        <button
+          onClick={() => { setForgotMode(false); setError(""); setMessage(""); }}
+          className="mt-4 w-full text-sm text-neutral-500 hover:text-neutral-700"
+        >
+          로그인으로 돌아가기
+        </button>
+      </>
+    );
+  }
 
   return (
     <>
@@ -305,7 +454,16 @@ function ContractorAuthForm() {
         </button>
       </form>
 
-      <div className="mt-6 pt-4 border-t border-neutral-100 text-center">
+      <div className="mt-3 text-center">
+        <button
+          onClick={() => { setForgotMode(true); setError(""); setMessage(""); }}
+          className="text-sm text-neutral-500 hover:text-blue-600 transition-colors"
+        >
+          비밀번호를 잊으셨나요?
+        </button>
+      </div>
+
+      <div className="mt-4 pt-4 border-t border-neutral-100 text-center">
         <p className="text-sm text-neutral-500">
           아직 등록하지 않으셨나요?{" "}
           <Link href="/contractor/register" className="text-blue-600 hover:underline font-medium">
