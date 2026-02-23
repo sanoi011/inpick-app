@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import {
   Upload, Camera, FileImage, Loader2,
   AlertTriangle, Smartphone, PenTool, ImagePlus, Info, Menu, X,
-  Send, Sparkles, MessageSquare, Palette, ChevronRight, ChevronLeft, ExternalLink,
+  Send, Sparkles, MessageSquare, Palette, ChevronRight, ChevronLeft, ChevronUp, ExternalLink,
 } from "lucide-react";
 import { toast } from "@/components/ui/Toast";
 import { useProjectState } from "@/hooks/useProjectState";
@@ -1126,7 +1126,7 @@ export default function FloorPlanPage() {
         {/* 모바일 사이드바 헤더 (데스크톱 숨김) */}
         <div className="md:hidden flex items-center justify-between px-4 py-2 bg-gray-50 border-b border-gray-200 sticky top-0 z-10">
           <span className="text-xs font-bold text-gray-600">
-            {!selectedAddress ? "주소 검색" : !hasFloorPlanData ? "건물 선택 · 도면 입력" : "설정"}
+            {!selectedAddress ? "주소 검색" : !hasFloorPlanData ? "건물 선택 · 도면 입력" : "AI 디자인 설정"}
           </span>
         </div>
         <AddressSearchPanel
@@ -1264,17 +1264,32 @@ export default function FloorPlanPage() {
         {/* 모바일 사이드바 토글 버튼 (데스크톱 숨김) */}
         <button
           onClick={() => setMobileSidebarCollapsed(!mobileSidebarCollapsed)}
-          className="md:hidden flex items-center justify-center gap-2 px-4 py-2 bg-white border-b border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className={`md:hidden flex items-center justify-center gap-2 px-4 py-2.5 border-b text-sm font-semibold transition-colors ${
+            mobileSidebarCollapsed && hasFloorPlanData
+              ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700"
+              : !mobileSidebarCollapsed && hasFloorPlanData
+              ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200 hover:from-blue-100 hover:to-indigo-100"
+              : "bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+          }`}
         >
           {mobileSidebarCollapsed ? (
             <>
               <Menu className="w-4 h-4" />
-              {!hasFloorPlanData ? "주소 검색 · 도면 입력 열기" : "설정 열기"}
+              {!hasFloorPlanData ? "주소 검색 · 도면 입력 열기" : "AI 디자인 설정하기"}
             </>
           ) : (
             <>
-              <X className="w-4 h-4" />
-              접기
+              {hasFloorPlanData ? (
+                <>
+                  <ChevronUp className="w-4 h-4" />
+                  이제 디자인 완성하러 가볼까요?
+                </>
+              ) : (
+                <>
+                  <X className="w-4 h-4" />
+                  접기
+                </>
+              )}
             </>
           )}
         </button>
