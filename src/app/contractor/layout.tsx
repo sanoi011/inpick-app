@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -26,13 +26,16 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const pathname = usePathname();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [contractorName, setContractorName] = useState<string | null>(null);
+
+  useEffect(() => {
+    setContractorName(localStorage.getItem("contractor_name"));
+  }, []);
 
   // 로그인/등록 페이지는 레이아웃 없이 렌더링
   if (EXCLUDE_LAYOUT.includes(pathname)) {
     return <>{children}</>;
   }
-
-  const contractorName = typeof window !== "undefined" ? localStorage.getItem("contractor_name") : null;
 
   const handleLogout = () => {
     localStorage.removeItem("contractor_token");

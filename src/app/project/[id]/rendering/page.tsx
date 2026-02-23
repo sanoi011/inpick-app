@@ -30,8 +30,14 @@ import type { FloorPlan2DHandle } from "@/components/viewer/FloorPlan2D";
 import type { RoomColorMap, RoomTypeKey } from "@/lib/constants/room-segmentation";
 import { ROOM_FLOOR_CATEGORY } from "@/lib/constants/room-segmentation";
 
-const FloorPlan2D = dynamic(() => import("@/components/viewer/FloorPlan2D"), { ssr: false });
-const FloorPlanCanvas = dynamic(() => import("@/components/workspace/FloorPlanCanvas"), { ssr: false });
+const FloorPlan2D = dynamic(() => import("@/components/viewer/FloorPlan2D"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64 text-sm text-gray-400">도면 로딩 중...</div>,
+});
+const FloorPlanCanvas = dynamic(() => import("@/components/workspace/FloorPlanCanvas"), {
+  ssr: false,
+  loading: () => <div className="flex items-center justify-center h-64 text-sm text-gray-400">캔버스 로딩 중...</div>,
+});
 
 // 카테고리별 스와치 색상 (이미지 대신 의미 있는 색상 표현)
 const CATEGORY_SWATCH: Record<string, { bg: string; text: string }> = {

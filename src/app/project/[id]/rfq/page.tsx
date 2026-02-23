@@ -131,8 +131,8 @@ export default function RfqPage() {
           setBids(data.bids || []);
           setStep("bids");
         }
-      } catch {
-        // 무시
+      } catch (err) {
+        console.error("[rfq] Failed to check existing RFQ:", err);
       }
     };
 
@@ -150,8 +150,8 @@ export default function RfqPage() {
         const data = await res.json();
         setBids(data.bids || []);
       }
-    } catch {
-      // 무시
+    } catch (err) {
+      console.error("[rfq] Failed to load bids:", err);
     } finally {
       setBidLoading(false);
     }
@@ -308,8 +308,8 @@ export default function RfqPage() {
         const data = await res.json();
         setBids(data.bids || []);
       }
-    } catch {
-      // 무시
+    } catch (err) {
+      console.error("[rfq] Failed to refresh bids:", err);
     } finally {
       setBidLoading(false);
     }
