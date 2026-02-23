@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
           `[Negative Prompt - AVOID these]: ${negativeItems.join(", ")}`,
         ].filter(Boolean).join("\n");
 
-        // gemini-3-pro-image-preview 이미지 생성
+        // AI 이미지 생성
         const response = await client.models.generateContent({
           model: "gemini-3-pro-image-preview",
           contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],

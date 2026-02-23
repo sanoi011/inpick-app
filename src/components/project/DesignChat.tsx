@@ -72,7 +72,7 @@ export default function DesignChat({
         </div>
         <div>
           <h3 className="text-sm font-semibold text-gray-900">AI 디자인 어시스턴트</h3>
-          <p className="text-xs text-gray-500">Gemini AI 기반</p>
+          <p className="text-xs text-gray-500">INPICK AI</p>
         </div>
       </div>
 

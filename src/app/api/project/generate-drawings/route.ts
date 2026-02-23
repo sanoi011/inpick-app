@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
           furnitureAnalysis = await analyzeFurnitureLayout(furniturePng);
           sendProgress(4, 60, furnitureAnalysis
             ? `가구배치 점수: ${furnitureAnalysis.layoutScore}/10`
-            : "AI 분석 건너뜀 (Gemini 미설정)"
+            : "AI 분석 건너뜀 (API 미설정)"
           );
         } catch (err) {
           console.error("[generate-drawings] SVG→PNG error:", err);

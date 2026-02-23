@@ -250,7 +250,7 @@ export default function FloorPlanGenerationProgress({
         {!error && !completed && (
           <div className="mt-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
             <p className="text-xs text-blue-700">
-              Gemini Pro AI가 도면을 생성하고 있습니다. 창을 닫지 마세요.
+              AI가 도면을 생성하고 있습니다. 창을 닫지 마세요.
               완료된 도면은 자동 저장되어 다음부터 즉시 제공됩니다.
             </p>
           </div>

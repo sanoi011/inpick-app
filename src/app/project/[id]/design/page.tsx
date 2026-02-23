@@ -1426,7 +1426,7 @@ export default function FloorPlanPage() {
                         <p className="text-sm text-gray-500">도면 + 대화 내용을 기반으로 거실·부엌·침실·욕실 디자인을 생성합니다...</p>
                         <div className="mt-4 flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
-                          <span className="text-xs text-indigo-600 font-medium">Gemini Pro 3.0 × 4컷 병렬 생성 중 · 약 1~2분</span>
+                          <span className="text-xs text-indigo-600 font-medium">AI × 4컷 병렬 생성 중 · 약 1~2분</span>
                         </div>
                         <div className="mt-3 flex gap-2">
                           {["거실", "부엌", "침실", "욕실"].map((label) => (

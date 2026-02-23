@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
+import { getGeminiClient } from "@/lib/gemini-client";
 
 function buildSystemPrompt(context?: Record<string, unknown>) {
   let prompt = `당신은 INPICK의 사업자 AI 비서입니다.
@@ -113,14 +114,6 @@ async function collectContext(contractorId: string): Promise<Record<string, unkn
 
 
 export async function POST(request: NextRequest) {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: "AI 서비스가 설정되지 않았습니다." }),
-      { status: 503, headers: { "Content-Type": "application/json" } }
-    );
-  }
-
   try {
     const { messages, contractorId } = await request.json();
 
@@ -143,70 +136,63 @@ export async function POST(request: NextRequest) {
 
     const systemPrompt = buildSystemPrompt(context) + knowledgeContext;
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 1024,
-        system: systemPrompt,
-        stream: true,
-        messages: messages
-          .filter((m: { role?: string; content?: string }) => m && typeof m.role === "string" && typeof m.content === "string")
-          .map((m: { role: string; content: string }) => ({
-            role: m.role,
-            content: m.content,
-          })),
-      }),
-    });
-
-    if (!response.ok) {
-      console.error("Claude API error:", await response.text());
-      return new Response(
-        JSON.stringify({ error: "AI 응답 생성 중 오류가 발생했습니다." }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
+    // Gemini API 사용
+    const client = getGeminiClient();
+    if (!client) {
+      // Mock 폴백 (API 키 미설정 시)
+      const mockText = generateMockResponse(lastUserMsg, context);
+      const encoder = new TextEncoder();
+      const stream = new ReadableStream({
+        async start(controller) {
+          // Mock 스트리밍 (20자씩 전송)
+          for (let i = 0; i < mockText.length; i += 20) {
+            const chunk = mockText.slice(i, i + 20);
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`));
+            await new Promise(r => setTimeout(r, 30));
+          }
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+          controller.close();
+        },
+      });
+      return new Response(stream, {
+        headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+      });
     }
 
+    // Gemini 스트리밍 호출
+    const geminiContents = messages
+      .filter((m: { role?: string; content?: string }) => m && typeof m.role === "string" && typeof m.content === "string")
+      .map((m: { role: string; content: string }) => ({
+        role: m.role === "assistant" ? "model" : "user",
+        parts: [{ text: m.content }],
+      }));
+
+    const response = await client.models.generateContentStream({
+      model: "gemini-2.0-flash",
+      contents: geminiContents,
+      config: {
+        systemInstruction: systemPrompt,
+        maxOutputTokens: 1024,
+        temperature: 0.7,
+      },
+    });
+
+    // Gemini 스트림 → SSE 변환
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
-        const reader = response.body?.getReader();
-        if (!reader) { controller.close(); return; }
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
         try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split("\n");
-            buffer = lines.pop() || "";
-
-            for (const line of lines) {
-              if (line.startsWith("data: ")) {
-                const data = line.slice(6);
-                if (data === "[DONE]") continue;
-                try {
-                  const parsed = JSON.parse(data);
-                  if (parsed.type === "content_block_delta" && parsed.delta?.text) {
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text: parsed.delta.text })}\n\n`));
-                  }
-                } catch { /* skip */ }
-              }
+          for await (const chunk of response) {
+            const text = chunk.text;
+            if (text) {
+              controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`));
             }
           }
+        } catch (err) {
+          console.error("[contractor-ai] Gemini stream error:", err);
         } finally {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
-          reader.releaseLock();
         }
       },
     });
@@ -215,10 +201,59 @@ export async function POST(request: NextRequest) {
       headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
     });
   } catch (err) {
-    console.error("Contractor AI error:", err);
+    console.error("[contractor-ai] Error:", err);
     return new Response(
       JSON.stringify({ error: "서버 오류가 발생했습니다." }),
       { status: 500, headers: { "Content-Type": "application/json" } }
     );
   }
+}
+
+function generateMockResponse(userMsg: string, context?: Record<string, unknown>): string {
+  const companyName = context?.companyName ? String(context.companyName) : "사업자";
+  const projects = context?.activeProjectCount || 0;
+  const bids = context?.pendingBidCount || 0;
+
+  if (userMsg.includes("입찰") || userMsg.includes("견적")) {
+    return `안녕하세요, ${companyName}님! 입찰/견적 관련 문의를 도와드리겠습니다.
+
+현재 진행 중인 프로젝트 ${projects}건, 대기 중 입찰 ${bids}건을 확인했습니다.
+
+[SUGGESTION]입찰 시 아래 사항을 확인하세요:
+1. 직접 공사비 대비 일반관리비 6% + 이윤 5% 적용 여부
+2. 자재비 시세 변동 (최근 3개월 추이 확인)
+3. 현장 여건에 따른 할증 요소 (층고, 양중거리 등)[SUGGESTION]
+
+구체적인 견적 내용을 알려주시면 더 정확한 분석을 드리겠습니다.
+
+*데모 모드 응답입니다.*`;
+  }
+
+  if (userMsg.includes("일정") || userMsg.includes("공정")) {
+    return `${companyName}님의 공정 관리를 도와드리겠습니다.
+
+일반적인 아파트 인테리어 공정 순서:
+1. **철거** (2~3일) → 2. **설비 배관** (3~5일) → 3. **전기** (2~3일)
+4. **방수** (3~5일, 양생 포함) → 5. **타일** (3~5일) → 6. **목공** (5~7일)
+7. **도배/도장** (3~5일) → 8. **바닥재** (2~3일) → 9. **설비 마감** (2~3일)
+
+[ALERT]방수 공정은 최소 48시간 양생이 필수입니다. 일정 단축 시에도 이 기간은 줄이지 마세요.[ALERT]
+
+*데모 모드 응답입니다.*`;
+  }
+
+  return `안녕하세요, ${companyName}님! INPICK AI 비서입니다.
+
+현재 현황을 확인했습니다:
+[DATA]진행 프로젝트: ${projects}건 | 대기 입찰: ${bids}건[DATA]
+
+다음과 같은 도움을 드릴 수 있습니다:
+- **입찰 전략**: 적정 단가 분석, 낙찰 확률 예측
+- **견적 검토**: 공종별 단가 적정성, 누락 항목 확인
+- **일정 관리**: 공정 최적화, 충돌 감지
+- **재무 분석**: 현금흐름, 미수금 관리, 수익률
+
+궁금한 점을 말씀해 주세요!
+
+*데모 모드 응답입니다.*`;
 }
