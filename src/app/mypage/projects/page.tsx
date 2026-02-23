@@ -113,22 +113,28 @@ export default function MyPageProjects() {
     setError(false);
     const localProjects = getLocalProjects();
     if (user) {
-      fetch(`/api/consumer-projects?userId=${user.id}`)
+      const controller = new AbortController();
+      fetch(`/api/consumer-projects?userId=${user.id}`, { signal: controller.signal })
         .then((res) => res.json())
         .then((data) => setProjects(mergeProjects(data.projects || [], localProjects)))
-        .catch(() => {
+        .catch((err) => {
+          if (err.name === "AbortError") return;
           setError(true);
           setProjects(mergeProjects([], localProjects));
           toast({ type: "error", title: "서버 연결 실패", message: "로컬 데이터만 표시합니다" });
         })
         .finally(() => setLoading(false));
+      return () => controller.abort();
     } else {
       setProjects(mergeProjects([], localProjects));
       setLoading(false);
     }
   }, [user]);
 
-  useEffect(() => { loadProjects(); }, [loadProjects]);
+  useEffect(() => {
+    const cleanup = loadProjects();
+    return () => cleanup?.();
+  }, [loadProjects]);
 
   const filtered = useMemo(() => {
     let list = projects;

@@ -43,7 +43,10 @@ export default function MyPageAccount() {
       const { error } = await supabase.auth.updateUser({ data: { full_name: fullName, phone, notification_preferences: notifPref } });
       if (error) throw error;
       toast({ type: "success", title: "프로필이 저장되었습니다" });
-    } catch { toast({ type: "error", title: "저장 실패", message: "다시 시도해주세요" }); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "다시 시도해주세요";
+      toast({ type: "error", title: "저장 실패", message: msg });
+    }
     finally { setSaving(false); }
   };
 
@@ -56,7 +59,10 @@ export default function MyPageAccount() {
       if (error) throw error;
       toast({ type: "success", title: "비밀번호가 변경되었습니다" });
       setNewPassword(""); setConfirmPassword("");
-    } catch { toast({ type: "error", title: "비밀번호 변경 실패" }); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "다시 시도해주세요";
+      toast({ type: "error", title: "비밀번호 변경 실패", message: msg });
+    }
     finally { setChangingPassword(false); }
   };
 
