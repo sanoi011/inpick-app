@@ -115,6 +115,12 @@ export default function RenderingPage() {
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const floorPlan2DRef = useRef<FloorPlan2DHandle>(null);
 
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+    };
+  }, []);
+
   // 도면 로드
   useEffect(() => {
     if (project?.drawingId) {

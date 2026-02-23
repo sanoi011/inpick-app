@@ -842,6 +842,12 @@ function ContractDetailContent() {
 
   const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  useEffect(() => {
+    return () => {
+      if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
+    };
+  }, []);
+
   const handleUpdateNotes = useCallback((notes: string) => {
     if (!contract) return;
     if (notesTimerRef.current) clearTimeout(notesTimerRef.current);
@@ -852,7 +858,9 @@ function ContractDetailContent() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: contract.id, consumer_notes: notes }),
         });
-      } catch { /* silent */ }
+      } catch (err) {
+        console.error("[contract] Failed to save notes:", err);
+      }
     }, 1000);
   }, [contract]);
 
