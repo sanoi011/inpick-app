@@ -1367,7 +1367,10 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
 | `20260222400000_add_segmentation_mask.sql` | Supabase 적용 완료 |
 | `20260222500000_consumer_projects_delete_policy.sql` | Supabase 적용 완료 |
-| `20260223100000_construction_drawings.sql` | **Supabase 미적용** |
+| `20260223100000_construction_drawings.sql` | Supabase 적용 완료 |
+| `20260223200000_roadmap_features.sql` | Supabase 적용 완료 |
+| `20260223300000_contractor_directory_columns.sql` | Supabase 적용 완료 |
+| `20260223400000_contractor_detail_columns.sql` | Supabase 적용 완료 |
 
 ## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
 
@@ -1854,15 +1857,46 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - `20260223100000_construction_drawings.sql` - construction_drawing_sets + construction_drawings 테이블
 - Supabase Storage: `construction-drawings` 버킷 생성 필요
 
+## 완료된 작업 (2026-02-23) - 관리자 로드맵 DB CRUD + 사업자 데모 데이터 + 시스템 헬스체크
+
+### 관리자 로드맵 페이지 DB CRUD
+- `src/app/admin/roadmap/page.tsx` - DB 연동 편집 모드 (기능/마일스톤/통계 CRUD)
+- `src/app/api/admin/roadmap/route.ts` - GET/POST/PATCH/DELETE API
+- `supabase/migrations/20260223200000_roadmap_features.sql` - roadmap_features, roadmap_milestones, roadmap_stats 테이블
+- `scripts/seed-roadmap.py` - 25개 기능 + 3개 마일스톤 + 4개 통계 시드 데이터
+- 관리자 인증 헤더 (`authHeaders()`) 11개 fetch 호출에 추가
+
+### 사업자 디렉토리 데모 데이터
+- `supabase/migrations/20260223300000_contractor_directory_columns.sql` - introduction, logo_url 컬럼 추가
+- `supabase/migrations/20260223400000_contractor_detail_columns.sql` - description, business_license_url 컬럼 추가
+- `scripts/seed-demo-contractors.py` - 5개 데모 업체 + 35개 공종 시드
+
+| 업체명 | 유형 | 지역 | 평점 | 리뷰 | 완료 | 예산범위 | Featured |
+|--------|------|------|------|------|------|---------|----------|
+| 청담 디자인하우스 | 종합 | 서울 | 4.9 | 83 | 234건 | 5천만~5억 | Yes |
+| 한빛 인테리어 | 종합 | 서울 | 4.8 | 47 | 152건 | 3천만~2억 | Yes |
+| 모던타일 전문 | 전문 | 서울 | 4.7 | 62 | 310건 | 5백만~5천만 | No |
+| 대전 리모델링 파트너 | 종합 | 대전 | 4.6 | 35 | 98건 | 1천5백만~1.2억 | No |
+| 수원 홈데코 | 종합 | 경기 | 4.5 | 28 | 87건 | 2천만~1.5억 | No |
+
+- 전체 8개 공개 업체 (데모 5 + 기존 3)
+- 필터 전체 정상: 지역/유형/공종/평점/인증/검색
+
+### 배포 사이트 시스템 헬스체크 (AC 2차 미팅 준비)
+- 31개 페이지 200 OK, 4개 페이지 307 리다이렉트 (인증 필요, 정상)
+- 관리자 API 전체 정상 동작 (401 보안 확인)
+- 33/34 DB 테이블 존재 (credit_balances 미사용, 정상)
+- 정적 자산/SEO/PWA 전체 정상
+- Edge 서버 ICN (서울) 확인
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **Supabase 마이그레이션 적용** - `20260223100000_construction_drawings.sql`
-2. **Supabase Storage 버킷 생성** - `construction-drawings` (public 읽기)
-3. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
-4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-5. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
-6. **ODA File Converter 설치** (DWG→DXF 변환용)
+1. **Supabase Storage 버킷 생성** - `construction-drawings` (public 읽기)
+2. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
+3. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+4. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
+5. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)
