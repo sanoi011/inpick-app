@@ -799,6 +799,17 @@ function ContractDetailContent() {
     })();
   }, [contract?.id, contract?.status]);
 
+  // URL 해시 네비게이션 (#drawings → 5부)
+  useEffect(() => {
+    if (!contract) return;
+    const hash = window.location.hash;
+    if (hash === "#drawings" && ["SIGNED", "IN_PROGRESS", "COMPLETED"].includes(contract.status)) {
+      setActiveSection(5);
+    } else if (hash === "#signature") {
+      setActiveSection(4);
+    }
+  }, [contract]);
+
   const handleSign = useCallback(async (type: 'consumer' | 'contractor', signatureImage?: string) => {
     if (!contract) return;
     const payload: Record<string, unknown> = { id: contract.id, sign: type };
