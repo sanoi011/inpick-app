@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useCredits } from "@/hooks/useCredits";
+import { toast } from "@/components/ui/Toast";
 
 interface DashboardStats {
   activeProjects: number;
@@ -66,8 +67,9 @@ export default function MyPageDashboard() {
           link: n.link as string | undefined,
         }))
       );
-    } catch {
-      // silent
+    } catch (err) {
+      console.error("[mypage] Dashboard load error:", err);
+      toast({ type: "error", title: "데이터 로드 실패", message: "대시보드 정보를 불러올 수 없습니다" });
     } finally {
       setLoading(false);
     }

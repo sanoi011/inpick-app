@@ -329,8 +329,8 @@ export default function RenderingPage() {
             }
           }
         }
-      } catch {
-        // DB 검색 실패 → 로컬 폴백
+      } catch (err) {
+        console.error("[rendering] Material search error:", err);
       }
       // 로컬 폴백
       setSearchResults(searchProducts(query.trim()));
