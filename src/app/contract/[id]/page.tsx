@@ -16,8 +16,19 @@ import { ChatWindow } from "@/components/chat/ChatWindow";
 import type { ConstructionSchedule } from "@/types/construction-schedule";
 import { ScheduleOverview } from "@/components/schedule/ScheduleOverview";
 import { generateContractPdf } from "@/lib/pdf/contract-pdf-generator";
+import { generateConstructionDrawingPdf } from "@/lib/pdf/construction-drawing-pdf";
 import { toast } from "@/components/ui/Toast";
 import SignaturePad from "@/components/contract/SignaturePad";
+import dynamic from "next/dynamic";
+
+const DrawingGenerationProgress = dynamic(
+  () => import("@/components/contract/DrawingGenerationProgress"),
+  { ssr: false }
+);
+const DrawingViewer = dynamic(
+  () => import("@/components/contract/DrawingViewer"),
+  { ssr: false }
+);
 
 const fmt = (n: number) => Math.round(n).toLocaleString("ko-KR");
 
@@ -712,6 +723,12 @@ function ContractDetailContent() {
   const [schedule, setSchedule] = useState<ConstructionSchedule | null>(null);
   const [activeSection, setActiveSection] = useState<number>(1);
 
+  // 시공도면 상태
+  const [drawingMode, setDrawingMode] = useState<"idle" | "generating" | "viewing">("idle");
+  const [drawingResult, setDrawingResult] = useState<{
+    drawings: Array<{ drawingType: string; finalUrl?: string; metadata?: Record<string, unknown> }>;
+  } | null>(null);
+
   const backUrl = searchParams.get("from") || (user ? "/contracts" : "/contractor/bids");
 
   useEffect(() => {
@@ -759,6 +776,28 @@ function ContractDetailContent() {
       } catch { toast({ type: "error", title: "오류", message: "시공 일정을 불러올 수 없습니다" }); }
     })();
   }, [contract?.id]);
+
+  // 기존 시공도면 확인
+  useEffect(() => {
+    if (!contract?.id) return;
+    if (!["SIGNED", "IN_PROGRESS", "COMPLETED"].includes(contract.status)) return;
+    (async () => {
+      try {
+        const res = await fetch(`/api/project/generate-drawings?contractId=${contract.id}`);
+        const data = await res.json();
+        if (data.exists && data.drawingSet?.status === "completed" && data.drawings?.length > 0) {
+          setDrawingResult({
+            drawings: data.drawings.map((d: Record<string, unknown>) => ({
+              drawingType: d.drawing_type,
+              finalUrl: d.final_url,
+              metadata: d.metadata,
+            })),
+          });
+          setDrawingMode("viewing");
+        }
+      } catch { /* 도면 조회 실패 무시 */ }
+    })();
+  }, [contract?.id, contract?.status]);
 
   const handleSign = useCallback(async (type: 'consumer' | 'contractor', signatureImage?: string) => {
     if (!contract) return;
@@ -828,11 +867,14 @@ function ContractDetailContent() {
     ? "고객"
     : (contractor?.company_name || "시공사");
 
+  const showDrawingSection = ["SIGNED", "IN_PROGRESS", "COMPLETED"].includes(contract.status);
+
   const sections = [
     { id: 1, label: "계약서", icon: Scale },
     { id: 2, label: "특기사항", icon: Edit3 },
     { id: 3, label: "첨부서류", icon: ClipboardList },
     { id: 4, label: "전자서명", icon: Pen },
+    ...(showDrawingSection ? [{ id: 5, label: "시공도면", icon: FileImage }] : []),
   ];
 
   return (
@@ -912,6 +954,60 @@ function ContractDetailContent() {
         {activeSection === 2 && <ContractPart2 contract={contract} onUpdateNotes={handleUpdateNotes} />}
         {activeSection === 3 && <ContractPart3 contract={contract} />}
         {activeSection === 4 && <ContractPart4 contract={contract} onSign={handleSign} contractor={contractor} />}
+
+        {/* 시공도면 섹션 */}
+        {activeSection === 5 && showDrawingSection && (
+          <div className="space-y-4">
+            {drawingMode === "idle" && !drawingResult && (
+              <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+                <FileImage className="w-12 h-12 text-blue-400 mx-auto mb-3" />
+                <h3 className="text-base font-bold text-gray-900 mb-2">시공도면 자동 생성</h3>
+                <p className="text-sm text-gray-500 mb-5">
+                  평면도 데이터를 기반으로 가구배치도, 전기배선도, 입면전개도를 자동 생성합니다.
+                </p>
+                <button
+                  onClick={() => setDrawingMode("generating")}
+                  className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  시공도면 생성하기
+                </button>
+              </div>
+            )}
+
+            {drawingMode === "generating" && (
+              <DrawingGenerationProgress
+                contractId={contract.id}
+                onComplete={(result) => {
+                  setDrawingResult({ drawings: result.drawings });
+                  setDrawingMode("viewing");
+                }}
+                onCancel={() => setDrawingMode("idle")}
+              />
+            )}
+
+            {(drawingMode === "viewing" || drawingResult) && drawingResult && (
+              <DrawingViewer
+                drawings={drawingResult.drawings}
+                onDownloadPdf={async () => {
+                  try {
+                    await generateConstructionDrawingPdf(
+                      drawingResult.drawings,
+                      {
+                        projectName: contract.projectName || "인테리어 공사",
+                        address: contract.address || "",
+                        area: Number((contract as unknown as Record<string, unknown>).area) || 84,
+                        date: new Date().toLocaleDateString("ko-KR"),
+                        contractId: contract.id,
+                      }
+                    );
+                  } catch {
+                    toast({ type: "error", title: "오류", message: "PDF 생성에 실패했습니다" });
+                  }
+                }}
+              />
+            )}
+          </div>
+        )}
 
         {/* 시공사 정보 */}
         {contractor && (
