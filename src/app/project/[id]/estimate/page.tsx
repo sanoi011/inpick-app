@@ -578,7 +578,7 @@ export default function EstimatePage() {
           <button
             onClick={handleSaveAndNext}
             disabled={activeSections.length === 0}
-            className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="hidden md:flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
           >
             {saved ? (
               <>
@@ -774,7 +774,7 @@ export default function EstimatePage() {
         </div>
 
         {/* 우측: 견적 테이블 */}
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto p-4 pb-24 md:pb-4">
           {activeSections.length === 0 ? (
             <div className="h-full flex items-center justify-center">
               <div className="text-center text-gray-400">
@@ -958,6 +958,42 @@ export default function EstimatePage() {
           )}
         </div>
       </div>
+
+      {/* 모바일 하단 고정 CTA */}
+      {activeSections.length > 0 && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 flex items-center justify-between z-30 safe-bottom">
+          <div>
+            <p className="text-xs text-gray-500">공사비 합계</p>
+            <p className="text-base font-bold text-gray-900">
+              {activeGrandTotal.toLocaleString("ko-KR")}
+              <span className="text-xs font-normal text-gray-500 ml-0.5">원</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportPdf}
+              disabled={exporting}
+              className="p-2.5 text-gray-500 border border-gray-300 rounded-xl hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            >
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+            </button>
+            <button
+              onClick={handleSaveAndNext}
+              className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors"
+            >
+              {saved ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4" /> 저장됨
+                </>
+              ) : (
+                <>
+                  견적요청 <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
