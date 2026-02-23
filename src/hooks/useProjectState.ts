@@ -230,7 +230,7 @@ export function useProjectState(projectId: string) {
         }, 1000);
       }
     },
-    [projectId, user]
+    [projectId, user?.id]
   );
 
   // 상태 업데이트

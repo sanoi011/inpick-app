@@ -156,7 +156,10 @@ export default function MatchingPage() {
       if (res.ok) {
         setCollabTarget(null);
         setCollabForm({ message: "", proposedAmount: "", startDate: "", endDate: "" });
-        alert("협업 요청이 전송되었습니다");
+        toast({ type: "success", title: "협업 요청 전송 완료", message: "상대 업체에 협업 요청이 전송되었습니다" });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ type: "error", title: "요청 실패", message: data.error || "협업 요청을 전송할 수 없습니다" });
       }
     } catch { toast({ type: "error", title: "오류", message: "협업 요청에 실패했습니다" }); } finally { setCollabSending(false); }
   };

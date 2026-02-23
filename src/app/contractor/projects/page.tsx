@@ -488,7 +488,7 @@ function PhaseCard({ phase, onStatusChange, onChecklistToggle, projectId, contra
       formData.append("folder", "phases");
       const uploadRes = await fetch("/api/contractor/upload", { method: "POST", body: formData });
       const uploadData = await uploadRes.json();
-      if (!uploadRes.ok) { alert(uploadData.error || "업로드 실패"); return; }
+      if (!uploadRes.ok) { toast({ type: "error", title: "업로드 실패", message: uploadData.error || "사진 업로드에 실패했습니다" }); return; }
 
       await fetch(`/api/contractor/projects/${projectId}`, {
         method: "PATCH",

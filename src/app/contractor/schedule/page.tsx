@@ -125,7 +125,7 @@ export default function SchedulePage() {
         loadSchedules();
       } else {
         const err = await res.json();
-        alert(err.error || "저장 실패");
+        toast({ type: "error", title: "저장 실패", message: err.error || "일정을 저장할 수 없습니다" });
       }
     } catch { toast({ type: "error", title: "오류", message: "일정 저장에 실패했습니다" }); } finally { setSaving(false); }
   };

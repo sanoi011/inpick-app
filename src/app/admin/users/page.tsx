@@ -95,7 +95,7 @@ export default function AdminUsersPage() {
     if (grantMode === "subtract") {
       const user = consumers.find((u) => u.id === userId);
       if (user && rawAmount > user.balance) {
-        alert(`현재 잔액(${user.balance})보다 많이 차감할 수 없습니다.`);
+        toast({ type: "warning", title: "차감 불가", message: `현재 잔액(${user.balance})보다 많이 차감할 수 없습니다` });
         return;
       }
     }
