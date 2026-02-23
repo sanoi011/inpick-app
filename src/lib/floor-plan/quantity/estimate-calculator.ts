@@ -134,10 +134,10 @@ export function calculateEstimate(
       continue;
     }
 
-    // 자재 오버라이드 적용
+    // 자재 오버라이드 적용 (음수/0 방어)
     const override = overrideIndex.get(item.itemCode);
-    const matCostPerUnit = override?.unitPrice ?? basePrice.materialCost;
-    const labCostPerUnit = override?.laborPrice ?? basePrice.laborCost;
+    const matCostPerUnit = Math.max(0, override?.unitPrice ?? basePrice.materialCost);
+    const labCostPerUnit = Math.max(0, override?.laborPrice ?? basePrice.laborCost);
     const source = override
       ? `${override.materialName} (${override.priceSource || '사용자 선택'})`
       : basePrice.source;

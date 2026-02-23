@@ -261,7 +261,7 @@ export default function EstimatePage() {
           if (data.designConcept) setAiDesignConcept(data.designConcept);
         }
       })
-      .catch(() => { /* silent fallback - engine will use default prices */ })
+      .catch((err) => { if (err?.name !== "AbortError") console.error("[estimate] AI material fetch error:", err); })
       .finally(() => { clearTimeout(timeout); setAiLoading(false); });
   }, [project, manualMaterials.length, aiRequested, aiLoading, aiMaterials.length]);
 

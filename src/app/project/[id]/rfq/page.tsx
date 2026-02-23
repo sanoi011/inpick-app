@@ -139,30 +139,27 @@ export default function RfqPage() {
     checkExistingRfq();
   }, [projectId, project?.estimateId, setEstimateId]);
 
-  // 입찰 로드 함수
-  const loadBids = useCallback(async (eid?: string) => {
-    const estimateId = eid || project?.estimateId;
-    if (!estimateId) return;
-    setBidLoading(true);
-    try {
-      const res = await fetch(`/api/bids?estimateId=${estimateId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setBids(data.bids || []);
-      }
-    } catch (err) {
-      console.error("[rfq] Failed to load bids:", err);
-    } finally {
-      setBidLoading(false);
-    }
-  }, [project?.estimateId]);
-
   // Realtime 구독 + 폴백 폴링 (60초)
   useEffect(() => {
     const estimateId = project?.estimateId;
     if (!estimateId) return;
 
-    loadBids();
+    const fetchBids = async () => {
+      setBidLoading(true);
+      try {
+        const res = await fetch(`/api/bids?estimateId=${estimateId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setBids(data.bids || []);
+        }
+      } catch (err) {
+        console.error("[rfq] Failed to load bids:", err);
+      } finally {
+        setBidLoading(false);
+      }
+    };
+
+    fetchBids();
 
     // Supabase Realtime 구독 시도
     const supabase = createClient();
@@ -171,23 +168,23 @@ export default function RfqPage() {
       .on(
         "postgres_changes" as never,
         { event: "INSERT", schema: "public", table: "bids", filter: `estimate_id=eq.${estimateId}` },
-        () => { loadBids(); }
+        () => { fetchBids(); }
       )
       .on(
         "postgres_changes" as never,
         { event: "UPDATE", schema: "public", table: "bids", filter: `estimate_id=eq.${estimateId}` },
-        () => { loadBids(); }
+        () => { fetchBids(); }
       )
       .subscribe();
 
     // 폴백: 60초 폴링 (Realtime 실패 대비)
-    const interval = setInterval(() => loadBids(), 60000);
+    const interval = setInterval(() => fetchBids(), 60000);
 
     return () => {
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [project?.estimateId, loadBids]);
+  }, [project?.estimateId]);
 
   // 견적요청 발송 (실제 API)
   const handleSubmitRfq = useCallback(async () => {
