@@ -1367,6 +1367,7 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
 | `20260222400000_add_segmentation_mask.sql` | Supabase 적용 완료 |
 | `20260222500000_consumer_projects_delete_policy.sql` | Supabase 적용 완료 |
+| `20260223100000_construction_drawings.sql` | **Supabase 미적용** |
 
 ## 완료된 작업 (2026-02-22) - 실시간 도면 생성 파이프라인 + 수동 동/호 입력
 
@@ -1825,13 +1826,43 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - `estimates.consumer_project_id` → null 설정 (소프트 링크 정리, 견적 데이터 보존)
 - localStorage `inpick_project_{id}` 키 삭제 (소비자 측)
 
+## 완료된 작업 (2026-02-23) - AI 시공도면 자동 생성 시스템 + 모바일 수정
+
+### AI 시공도면 자동 생성 시스템 (10개 신규 + 3개 수정 파일)
+- **하이브리드 방식**: 프로그래매틱 SVG 구조 프레임 + Gemini AI 시각 보강
+- **스타일**: 다크 배경 + 흰색 라인 + mm 치수 (loom_drawings 참조)
+- `src/types/construction-drawing.ts` - 타입 + mapDb + DRAWING_TYPE_LABELS
+- `supabase/migrations/20260223100000_construction_drawings.sql` - DB 스키마 (construction_drawing_sets + construction_drawings)
+- `src/lib/floor-plan/elevation/elevation-calculator.ts` - 입면도 계산 엔진
+- `src/lib/floor-plan/elevation/electrical-placement.ts` - 한국 주거 전기 표준 배치
+- `src/lib/floor-plan/drawing/drawing-constants.ts` - 색상/스케일/가구 치수 상수
+- `src/lib/floor-plan/drawing/svg-generators.ts` - SVG 도면 3종 (가구배치도/전기배선도/입면전개도)
+- `src/lib/floor-plan/drawing/gemini-enhancer.ts` - Gemini AI 분석/3D 묘사 생성
+- `src/app/api/project/generate-drawings/route.ts` - SSE 7단계 파이프라인 (maxDuration=300)
+- `src/components/contract/DrawingGenerationProgress.tsx` - 진행률 UI
+- `src/components/contract/DrawingViewer.tsx` - 도면 갤러리 + 다운로드
+- `src/lib/pdf/construction-drawing-pdf.ts` - jsPDF A3 가로 PDF (표지+도면)
+- `src/app/contract/[id]/page.tsx` - 5부 시공도면 섹션 통합
+- `src/app/contractor/projects/page.tsx` - "시공도면 보기" 링크 추가
+
+### 모바일 접근성 수정 3건
+- community 5개 페이지 `text-[10px]` → `text-xs` (8건, 모바일 가독성)
+- project layout 탭 라벨 `hidden lg:inline` → `hidden md:inline` (태블릿 768px 대응)
+- filter chip `min-h-[44px]` 이미 적용 확인 (추가 작업 불필요)
+
+### DB 마이그레이션 (Supabase 적용 필요)
+- `20260223100000_construction_drawings.sql` - construction_drawing_sets + construction_drawings 테이블
+- Supabase Storage: `construction-drawings` 버킷 생성 필요
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
-1. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
-2. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
-3. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
-4. **ODA File Converter 설치** (DWG→DXF 변환용)
+1. **Supabase 마이그레이션 적용** - `20260223100000_construction_drawings.sql`
+2. **Supabase Storage 버킷 생성** - `construction-drawings` (public 읽기)
+3. **커스텀 도메인 구매 + 연결** - 도메인 구매 후 Vercel 연결 + 코드 3곳 URL 수정
+4. **카카오 로그인 Supabase 설정** - Supabase 대시보드 → Authentication → Providers → Kakao 활성화
+5. **Toss Payments 키 발급** - `TOSS_PAYMENTS_CLIENT_KEY`, `TOSS_PAYMENTS_SECRET_KEY`, `TOSS_WEBHOOK_SECRET`
+6. **ODA File Converter 설치** (DWG→DXF 변환용)
 
 ### 개발 작업
 - DXF 파서 실행 및 Ground Truth 비교 검증 (ODA File Converter 설치 후)

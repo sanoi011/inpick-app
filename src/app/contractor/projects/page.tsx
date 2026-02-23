@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
+import Link from "next/link";
 import {
   Loader2, FolderKanban, Plus, ChevronDown, ChevronUp,
   CheckSquare, Square, AlertTriangle, Clock, Activity,
   MapPin, Calendar, DollarSign, X, BarChart3, List, RefreshCw,
-  Camera, Trash2, ImageIcon,
+  Camera, Trash2, ImageIcon, FileImage,
 } from "lucide-react";
 import {
   type Project, type ProjectPhase, type ProjectIssue, type ProjectActivity,
@@ -376,8 +377,19 @@ export default function ProjectsPage() {
                         </div>
                       </div>
 
-                      {/* 활동 로그 */}
+                      {/* 활동 로그 + 시공도면 */}
                       <div>
+                        {/* 시공도면 바로가기 */}
+                        {detailProject.contractId && (
+                          <Link
+                            href={`/contract/${detailProject.contractId}#drawings`}
+                            className="flex items-center gap-2 px-4 py-3 mb-4 bg-indigo-50 border border-indigo-200 rounded-xl text-sm font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+                          >
+                            <FileImage className="w-4 h-4" />
+                            시공도면 보기
+                          </Link>
+                        )}
+
                         <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
                           <Activity className="w-4 h-4 text-green-600" /> 활동 기록
                         </h4>
