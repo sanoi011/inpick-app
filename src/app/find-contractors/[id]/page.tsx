@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   ArrowLeft, Star, Shield, MapPin, Crown, Phone, Mail, Briefcase,
-  Loader2, Clock, Camera, MessageCircle, Building2,
+  Clock, Camera, MessageCircle, Building2,
 } from "lucide-react";
 import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
@@ -60,10 +61,30 @@ export default function ContractorDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="flex flex-col items-center justify-center py-32 gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          <p className="text-sm text-gray-500">업체 정보 불러오는 중...</p>
-        </div>
+        <main className="max-w-4xl mx-auto px-6 py-8">
+          <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mb-4" />
+          <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <div className="w-20 h-20 rounded-xl bg-gray-200 animate-pulse flex-shrink-0" />
+              <div className="flex-1 space-y-3 min-w-0">
+                <div className="h-6 w-48 bg-gray-200 rounded animate-pulse" />
+                <div className="h-4 w-64 bg-gray-100 rounded animate-pulse" />
+              </div>
+              <div className="h-10 w-32 bg-gray-200 rounded-lg animate-pulse flex-shrink-0" />
+            </div>
+          </div>
+          <div className="flex gap-1 border-b border-gray-200 mb-6">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-9 w-20 bg-gray-100 rounded animate-pulse" />
+            ))}
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
+            <div className="h-4 w-24 bg-gray-200 rounded animate-pulse" />
+            <div className="h-4 w-full bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 w-3/4 bg-gray-100 rounded animate-pulse" />
+            <div className="h-4 w-1/2 bg-gray-100 rounded animate-pulse" />
+          </div>
+        </main>
       </div>
     );
   }
@@ -120,8 +141,7 @@ export default function ContractorDetailPage() {
           <div className="flex flex-col sm:flex-row items-start gap-4">
             {/* 로고 */}
             {c.logo_url ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={c.logo_url} alt={c.company_name} className="w-20 h-20 rounded-xl object-cover border border-gray-100" />
+              <Image src={c.logo_url} alt={c.company_name} width={80} height={80} className="w-20 h-20 rounded-xl object-cover border border-gray-100" />
             ) : (
               <div className="w-20 h-20 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-2xl">
                 {c.company_name.charAt(0)}
@@ -257,12 +277,15 @@ export default function ContractorDetailPage() {
                 {portfolio.map((p) => (
                   <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                     {p.image_urls?.[0] && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={p.image_urls[0]}
-                        alt={p.title}
-                        className="w-full h-48 object-cover"
-                      />
+                      <div className="relative w-full h-48">
+                        <Image
+                          src={p.image_urls[0]}
+                          alt={p.title}
+                          fill
+                          className="object-cover"
+                          sizes="(max-width: 640px) 100vw, 50vw"
+                        />
+                      </div>
                     )}
                     <div className="p-4">
                       <h4 className="text-sm font-bold text-gray-900">{p.title}</h4>
@@ -284,8 +307,7 @@ export default function ContractorDetailPage() {
                       {p.image_urls?.length > 1 && (
                         <div className="flex gap-1 mt-2">
                           {p.image_urls.slice(1, 4).map((url, i) => (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img key={i} src={url} alt="" className="w-12 h-12 rounded object-cover" />
+                            <Image key={i} src={url} alt="" width={48} height={48} className="w-12 h-12 rounded object-cover" />
                           ))}
                           {p.image_urls.length > 4 && (
                             <span className="w-12 h-12 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-400">

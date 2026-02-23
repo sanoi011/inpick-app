@@ -87,7 +87,7 @@ export default function FindContractorsPage() {
             검증된 종합 인테리어 업체와 전문공종 업체를 찾아보세요
           </p>
           {/* 검색 바 (히어로 내) */}
-          <div className="max-w-xl mx-auto relative">
+          <form className="max-w-xl mx-auto relative" onSubmit={(e) => e.preventDefault()}>
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
               type="text"
@@ -96,7 +96,7 @@ export default function FindContractorsPage() {
               placeholder="업체명으로 검색..."
               className="w-full pl-11 pr-4 py-3 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 shadow-lg"
             />
-          </div>
+          </form>
         </div>
       </section>
 

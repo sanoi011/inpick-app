@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { Star, Shield, MapPin, Crown } from "lucide-react";
 import type { PublicContractor } from "@/types/contractor-directory";
 import { CONTRACTOR_TYPE_LABELS, CONTRACTOR_TYPE_COLORS } from "@/types/contractor-directory";
@@ -18,10 +19,11 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
       {/* 상단: 로고 + 기본 정보 */}
       <div className="flex items-start gap-3 mb-3">
         {contractor.logoUrl ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img
+          <Image
             src={contractor.logoUrl}
             alt={contractor.companyName}
+            width={48}
+            height={48}
             className="w-12 h-12 rounded-lg object-cover border border-gray-100 flex-shrink-0"
           />
         ) : (
@@ -87,9 +89,8 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
       {contractor.portfolioThumbnails.length > 0 && (
         <div className="flex gap-1.5 mb-3">
           {contractor.portfolioThumbnails.slice(0, 3).map((url, i) => (
-            <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={url} alt="" className="w-full h-full object-cover" />
+            <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 relative">
+              <Image src={url} alt="" fill className="object-cover" sizes="64px" />
             </div>
           ))}
         </div>
