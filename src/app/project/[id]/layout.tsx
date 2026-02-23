@@ -161,7 +161,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                     key={tab.segment}
                     className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-full text-xs font-medium whitespace-nowrap opacity-40 cursor-not-allowed select-none border border-gray-200 snap-start"
                   >
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold bg-gray-200 text-gray-400">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold bg-gray-200 text-gray-400">
                       <Lock className="w-3 h-3" />
                     </span>
                     {tab.label}
@@ -183,7 +183,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                   `}
                 >
                   <span className={`
-                    w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold
+                    w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold
                     ${isCompleted
                       ? "bg-green-500 text-white"
                       : active

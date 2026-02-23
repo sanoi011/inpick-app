@@ -28,7 +28,7 @@ export default function UploadOptionsPanel({ onSelectMode }: Props) {
           >
             <FileImage className="w-5 h-5 text-blue-600 mb-1" />
             <p className="text-[11px] font-bold text-gray-900">파일 업로드</p>
-            <p className="text-[10px] text-gray-500">PDF/JPG/PNG</p>
+            <p className="text-xs text-gray-500">PDF/JPG/PNG</p>
           </button>
           <button
             onClick={() => onSelectMode("lidar")}
@@ -36,7 +36,7 @@ export default function UploadOptionsPanel({ onSelectMode }: Props) {
           >
             <Smartphone className="w-5 h-5 text-violet-600 mb-1" />
             <p className="text-[11px] font-bold text-gray-900">LiDAR 스캔</p>
-            <p className="text-[10px] text-gray-500">iPhone/iPad</p>
+            <p className="text-xs text-gray-500">iPhone/iPad</p>
           </button>
           <button
             onClick={() => onSelectMode("photo")}
@@ -44,7 +44,7 @@ export default function UploadOptionsPanel({ onSelectMode }: Props) {
           >
             <Camera className="w-5 h-5 text-emerald-600 mb-1" />
             <p className="text-[11px] font-bold text-gray-900">사진 촬영</p>
-            <p className="text-[10px] text-gray-500">AI 도면 생성</p>
+            <p className="text-xs text-gray-500">AI 도면 생성</p>
           </button>
           <button
             onClick={() => onSelectMode("hand-drawing")}
@@ -52,7 +52,7 @@ export default function UploadOptionsPanel({ onSelectMode }: Props) {
           >
             <PenTool className="w-5 h-5 text-amber-600 mb-1" />
             <p className="text-[11px] font-bold text-gray-900">손도면</p>
-            <p className="text-[10px] text-gray-500">사진 변환</p>
+            <p className="text-xs text-gray-500">사진 변환</p>
           </button>
           <button
             onClick={() => onSelectMode("draw")}
@@ -60,7 +60,7 @@ export default function UploadOptionsPanel({ onSelectMode }: Props) {
           >
             <PenTool className="w-5 h-5 text-indigo-600 mb-1" />
             <p className="text-[11px] font-bold text-gray-900">직접 그리기</p>
-            <p className="text-[10px] text-gray-500">벽과 문/창문을 직접 그리기</p>
+            <p className="text-xs text-gray-500">벽과 문/창문을 직접 그리기</p>
           </button>
         </div>
       )}

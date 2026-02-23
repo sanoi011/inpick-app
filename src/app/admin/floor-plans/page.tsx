@@ -212,7 +212,7 @@ export default function FloorPlanLibraryPage() {
                         <span className="font-medium text-gray-900 truncate max-w-[200px]">
                           {item.source_file_name || "Unknown"}
                         </span>
-                        <span className="text-[10px] text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
+                        <span className="text-xs text-gray-400 px-1.5 py-0.5 bg-gray-100 rounded">
                           {item.source_type}
                         </span>
                       </div>
@@ -281,14 +281,14 @@ export default function FloorPlanLibraryPage() {
                             <BarChart3 className="w-4 h-4 text-gray-400" />
                             {Object.entries(item.quality_details).map(([key, value]) => (
                               <div key={key} className="flex items-center gap-1.5">
-                                <span className="text-[10px] text-gray-400">{key}</span>
+                                <span className="text-xs text-gray-400">{key}</span>
                                 <div className="w-16 h-1.5 bg-gray-200 rounded-full">
                                   <div
                                     className="h-full rounded-full bg-blue-500"
                                     style={{ width: `${(value as number) * 100}%` }}
                                   />
                                 </div>
-                                <span className="text-[10px] font-medium text-gray-600">
+                                <span className="text-xs font-medium text-gray-600">
                                   {((value as number) * 100).toFixed(0)}%
                                 </span>
                               </div>

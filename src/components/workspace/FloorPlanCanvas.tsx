@@ -367,7 +367,7 @@ export default function FloorPlanCanvas({
             <button
               key={item.type}
               onClick={() => onRoomClick?.(item.type, item.label)}
-              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] transition-colors ${
+              className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-xs transition-colors ${
                 item.selectedProduct
                   ? "bg-green-50 text-green-700 border border-green-200"
                   : "bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100"

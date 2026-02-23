@@ -133,7 +133,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
           )}
           <Home className={`w-5 h-5 mb-1.5 ${buildingType === "residential" ? "text-blue-600" : "text-gray-400"}`} />
           <p className={`text-xs font-bold ${buildingType === "residential" ? "text-blue-900" : "text-gray-700"}`}>아파트 / 빌라</p>
-          <p className={`text-[10px] mt-0.5 ${buildingType === "residential" ? "text-blue-600" : "text-gray-400"}`}>도면 자동 조회</p>
+          <p className={`text-xs mt-0.5 ${buildingType === "residential" ? "text-blue-600" : "text-gray-400"}`}>도면 자동 조회</p>
         </button>
         <button
           onClick={() => setBuildingType("commercial")}
@@ -148,7 +148,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
           )}
           <Store className={`w-5 h-5 mb-1.5 ${buildingType === "commercial" ? "text-indigo-600" : "text-gray-400"}`} />
           <p className={`text-xs font-bold ${buildingType === "commercial" ? "text-indigo-900" : "text-gray-700"}`}>상가 / 사무실</p>
-          <p className={`text-[10px] mt-0.5 ${buildingType === "commercial" ? "text-indigo-600" : "text-gray-400"}`}>맞춤 견적</p>
+          <p className={`text-xs mt-0.5 ${buildingType === "commercial" ? "text-indigo-600" : "text-gray-400"}`}>맞춤 견적</p>
         </button>
       </div>
 
@@ -175,7 +175,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
 
         {showRecent && recentAddresses.length > 0 && results.length === 0 && (
           <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
-            <div className="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-100">최근 검색</div>
+            <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100">최근 검색</div>
             {recentAddresses.map((addr, i) => (
               <button
                 key={i}
@@ -185,7 +185,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
                 <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-900 truncate">{addr.roadAddress}</p>
-                  <p className="text-[10px] text-gray-500">{addr.buildingName}</p>
+                  <p className="text-xs text-gray-500">{addr.buildingName}</p>
                 </div>
               </button>
             ))}
@@ -194,7 +194,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
 
         {results.length > 0 && (
           <div className="absolute left-0 right-0 top-full mt-1 bg-white rounded-xl border border-gray-200 shadow-lg max-h-60 overflow-y-auto z-20">
-            <div className="px-3 py-1.5 text-[10px] text-gray-400 border-b border-gray-100">
+            <div className="px-3 py-1.5 text-xs text-gray-400 border-b border-gray-100">
               {totalCount.toLocaleString()}건
             </div>
             {results.map((addr, i) => (
@@ -206,7 +206,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
                 <MapPin className="w-3.5 h-3.5 text-blue-500 mt-0.5 flex-shrink-0" />
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-900 truncate">{addr.roadAddress}</p>
-                  <p className="text-[10px] text-gray-500 truncate">
+                  <p className="text-xs text-gray-500 truncate">
                     {addr.jibunAddress} {addr.buildingName && `| ${addr.buildingName}`}
                   </p>
                 </div>
@@ -227,7 +227,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
 
       {/* Search hint */}
       {keyword.trim().length === 0 && results.length === 0 && (
-        <p className="mt-2 text-[10px] text-gray-400 text-center">
+        <p className="mt-2 text-xs text-gray-400 text-center">
           예: 래미안 아파트, 서울시 강남구 역삼동 123
         </p>
       )}

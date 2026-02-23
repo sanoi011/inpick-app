@@ -114,6 +114,7 @@ export default function RfqPage() {
   const [selectedBid, setSelectedBid] = useState<string | null>(project?.rfq?.selectedBidId || null);
   const [bids, setBids] = useState<BidData[]>([]);
   const [bidLoading, setBidLoading] = useState(false);
+  const [contracting, setContracting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
   // Supabase 폴백: localStorage에 estimateId가 없으면 서버에서 조회
@@ -234,14 +235,15 @@ export default function RfqPage() {
       if (res.ok) {
         const data = await res.json();
         setEstimateId(data.estimateId);
+        setStep("bids");
       } else {
         toast({ type: "error", title: "견적요청 실패", message: "서버 오류가 발생했습니다. 다시 시도해주세요." });
+        setStep("form");
       }
     } catch {
       toast({ type: "error", title: "네트워크 오류", message: "견적요청 발송 중 오류가 발생했습니다." });
+      setStep("form");
     }
-
-    setStep("bids");
   }, [
     project, projectId, user, specialNotes, preferredStartDate, preferredDuration,
     budgetRange, livingDuringWork, noiseRestriction, updateRfq, updateStatus, setEstimateId,
@@ -269,7 +271,8 @@ export default function RfqPage() {
 
   // 계약 확정
   const handleConfirmContract = async () => {
-    if (!selectedBid) return;
+    if (!selectedBid || contracting) return;
+    setContracting(true);
 
     try {
       const res = await fetch("/api/contracts", {
@@ -285,9 +288,11 @@ export default function RfqPage() {
       } else {
         const errData = await res.json().catch(() => ({}));
         toast({ type: "error", title: "계약 생성 실패", message: errData.error || "다시 시도해주세요" });
+        setContracting(false);
       }
     } catch {
       toast({ type: "error", title: "네트워크 오류", message: "계약 생성 중 오류가 발생했습니다" });
+      setContracting(false);
     }
   };
 
@@ -348,9 +353,11 @@ export default function RfqPage() {
           {selectedBid && (
             <button
               onClick={handleConfirmContract}
-              className="flex items-center gap-1 px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+              disabled={contracting}
+              className="flex items-center gap-1 px-4 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
             >
-              <CheckCircle2 className="w-4 h-4" /> 업체 확정
+              {contracting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {contracting ? "계약 생성 중..." : "업체 확정"}
             </button>
           )}
         </div>
@@ -469,7 +476,7 @@ export default function RfqPage() {
                     <Home className="w-3.5 h-3.5 inline mr-1" />
                     거주 중 시공
                   </span>
-                  <span className="text-[10px] text-gray-400">(시공 기간 중 해당 주소에 거주합니다)</span>
+                  <span className="text-xs text-gray-400">(시공 기간 중 해당 주소에 거주합니다)</span>
                 </label>
               </div>
 
@@ -508,7 +515,7 @@ export default function RfqPage() {
                 <Send className="w-4 h-4" />
                 견적요청 발송
               </button>
-              <p className="text-[10px] text-gray-400 text-center">
+              <p className="text-xs text-gray-400 text-center">
                 주변 지역의 검증된 인테리어 업체에 견적 요청이 발송됩니다.
               </p>
             </div>
@@ -579,10 +586,10 @@ export default function RfqPage() {
                       >
                         {aiTag && (
                           <div className="px-4 py-1.5 border-b border-gray-100 flex items-center justify-between">
-                            <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${AI_TAG_STYLES[aiTag] || "bg-gray-100 text-gray-600"}`}>
+                            <span className={`px-2 py-0.5 text-xs font-bold rounded-full ${AI_TAG_STYLES[aiTag] || "bg-gray-100 text-gray-600"}`}>
                               {aiTag}
                             </span>
-                            <span className="text-[10px] text-gray-400">{aiReason}</span>
+                            <span className="text-xs text-gray-400">{aiReason}</span>
                           </div>
                         )}
 
@@ -597,7 +604,7 @@ export default function RfqPage() {
                                   <div className="flex items-center gap-0.5 text-amber-500">
                                     <Star className="w-3 h-3 fill-current" />
                                     <span className="text-xs font-medium">{contractor.rating}</span>
-                                    <span className="text-[10px] text-gray-400">({contractor.total_reviews})</span>
+                                    <span className="text-xs text-gray-400">({contractor.total_reviews})</span>
                                   </div>
                                 )}
                                 {contractor?.is_verified && (
@@ -618,7 +625,7 @@ export default function RfqPage() {
                                 {bid.bid_amount.toLocaleString()}
                                 <span className="text-xs font-normal text-gray-500">원</span>
                               </p>
-                              <div className="flex items-center gap-2 mt-0.5 text-[10px] text-gray-400">
+                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-400">
                                 <span className="flex items-center gap-0.5">
                                   <Clock className="w-3 h-3" /> {bid.estimated_days || 30}일
                                 </span>
@@ -632,7 +639,7 @@ export default function RfqPage() {
                           {trades.length > 0 && (
                             <div className="flex flex-wrap gap-1 mb-2">
                               {trades.map((t) => (
-                                <span key={t.trade_code} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded-full">
+                                <span key={t.trade_code} className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">
                                   {t.trade_name}
                                 </span>
                               ))}

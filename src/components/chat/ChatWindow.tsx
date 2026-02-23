@@ -204,7 +204,7 @@ export function ChatWindow({
               <div key={msg.id}>
                 {shouldShowDate(idx) && (
                   <div className="flex items-center justify-center my-3">
-                    <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[10px] rounded-full">
+                    <span className="px-3 py-1 bg-gray-100 text-gray-500 text-xs rounded-full">
                       {formatDate(msg.created_at)}
                     </span>
                   </div>
@@ -215,7 +215,7 @@ export function ChatWindow({
                   <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                     <div className={`max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
                       {!isMe && msg.sender_name && (
-                        <p className="text-[10px] text-gray-400 mb-0.5 ml-1">{msg.sender_name}</p>
+                        <p className="text-xs text-gray-400 mb-0.5 ml-1">{msg.sender_name}</p>
                       )}
                       <div className="flex items-end gap-1">
                         {isMe && (

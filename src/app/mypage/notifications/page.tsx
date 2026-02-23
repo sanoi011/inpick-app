@@ -115,7 +115,7 @@ export default function MyPageNotifications() {
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">알림</h1>
           {unreadCount > 0 && (
-            <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+            <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] text-center">
               {unreadCount}
             </span>
           )}
@@ -162,12 +162,12 @@ export default function MyPageNotifications() {
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">{CONSUMER_NOTIFICATION_TYPE_LABELS[n.type]}</span>
+                  <span className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded font-medium">{CONSUMER_NOTIFICATION_TYPE_LABELS[n.type]}</span>
                   {!n.isRead && <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />}
                 </div>
                 <p className={`text-sm ${!n.isRead ? "font-semibold text-gray-900" : "text-gray-700"}`}>{n.title}</p>
                 {n.message && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>}
-                <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
+                <p className="text-xs text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
               </div>
               <ChevronRight className="w-4 h-4 text-gray-300 mt-2 flex-shrink-0" />
             </Link>

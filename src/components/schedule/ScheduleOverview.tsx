@@ -64,7 +64,7 @@ export function ScheduleOverview({ schedule, className = "" }: ScheduleOverviewP
         {/* 왼쪽 라벨 */}
         <div className="flex-shrink-0 border-r border-gray-100 bg-gray-50" style={{ width: 140 }}>
           <div className="border-b border-gray-100 px-3 flex items-center" style={{ height: HEADER_HEIGHT }}>
-            <span className="text-[10px] font-semibold text-gray-400">공정</span>
+            <span className="text-xs font-semibold text-gray-400">공정</span>
           </div>
           {schedule.phases.map((p) => (
             <div
@@ -100,7 +100,7 @@ export function ScheduleOverview({ schedule, className = "" }: ScheduleOverviewP
                   className="flex-shrink-0 border-r border-gray-50 flex items-center justify-center"
                   style={{ width: col.days * DAY_WIDTH }}
                 >
-                  <span className="text-[10px] text-gray-400 font-medium">{col.label}</span>
+                  <span className="text-xs text-gray-400 font-medium">{col.label}</span>
                 </div>
               ))}
             </div>
@@ -177,7 +177,7 @@ export function ScheduleOverview({ schedule, className = "" }: ScheduleOverviewP
         {schedule.phases.map((p) => (
           <div key={p.id} className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: p.color }} />
-            <span className="text-[10px] text-gray-400">
+            <span className="text-xs text-gray-400">
               {p.name} ({formatDateKR(p.startDate)}~{formatDateKR(p.endDate)})
             </span>
           </div>

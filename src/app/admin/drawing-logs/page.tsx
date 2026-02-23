@@ -139,7 +139,7 @@ export default function AdminDrawingLogsPage() {
               <span className="text-xs text-gray-500">총 파싱</span>
             </div>
             <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
-            <div className="mt-1 flex gap-2 text-[10px] text-gray-400">
+            <div className="mt-1 flex gap-2 text-xs text-gray-400">
               {Object.entries(stats.methods).map(([m, c]) => (
                 <span key={m}>{METHOD_LABELS[m] || m}: {c}</span>
               ))}
@@ -153,7 +153,7 @@ export default function AdminDrawingLogsPage() {
             <p className="text-2xl font-bold text-gray-900">
               {Math.round(stats.avgConfidence * 100)}%
             </p>
-            <div className="mt-1 text-[10px] text-gray-400">
+            <div className="mt-1 text-xs text-gray-400">
               높음({stats.highConfidence}) / 낮음({stats.lowConfidence})
             </div>
           </div>
@@ -178,7 +178,7 @@ export default function AdminDrawingLogsPage() {
                 ? Math.round(((stats.total - (stats.methods["mock"] || 0)) / stats.total) * 100)
                 : 0}%
             </p>
-            <div className="mt-1 text-[10px] text-gray-400">
+            <div className="mt-1 text-xs text-gray-400">
               Mock 제외 실제 파싱 비율
             </div>
           </div>
@@ -242,7 +242,7 @@ export default function AdminDrawingLogsPage() {
                           <p className="text-sm font-medium text-gray-900 truncate max-w-[160px]">
                             {log.file_name}
                           </p>
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-xs text-gray-400">
                             {log.file_type.toUpperCase()}
                             {log.file_size_bytes
                               ? ` · ${(log.file_size_bytes / 1024).toFixed(0)}KB`
@@ -328,7 +328,7 @@ export default function AdminDrawingLogsPage() {
                           {log.result_json && (
                             <div>
                               <p className="text-xs font-semibold text-gray-600 mb-1">파싱 결과 요약</p>
-                              <pre className="text-[10px] text-gray-600 bg-white rounded border border-gray-200 p-2 max-h-40 overflow-auto">
+                              <pre className="text-xs text-gray-600 bg-white rounded border border-gray-200 p-2 max-h-40 overflow-auto">
                                 {JSON.stringify(
                                   {
                                     totalArea: (log.result_json as Record<string, unknown>).totalArea,
@@ -348,7 +348,7 @@ export default function AdminDrawingLogsPage() {
                             </div>
                           )}
                           {/* 메타 */}
-                          <div className="flex gap-4 text-[10px] text-gray-400">
+                          <div className="flex gap-4 text-xs text-gray-400">
                             <span>ID: {log.id.slice(0, 8)}</span>
                             {log.project_id && <span>Project: {log.project_id.slice(0, 8)}</span>}
                             {log.user_id && <span>User: {log.user_id.slice(0, 8)}</span>}

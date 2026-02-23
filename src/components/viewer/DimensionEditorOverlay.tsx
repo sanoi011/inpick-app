@@ -514,7 +514,7 @@ export default function DimensionEditorOverlay({
               <Plus className="w-3 h-3 inline mr-0.5" />추가
             </button>
             {tool === "add" && (
-              <span className="text-[10px] text-blue-600 font-medium">
+              <span className="text-xs text-blue-600 font-medium">
                 {drawStart ? "끝점을 클릭하세요" : "시작점을 클릭하세요"}
               </span>
             )}
@@ -530,7 +530,7 @@ export default function DimensionEditorOverlay({
           <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-gray-100">
             {/* Dimensions list */}
             <div className="flex-1 px-3 py-2">
-              <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">치수선 목록</p>
+              <p className="text-xs font-semibold text-gray-500 uppercase mb-1">치수선 목록</p>
               {dimensions.length === 0 ? (
                 <p className="text-xs text-gray-400 py-2">
                   &ldquo;추가&rdquo; 버튼을 클릭 후 도면 위 두 점을 클릭하여 치수선을 추가하세요
@@ -558,7 +558,7 @@ export default function DimensionEditorOverlay({
                       ) : (
                         <button
                           onClick={(e) => { e.stopPropagation(); startEdit(dim.id, "room"); }}
-                          className="text-blue-500 hover:text-blue-700 text-[10px]"
+                          className="text-blue-500 hover:text-blue-700 text-xs"
                         >
                           방 지정
                         </button>
@@ -566,7 +566,7 @@ export default function DimensionEditorOverlay({
                       <div className="flex-1" />
                       <button
                         onClick={(e) => { e.stopPropagation(); startEdit(dim.id, "value"); }}
-                        className="text-gray-400 hover:text-blue-600 text-[10px] px-1"
+                        className="text-gray-400 hover:text-blue-600 text-xs px-1"
                         title="치수 수정"
                       >
                         수정
@@ -587,7 +587,7 @@ export default function DimensionEditorOverlay({
             {/* Room summaries */}
             {roomSummaries.length > 0 && (
               <div className="flex-1 px-3 py-2">
-                <p className="text-[10px] font-semibold text-gray-500 uppercase mb-1">방별 면적</p>
+                <p className="text-xs font-semibold text-gray-500 uppercase mb-1">방별 면적</p>
                 <div className="space-y-1">
                   {roomSummaries.map((room) => (
                     <div key={room.name} className="flex items-center gap-2 text-xs">
@@ -609,7 +609,7 @@ export default function DimensionEditorOverlay({
                 {/* Room name quick-assign */}
                 {selectedId && !dimensions.find((d) => d.id === selectedId)?.roomName && (
                   <div className="mt-2 pt-2 border-t border-gray-100">
-                    <p className="text-[10px] text-gray-500 mb-1">빠른 방 지정:</p>
+                    <p className="text-xs text-gray-500 mb-1">빠른 방 지정:</p>
                     <div className="flex flex-wrap gap-1">
                       {ROOM_PRESETS.map((name) => (
                         <button
@@ -620,7 +620,7 @@ export default function DimensionEditorOverlay({
                             );
                             onChange(updated);
                           }}
-                          className="px-2 py-0.5 text-[10px] font-medium rounded-full border border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                          className="px-2 py-0.5 text-xs font-medium rounded-full border border-gray-200 bg-gray-50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-colors"
                         >
                           {name}
                         </button>

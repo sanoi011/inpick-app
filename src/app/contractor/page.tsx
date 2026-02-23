@@ -224,7 +224,7 @@ export default function ContractorDashboard() {
                   <Bell className="w-5 h-5 text-gray-400" />
                   <h2 className="font-semibold text-gray-900">알림</h2>
                   {notifications.filter((n) => !n.isRead).length > 0 && (
-                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] text-center">
+                    <span className="px-1.5 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full min-w-[18px] text-center">
                       {notifications.filter((n) => !n.isRead).length}
                     </span>
                   )}

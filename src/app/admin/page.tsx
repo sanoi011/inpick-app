@@ -183,7 +183,7 @@ export default function AdminDashboardPage() {
                         className="h-full bg-blue-500 rounded-full flex items-center justify-end px-2"
                         style={{ width: `${Math.max(10, (sido.complexes / maxC) * 100)}%` }}
                       >
-                        <span className="text-[10px] text-white font-medium">{sido.complexes}</span>
+                        <span className="text-xs text-white font-medium">{sido.complexes}</span>
                       </div>
                     </div>
                   </div>

@@ -174,7 +174,7 @@ export default function DrawingGenerationProgress({ contractId, onComplete, onCa
               ) : idx === currentStep && !error ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <span className="w-3.5 h-3.5 flex items-center justify-center text-[10px] font-bold">
+                <span className="w-3.5 h-3.5 flex items-center justify-center text-xs font-bold">
                   {idx + 1}
                 </span>
               )}

@@ -135,9 +135,9 @@ export default function AdminAILogsPage() {
                   </span>
                 )}
                 {log.response_time_ms > 0 && (
-                  <span className="text-[10px] text-gray-400">{(log.response_time_ms / 1000).toFixed(1)}s</span>
+                  <span className="text-xs text-gray-400">{(log.response_time_ms / 1000).toFixed(1)}s</span>
                 )}
-                <span className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleDateString("ko-KR")}</span>
+                <span className="text-xs text-gray-400">{new Date(log.created_at).toLocaleDateString("ko-KR")}</span>
               </div>
             </div>
             {expandedId === log.id && (

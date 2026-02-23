@@ -141,7 +141,7 @@ export function NotificationBell() {
                       {n.title}
                     </p>
                     <p className="text-xs text-gray-500 truncate">{n.message}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(n.createdAt)}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">{timeAgo(n.createdAt)}</p>
                   </div>
                   <ChevronRight className="w-4 h-4 text-gray-300 mt-1 flex-shrink-0" />
                 </Link>

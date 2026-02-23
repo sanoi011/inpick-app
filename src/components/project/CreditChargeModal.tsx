@@ -130,7 +130,7 @@ export default function CreditChargeModal({
             <p className="text-xs text-green-600 mt-1">
               현재 잔액: {mockResult.newBalance} 크레딧
             </p>
-            <p className="text-[10px] text-gray-400 mt-2">
+            <p className="text-xs text-gray-400 mt-2">
               테스트 모드 (Toss 키 미설정)
             </p>
           </div>
@@ -194,7 +194,7 @@ export default function CreditChargeModal({
                           {pkg.price.toLocaleString()}원
                         </p>
                         {pkg.discount && (
-                          <p className="text-[10px] text-green-600">
+                          <p className="text-xs text-green-600">
                             {pkg.discount}
                           </p>
                         )}
@@ -219,7 +219,7 @@ export default function CreditChargeModal({
         )}
 
         {!mockResult && (
-          <p className="text-[10px] text-gray-400 text-center mt-3">
+          <p className="text-xs text-gray-400 text-center mt-3">
             {process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY
               ? "토스페이먼츠로 안전하게 결제됩니다"
               : "결제 시스템 테스트 모드 (키 미설정 시 바로 충전)"}

@@ -19,6 +19,7 @@ import {
   Ruler,
   Plus,
   X,
+  Download,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import dynamic from "next/dynamic";
@@ -181,6 +182,7 @@ export default function EstimatePage() {
   const [saved, setSaved] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [viewMode, setViewMode] = useState<"room" | "trade">("room");
+  const [exporting, setExporting] = useState(false);
   const [ceilingHeight, setCeilingHeight] = useState(2200); // mm 기본값
 
   // AI 자재 추천 상태
@@ -462,6 +464,34 @@ export default function EstimatePage() {
     }, 500);
   }, [activeSections, editedSections, totalMaterial, totalLabor, totalOverhead, grandTotal, activeGrandTotal, setEstimate, router, projectId]);
 
+  const handleExportPdf = useCallback(async () => {
+    setExporting(true);
+    try {
+      const { generateEstimatePdf } = await import("@/lib/pdf/estimate-pdf-generator");
+      await generateEstimatePdf({
+        sections: activeSections,
+        grandTotal: activeGrandTotal,
+        totalMaterial: editedSections
+          ? activeSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.materialCost, 0), 0)
+          : totalMaterial,
+        totalLabor: editedSections
+          ? activeSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.laborCost, 0), 0)
+          : totalLabor,
+        totalOverhead: editedSections
+          ? activeSections.reduce((sum, s) => sum + s.items.reduce((iSum, i) => iSum + i.overhead, 0), 0)
+          : totalOverhead,
+        engineSummary: engineResult?.summary || null,
+        projectId,
+        floorPlanArea: project?.address?.exclusiveArea,
+        roomCount: activeSections.length,
+      });
+    } catch (err) {
+      console.error("[estimate] PDF export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  }, [activeSections, activeGrandTotal, editedSections, totalMaterial, totalLabor, totalOverhead, engineResult, projectId, project?.address?.exclusiveArea]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-56px)] bg-gray-50">
@@ -538,6 +568,14 @@ export default function EstimatePage() {
             </span>
           )}
           <button
+            onClick={handleExportPdf}
+            disabled={activeSections.length === 0 || exporting}
+            className="flex items-center gap-1 px-3 py-1.5 text-gray-600 text-sm font-medium border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+            <span className="hidden sm:inline">{exporting ? "내보내는 중..." : "PDF"}</span>
+          </button>
+          <button
             onClick={handleSaveAndNext}
             disabled={activeSections.length === 0}
             className="flex items-center gap-1 px-4 py-1.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
@@ -599,7 +637,7 @@ export default function EstimatePage() {
             </div>
             {isHeightSurcharge && (
               <div className="mt-2 px-2 py-1.5 bg-red-50 rounded-lg border border-red-200">
-                <p className="text-[10px] text-red-600 flex items-center gap-1">
+                <p className="text-xs text-red-600 flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
                   층고 {ceilingHeight}mm &gt; 2500mm: 노무비 1.5배 할증 적용
                 </p>
@@ -647,7 +685,7 @@ export default function EstimatePage() {
                       <div className={`w-2 h-2 rounded-full ${s.color}`} />
                       <Icon className="w-3.5 h-3.5 text-gray-500" />
                       <span className="text-xs font-medium text-gray-700 flex-1">{s.label}</span>
-                      <span className="text-[10px] text-gray-400">{pct}%</span>
+                      <span className="text-xs text-gray-400">{pct}%</span>
                       <span className="text-xs font-medium text-gray-900">
                         {(s.amount / 10000).toFixed(0)}만
                       </span>
@@ -666,7 +704,7 @@ export default function EstimatePage() {
                 <span className="text-xs font-semibold text-purple-700">AI 자재 추천</span>
               </div>
               <p className="text-[11px] text-gray-600 leading-relaxed">{aiDesignConcept}</p>
-              <p className="text-[10px] text-gray-400 mt-2">
+              <p className="text-xs text-gray-400 mt-2">
                 {aiMaterials.length}개 자재 카테고리 자동 추천 적용
               </p>
             </div>
@@ -715,20 +753,20 @@ export default function EstimatePage() {
             )}
             {isSyntheticPlan && (
               <div className="mt-2 px-3 py-2 bg-cyan-50 rounded-lg border border-cyan-200">
-                <p className="text-[10px] text-cyan-700">
+                <p className="text-xs text-cyan-700">
                   ※ 도면 미등록 - {project?.address?.exclusiveArea || 84}㎡ 표준 배치 기반 추정 견적입니다.
                 </p>
               </div>
             )}
             {isAiMaterialsUsed && (
               <div className="mt-2 px-3 py-2 bg-purple-50 rounded-lg border border-purple-200">
-                <p className="text-[10px] text-purple-700">
+                <p className="text-xs text-purple-700">
                   ※ AI 추천 자재가 적용되었습니다. 자재 선택 탭에서 직접 변경할 수 있습니다.
                 </p>
               </div>
             )}
             <div className="mt-2 px-3 py-2 bg-amber-50 rounded-lg border border-amber-200">
-              <p className="text-[10px] text-amber-700">
+              <p className="text-xs text-amber-700">
                 ※ 본 견적은 참고 금액이며, 실제 시공 시 현장 상황에 따라 변동됩니다.
               </p>
             </div>
@@ -814,7 +852,7 @@ export default function EstimatePage() {
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">공종</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">공종</label>
                       <select
                         value={addForm.category}
                         onChange={(e) => setAddForm(f => ({ ...f, category: e.target.value }))}
@@ -827,7 +865,7 @@ export default function EstimatePage() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">품명 *</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">품명 *</label>
                       <input
                         value={addForm.productName}
                         onChange={(e) => setAddForm(f => ({ ...f, productName: e.target.value }))}
@@ -836,7 +874,7 @@ export default function EstimatePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">규격</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">규격</label>
                       <input
                         value={addForm.spec}
                         onChange={(e) => setAddForm(f => ({ ...f, spec: e.target.value }))}
@@ -845,7 +883,7 @@ export default function EstimatePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">단위</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">단위</label>
                       <select
                         value={addForm.unit}
                         onChange={(e) => setAddForm(f => ({ ...f, unit: e.target.value }))}
@@ -861,7 +899,7 @@ export default function EstimatePage() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 mb-3">
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">수량 *</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">수량 *</label>
                       <input
                         type="number"
                         value={addForm.quantity}
@@ -871,7 +909,7 @@ export default function EstimatePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">재료비 (원)</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">재료비 (원)</label>
                       <input
                         type="number"
                         value={addForm.materialCost}
@@ -881,7 +919,7 @@ export default function EstimatePage() {
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] text-gray-500 mb-0.5 block">노무비 (원)</label>
+                      <label className="text-xs text-gray-500 mb-0.5 block">노무비 (원)</label>
                       <input
                         type="number"
                         value={addForm.laborCost}

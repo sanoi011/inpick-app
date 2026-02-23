@@ -390,7 +390,7 @@ export default function RenderingPage() {
             <div className="flex items-center gap-2 mb-3">
               <h3 className="text-sm font-bold text-gray-900">{category.nameKr}</h3>
               {selectedId && <CheckCircle2 className="w-4 h-4 text-green-500" />}
-              <span className="text-[10px] text-gray-400">{products.length}개 옵션</span>
+              <span className="text-xs text-gray-400">{products.length}개 옵션</span>
             </div>
 
             {/* 가로 스크롤 컨테이너 */}
@@ -431,14 +431,14 @@ export default function RenderingPage() {
                           >
                             {product.productName.charAt(0)}
                           </span>
-                          <span className={`text-[10px] mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[category.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
+                          <span className={`text-xs mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[category.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
                             style={product.colorHex ? { textShadow: "0 1px 2px rgba(0,0,0,0.2)" } : undefined}
                           >
                             {category.nameKr}
                           </span>
                         </div>
                         <div
-                          className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}
+                          className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold border ${grade.bg} ${grade.border} ${grade.color}`}
                         >
                           {grade.label}
                         </div>
@@ -458,7 +458,7 @@ export default function RenderingPage() {
                       </div>
 
                       <div className="p-3">
-                        <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                        <p className="text-xs text-gray-400 mb-0.5">{product.brand}</p>
                         <p
                           className={`text-sm font-bold mb-1 leading-snug line-clamp-1 ${
                             isSelected ? "text-blue-800" : "text-gray-800"
@@ -475,11 +475,11 @@ export default function RenderingPage() {
                             <span className="text-base font-extrabold text-gray-900">
                               {product.unitPrice.toLocaleString()}
                             </span>
-                            <span className="text-[10px] text-gray-400 ml-0.5">
+                            <span className="text-xs text-gray-400 ml-0.5">
                               원/{product.unit}
                             </span>
                           </div>
-                          <span className="text-[10px] text-gray-400">
+                          <span className="text-xs text-gray-400">
                             시공 {product.laborPrice.toLocaleString()}
                           </span>
                         </div>
@@ -499,11 +499,11 @@ export default function RenderingPage() {
 
                         {isSelected && product.subItems.length > 0 && (
                           <div className="mt-2 pt-2 border-t border-blue-100 space-y-0.5">
-                            <p className="text-[10px] text-blue-500 font-bold">포함 부자재</p>
+                            <p className="text-xs text-blue-500 font-bold">포함 부자재</p>
                             {product.subItems.map((sub) => (
                               <div key={sub.name} className="flex justify-between">
-                                <span className="text-[10px] text-gray-500">{sub.name}</span>
-                                <span className="text-[10px] text-gray-400">
+                                <span className="text-xs text-gray-500">{sub.name}</span>
+                                <span className="text-xs text-gray-400">
                                   {sub.unitPrice.toLocaleString()}원
                                 </span>
                               </div>
@@ -571,7 +571,7 @@ export default function RenderingPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
-                    <span className="text-[10px] text-gray-400">{item.category}</span>
+                    <span className="text-xs text-gray-400">{item.category}</span>
                     <span
                       className={`px-1 text-[9px] font-medium rounded ${grade.bg} ${grade.color}`}
                     >
@@ -676,7 +676,7 @@ export default function RenderingPage() {
                     {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                     {g.label}
                     {p && !isDone && (
-                      <span className="text-[10px] text-gray-400">
+                      <span className="text-xs text-gray-400">
                         {p.done}/{p.total}
                       </span>
                     )}
@@ -715,7 +715,7 @@ export default function RenderingPage() {
                     />
                   </div>
                 )}
-                <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                <p className="text-xs text-gray-400 text-center mt-1.5">
                   {project?.floorPlanMaskUrl
                     ? "방을 클릭하면 해당 공간의 자재를 선택할 수 있습니다"
                     : "도면을 참고하여 아래 공종별 자재를 선택하세요"}
@@ -750,7 +750,7 @@ export default function RenderingPage() {
                         {isDone && <CheckCircle2 className="w-3.5 h-3.5 text-green-500" />}
                         {g.label}
                         {!isDone && p && (
-                          <span className="text-[10px] opacity-60">
+                          <span className="text-xs opacity-60">
                             {p.done}/{p.total}
                           </span>
                         )}
@@ -1018,10 +1018,10 @@ export default function RenderingPage() {
               ) : (
                 <div className="rounded-lg bg-gray-50 border border-dashed border-gray-200 p-3 text-center">
                   <Palette className="w-5 h-5 mx-auto text-gray-300 mb-1" />
-                  <p className="text-[10px] text-gray-400">
+                  <p className="text-xs text-gray-400">
                     AI 디자인 이미지가 없습니다
                   </p>
-                  <p className="text-[10px] text-gray-300">
+                  <p className="text-xs text-gray-300">
                     디자인하기 탭에서 AI 디자인을 생성해보세요
                   </p>
                 </div>
@@ -1062,7 +1062,7 @@ export default function RenderingPage() {
                     ) : null}
                     {room.name}
                     {!isComplete && (
-                      <span className="text-[10px] opacity-60">
+                      <span className="text-xs opacity-60">
                         {done}/{cats.length}
                       </span>
                     )}
@@ -1146,13 +1146,13 @@ export default function RenderingPage() {
                                       >
                                         {product.productName.charAt(0)}
                                       </span>
-                                      <span className={`text-[10px] mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[cat.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
+                                      <span className={`text-xs mt-0.5 ${product.colorHex ? "text-white/60" : (CATEGORY_SWATCH[cat.code] ?? DEFAULT_SWATCH).text + " opacity-60"}`}
                                         style={product.colorHex ? { textShadow: "0 1px 2px rgba(0,0,0,0.2)" } : undefined}
                                       >
                                         {cat.nameKr}
                                       </span>
                                     </div>
-                                    <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-bold border ${grade.bg} ${grade.border} ${grade.color}`}>
+                                    <div className={`absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-bold border ${grade.bg} ${grade.border} ${grade.color}`}>
                                       {grade.label}
                                     </div>
                                     {isSelected && (
@@ -1162,7 +1162,7 @@ export default function RenderingPage() {
                                     )}
                                   </div>
                                   <div className="p-3">
-                                    <p className="text-[10px] text-gray-400 mb-0.5">{product.brand}</p>
+                                    <p className="text-xs text-gray-400 mb-0.5">{product.brand}</p>
                                     <p className={`text-sm font-bold mb-1 leading-snug ${isSelected ? "text-blue-800" : "text-gray-800"}`}>
                                       {product.productName}
                                     </p>
@@ -1170,9 +1170,9 @@ export default function RenderingPage() {
                                     <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
                                       <div>
                                         <span className="text-base font-extrabold text-gray-900">{product.unitPrice.toLocaleString()}</span>
-                                        <span className="text-[10px] text-gray-400 ml-0.5">원/{product.unit}</span>
+                                        <span className="text-xs text-gray-400 ml-0.5">원/{product.unit}</span>
                                       </div>
-                                      <span className="text-[10px] text-gray-400">시공 {product.laborPrice.toLocaleString()}</span>
+                                      <span className="text-xs text-gray-400">시공 {product.laborPrice.toLocaleString()}</span>
                                     </div>
                                   </div>
                                 </button>

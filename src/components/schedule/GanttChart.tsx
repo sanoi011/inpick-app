@@ -366,7 +366,7 @@ export function GanttChart({
           {schedule.phases.map((p) => (
             <div key={p.id} className="flex items-center gap-1">
               <div className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: p.color }} />
-              <span className="text-[10px] text-gray-500">{p.name}</span>
+              <span className="text-xs text-gray-500">{p.name}</span>
             </div>
           ))}
         </div>

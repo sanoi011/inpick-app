@@ -107,7 +107,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           {(adminName || adminEmail) && (
             <div className="px-3 mb-2">
               <p className="text-xs text-gray-400 truncate">{adminName || "Admin"}</p>
-              <p className="text-[10px] text-gray-500 truncate">{adminEmail}</p>
+              <p className="text-xs text-gray-500 truncate">{adminEmail}</p>
             </div>
           )}
           <Link

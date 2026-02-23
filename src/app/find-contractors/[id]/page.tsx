@@ -271,12 +271,12 @@ export default function ContractorDetailPage() {
                       )}
                       <div className="flex items-center gap-2 mt-2">
                         {p.project_type && (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-[10px] rounded">
+                          <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
                             {p.project_type}
                           </span>
                         )}
                         {p.completion_date && (
-                          <span className="text-[10px] text-gray-400">
+                          <span className="text-xs text-gray-400">
                             {new Date(p.completion_date).toLocaleDateString("ko-KR")}
                           </span>
                         )}
@@ -348,11 +348,11 @@ export default function ContractorDetailPage() {
                         ))}
                       </div>
                       {r.is_verified && (
-                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-medium rounded">
+                        <span className="px-1.5 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded">
                           인증됨
                         </span>
                       )}
-                      <span className="text-[10px] text-gray-400 ml-auto">
+                      <span className="text-xs text-gray-400 ml-auto">
                         {new Date(r.created_at).toLocaleDateString("ko-KR")}
                       </span>
                     </div>
@@ -378,7 +378,7 @@ export default function ContractorDetailPage() {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-gray-900">{t.trade_name}</span>
                     {t.is_primary && (
-                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded">
+                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">
                         주공종
                       </span>
                     )}

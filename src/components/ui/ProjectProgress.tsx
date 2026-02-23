@@ -59,7 +59,7 @@ export function ProjectProgress({ status, compact = false }: ProjectProgressProp
             </div>
           );
         })}
-        <span className="text-[10px] text-gray-400 ml-1.5">
+        <span className="text-xs text-gray-400 ml-1.5">
           {currentStep > 6 ? "완료" : `${currentStep}/6`}
         </span>
       </div>
@@ -88,7 +88,7 @@ export function ProjectProgress({ status, compact = false }: ProjectProgressProp
                 <Icon className="w-3.5 h-3.5" />
               </div>
               <span
-                className={`text-[10px] mt-1 whitespace-nowrap ${
+                className={`text-xs mt-1 whitespace-nowrap ${
                   isCompleted
                     ? "text-green-600 font-medium"
                     : isCurrent

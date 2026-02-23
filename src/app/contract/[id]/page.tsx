@@ -156,7 +156,7 @@ function ContractPart1({ contract, contractor }: {
             <h4 className="font-bold text-gray-800">제11조 (분쟁해결)</h4>
             <p>본 계약에 관한 분쟁은 갑·을 합의에 의해 해결하되, 합의가 이루어지지 않을 경우 관할 법원의 판결에 따른다.</p>
 
-            <div className="mt-4 pt-3 border-t border-gray-200 text-[10px] text-gray-400">
+            <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-400">
               본 계약서는 공정거래위원회 실내건축공사 표준계약서(표준약관 제10096호)를 준용하여 작성되었습니다.
             </div>
           </div>
@@ -317,13 +317,13 @@ function ContractPart3({ contract }: { contract: Contract }) {
                 <div className="p-4">
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="p-3 bg-blue-50 rounded-lg">
-                      <p className="text-[10px] text-blue-500 mb-1">직접 재료비</p>
+                      <p className="text-xs text-blue-500 mb-1">직접 재료비</p>
                       <p className="text-sm font-bold text-blue-800">
                         {fmt(Number((estimateData as Record<string, unknown>).directMaterialCost) || 0)}원
                       </p>
                     </div>
                     <div className="p-3 bg-indigo-50 rounded-lg">
-                      <p className="text-[10px] text-indigo-500 mb-1">직접 노무비</p>
+                      <p className="text-xs text-indigo-500 mb-1">직접 노무비</p>
                       <p className="text-sm font-bold text-indigo-800">
                         {fmt(Number((estimateData as Record<string, unknown>).directLaborCost) || 0)}원
                       </p>
@@ -351,7 +351,7 @@ function ContractPart3({ contract }: { contract: Contract }) {
               ) : (
                 <div className="p-6 text-center">
                   <p className="text-xs text-gray-400">세부내역이 첨부되지 않았습니다</p>
-                  <p className="text-[10px] text-gray-300 mt-1">계약 금액: {fmt(contract.totalAmount)}원</p>
+                  <p className="text-xs text-gray-300 mt-1">계약 금액: {fmt(contract.totalAmount)}원</p>
                 </div>
               )}
             </div>
@@ -412,7 +412,7 @@ function ContractPart4({ contract, onSign, contractor }: {
             contract.consumerSignature ? "border-green-300 bg-green-50" : "border-dashed border-gray-300"
           }`}>
             <p className="text-xs font-bold text-gray-500 mb-1">갑 (소비자)</p>
-            <p className="text-[10px] text-gray-400 mb-3">발주자 서명</p>
+            <p className="text-xs text-gray-400 mb-3">발주자 서명</p>
             {contract.consumerSignature ? (
               <div className="flex flex-col items-center gap-2">
                 {consumerSigImage ? (
@@ -422,7 +422,7 @@ function ContractPart4({ contract, onSign, contractor }: {
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
                 )}
                 <p className="text-xs font-medium text-green-700">서명 완료</p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-xs text-gray-400">
                   {new Date(contract.consumerSignature).toLocaleDateString("ko-KR")} {new Date(contract.consumerSignature).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>
@@ -442,7 +442,7 @@ function ContractPart4({ contract, onSign, contractor }: {
             contract.contractorSignature ? "border-green-300 bg-green-50" : "border-dashed border-gray-300"
           }`}>
             <p className="text-xs font-bold text-gray-500 mb-1">을 (시공사)</p>
-            <p className="text-[10px] text-gray-400 mb-3">수급인 서명</p>
+            <p className="text-xs text-gray-400 mb-3">수급인 서명</p>
             {contract.contractorSignature ? (
               <div className="flex flex-col items-center gap-2">
                 {contractorSigImage ? (
@@ -452,7 +452,7 @@ function ContractPart4({ contract, onSign, contractor }: {
                   <CheckCircle2 className="w-10 h-10 text-green-500" />
                 )}
                 <p className="text-xs font-medium text-green-700">서명 완료</p>
-                <p className="text-[10px] text-gray-400">
+                <p className="text-xs text-gray-400">
                   {new Date(contract.contractorSignature).toLocaleDateString("ko-KR")} {new Date(contract.contractorSignature).toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" })}
                 </p>
               </div>

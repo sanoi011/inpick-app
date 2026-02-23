@@ -41,7 +41,7 @@ export default function ViewerToolbar({
         {onToggleMirror && (
           <button
             onClick={onToggleMirror}
-            className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
               mirrored
                 ? "bg-indigo-600 text-white"
                 : "bg-gray-50 text-gray-600 hover:bg-gray-100 border border-gray-200"
@@ -55,7 +55,7 @@ export default function ViewerToolbar({
         {onToggleEditDimensions && (
           <button
             onClick={onToggleEditDimensions}
-            className={`flex items-center gap-1 px-2.5 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-lg transition-colors ${
               editingDimensions
                 ? "bg-red-600 text-white"
                 : "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200"
@@ -89,7 +89,7 @@ export default function ViewerToolbar({
         {onToggleDimensions && (
           <button
             onClick={onToggleDimensions}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg transition-colors ${
               showDimensions ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"
             }`}
             title="치수선"
@@ -101,7 +101,7 @@ export default function ViewerToolbar({
         {onToggleEngInfo && (
           <button
             onClick={onToggleEngInfo}
-            className={`flex items-center gap-1 px-2 py-1 text-[10px] font-medium rounded-lg transition-colors ${
+            className={`flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg transition-colors ${
               showEngInfo ? "bg-gray-800 text-white" : "text-gray-500 hover:bg-gray-100"
             }`}
             title="구조 정보"

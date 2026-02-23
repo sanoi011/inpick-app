@@ -1162,7 +1162,7 @@ export default function FloorPlanPage() {
                 </div>
                 <span className="text-xs font-bold text-gray-700">AI 인테리어 상담</span>
                 {aiMessages.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-semibold rounded-full">
+                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-full">
                     {aiMessages.filter(m => m.role === "user").length}회 대화
                   </span>
                 )}
@@ -1230,7 +1230,7 @@ export default function FloorPlanPage() {
                     key={qp}
                     onClick={() => setAiInput(qp)}
                     disabled={aiGenerating || generatingDesign}
-                    className="flex items-center gap-1 px-2 py-1.5 text-[10px] font-medium rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-40 text-left leading-tight"
+                    className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-40 text-left leading-tight"
                   >
                     <Sparkles className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />{qp}
                   </button>
@@ -1310,12 +1310,12 @@ export default function FloorPlanPage() {
                   </span>
                 )}
                 {floorPlan && (
-                  <span className="px-1.5 py-px bg-emerald-100 text-emerald-700 text-[10px] font-semibold rounded">
+                  <span className="px-1.5 py-px bg-emerald-100 text-emerald-700 text-xs font-semibold rounded">
                     구조분석 완료
                   </span>
                 )}
                 {floorPlanImageUrl && !floorPlan && (
-                  <span className="px-1.5 py-px bg-blue-100 text-blue-700 text-[10px] font-semibold rounded">
+                  <span className="px-1.5 py-px bg-blue-100 text-blue-700 text-xs font-semibold rounded">
                     AI 생성 도면
                   </span>
                 )}
@@ -1376,7 +1376,7 @@ export default function FloorPlanPage() {
                       </div>
                     </button>
                   </div>
-                  <p className="text-[10px] text-gray-400 text-center mt-4">
+                  <p className="text-xs text-gray-400 text-center mt-4">
                     대부분의 신축 아파트는 확장형으로 시공됩니다
                   </p>
                 </div>
@@ -1430,7 +1430,7 @@ export default function FloorPlanPage() {
                         </div>
                         <div className="mt-3 flex gap-2">
                           {["거실", "부엌", "침실", "욕실"].map((label) => (
-                            <span key={label} className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-[10px] font-medium rounded-full animate-pulse">
+                            <span key={label} className="px-2 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-medium rounded-full animate-pulse">
                               {label}
                             </span>
                           ))}
@@ -1458,13 +1458,13 @@ export default function FloorPlanPage() {
 
                         {/* 좌측 상단: AI 라벨 + 방 이름 */}
                         <div className="absolute top-3 left-3 z-20 flex items-center gap-2">
-                          <div className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-[10px] font-bold rounded-lg shadow-md flex items-center gap-1">
+                          <div className="px-2.5 py-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs font-bold rounded-lg shadow-md flex items-center gap-1">
                             <Sparkles className="w-3 h-3" /> AI 생성 디자인
                           </div>
                           <div className="px-2.5 py-1 bg-white/90 backdrop-blur-sm text-gray-800 text-xs font-bold rounded-lg shadow-md border border-gray-200">
                             {generatedDesigns[designSlideIndex]?.label}
                           </div>
-                          <div className="px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-[10px] font-medium rounded-lg">
+                          <div className="px-2 py-1 bg-black/50 backdrop-blur-sm text-white text-xs font-medium rounded-lg">
                             {designSlideIndex + 1} / {generatedDesigns.length}
                           </div>
                         </div>
@@ -1652,7 +1652,7 @@ export default function FloorPlanPage() {
             </div>
             <span className="whitespace-nowrap font-medium">{parseWarnings[0]}</span>
             {parseWarnings.length > 1 && (
-              <span className="px-1.5 py-0.5 bg-amber-200 text-amber-700 text-[10px] font-semibold rounded-full">+{parseWarnings.length - 1}</span>
+              <span className="px-1.5 py-0.5 bg-amber-200 text-amber-700 text-xs font-semibold rounded-full">+{parseWarnings.length - 1}</span>
             )}
           </div>
         )}
@@ -1678,7 +1678,7 @@ export default function FloorPlanPage() {
               )}
             </button>
             {!generatingDesign && (
-              <p className="text-center text-[10px] text-white/80 mt-1.5 drop-shadow-sm">
+              <p className="text-center text-xs text-white/80 mt-1.5 drop-shadow-sm">
                 도면 + 채팅 + 옵션 종합 분석
               </p>
             )}

@@ -46,7 +46,7 @@ export function AIConsultAnimation() {
             <div className="w-2 h-2 rounded-full bg-emerald-400" />
             <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Design Analysis</span>
           </div>
-          <span className="text-[10px] font-mono text-slate-500">{progress}%</span>
+          <span className="text-xs font-mono text-slate-500">{progress}%</span>
         </div>
 
         {/* Progress bar */}
@@ -125,14 +125,14 @@ export function AIConsultAnimation() {
                       style={{ fontFeatureSettings: "'tnum'" }}>1,850
                       <span className="text-sm font-normal text-slate-400 ml-1">만원</span>
                     </div>
-                    <div className="text-[10px] text-cyan-400/80 font-medium">견적 산출 완료</div>
+                    <div className="text-xs text-cyan-400/80 font-medium">견적 산출 완료</div>
                   </div>
                 </div>
               )}
 
               {!isAnalyzing && !showResult && (
                 <div className="h-full flex items-center justify-center">
-                  <span className="text-[10px] text-slate-600">AI 분석 대기</span>
+                  <span className="text-xs text-slate-600">AI 분석 대기</span>
                 </div>
               )}
             </div>
@@ -295,10 +295,10 @@ export function PriceSyncAnimation() {
                   backgroundColor: isHighlighted ? `${SOURCES[activeSource].color}08` : "transparent",
                   borderBottom: "1px solid rgba(255,255,255,0.03)",
                 }}>
-                <span className={`flex-1 text-[10px] ${isHighlighted ? "text-white/80" : "text-slate-400"}`}>
+                <span className={`flex-1 text-xs ${isHighlighted ? "text-white/80" : "text-slate-400"}`}>
                   {item.name}
                 </span>
-                <span className={`w-24 text-right text-[10px] font-mono ${isHighlighted ? "text-cyan-400" : "text-slate-300"}`}>
+                <span className={`w-24 text-right text-xs font-mono ${isHighlighted ? "text-cyan-400" : "text-slate-300"}`}>
                   ₩{item.price}
                 </span>
                 <span className="w-10 text-right text-[9px] text-slate-500">/{item.unit}</span>
@@ -547,7 +547,7 @@ export function EstimateViewerAnimation() {
             {/* Room label overlay */}
             <div className="absolute bottom-2 left-2 px-2 py-1 rounded-md"
               style={{ backgroundColor: `${room.accent}20`, border: `1px solid ${room.accent}40` }}>
-              <span className="text-[10px] font-semibold" style={{ color: room.accent }}>{room.label}</span>
+              <span className="text-xs font-semibold" style={{ color: room.accent }}>{room.label}</span>
               <span className="text-[9px] text-slate-400 ml-1.5">{room.area}m²</span>
             </div>
 
@@ -567,7 +567,7 @@ export function EstimateViewerAnimation() {
               <div className="text-[9px] text-slate-500 mb-0.5">예상 견적</div>
               <div className="flex items-baseline gap-1">
                 <span className="text-lg font-bold text-white/90 font-mono">{room.cost}</span>
-                <span className="text-[10px] text-slate-400">만원</span>
+                <span className="text-xs text-slate-400">만원</span>
               </div>
             </div>
 

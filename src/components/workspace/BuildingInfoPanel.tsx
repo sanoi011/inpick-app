@@ -129,21 +129,21 @@ export default function BuildingInfoPanel({ selectedAddress, onSelectBuilding, s
               {selectedAddress.buildingName} {selectedBuilding.dongName} {selectedBuilding.hoName}
             </p>
             {selectedBuilding.typeName && (
-              <p className="text-blue-200 text-[10px] mt-0.5">{selectedBuilding.typeName}형</p>
+              <p className="text-blue-200 text-xs mt-0.5">{selectedBuilding.typeName}형</p>
             )}
           </div>
           <div className="p-3 grid grid-cols-2 gap-2">
             <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
               <Maximize className="w-3.5 h-3.5 text-blue-600" />
               <div>
-                <p className="text-[10px] text-gray-500">전용</p>
+                <p className="text-xs text-gray-500">전용</p>
                 <p className="text-xs font-semibold">{selectedBuilding.exclusiveArea}m²</p>
               </div>
             </div>
             <div className="flex items-center gap-2 p-2 bg-gray-50 rounded">
               <BedDouble className="w-3.5 h-3.5 text-green-600" />
               <div>
-                <p className="text-[10px] text-gray-500">방/욕실</p>
+                <p className="text-xs text-gray-500">방/욕실</p>
                 <p className="text-xs font-semibold">{selectedBuilding.roomCount || "?"}방 {selectedBuilding.bathroomCount || "?"}욕</p>
               </div>
             </div>
@@ -166,12 +166,12 @@ export default function BuildingInfoPanel({ selectedAddress, onSelectBuilding, s
       </h3>
 
       {source === "known_apartment" && (
-        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-[10px] text-green-700">
+        <div className="mb-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
           실측 도면 기반 정확 데이터
         </div>
       )}
       {(source === "naver_land" || source === "naver_land_cache") && (
-        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-[10px] text-blue-700">
+        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded text-xs text-blue-700">
           네이버 부동산 데이터
         </div>
       )}
@@ -232,11 +232,11 @@ export default function BuildingInfoPanel({ selectedAddress, onSelectBuilding, s
                         <Home className="w-4 h-4 text-blue-600 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-medium text-gray-900">{unit.hoName}</p>
-                          <p className="text-[10px] text-gray-500">
+                          <p className="text-xs text-gray-500">
                             {unit.typeName ? `${unit.typeName}형 | ` : ""}{unit.exclusiveArea}m²
                           </p>
                         </div>
-                        <span className="text-[10px] text-gray-400">{unit.floor}층</span>
+                        <span className="text-xs text-gray-400">{unit.floor}층</span>
                       </button>
                     ))}
                   </div>
@@ -299,7 +299,7 @@ function ManualInputSection({
     <div className="space-y-3">
       <div className="flex gap-2">
         <div className="flex-1">
-          <label className="text-[10px] text-gray-500 mb-0.5 block">동</label>
+          <label className="text-xs text-gray-500 mb-0.5 block">동</label>
           <input
             type="text"
             value={manualDong}
@@ -309,7 +309,7 @@ function ManualInputSection({
           />
         </div>
         <div className="flex-1">
-          <label className="text-[10px] text-gray-500 mb-0.5 block">호</label>
+          <label className="text-xs text-gray-500 mb-0.5 block">호</label>
           <input
             type="text"
             value={manualHo}
@@ -345,7 +345,7 @@ function ManualInputSection({
       {pyeongList.length > 0 && (
         <div>
           {manualComplexName && (
-            <p className="text-[10px] text-gray-500 mb-1.5 font-medium">{manualComplexName}</p>
+            <p className="text-xs text-gray-500 mb-1.5 font-medium">{manualComplexName}</p>
           )}
           <div className="space-y-1.5">
             {pyeongList.map((p) => (
@@ -359,17 +359,17 @@ function ManualInputSection({
                     <p className="text-xs font-semibold text-gray-900">
                       {p.pyeongName}평형
                     </p>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-xs text-gray-500">
                       전용 {p.exclusiveArea}m² · {p.roomCnt}방 {p.bathroomCnt}욕
                     </p>
                   </div>
                   {p.hasFloorPlan ? (
-                    <span className="flex items-center gap-0.5 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
+                    <span className="flex items-center gap-0.5 text-xs text-green-600 bg-green-50 px-1.5 py-0.5 rounded">
                       <ImageIcon className="w-3 h-3" />
                       도면
                     </span>
                   ) : (
-                    <span className="text-[10px] text-gray-400">도면없음</span>
+                    <span className="text-xs text-gray-400">도면없음</span>
                   )}
                 </div>
               </button>
@@ -379,7 +379,7 @@ function ManualInputSection({
       )}
 
       {pyeongList.length === 0 && !pyeongLoading && manualComplexName && (
-        <p className="text-[10px] text-gray-400 text-center py-2">평형 정보를 찾을 수 없습니다</p>
+        <p className="text-xs text-gray-400 text-center py-2">평형 정보를 찾을 수 없습니다</p>
       )}
     </div>
   );

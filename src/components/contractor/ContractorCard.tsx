@@ -56,7 +56,7 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
 
       {/* 업체 유형 + 공종 */}
       <div className="flex flex-wrap gap-1 mb-2">
-        <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+        <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
           CONTRACTOR_TYPE_COLORS[contractor.contractorType]
         }`}>
           {CONTRACTOR_TYPE_LABELS[contractor.contractorType]}
@@ -64,13 +64,13 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
         {contractor.trades.slice(0, 3).map((t) => (
           <span
             key={t.code}
-            className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600"
+            className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
           >
             {t.name}
           </span>
         ))}
         {contractor.trades.length > 3 && (
-          <span className="px-1.5 py-0.5 rounded text-[10px] text-gray-400">
+          <span className="px-1.5 py-0.5 rounded text-xs text-gray-400">
             +{contractor.trades.length - 3}
           </span>
         )}

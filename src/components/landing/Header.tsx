@@ -84,7 +84,7 @@ export default function Header({
             <a key={link.href} href={link.href} className={`text-sm font-medium transition-colors hover:opacity-70 whitespace-nowrap ${isScrolled ? "" : "!text-white/80 hover:!text-white"}`} style={{ color: isScrolled ? colors.text : undefined }}>
               {link.label}
               {link.label === "커뮤니티" && (
-                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold bg-violet-500 text-white rounded-full leading-none align-middle">NEW</span>
+                <span className="ml-1 inline-flex items-center px-1.5 py-0.5 text-xs font-bold bg-violet-500 text-white rounded-full leading-none align-middle">NEW</span>
               )}
             </a>
           ))}
@@ -172,7 +172,7 @@ export default function Header({
                       <a key={link.href} href={link.href} className="text-lg font-medium py-2 min-h-[44px] flex items-center" style={{ color: colors.text }} onClick={() => setMobileMenuOpen(false)}>
                         {link.label}
                         {link.label === "커뮤니티" && (
-                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-[10px] font-bold bg-violet-500 text-white rounded-full leading-none align-middle">NEW</span>
+                          <span className="ml-2 inline-flex items-center px-1.5 py-0.5 text-xs font-bold bg-violet-500 text-white rounded-full leading-none align-middle">NEW</span>
                         )}
                       </a>
                     ))}

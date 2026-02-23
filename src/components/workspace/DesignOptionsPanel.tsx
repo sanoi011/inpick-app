@@ -80,7 +80,7 @@ export default function DesignOptionsPanel({ preferences, onChange }: Props) {
           </div>
           <span className="text-sm font-bold text-gray-900">디자인 옵션</span>
           {prefs.style && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-medium rounded-full">
+            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full">
               {prefs.style}
             </span>
           )}
@@ -117,7 +117,7 @@ export default function DesignOptionsPanel({ preferences, onChange }: Props) {
                       <Icon className="w-4 h-4" />
                     </div>
                     <span
-                      className={`text-[10px] font-medium ${
+                      className={`text-xs font-medium ${
                         selected ? "text-blue-600" : "text-gray-500"
                       }`}
                     >
@@ -155,7 +155,7 @@ export default function DesignOptionsPanel({ preferences, onChange }: Props) {
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                     <span
-                      className={`text-[10px] font-bold ${
+                      className={`text-xs font-bold ${
                         selected ? "text-blue-700" : "text-gray-600"
                       }`}
                     >
