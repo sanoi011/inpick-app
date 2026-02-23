@@ -129,10 +129,10 @@ export async function detect(imageData: ImageData | HTMLCanvasElement | HTMLImag
   const outputName = session.outputNames[0] || "output0";
   const output = results[outputName];
 
-  // YOLOv8 output: [1, 8+4, num_detections] → transpose → [num_detections, 12]
+  // YOLOv26 output: [1, 8+4, num_detections] → transpose → [num_detections, 12]
   // 4 = cx, cy, w, h (normalized)
   // 8 = class confidences
-  const detections = parseYOLOv8Output(output.data as Float32Array, output.dims as number[]);
+  const detections = parseYOLOOutput(output.data as Float32Array, output.dims as number[]);
 
   // NMS
   const nmsResults = nonMaxSuppression(detections, IOU_THRESHOLD);
@@ -140,10 +140,10 @@ export async function detect(imageData: ImageData | HTMLCanvasElement | HTMLImag
   return nmsResults;
 }
 
-function parseYOLOv8Output(data: Float32Array, dims: number[]): Detection[] {
+function parseYOLOOutput(data: Float32Array, dims: number[]): Detection[] {
   const detections: Detection[] = [];
 
-  // YOLOv8 output shape: [1, num_classes+4, num_boxes]
+  // YOLOv26 output shape: [1, num_classes+4, num_boxes]
   // dims = [1, 12, 8400] for 8 classes
   if (dims.length !== 3) return detections;
 

@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
 
         // AI 이미지 생성
         const response = await client.models.generateContent({
-          model: "gemini-3-pro-image-preview",
+          model: "gemini-3.0-pro",
           contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
           config: {
             responseModalities: ["IMAGE", "TEXT"],

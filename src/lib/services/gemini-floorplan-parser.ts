@@ -989,8 +989,8 @@ export async function extractFloorPlanFromImage(
     }
   }
 
-  // 모델 폴백 순서: gemini-2.5-flash → gemini-2.0-flash → gemini-2.0-flash-lite
-  const MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"];
+  // 모델 폴백 순서: gemini-3.0-pro → gemini-3.0-flash → gemini-3.0-flash-lite
+  const MODELS = ["gemini-3.0-pro", "gemini-3.0-flash", "gemini-3.0-flash-lite"];
 
   // JSON 스키마 문자열 (시스템 프롬프트에 포함)
   const JSON_SCHEMA_STR = JSON.stringify(JSON_SCHEMA, null, 2);

@@ -206,7 +206,7 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
     let response;
     try {
       response = await client.models.generateContent({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3.0-pro",
         contents: [{
           role: "user",
           parts: [

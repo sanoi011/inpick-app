@@ -168,7 +168,7 @@ export async function POST(request: NextRequest) {
       }));
 
     const response = await client.models.generateContentStream({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.0-pro",
       contents: geminiContents,
       config: {
         systemInstruction: systemPrompt,
