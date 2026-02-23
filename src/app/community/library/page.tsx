@@ -177,7 +177,7 @@ function PromptCard({
   return (
     <div className="flex flex-col rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="mb-2 flex items-center justify-between">
-        <span className="rounded bg-violet-50 px-2 py-0.5 text-[10px] font-medium text-violet-600">
+        <span className="rounded bg-violet-50 px-2 py-0.5 text-xs font-medium text-violet-600">
           {prompt.category}
         </span>
         <div className="flex items-center gap-0.5">
@@ -195,14 +195,14 @@ function PromptCard({
         {prompt.tags.map((tag) => (
           <span
             key={tag}
-            className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-500"
+            className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500"
           >
             #{tag}
           </span>
         ))}
       </div>
       <div className="mt-3 flex items-center justify-between border-t pt-3">
-        <span className="text-[10px] text-gray-400">
+        <span className="text-xs text-gray-400">
           {prompt.useCount.toLocaleString()}회 사용
         </span>
         <div className="flex gap-1">

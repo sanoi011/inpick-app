@@ -104,7 +104,7 @@ export default function CommunityMapPage() {
                       시공사례 {region.caseCount}건
                     </p>
                     {!hasCases && (
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] text-gray-400">
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-400">
                         업데이트 예정
                       </span>
                     )}

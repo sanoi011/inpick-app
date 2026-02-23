@@ -103,7 +103,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                         <Lock className="w-3 h-3" />
                       </span>
                       <tab.icon className="w-4 h-4 text-gray-300" />
-                      <span className="hidden lg:inline text-gray-400">{tab.label}</span>
+                      <span className="hidden md:inline text-gray-400">{tab.label}</span>
                     </span>
                   );
                 }
@@ -138,7 +138,7 @@ export default function ProjectLayout({ children }: { children: React.ReactNode 
                     <tab.icon className={`w-4 h-4 ${
                       isCompleted ? "text-green-500" : active ? "text-blue-600" : "text-gray-400"
                     }`} />
-                    <span className="hidden lg:inline">{tab.label}</span>
+                    <span className="hidden md:inline">{tab.label}</span>
                   </Link>
                 );
               })}

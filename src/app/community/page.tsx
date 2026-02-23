@@ -101,7 +101,7 @@ export default function CommunityExplorePage() {
                     <Icon className={`w-5 h-5 ${meta.color}`} />
                   </div>
                   <span className="text-xs sm:text-sm font-bold text-gray-900">{board.name}</span>
-                  <span className="text-[10px] sm:text-xs text-gray-500">{board.threadCount.toLocaleString()}개 글</span>
+                  <span className="text-xs text-gray-500">{board.threadCount.toLocaleString()}개 글</span>
                 </Link>
               );
             })}

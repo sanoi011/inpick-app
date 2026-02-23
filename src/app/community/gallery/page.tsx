@@ -183,7 +183,7 @@ export default function CommunityGalleryPage() {
                 <div
                   className={`relative h-48 bg-gradient-to-br ${item.gradient}`}
                 >
-                  <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-[10px] font-medium text-white">
+                  <div className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-0.5 text-xs font-medium text-white">
                     {STYLE_OPTIONS.find((s) => s.value === item.style)?.label}{" "}
                     /{" "}
                     {ROOM_TYPE_OPTIONS.find((r) => r.value === item.roomType)

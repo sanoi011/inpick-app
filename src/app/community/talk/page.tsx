@@ -216,11 +216,11 @@ function ThreadRow({ thread }: { thread: DiscussionThread }) {
         {/* Content */}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500">
+            <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-500">
               {boardName}
             </span>
             {thread.isAnonymous && (
-              <span className="rounded bg-violet-50 px-1.5 py-0.5 text-[10px] font-medium text-violet-600">
+              <span className="rounded bg-violet-50 px-1.5 py-0.5 text-xs font-medium text-violet-600">
                 익명
               </span>
             )}
