@@ -43,6 +43,8 @@ export default function DrawingGenerationProgress({ contractId, onComplete, onCa
 
   useEffect(() => {
     const abortController = new AbortController();
+    // 5분 타임아웃 (Vercel Pro maxDuration=300)
+    const timeout = setTimeout(() => abortController.abort(), 310000);
 
     async function run() {
       try {
@@ -53,15 +55,15 @@ export default function DrawingGenerationProgress({ contractId, onComplete, onCa
         );
         const checkData = await checkRes.json();
 
-        if (checkData.exists && checkData.drawingSet?.status === "completed") {
+        if (checkData.exists && checkData.drawingSet?.status === "completed" && checkData.drawings?.length > 0) {
           setProgress(100);
           setCompleted(true);
           setMessage("기존 도면 세트를 불러왔습니다.");
           onCompleteRef.current({
             drawingSetId: checkData.drawingSet.id,
-            drawingCount: checkData.drawings?.length || 0,
+            drawingCount: checkData.drawings.length,
             processingTimeMs: 0,
-            drawings: (checkData.drawings || []).map((d: Record<string, unknown>) => ({
+            drawings: checkData.drawings.map((d: Record<string, unknown>) => ({
               drawingType: d.drawing_type,
               finalUrl: d.final_url,
               metadata: d.metadata,
@@ -114,19 +116,30 @@ export default function DrawingGenerationProgress({ contractId, onComplete, onCa
               } else if (data.event === "error") {
                 setError(data.message || "알 수 없는 오류");
               }
-            } catch {
-              // JSON 파싱 에러 무시
+            } catch (parseErr) {
+              console.error("[drawing-progress] SSE parse error:", parseErr, trimmed.slice(0, 200));
             }
           }
         }
       } catch (err) {
-        if ((err as Error).name === "AbortError") return;
-        setError((err as Error).message || "연결 오류");
+        if ((err as Error).name === "AbortError") {
+          if (!abortController.signal.aborted) return;
+          setError("도면 생성 시간이 초과되었습니다. 다시 시도해주세요.");
+          return;
+        }
+        const msg = (err as Error).message || "";
+        if (msg === "Failed to fetch" || msg.includes("network")) {
+          setError("네트워크 연결이 끊겼습니다. 다시 시도해주세요.");
+        } else {
+          setError(msg || "연결 오류");
+        }
+      } finally {
+        clearTimeout(timeout);
       }
     }
 
     run();
-    return () => abortController.abort();
+    return () => { clearTimeout(timeout); abortController.abort(); };
   }, [contractId, retryCount]);
 
   const handleRetry = () => {

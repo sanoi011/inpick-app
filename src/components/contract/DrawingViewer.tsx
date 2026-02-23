@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Download, X, Maximize2, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, X, Maximize2, FileText, Loader2 } from "lucide-react";
 import { DRAWING_TYPE_LABELS } from "@/types/construction-drawing";
 import type { DrawingType } from "@/types/construction-drawing";
+import { toast } from "@/components/ui/Toast";
 
 interface Drawing {
   drawingType: string;
@@ -20,6 +21,7 @@ interface Props {
 export default function DrawingViewer({ drawings, pdfUrl, onDownloadPdf }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showModal, setShowModal] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const validDrawings = drawings.filter(d => d.finalUrl);
   if (validDrawings.length === 0) {
@@ -37,12 +39,23 @@ export default function DrawingViewer({ drawings, pdfUrl, onDownloadPdf }: Props
   const goNext = () => setCurrentIndex(i => (i + 1) % validDrawings.length);
   const goPrev = () => setCurrentIndex(i => (i - 1 + validDrawings.length) % validDrawings.length);
 
-  const downloadImage = (url: string, filename: string) => {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.target = "_blank";
-    a.click();
+  const downloadImage = async (url: string, filename: string) => {
+    setDownloading(true);
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      toast({ type: "error", title: "다운로드 실패", message: "이미지를 다운로드할 수 없습니다. URL이 만료되었을 수 있습니다." });
+    } finally {
+      setDownloading(false);
+    }
   };
 
   return (
@@ -146,7 +159,7 @@ export default function DrawingViewer({ drawings, pdfUrl, onDownloadPdf }: Props
                     <FileText className="w-4 h-4 text-gray-300" />
                   </div>
                 )}
-                <span className="text-[10px] text-gray-500 whitespace-nowrap max-w-[70px] truncate">
+                <span className="text-xs text-gray-500 whitespace-nowrap max-w-[70px] truncate">
                   {thumbLabel}
                 </span>
               </button>
@@ -167,11 +180,11 @@ export default function DrawingViewer({ drawings, pdfUrl, onDownloadPdf }: Props
               downloadImage(current.finalUrl, filename);
             }
           }}
-          disabled={!current.finalUrl}
+          disabled={!current.finalUrl || downloading}
           className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-40"
         >
-          <Download className="w-3.5 h-3.5" />
-          현재 도면 다운로드
+          {downloading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+          {downloading ? "다운로드 중..." : "현재 도면 다운로드"}
         </button>
       </div>
 

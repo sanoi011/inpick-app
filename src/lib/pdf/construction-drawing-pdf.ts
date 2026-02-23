@@ -42,6 +42,7 @@ async function loadFonts() {
       fetch("/fonts/NanumGothic-Regular.ttf"),
       fetch("/fonts/NanumGothic-Bold.ttf"),
     ]);
+    if (!regRes.ok || !boldRes.ok) throw new Error("Font fetch failed");
     const [regBuf, boldBuf] = await Promise.all([
       regRes.arrayBuffer(),
       boldRes.arrayBuffer(),
@@ -51,6 +52,10 @@ async function loadFonts() {
     fontsLoaded = true;
   } catch (err) {
     console.error("[drawing-pdf] Font loading failed:", err);
+    // 실패 시 캐시 초기화 → 다음 호출에서 재시도 가능
+    regularFontData = null;
+    boldFontData = null;
+    fontsLoaded = false;
   }
 }
 
@@ -209,11 +214,15 @@ export async function generateConstructionDrawingPdf(
           doc.addImage(imageData, "PNG", MARGIN, 22, imgW, imgH);
         } catch (err) {
           console.error(`[drawing-pdf] Image add error for ${d.drawingType}:`, err);
-          // 이미지 실패 시 플레이스홀더
           doc.setTextColor(139, 148, 158);
           doc.setFontSize(12);
           doc.text("이미지를 불러올 수 없습니다.", PAGE_W / 2, PAGE_H / 2, { align: "center" });
         }
+      } else {
+        // URL 만료 또는 다운로드 실패
+        doc.setTextColor(139, 148, 158);
+        doc.setFontSize(12);
+        doc.text("이미지를 불러올 수 없습니다 (URL 만료)", PAGE_W / 2, PAGE_H / 2, { align: "center" });
       }
     }
 
