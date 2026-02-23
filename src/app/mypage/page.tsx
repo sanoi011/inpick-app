@@ -52,7 +52,7 @@ export default function MyPageDashboard() {
       const activeProjectStatuses = ["ADDRESS_SELECTION", "FLOOR_PLAN", "AI_DESIGN", "RENDERING", "ESTIMATING", "RFQ"];
       setStats({
         activeProjects: projects.filter((p: { status: string }) => activeProjectStatuses.includes(p.status)).length,
-        activeContracts: contracts.filter((c: { status: string }) => ["SIGNED", "IN_PROGRESS", "PENDING_SIGNATURE"].includes(c.status)).length,
+        activeContracts: contracts.filter((c: { status: string }) => ["SIGNED", "IN_PROGRESS", "PENDING_SIGNATURE", "signed", "in_progress", "pending_signature"].includes(c.status)).length,
         unreadNotifications: notifications.filter((n: { is_read?: boolean }) => !n.is_read).length,
       });
 

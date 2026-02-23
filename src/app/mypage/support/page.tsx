@@ -41,14 +41,14 @@ export default function MyPageSupport() {
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center"><Mail className="w-5 h-5 text-blue-600" /></div>
           <div><p className="text-sm font-medium text-gray-900">이메일 문의</p><p className="text-xs text-gray-500">support@inpick.kr</p></div>
         </a>
-        <a href="tel:1588-0000" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all flex items-center gap-3">
+        <div className="bg-white border border-gray-200 rounded-xl p-4 opacity-60 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center"><Phone className="w-5 h-5 text-green-600" /></div>
-          <div><p className="text-sm font-medium text-gray-900">전화 상담</p><p className="text-xs text-gray-500">1588-0000</p></div>
-        </a>
-        <a href="https://pf.kakao.com/_inpick" target="_blank" rel="noopener noreferrer" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-yellow-300 hover:shadow-sm transition-all flex items-center gap-3">
+          <div><p className="text-sm font-medium text-gray-900">전화 상담</p><p className="text-xs text-gray-400">준비 중</p></div>
+        </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-4 opacity-60 flex items-center gap-3">
           <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-yellow-600" /></div>
-          <div><p className="text-sm font-medium text-gray-900">카카오톡 문의</p><p className="text-xs text-gray-500">@inpick</p></div>
-        </a>
+          <div><p className="text-sm font-medium text-gray-900">카카오톡 문의</p><p className="text-xs text-gray-400">준비 중</p></div>
+        </div>
       </div>
 
       {/* FAQ 아코디언 */}
