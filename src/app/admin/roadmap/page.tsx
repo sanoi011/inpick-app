@@ -522,10 +522,15 @@ export default function RoadmapPage() {
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // --- 인증 헤더 ---
+  const authHeaders = useCallback(() => ({
+    Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+  }), []);
+
   // --- 데이터 로드 ---
   const loadData = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/roadmap");
+      const res = await fetch("/api/admin/roadmap", { headers: authHeaders() });
       if (!res.ok) throw new Error();
       const data = await res.json();
       if (data.fromDb && data.features.length > 0) {
@@ -549,7 +554,7 @@ export default function RoadmapPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [authHeaders]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -559,74 +564,74 @@ export default function RoadmapPage() {
     try {
       const res = await fetch("/api/admin/roadmap", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ action: "seed", features: DEFAULT_FEATURES, milestones: DEFAULT_MILESTONES, stats: DEFAULT_STATS }),
       });
       if (res.ok) { await loadData(); }
     } catch { /* silently fail */ } finally { setSaving(false); }
-  }, [loadData]);
+  }, [loadData, authHeaders]);
 
   // --- CRUD 핸들러 ---
   const handleSaveFeature = useCallback(async (data: Partial<DbFeature>) => {
     setSaving(true);
     try {
       if (data.id && !data.id.startsWith("local-")) {
-        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "feature", ...data }) });
+        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "feature", ...data }) });
       } else {
         const { id: _fid, ...rest } = data;
         void _fid;
-        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "feature", ...rest }) });
+        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "feature", ...rest }) });
       }
       await loadData();
     } catch { /* silently fail */ } finally { setSaving(false); setEditingFeature(null); }
-  }, [loadData]);
+  }, [loadData, authHeaders]);
 
   const handleDeleteFeature = useCallback(async (id: string) => {
     if (!confirm("이 기능 카드를 삭제하시겠습니까?")) return;
     setSaving(true);
     try {
-      await fetch(`/api/admin/roadmap?type=feature&id=${id}`, { method: "DELETE" });
+      await fetch(`/api/admin/roadmap?type=feature&id=${id}`, { method: "DELETE", headers: authHeaders() });
       await loadData();
     } catch { /* silently fail */ } finally { setSaving(false); }
-  }, [loadData]);
+  }, [loadData, authHeaders]);
 
   const handleSaveMilestone = useCallback(async (data: Partial<DbMilestone>) => {
     setSaving(true);
     try {
       if (data.id && !data.id.startsWith("local-")) {
-        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "milestone", ...data }) });
+        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "milestone", ...data }) });
       } else {
         const { id: _mid, ...rest } = data;
         void _mid;
-        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "milestone", ...rest }) });
+        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "milestone", ...rest }) });
       }
       await loadData();
     } catch { /* silently fail */ } finally { setSaving(false); setEditingMilestone(null); }
-  }, [loadData]);
+  }, [loadData, authHeaders]);
 
   const handleDeleteMilestone = useCallback(async (id: string) => {
     if (!confirm("이 마일스톤을 삭제하시겠습니까?")) return;
-    try { await fetch(`/api/admin/roadmap?type=milestone&id=${id}`, { method: "DELETE" }); await loadData(); } catch { /* */ }
-  }, [loadData]);
+    try { await fetch(`/api/admin/roadmap?type=milestone&id=${id}`, { method: "DELETE", headers: authHeaders() }); await loadData(); } catch { /* */ }
+  }, [loadData, authHeaders]);
 
   const handleSaveStat = useCallback(async (data: Partial<DbStat>) => {
     setSaving(true);
     try {
       if (data.id && !data.id.startsWith("local-")) {
-        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "stat", ...data }) });
+        await fetch("/api/admin/roadmap", { method: "PATCH", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "stat", ...data }) });
       } else {
         const { id: _sid, ...rest } = data;
         void _sid;
-        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "stat", ...rest }) });
+        await fetch("/api/admin/roadmap", { method: "POST", headers: { "Content-Type": "application/json", ...authHeaders() }, body: JSON.stringify({ type: "stat", ...rest }) });
       }
       await loadData();
     } catch { /* silently fail */ } finally { setSaving(false); setEditingStat(null); }
-  }, [loadData]);
+  }, [loadData, authHeaders]);
 
   const handleDeleteStat = useCallback(async (id: string) => {
     if (!confirm("이 통계를 삭제하시겠습니까?")) return;
-    try { await fetch(`/api/admin/roadmap?type=stat&id=${id}`, { method: "DELETE" }); await loadData(); } catch { /* */ }
-  }, [loadData]);
+    try { await fetch(`/api/admin/roadmap?type=stat&id=${id}`, { method: "DELETE", headers: authHeaders() }); await loadData(); } catch { /* */ }
+  }, [loadData, authHeaders]);
 
   // --- 분류 ---
   const completedFeatures = features.filter(f => f.status === "completed");
