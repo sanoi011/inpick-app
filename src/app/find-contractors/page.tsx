@@ -14,6 +14,7 @@ export default function FindContractorsPage() {
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
 
   // 필터 상태
   const [search, setSearch] = useState("");
@@ -49,8 +50,10 @@ export default function FindContractorsPage() {
       } else {
         setFeatured([]);
       }
-    } catch {
+    } catch (err) {
+      console.error("[find-contractors] Fetch error:", err);
       setContractors([]);
+      setFetchError(true);
     } finally {
       setLoading(false);
     }
@@ -116,12 +119,19 @@ export default function FindContractorsPage() {
           />
         </div>
 
+        {fetchError && (
+          <div className="mb-4 flex items-center justify-between bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-red-700">업체 목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.</p>
+            <button onClick={() => { setFetchError(false); fetchContractors(); }} className="text-sm text-red-600 font-medium hover:text-red-800 whitespace-nowrap ml-3">재시도</button>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
             <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
             <p className="text-sm text-gray-500">업체 목록 불러오는 중...</p>
           </div>
-        ) : contractors.length === 0 ? (
+        ) : contractors.length === 0 && !fetchError ? (
           <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
             <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-gray-900 mb-2">

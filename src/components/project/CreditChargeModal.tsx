@@ -55,6 +55,7 @@ export default function CreditChargeModal({
   const { user } = useAuth();
   const { credits, reload } = useCredits();
   const [charging, setCharging] = useState<string | null>(null);
+  const [chargeError, setChargeError] = useState<string | null>(null);
   const [mockResult, setMockResult] = useState<{
     credits: number;
     newBalance: number;
@@ -66,6 +67,7 @@ export default function CreditChargeModal({
     if (!user || charging) return;
     setCharging(packageId);
     setMockResult(null);
+    setChargeError(null);
 
     try {
       const res = await fetch("/api/payments/checkout", {
@@ -97,8 +99,12 @@ export default function CreditChargeModal({
             user.user_metadata?.full_name || user.email?.split("@")[0],
         });
       }
-    } catch {
-      // 사용자 취소 또는 에러
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "";
+      if (msg && !msg.includes("취소") && !msg.includes("cancel")) {
+        console.error("[credit] Charge error:", err);
+        setChargeError("결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+      }
     } finally {
       setCharging(null);
     }
@@ -148,6 +154,13 @@ export default function CreditChargeModal({
                 무료 {FREE_GENERATION_LIMIT - credits.freeGenerationsUsed}회 남음
               </p>
             )}
+          </div>
+        )}
+
+        {/* 결제 에러 */}
+        {chargeError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-center">
+            <p className="text-sm text-red-700">{chargeError}</p>
           </div>
         )}
 

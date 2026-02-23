@@ -37,6 +37,7 @@ export function ChatWindow({
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -47,8 +48,9 @@ export function ChatWindow({
       const res = await fetch(`/api/chat?roomId=${roomId}&limit=50`);
       const data = await res.json();
       setMessages(data.messages || []);
-    } catch {
-      // silent
+    } catch (err) {
+      console.error("[chat] Failed to load messages:", err);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -192,6 +194,11 @@ export function ChatWindow({
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
+          </div>
+        ) : loadError ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-2">
+            <p className="text-sm text-red-500">메시지를 불러오지 못했습니다</p>
+            <button onClick={() => { setLoadError(false); loadMessages(); }} className="text-xs text-blue-600 hover:text-blue-800">다시 시도</button>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex items-center justify-center py-12 text-sm text-gray-400">
