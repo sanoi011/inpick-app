@@ -711,7 +711,7 @@ export default function RfqPage() {
                 <TrendingDown className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="text-xs text-amber-700">
                   <p className="font-medium mb-1">입찰 안내</p>
-                  <ul className="space-y-0.5 text-[11px]">
+                  <ul className="space-y-0.5 text-xs">
                     <li>- 업체 선택 후 &quot;업체 확정&quot; 버튼을 눌러 계약을 진행합니다.</li>
                     <li>- 실측 후 최종 견적이 변경될 수 있습니다.</li>
                     <li>- 모든 업체는 INPICK 검증을 완료한 등록 사업자입니다.</li>

@@ -196,7 +196,7 @@ export default function DesignOptionsPanel({ preferences, onChange }: Props) {
                       )}
                     </div>
                     <span
-                      className={`text-[11px] font-medium ${
+                      className={`text-xs font-medium ${
                         selected ? "text-blue-600" : "text-gray-500"
                       }`}
                     >
@@ -236,7 +236,7 @@ export default function DesignOptionsPanel({ preferences, onChange }: Props) {
                       )}
                     </div>
                     <span
-                      className={`text-[11px] font-medium ${
+                      className={`text-xs font-medium ${
                         selected ? "text-violet-600" : "text-gray-500"
                       }`}
                     >

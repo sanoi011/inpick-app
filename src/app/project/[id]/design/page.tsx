@@ -1304,7 +1304,7 @@ export default function FloorPlanPage() {
               <h2 className="text-sm font-bold text-gray-900 leading-tight">디자인하기</h2>
               <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
                 {(floorPlan || floorPlanImageUrl) && (
-                  <span className="text-[11px] text-gray-500">
+                  <span className="text-xs text-gray-500">
                     {floorPlan?.totalArea || project?.address?.exclusiveArea || "—"}m²
                     {floorPlan && ` · ${floorPlan.rooms.length}개 공간`}
                   </span>
@@ -1357,7 +1357,7 @@ export default function FloorPlanPage() {
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-blue-700">확장형</p>
-                        <p className="text-[11px] text-blue-500 mt-0.5">발코니 벽 제거</p>
+                        <p className="text-xs text-blue-500 mt-0.5">발코니 벽 제거</p>
                       </div>
                       <span className="absolute top-2 right-2 px-1.5 py-0.5 text-[9px] font-bold bg-blue-600 text-white rounded-full">추천</span>
                     </button>
@@ -1372,7 +1372,7 @@ export default function FloorPlanPage() {
                       </div>
                       <div className="text-center">
                         <p className="text-sm font-bold text-gray-700">기본형</p>
-                        <p className="text-[11px] text-gray-500 mt-0.5">발코니 벽 유지</p>
+                        <p className="text-xs text-gray-500 mt-0.5">발코니 벽 유지</p>
                       </div>
                     </button>
                   </div>
@@ -1493,7 +1493,7 @@ export default function FloorPlanPage() {
                             <button
                               key={d.room}
                               onClick={() => setDesignSlideIndex(i)}
-                              className={`px-2.5 py-1 text-[11px] font-medium rounded-full transition-all ${
+                              className={`px-2.5 py-1 text-xs font-medium rounded-full transition-all ${
                                 i === designSlideIndex
                                   ? "bg-white text-gray-900 shadow-sm"
                                   : "text-white/70 hover:text-white hover:bg-white/20"

@@ -370,6 +370,7 @@ function ContractPart4({ contract, onSign, contractor }: {
   contractor?: Record<string, string>;
 }) {
   const [signingType, setSigningType] = useState<'consumer' | 'contractor' | null>(null);
+  const [downloading, setDownloading] = useState(false);
   // 서명 이미지 (로컬 캐시)
   const [consumerSigImage, setConsumerSigImage] = useState<string | null>(
     (contract as unknown as Record<string, unknown>).consumer_signature_image as string | null
@@ -480,30 +481,39 @@ function ContractPart4({ contract, onSign, contractor }: {
               </div>
             </div>
             <button
+              disabled={downloading}
               onClick={async () => {
-                await generateContractPdf({
-                  id: contract.id,
-                  projectName: contract.projectName,
-                  address: contract.address || "",
-                  totalAmount: contract.totalAmount,
-                  depositAmount: contract.depositAmount,
-                  finalPayment: contract.finalPayment,
-                  progressPayments: contract.progressPayments.map((p) => ({
-                    label: p.phase, amount: p.amount, dueDate: p.dueDate || "", status: p.status,
-                  })),
-                  startDate: contract.startDate || "",
-                  expectedEndDate: contract.expectedEndDate || "",
-                  consumerSignature: contract.consumerSignature || undefined,
-                  contractorSignature: contract.contractorSignature || undefined,
-                  signedAt: contract.signedAt || undefined,
-                  contractorName: contractor?.company_name || contractor?.contact_name || "",
-                  consumerName: "",
-                });
+                if (downloading) return;
+                setDownloading(true);
+                try {
+                  await generateContractPdf({
+                    id: contract.id,
+                    projectName: contract.projectName,
+                    address: contract.address || "",
+                    totalAmount: contract.totalAmount,
+                    depositAmount: contract.depositAmount,
+                    finalPayment: contract.finalPayment,
+                    progressPayments: contract.progressPayments.map((p) => ({
+                      label: p.phase, amount: p.amount, dueDate: p.dueDate || "", status: p.status,
+                    })),
+                    startDate: contract.startDate || "",
+                    expectedEndDate: contract.expectedEndDate || "",
+                    consumerSignature: contract.consumerSignature || undefined,
+                    contractorSignature: contract.contractorSignature || undefined,
+                    signedAt: contract.signedAt || undefined,
+                    contractorName: contractor?.company_name || contractor?.contact_name || "",
+                    consumerName: "",
+                  });
+                } catch (err) {
+                  console.error("[contract] PDF generation failed:", err);
+                } finally {
+                  setDownloading(false);
+                }
               }}
-              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4" />
-              계약서 다운로드
+              {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+              {downloading ? "생성 중..." : "계약서 다운로드"}
             </button>
           </div>
         )}
@@ -658,6 +668,8 @@ function ReviewSection({ contract, userId }: { contract: Contract; userId?: stri
               onMouseLeave={() => setHoverRating(0)}
               onClick={() => setRating(i)}
               className="p-0.5"
+              aria-label={`별점 ${i}점`}
+              aria-pressed={rating === i}
             >
               <Star className={`w-7 h-7 transition-colors ${
                 i <= (hoverRating || rating)

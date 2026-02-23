@@ -219,7 +219,7 @@ export default function AddressSearchPanel({ onSelectAddress, selectedAddress }:
       {/* Commercial note */}
       {buildingType === "commercial" && (
         <div className="mt-2.5 p-2.5 bg-indigo-50 rounded-xl border border-indigo-100">
-          <p className="text-[11px] text-indigo-700 leading-relaxed">
+          <p className="text-xs text-indigo-700 leading-relaxed">
             <strong>상가/사무실</strong>은 주소 검색 후 도면을 직접 업로드하거나, 아래 도면 등록 방법에서 직접 그리기를 이용해주세요.
           </p>
         </div>

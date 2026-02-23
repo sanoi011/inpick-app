@@ -81,7 +81,7 @@ export default function CostTable({
               <div className="flex items-center gap-2">
                 {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 <span className="font-bold text-sm tracking-tight">{section.roomName}</span>
-                <span className="text-[11px] text-slate-300 ml-1">{section.items.length}건</span>
+                <span className="text-xs text-slate-300 ml-1">{section.items.length}건</span>
               </div>
               <span className="font-bold text-sm tabular-nums">{formatNumber(section.subtotal)}원</span>
             </button>
@@ -125,7 +125,7 @@ export default function CostTable({
                         <td className="px-2 py-2 text-center text-slate-400 tabular-nums border-r border-slate-200">{idx + 1}</td>
                         <td className="px-2 py-2 text-slate-600 border-r border-slate-200">{item.category}</td>
                         <td className="px-2 py-2 font-medium text-slate-900 border-r border-slate-200">{item.productName}</td>
-                        <td className="px-2 py-2 text-slate-500 text-[11px] border-r border-slate-200 truncate max-w-[160px]" title={item.spec}>{item.spec}</td>
+                        <td className="px-2 py-2 text-slate-500 text-xs border-r border-slate-200 truncate max-w-[160px]" title={item.spec}>{item.spec}</td>
                         <td className="px-2 py-2 text-center text-slate-600 border-r border-slate-200">{item.unit}</td>
                         <td className="px-2 py-2 text-right tabular-nums text-slate-900 border-r border-slate-200">{item.quantity}</td>
                         {editable ? (

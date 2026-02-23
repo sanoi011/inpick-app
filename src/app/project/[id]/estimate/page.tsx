@@ -703,7 +703,7 @@ export default function EstimatePage() {
                 <Calculator className="w-3.5 h-3.5 text-purple-500" />
                 <span className="text-xs font-semibold text-purple-700">AI 자재 추천</span>
               </div>
-              <p className="text-[11px] text-gray-600 leading-relaxed">{aiDesignConcept}</p>
+              <p className="text-xs text-gray-600 leading-relaxed">{aiDesignConcept}</p>
               <p className="text-xs text-gray-400 mt-2">
                 {aiMaterials.length}개 자재 카테고리 자동 추천 적용
               </p>
@@ -713,7 +713,7 @@ export default function EstimatePage() {
           {/* 산출 기준 */}
           <div className="p-4">
             <p className="text-xs font-semibold text-gray-600 mb-2">산출 기준</p>
-            <div className="space-y-1 text-[11px] text-gray-500">
+            <div className="space-y-1 text-xs text-gray-500">
               {useEngine ? (
                 <>
                   <p>- 17개 공종 정밀 물량산출 엔진</p>
@@ -736,7 +736,7 @@ export default function EstimatePage() {
               <p>- 실측 후 물량 변동 가능</p>
             </div>
             {engineResult && (
-              <div className="mt-3 space-y-1 text-[11px]">
+              <div className="mt-3 space-y-1 text-xs">
                 <div className="flex justify-between text-gray-500">
                   <span>일반관리비 ({engineResult.summary.overheadRate}%)</span>
                   <span>{engineResult.summary.overheadAmount.toLocaleString("ko-KR")}원</span>

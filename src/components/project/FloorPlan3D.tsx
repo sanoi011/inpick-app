@@ -588,7 +588,7 @@ export default function FloorPlan3D({
             <button
               key={mode}
               onClick={() => setCameraModeInt(mode)}
-              className={`px-2.5 py-1 text-[11px] font-medium rounded-lg shadow-sm transition-colors ${
+              className={`px-2.5 py-1 text-xs font-medium rounded-lg shadow-sm transition-colors ${
                 cameraMode === mode
                   ? "bg-blue-600 text-white"
                   : "bg-white/90 text-gray-600 hover:bg-white"
@@ -599,7 +599,7 @@ export default function FloorPlan3D({
           ))}
           <button
             onClick={() => setShowCeilingInt(!showCeiling)}
-            className={`px-2.5 py-1 text-[11px] font-medium rounded-lg shadow-sm transition-colors ${
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg shadow-sm transition-colors ${
               showCeiling
                 ? "bg-blue-600 text-white"
                 : "bg-white/90 text-gray-600 hover:bg-white"

@@ -44,7 +44,7 @@ export function AIConsultAnimation() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Design Analysis</span>
+            <span className="text-xs font-medium text-slate-400 tracking-wide uppercase">Design Analysis</span>
           </div>
           <span className="text-xs font-mono text-slate-500">{progress}%</span>
         </div>
@@ -226,7 +226,7 @@ export function PriceSyncAnimation() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-emerald-400 anim-status-pulse" />
-            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Live Data Feed</span>
+            <span className="text-xs font-medium text-slate-400 tracking-wide uppercase">Live Data Feed</span>
           </div>
           <span className="px-2 py-0.5 rounded-full text-[9px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             SYNCED
@@ -388,7 +388,7 @@ export function EstimateViewerAnimation() {
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-blue-400" />
-            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">3D Estimate Viewer</span>
+            <span className="text-xs font-medium text-slate-400 tracking-wide uppercase">3D Estimate Viewer</span>
           </div>
           <div className="flex gap-1.5">
             {["2D", "3D", "VR"].map((m) => (
@@ -688,7 +688,7 @@ export function ContractorMatchAnimation() {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 rounded-full bg-violet-400" />
-            <span className="text-[11px] font-medium text-slate-400 tracking-wide uppercase">Matching Score</span>
+            <span className="text-xs font-medium text-slate-400 tracking-wide uppercase">Matching Score</span>
           </div>
           <div className="flex items-center gap-1.5">
             {SCORE_DATA.map((_, i) => (

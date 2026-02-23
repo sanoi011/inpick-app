@@ -466,7 +466,7 @@ export default function RenderingPage() {
                         >
                           {product.productName}
                         </p>
-                        <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">
+                        <p className="text-xs text-gray-400 line-clamp-1 mb-2">
                           {product.spec}
                         </p>
 
@@ -644,7 +644,7 @@ export default function RenderingPage() {
                     style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
                   />
                 </div>
-                <span className="text-[11px] font-medium text-gray-500">
+                <span className="text-xs font-medium text-gray-500">
                   {selectedCount}/{totalCategories}
                 </span>
               </div>
@@ -726,7 +726,7 @@ export default function RenderingPage() {
               <div className="px-3 pb-3 flex-shrink-0">
                 <div className="flex items-center gap-1.5 mb-2">
                   <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-[11px] font-medium text-gray-500">공종 선택</span>
+                  <span className="text-xs font-medium text-gray-500">공종 선택</span>
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {FALLBACK_GROUPS.map((g) => {
@@ -899,7 +899,7 @@ export default function RenderingPage() {
                 style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
               />
             </div>
-            <span className="text-[11px] text-gray-500">
+            <span className="text-xs text-gray-500">
               {selectedCount}/{totalCategories}
             </span>
           </div>
@@ -931,13 +931,13 @@ export default function RenderingPage() {
               <Package className="w-3.5 h-3.5 text-white" />
             </div>
             <h2 className="text-sm font-bold text-gray-900">자재 선택</h2>
-            <span className="hidden sm:inline text-[11px] text-gray-400">
+            <span className="hidden sm:inline text-xs text-gray-400">
               {floorPlan.totalArea}m²
             </span>
           </div>
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="hidden sm:flex items-center gap-1.5">
-              <span className="text-[11px] text-gray-500">
+              <span className="text-xs text-gray-500">
                 {completedRoomCount}/{materialRooms.length} 공간 완료
               </span>
               <div className="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -956,7 +956,7 @@ export default function RenderingPage() {
                   style={{ width: `${(selectedCount / totalCategories) * 100}%` }}
                 />
               </div>
-              <span className="text-[11px] font-medium text-gray-500">
+              <span className="text-xs font-medium text-gray-500">
                 {selectedCount}/{totalCategories}
               </span>
             </div>
@@ -999,7 +999,7 @@ export default function RenderingPage() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-1.5">
                     <Palette className="w-3.5 h-3.5 text-indigo-400" />
-                    <span className="text-[11px] font-medium text-gray-500">
+                    <span className="text-xs font-medium text-gray-500">
                       AI 디자인 참조
                     </span>
                   </div>
@@ -1033,7 +1033,7 @@ export default function RenderingPage() {
           <div className="px-3 pb-3 flex-shrink-0">
             <div className="flex items-center gap-1.5 mb-2">
               <MapPin className="w-3.5 h-3.5 text-gray-400" />
-              <span className="text-[11px] font-medium text-gray-500">공간 선택</span>
+              <span className="text-xs font-medium text-gray-500">공간 선택</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
               {materialRooms.map((room) => {
@@ -1166,7 +1166,7 @@ export default function RenderingPage() {
                                     <p className={`text-sm font-bold mb-1 leading-snug ${isSelected ? "text-blue-800" : "text-gray-800"}`}>
                                       {product.productName}
                                     </p>
-                                    <p className="text-[11px] text-gray-400 line-clamp-1 mb-2">{product.spec}</p>
+                                    <p className="text-xs text-gray-400 line-clamp-1 mb-2">{product.spec}</p>
                                     <div className="flex items-baseline justify-between border-t border-gray-100 pt-2">
                                       <div>
                                         <span className="text-base font-extrabold text-gray-900">{product.unitPrice.toLocaleString()}</span>

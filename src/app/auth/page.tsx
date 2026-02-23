@@ -350,7 +350,7 @@ function AuthContent() {
             <User className="w-5 h-5" />
             <div className="text-left">
               <p className="text-sm font-semibold">일반 고객</p>
-              <p className="text-[11px] opacity-70">인테리어 견적 받기</p>
+              <p className="text-xs opacity-70">인테리어 견적 받기</p>
             </div>
           </button>
           <button
@@ -364,7 +364,7 @@ function AuthContent() {
             <Building2 className="w-5 h-5" />
             <div className="text-left">
               <p className="text-sm font-semibold">사업자</p>
-              <p className="text-[11px] opacity-70">입찰 및 프로젝트 관리</p>
+              <p className="text-xs opacity-70">입찰 및 프로젝트 관리</p>
             </div>
           </button>
         </div>

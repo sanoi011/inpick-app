@@ -247,7 +247,7 @@ export default function BuildingInfoPanel({ selectedAddress, onSelectBuilding, s
           {/* 수동 입력 토글 (건물 있어도 다른 동/호 직접 입력 가능) */}
           <button
             onClick={() => setShowManualInput(!showManualInput)}
-            className="w-full mt-2 flex items-center justify-center gap-1 text-[11px] text-gray-500 hover:text-blue-600 py-1.5"
+            className="w-full mt-2 flex items-center justify-center gap-1 text-xs text-gray-500 hover:text-blue-600 py-1.5"
           >
             <Edit3 className="w-3 h-3" />
             {showManualInput ? "목록에서 선택" : "동/호수 직접 입력"}
