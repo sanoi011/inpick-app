@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, Users, FolderKanban, FileText, DollarSign,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
-  Library, ExternalLink,
+  Library, ExternalLink, Rocket,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { label: "도면 라이브러리", href: "/admin/floor-plans", icon: Library },
   { label: "자재/단가", href: "/admin/materials", icon: Package },
   { label: "크롤러", href: "/admin/crawlers", icon: RefreshCw },
+  { label: "로드맵", href: "/admin/roadmap", icon: Rocket },
   { label: "설정", href: "/admin/settings", icon: Settings },
 ];
 
