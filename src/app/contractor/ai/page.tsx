@@ -67,6 +67,7 @@ export default function ContractorAIPage() {
   const [feedbackSent, setFeedbackSent] = useState<Record<string, "up" | "down">>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const sessionIdRef = useRef(crypto.randomUUID());
+  const abortRef = useRef<AbortController | null>(null);
 
   // 대화 이력 로드
   useEffect(() => {
@@ -93,6 +94,11 @@ export default function ContractorAIPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // 언마운트 시 진행 중인 SSE 스트림 중단
+  useEffect(() => {
+    return () => { abortRef.current?.abort(); };
+  }, []);
+
   const handleNewChat = () => {
     localStorage.removeItem(HISTORY_KEY);
     setMessages([{ role: "assistant", content: "새 대화를 시작합니다. 무엇을 도와드릴까요?" }]);
@@ -111,6 +117,9 @@ export default function ContractorAIPage() {
 
     const startTime = Date.now();
 
+    abortRef.current?.abort();
+    abortRef.current = new AbortController();
+
     try {
       const res = await fetch("/api/contractor-ai", {
         method: "POST",
@@ -119,6 +128,7 @@ export default function ContractorAIPage() {
           messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
           contractorId,
         }),
+        signal: abortRef.current.signal,
       });
 
       if (!res.ok) {
@@ -178,7 +188,8 @@ export default function ContractorAIPage() {
           }
         });
       }
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
       setMessages((prev) => {
         const copy = [...prev];
         copy[copy.length - 1] = { role: "assistant", content: "네트워크 오류가 발생했습니다." };

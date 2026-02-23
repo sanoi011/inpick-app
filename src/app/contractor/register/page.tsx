@@ -6,6 +6,7 @@ import {
   ArrowLeft, Building2, User, Phone, Mail, MapPin,
   FileText, Briefcase, CheckCircle2, Loader2, ChevronRight,
 } from "lucide-react";
+import { toast } from "@/components/ui/Toast";
 
 const TRADE_OPTIONS = [
   { code: "T01", label: "도배" },
@@ -96,10 +97,13 @@ export default function ContractorRegisterPage() {
 
       if (res.ok) {
         setSubmitted(true);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ type: "error", title: "등록 실패", message: data.error || "다시 시도해주세요" });
       }
-    } catch {
-      // fallback: just show success
-      setSubmitted(true);
+    } catch (err) {
+      console.error("[register] Submit error:", err);
+      toast({ type: "error", title: "네트워크 오류", message: "인터넷 연결을 확인 후 다시 시도해주세요" });
     } finally {
       setSubmitting(false);
     }

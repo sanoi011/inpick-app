@@ -162,15 +162,9 @@ export function useCredits() {
         localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(updated));
       }
       return true;
-    } catch {
-      // DB 실패 시 localStorage 폴백
-      const updated = isFree
-        ? { ...credits, freeGenerationsUsed: credits.freeGenerationsUsed + 1 }
-        : { ...credits, balance: credits.balance - CREDITS_PER_GENERATION };
-      updated.updatedAt = new Date().toISOString();
-      localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(updated));
-      setCredits(updated);
-      return true;
+    } catch (err) {
+      console.error("[useCredits] spendCredits DB error:", err);
+      return false;
     }
   }, [credits, user, supabase, isAdmin]);
 
@@ -200,11 +194,9 @@ export function useCredits() {
       setCredits(updated);
       localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(updated));
       return true;
-    } catch {
-      const updated = { ...credits, balance: credits.balance + amount, updatedAt: new Date().toISOString() };
-      localStorage.setItem(`inpick_credits_${user.id}`, JSON.stringify(updated));
-      setCredits(updated);
-      return true;
+    } catch (err) {
+      console.error("[useCredits] chargeCredits DB error:", err);
+      return false;
     }
   }, [credits, user, supabase]);
 
