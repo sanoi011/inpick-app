@@ -4,7 +4,7 @@
 import { getGeminiClient, isGeminiConfigured } from '@/lib/gemini-client';
 import type { WallElevation } from '@/types/construction-drawing';
 
-const MODEL = 'gemini-3.0-pro';
+const MODEL = 'gemini-3-pro-preview';
 const MAX_RETRIES = 2;
 const RATE_LIMIT_WAIT = 15000;
 
@@ -199,7 +199,7 @@ export async function generateElevation3DImage(
   const client = getGeminiClient();
   if (!client) return null;
 
-  const imageModel = 'gemini-3.0-pro';
+  const imageModel = 'gemini-3-pro-preview';
 
   const materialDesc = elevation.materials.map(m =>
     `${m.area === 'floor' ? '바닥' : m.area === 'wall' ? '벽' : '천장'}: ${m.name}`

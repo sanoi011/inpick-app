@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
       contextType,
       contextId,
       contextData,
-      modelName = "gemini-3.0-pro",
+      modelName = "gemini-3-pro-preview",
       responseTimeMs,
       tokenCount,
     } = body;

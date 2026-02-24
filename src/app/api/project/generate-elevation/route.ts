@@ -372,7 +372,7 @@ ${imageParts.length > 0 ? `- 다음 1장: 사용자 평면도\n- 나머지: 인�
     const startTime = Date.now();
 
     const response = await client.models.generateContent({
-      model: "gemini-3.0-pro",
+      model: "gemini-3-pro-preview",
       contents: [{
         role: "user",
         parts: [

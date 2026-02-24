@@ -134,7 +134,7 @@ export async function recognizeLayout(
 
 전용면적: ${knownArea}m²`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.0-pro:generateContent?key=${apiKey}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-preview:generateContent?key=${apiKey}`;
 
   const res = await fetch(url, {
     method: "POST",
