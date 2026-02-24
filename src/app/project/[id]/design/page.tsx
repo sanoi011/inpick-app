@@ -1151,115 +1151,9 @@ export default function FloorPlanPage() {
           />
         )}
 
-        {/* AI 채팅 패널 - 사이드바 내 */}
-        {(floorPlan || floorPlanImageUrl) && (
-          <div className="border-t border-gray-200 bg-white flex flex-col">
-            {/* Chat Panel Header */}
-            <div className="flex items-center justify-between px-4 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-gray-100">
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-md flex items-center justify-center">
-                  <MessageSquare className="w-3.5 h-3.5 text-white" />
-                </div>
-                <span className="text-xs font-bold text-gray-700">AI 인테리어 상담</span>
-                {aiMessages.length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-full">
-                    {aiMessages.filter(m => m.role === "user").length}회 대화
-                  </span>
-                )}
-              </div>
-            </div>
-
-            {/* AI Chat Messages */}
-            {aiMessages.length === 0 && (
-              <div className="px-3 py-3 bg-gray-50/30">
-                <div className="flex items-start gap-2.5 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
-                  <div className="w-7 h-7 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <Sparkles className="w-3.5 h-3.5 text-indigo-500" />
-                  </div>
-                  <div className="text-[12px] text-gray-600 leading-relaxed">
-                    <p className="font-semibold text-gray-800 mb-1">AI 인테리어 디자이너</p>
-                    <p>원하는 스타일을 말씀해 주세요. 대화 후 우측 하단 <strong className="text-indigo-600">&quot;디자인 완성&quot;</strong> 버튼으로 AI 이미지를 생성합니다.</p>
-                  </div>
-                </div>
-              </div>
-            )}
-            {aiMessages.length > 0 && (
-              <div className="max-h-[300px] overflow-y-auto px-3 py-3 space-y-2.5 bg-gray-50/30">
-                {aiMessages.map((msg) => (
-                  <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                    <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 text-[12px] leading-relaxed ${
-                        msg.role === "user"
-                          ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"
-                          : "bg-white text-gray-800 border border-gray-200 shadow-sm"
-                      }`}
-                    >
-                      <p className="whitespace-pre-wrap">{msg.content || "..."}</p>
-                      {msg.images && msg.images.map((imgSrc, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={i}
-                          src={imgSrc}
-                          alt="AI 생성 디자인"
-                          className="mt-2 rounded-lg max-w-full cursor-pointer hover:opacity-80 transition-opacity border border-white/20"
-                          onClick={() => {
-                            const idx = generatedDesigns.findIndex((d) => d.imageData === imgSrc);
-                            if (idx >= 0) setDesignSlideIndex(idx);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-                {aiGenerating && aiMessages[aiMessages.length - 1]?.content === "" && (
-                  <div className="flex justify-start">
-                    <div className="bg-white rounded-2xl px-3 py-2 text-[12px] text-gray-400 border border-gray-200 shadow-sm flex items-center gap-2">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" /> AI가 답변 작성 중...
-                    </div>
-                  </div>
-                )}
-                <div ref={chatEndRef} />
-              </div>
-            )}
-
-            {/* Quick Prompts + Input */}
-            <div className="px-3 py-2.5 border-t border-gray-100 bg-white">
-              <div className="grid grid-cols-2 gap-1 mb-2">
-                {AI_QUICK_PROMPTS.map((qp) => (
-                  <button
-                    key={qp}
-                    onClick={() => setAiInput(qp)}
-                    disabled={aiGenerating || generatingDesign}
-                    className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-40 text-left leading-tight"
-                  >
-                    <Sparkles className="w-2.5 h-2.5 text-blue-400 flex-shrink-0" />{qp}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-1.5">
-                <textarea
-                  value={aiInput}
-                  onChange={(e) => setAiInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendAI(); } }}
-                  placeholder="인테리어 스타일, 자재, 디자인을 물어보세요..."
-                  disabled={aiGenerating}
-                  rows={3}
-                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 bg-gray-50/80 text-[12px] focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white outline-none disabled:bg-gray-100 disabled:text-gray-400 transition-all placeholder:text-gray-400 resize-none"
-                />
-                <button
-                  onClick={handleSendAI}
-                  disabled={!aiInput.trim() || aiGenerating}
-                  className="self-end px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all shadow-sm"
-                >
-                  {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </aside>
 
-      {/* Right canvas area */}
+      {/* Right area: AI Prompt Panel + Canvas */}
       <div className="flex-1 flex flex-col min-w-0 relative">
         {/* 모바일 사이드바 토글 버튼 (데스크톱 숨김) */}
         <button
@@ -1334,8 +1228,122 @@ export default function FloorPlanPage() {
           </div>
         </div>
 
-        {/* Main viewer area */}
-        <div className="flex-1 min-h-0">
+        {/* Main content: AI Prompt Panel + Viewer */}
+        <div className="flex-1 min-h-0 flex flex-col md:flex-row">
+          {/* AI 프롬프트 패널 - 도면 확보 후 표시 */}
+          {(floorPlan || floorPlanImageUrl) && (
+            <div className="w-full md:w-[45%] md:max-w-[520px] flex flex-col border-b md:border-b-0 md:border-r border-gray-200 bg-white flex-shrink-0">
+              {/* Chat Panel Header */}
+              <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-indigo-50 via-purple-50 to-white border-b border-gray-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center shadow-sm">
+                    <MessageSquare className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div>
+                    <span className="text-sm font-bold text-gray-800">AI 인테리어 상담</span>
+                    {aiMessages.length > 0 && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-indigo-100 text-indigo-600 text-xs font-semibold rounded-full">
+                        {aiMessages.filter(m => m.role === "user").length}회 대화
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Chat Messages - 스크롤 영역 */}
+              <div className="flex-1 overflow-y-auto min-h-0">
+                {aiMessages.length === 0 && (
+                  <div className="px-4 py-4">
+                    <div className="flex items-start gap-3 p-4 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100">
+                      <div className="w-9 h-9 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5">
+                        <Sparkles className="w-4 h-4 text-indigo-500" />
+                      </div>
+                      <div className="text-sm text-gray-600 leading-relaxed">
+                        <p className="font-semibold text-gray-800 mb-1">AI 인테리어 디자이너</p>
+                        <p>원하는 인테리어 스타일, 자재, 분위기를 말씀해 주세요.</p>
+                        <p className="mt-1 text-xs text-gray-500">대화 후 우측 하단 <strong className="text-indigo-600">&quot;디자인 완성&quot;</strong> 버튼으로 AI 이미지를 생성합니다.</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {aiMessages.length > 0 && (
+                  <div className="px-4 py-3 space-y-3">
+                    {aiMessages.map((msg) => (
+                      <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div
+                          className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+                            msg.role === "user"
+                              ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-sm"
+                              : "bg-gray-50 text-gray-800 border border-gray-200 shadow-sm"
+                          }`}
+                        >
+                          <p className="whitespace-pre-wrap">{msg.content || "..."}</p>
+                          {msg.images && msg.images.map((imgSrc, i) => (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              key={i}
+                              src={imgSrc}
+                              alt="AI 생성 디자인"
+                              className="mt-2 rounded-lg max-w-full cursor-pointer hover:opacity-80 transition-opacity border border-white/20"
+                              onClick={() => {
+                                const idx = generatedDesigns.findIndex((d) => d.imageData === imgSrc);
+                                if (idx >= 0) setDesignSlideIndex(idx);
+                              }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {aiGenerating && aiMessages[aiMessages.length - 1]?.content === "" && (
+                      <div className="flex justify-start">
+                        <div className="bg-gray-50 rounded-2xl px-4 py-2.5 text-sm text-gray-400 border border-gray-200 shadow-sm flex items-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" /> AI가 답변 작성 중...
+                        </div>
+                      </div>
+                    )}
+                    <div ref={chatEndRef} />
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Prompts + Input - 하단 고정 */}
+              <div className="px-4 py-3 border-t border-gray-100 bg-white flex-shrink-0">
+                <div className="grid grid-cols-2 gap-1.5 mb-2.5">
+                  {AI_QUICK_PROMPTS.map((qp) => (
+                    <button
+                      key={qp}
+                      onClick={() => setAiInput(qp)}
+                      disabled={aiGenerating || generatingDesign}
+                      className="flex items-center gap-1.5 px-2.5 py-2 text-xs font-medium rounded-lg border border-gray-200 bg-white hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all disabled:opacity-40 text-left leading-tight"
+                    >
+                      <Sparkles className="w-3 h-3 text-blue-400 flex-shrink-0" />{qp}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <textarea
+                    value={aiInput}
+                    onChange={(e) => setAiInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSendAI(); } }}
+                    placeholder="인테리어 스타일, 자재, 디자인을 물어보세요..."
+                    disabled={aiGenerating}
+                    rows={3}
+                    className="flex-1 px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50/80 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent focus:bg-white outline-none disabled:bg-gray-100 disabled:text-gray-400 transition-all placeholder:text-gray-400 resize-none"
+                  />
+                  <button
+                    onClick={handleSendAI}
+                    disabled={!aiInput.trim() || aiGenerating}
+                    className="self-end px-3.5 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 disabled:from-gray-300 disabled:to-gray-300 disabled:cursor-not-allowed transition-all shadow-sm"
+                  >
+                    {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Viewer area */}
+          <div className="flex-1 min-h-0 min-w-0">
           {pendingBuildingForExpanded ? (
             /* ── 확장형/기본형 선택 ── */
             <div className="h-full flex items-center justify-center bg-gray-50/60">
@@ -1642,6 +1650,7 @@ export default function FloorPlanPage() {
           ) : (
             renderUploadContent()
           )}
+          </div>
         </div>
 
         {/* Parse warnings */}
