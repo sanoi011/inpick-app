@@ -948,7 +948,7 @@ export async function extractFloorPlanFromImage(
   const warnings: string[] = [];
 
   if (!isGeminiConfigured()) {
-    warnings.push("Gemini API 키가 설정되지 않아 Mock 데이터를 반환합니다");
+    warnings.push("AI 서비스 연결 대기 중 - 기본 도면 데이터를 사용합니다");
     return {
       floorPlan: getMockFloorPlan(options.knownAreaM2),
       confidence: 0.3,

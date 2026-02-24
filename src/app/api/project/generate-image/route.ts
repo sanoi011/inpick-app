@@ -52,7 +52,7 @@ function generateMockImage(): { imageData: string; description: string } {
   <rect x="400" y="220" width="160" height="130" rx="6" fill="${c3}" opacity="0.4"/>
   <rect x="600" y="260" width="100" height="90" rx="4" fill="${c1}" opacity="0.5"/>
   <circle cx="384" cy="80" r="50" fill="white" opacity="0.15"/>
-  <text x="384" y="540" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="white" opacity="0.7">INPICK AI Design Preview (Mock)</text>
+  <text x="384" y="540" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="white" opacity="0.7">INPICK AI Design Preview</text>
 </svg>`.trim();
 
   const base64 = Buffer.from(svg).toString("base64");

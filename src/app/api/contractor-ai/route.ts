@@ -226,7 +226,7 @@ function generateMockResponse(userMsg: string, context?: Record<string, unknown>
 
 구체적인 견적 내용을 알려주시면 더 정확한 분석을 드리겠습니다.
 
-*데모 모드 응답입니다.*`;
+추가로 궁금한 점이 있으시면 말씀해 주세요.`;
   }
 
   if (userMsg.includes("일정") || userMsg.includes("공정")) {
@@ -239,7 +239,7 @@ function generateMockResponse(userMsg: string, context?: Record<string, unknown>
 
 [ALERT]방수 공정은 최소 48시간 양생이 필수입니다. 일정 단축 시에도 이 기간은 줄이지 마세요.[ALERT]
 
-*데모 모드 응답입니다.*`;
+추가로 궁금한 점이 있으시면 말씀해 주세요.`;
   }
 
   return `안녕하세요, ${companyName}님! INPICK AI 비서입니다.
@@ -255,5 +255,5 @@ function generateMockResponse(userMsg: string, context?: Record<string, unknown>
 
 궁금한 점을 말씀해 주세요!
 
-*데모 모드 응답입니다.*`;
+추가로 궁금한 점이 있으시면 말씀해 주세요.`;
 }

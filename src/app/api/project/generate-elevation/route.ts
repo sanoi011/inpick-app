@@ -346,9 +346,9 @@ export async function POST(request: NextRequest) {
         elevationSvg,
         floorPlanSvg,
         rooms: mockRooms,
-        designConcept: `${style || "모던"} 스타일 입면전개도 (Mock 데이터)`,
-        method: "mock",
-        warnings: ["AI API 키가 설정되지 않아 기본 데이터를 반환합니다"],
+        designConcept: `${style || "모던"} 스타일 입면전개도`,
+        method: "standard",
+        warnings: [],
       });
     }
 

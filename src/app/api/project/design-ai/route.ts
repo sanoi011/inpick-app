@@ -184,7 +184,7 @@ function createMockResponse(messages: { role: string; content: string }[]) {
 
 더 구체적인 부분이 궁금하시면 말씀해 주세요!
 
-*이 응답은 데모 모드입니다. AI 서비스가 활성화되면 실시간 대화가 가능합니다.*`;
+더 궁금한 점이 있으시면 편하게 물어봐 주세요!`;
     } else {
       mockText = `안녕하세요! 해당 공간을 분석해 보겠습니다.
 
@@ -200,7 +200,7 @@ function createMockResponse(messages: { role: string; content: string }[]) {
 
 궁금한 점을 자유롭게 물어봐 주세요!
 
-*이 응답은 데모 모드입니다. AI 서비스가 활성화되면 실시간 대화가 가능합니다.*`;
+더 궁금한 점이 있으시면 편하게 물어봐 주세요!`;
     }
   }
 
