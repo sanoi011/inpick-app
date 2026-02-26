@@ -1365,6 +1365,8 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 | `20260219100001_contract_notes.sql` | Supabase 적용 완료 |
 | `20260219100002_contact_inquiries.sql` | Supabase 적용 완료 |
 | `20260222000000_generated_floorplans.sql` | Supabase 적용 완료 |
+| `20260222100000_add_extracted_dimensions.sql` | Supabase 적용 완료 |
+| `20260222300000_add_prompt_version.sql` | Supabase 적용 완료 |
 | `20260222400000_add_segmentation_mask.sql` | Supabase 적용 완료 |
 | `20260222500000_consumer_projects_delete_policy.sql` | Supabase 적용 완료 |
 | `20260223100000_construction_drawings.sql` | Supabase 적용 완료 |
@@ -1882,12 +1884,39 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - 전체 8개 공개 업체 (데모 5 + 기존 3)
 - 필터 전체 정상: 지역/유형/공종/평점/인증/검색
 
-### 배포 사이트 시스템 헬스체크 (AC 2차 미팅 준비)
-- 31개 페이지 200 OK, 4개 페이지 307 리다이렉트 (인증 필요, 정상)
-- 관리자 API 전체 정상 동작 (401 보안 확인)
-- 33/34 DB 테이블 존재 (credit_balances 미사용, 정상)
-- 정적 자산/SEO/PWA 전체 정상
-- Edge 서버 ICN (서울) 확인
+### 배포 사이트 시스템 헬스체크
+- **2026-02-23**: 31페이지 200 OK, 4페이지 307 리다이렉트, DB 33/34 테이블, Edge ICN
+- **2026-02-27**: 42페이지+11API+10정적자산 전체 검증, 소비자 6탭 워크플로우 배포 테스트 완료
+  - AI 스트리밍 (contractor-ai, design-ai) 완전 응답 + [DONE] 확인
+  - 업체 디렉토리 8개 업체 정상 반환
+
+## 완료된 작업 (2026-02-27) - 버그 수정 + 배포 검증
+
+### 사업자 AI 비서 응답 잘림 수정
+- `src/app/api/contractor-ai/route.ts` (수정)
+  - `maxOutputTokens: 1024` → `4096` (한국어 충분한 길이)
+  - 시스템 프롬프트 "500자 이내" → "필요한 만큼 충분히 상세하게 답변하세요"
+  - 배포 사이트 검증: 2건 질문 모두 완전한 응답 + [DONE] 확인
+
+### 입면전개도 참고 이미지 인스타 UI 크롭
+- `public/showcase/elevation-01~09.jpg` (9개 수정)
+  - 상단 인스타 UI (상태바+헤더+프로필라인) ~465px 크롭
+  - 하단 인스타 프로필 아이콘 패치 (주변색 덮기)
+  - 원본 ~2000px → 크롭 후 ~1475-1497px
+
+### 배포 사이트 전체 검증 (2026-02-27)
+- **페이지**: 42개 (38×200 OK + 4×307 인증 리다이렉트)
+- **API**: 11개 엔드포인트 정상 (퍼블릭 200, 보호 401, 밸리데이션 400)
+- **정적 자산**: 10개 모두 200 OK
+- **소비자 6탭 워크플로우**:
+  - Tab 1 (우리집찾기): Building API 200 OK, 96건 건물 반환
+  - Tab 2 (도면/3D): index.json + sample-84b.json 정상 로드
+  - Tab 3 (AI 디자인): design-ai SSE 스트리밍 완료 + [DONE]
+  - Tab 4 (3D 렌더링): materials API 200 OK, 자재 카탈로그 정상
+  - Tab 5 (물량산출): estimate-materials 200 OK
+  - Tab 6 (견적요청): RFQ 401 인증보호 정상
+- **사업자 AI 비서**: contractor-ai SSE 스트리밍 2건 테스트 완료
+- **업체 디렉토리**: contractors API 200 OK, 8개 업체 정상 반환
 
 ## 다음 작업 (우선순위 순)
 
