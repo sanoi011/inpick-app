@@ -18,7 +18,7 @@ function buildSystemPrompt(context?: Record<string, unknown>) {
 - 한국어로 답변하세요.
 - 건설/인테리어 사업 관련 질문에만 답변하세요.
 - 입찰가 제안 시 공식 단가 기준임을 명시하세요.
-- 답변은 전문적이고 실무적으로, 500자 이내로 하세요.
+- 답변은 전문적이고 실무적으로 하되, 필요한 만큼 충분히 상세하게 답변하세요.
 - 법규(건설산업기본법, 하도급법 등) 관련 사항은 확인을 권유하세요.
 
 응답 형식 지시:
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
       contents: geminiContents,
       config: {
         systemInstruction: systemPrompt,
-        maxOutputTokens: 1024,
+        maxOutputTokens: 4096,
         temperature: 0.7,
       },
     });
