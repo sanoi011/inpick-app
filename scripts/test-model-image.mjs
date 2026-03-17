@@ -1,6 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 
-const client = new GoogleGenAI({ apiKey: "AIzaSyB6t6lpQBYp_V9tSZ49YnYPbJo5Hzddcs0" });
+const client = new GoogleGenAI({ apiKey: "" + process.env.GOOGLE_GEMINI_API_KEY + "" });
 
 const models = [
   "gemini-2.0-flash-exp",

@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import fs from "fs";
 
-const client = new GoogleGenAI({ apiKey: "AIzaSyB6t6lpQBYp_V9tSZ49YnYPbJo5Hzddcs0" });
+const client = new GoogleGenAI({ apiKey: "" + process.env.GOOGLE_GEMINI_API_KEY + "" });
 
 // Test 1: Text-to-image (like generate-image route)
 console.log("=== Test 1: text-to-image ===");

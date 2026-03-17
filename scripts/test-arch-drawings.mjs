@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const OUTPUT_DIR = path.resolve(__dirname, '..');
 
-const API_KEY = 'AIzaSyB6t6lpQBYp_V9tSZ49YnYPbJo5Hzddcs0';
+const API_KEY = '" + process.env.GOOGLE_GEMINI_API_KEY + "';
 const MODEL = 'gemini-3-pro-image-preview';
 const IMAGE_URL =
   'https://pyhsjjtxcfmkcqmaxozd.supabase.co/storage/v1/object/public/uploads/floorplans/6165/3/clean.png';

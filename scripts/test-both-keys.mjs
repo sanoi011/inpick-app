@@ -1,7 +1,7 @@
 import { GoogleGenAI } from '@google/genai';
 
 const keys = [
-  { name: 'INPICK (phlw)', key: 'AIzaSyA3ctRKZDD76nFyL9971PWFpjdkZmPphlw' },
+  { name: 'INPICK (phlw)', key: process.env.GOOGLE_GEMINI_API_KEY },
 ];
 
 const models = [

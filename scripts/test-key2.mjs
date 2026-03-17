@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: 'AIzaSyB6t6lpQBYp_V9tSZ49YnYPbJo5Hzddcs0' });
+const ai = new GoogleGenAI({ apiKey: '" + process.env.GOOGLE_GEMINI_API_KEY + "' });
 
 console.log('Testing gemini-3-pro-image-preview with key2...');
 try {
