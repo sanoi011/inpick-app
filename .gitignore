@@ -57,6 +57,13 @@ python/floorplan-ai/models/*.pt
 python/floorplan-ai/outputs/
 python/floorplan-ai/__pycache__/
 python/floorplan-ai/data/
+
+# floorplan pipeline saved images (large binary files)
+scripts/floorplan-pipeline/saved_plans/
+scripts/floorplan-pipeline/__pycache__/
+
+# test result json files
+test-results/
 python/floorplan-ai/src/__pycache__/
 
 # v4.7 services/pdf_parser artifacts

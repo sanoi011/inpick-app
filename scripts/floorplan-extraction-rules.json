@@ -1,0 +1,39 @@
+{
+  "rules": {
+    "brightness_threshold": 145,
+    "saturation_threshold": 0.12,
+    "max_fixture_interior": 5000,
+    "fixture_outline_reach": 4,
+    "min_room_size": 5000,
+    "text_component_max": 200
+  },
+  "stats": {
+    "fixture_interior_count": 176,
+    "fixture_interior_sizes": [
+      4596,
+      2744,
+      2680,
+      2452,
+      1895,
+      1572,
+      1107,
+      885,
+      844,
+      755,
+      749,
+      659,
+      656,
+      631,
+      630,
+      573,
+      566,
+      564,
+      531,
+      521
+    ],
+    "fixture_px": 6625,
+    "text_count": 13,
+    "text_px": 2024,
+    "room_count": 11
+  }
+}
