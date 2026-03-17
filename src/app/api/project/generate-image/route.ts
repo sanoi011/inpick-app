@@ -148,8 +148,6 @@ export async function POST(request: NextRequest) {
         // AI 이미지 생성 (이미지 생성 지원 모델 순차 시도)
         const imageModels = [
           "nano-banana-pro-preview",
-          "gemini-2.5-flash-image",
-          "gemini-3.1-flash-image-preview",
           "gemini-3-pro-image-preview",
         ];
 

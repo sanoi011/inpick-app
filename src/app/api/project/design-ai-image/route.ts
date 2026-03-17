@@ -3,7 +3,7 @@ import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 
 export const maxDuration = 120;
 
-const IMAGE_GEN_MODEL = "gemini-3-pro-image-preview";
+const IMAGE_GEN_MODEL = "nano-banana-pro-preview";
 
 // 4컷 방별 렌더링 대상 + 구조 데이터 기본값
 const ROOMS_TO_RENDER = [
