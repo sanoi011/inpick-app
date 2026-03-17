@@ -3,7 +3,7 @@ import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 
 export const maxDuration = 120;
 
-const IMAGE_GEN_MODEL = "nano-banana-pro-preview";
+const IMAGE_GEN_MODEL = "gemini-3-pro-image-preview";
 
 // 4컷 방별 렌더링 대상 + 구조 데이터 기본값
 const ROOMS_TO_RENDER = [
@@ -183,35 +183,41 @@ export async function POST(request: NextRequest) {
           description: description || `${room.label} 디자인이 생성되었습니다.`,
         };
       } catch (err: unknown) {
-        const msg = (err as { message?: string }).message || "";
-        const code = msg.match(/"code"\s*:\s*(\d+)/)?.[1];
-        console.error(`[design-ai-image] ${room.label} error [${code}]:`, msg.substring(0, 100));
+        const error = err as { status?: number; message?: string };
+        console.error(`[design-ai-image] ${room.label} generation error:`, error.message);
+
+        if (error.status === 429) {
+          return {
+            room: room.key,
+            label: room.label,
+            imageData: null,
+            description: "API 요청 한도 초과. 잠시 후 다시 시도해주세요.",
+          };
+        }
+
         return {
           room: room.key,
           label: room.label,
           imageData: null,
-          description: code === "429" ? "quota_exceeded" : `${room.label} 이미지 생성 실패`,
+          description: `${room.label} 이미지 생성에 실패했습니다.`,
         };
       }
     });
 
     try {
       const images = await Promise.all(roomPromises);
+
+      // 하나라도 성공한 이미지가 있으면 반환
       const hasAnyImage = images.some((img) => img.imageData !== null);
 
       if (hasAnyImage) {
-        return NextResponse.json({ images, isMock: false });
+        return NextResponse.json({
+          images,
+          isMock: false,
+        });
       }
 
-      // 전부 quota 초과인 경우 → mock 대신 에러 반환
-      const allQuota = images.every((img) => img.description === "quota_exceeded");
-      if (allQuota) {
-        return NextResponse.json(
-          { error: "AI 이미지 생성 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.", code: "RATE_LIMIT" },
-          { status: 429 }
-        );
-      }
-
+      // 모두 실패한 경우 mock 폴백
       return createMockResponse(designPreferences);
     } catch {
       return createMockResponse(designPreferences);

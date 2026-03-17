@@ -22,7 +22,7 @@ function createAdminClient() {
 
 export const maxDuration = 300; // Vercel Pro 5분
 
-const MODEL = "nano-banana-pro-preview";
+const MODEL = "gemini-3-pro-image-preview";
 const MAX_RETRIES = 3;
 const RATE_LIMIT_WAIT = 30000;
 // 프롬프트 버전: 변경 시 이 값을 올리면 기존 캐시 자동 무효화
