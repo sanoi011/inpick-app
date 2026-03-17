@@ -62,6 +62,15 @@ function generateMockImage(): { imageData: string; description: string } {
   };
 }
 
+// SDK 에러 메시지에서 HTTP 상태코드 추출 ({"error":{"code":429,...}})
+function extractErrorCode(err: unknown): number | null {
+  try {
+    const msg = (err as { message?: string }).message || "";
+    const match = msg.match(/"code"\s*:\s*(\d+)/);
+    return match ? parseInt(match[1], 10) : null;
+  } catch { return null; }
+}
+
 // ─── POST handler ───
 
 export async function POST(request: NextRequest) {
@@ -138,12 +147,15 @@ export async function POST(request: NextRequest) {
 
         // AI 이미지 생성 (이미지 생성 지원 모델 순차 시도)
         const imageModels = [
+          "nano-banana-pro-preview",
           "gemini-2.5-flash-image",
           "gemini-3.1-flash-image-preview",
           "gemini-3-pro-image-preview",
         ];
+
         let response: Awaited<ReturnType<typeof client.models.generateContent>> | null = null;
-        let lastModelError: Error | null = null;
+        let lastModelError: unknown = null;
+        let allQuotaExceeded = true;
         for (const imageModel of imageModels) {
           try {
             response = await client.models.generateContent({
@@ -154,11 +166,22 @@ export async function POST(request: NextRequest) {
               },
             });
             console.log(`[generate-image] Used model: ${imageModel}`);
+            allQuotaExceeded = false;
             break;
           } catch (modelErr: unknown) {
-            lastModelError = modelErr as Error;
-            console.warn(`[generate-image] Model ${imageModel} failed:`, (modelErr as Error).message?.substring(0, 80));
+            lastModelError = modelErr;
+            const code = extractErrorCode(modelErr);
+            console.warn(`[generate-image] Model ${imageModel} failed (${code}):`, (modelErr as Error).message?.substring(0, 80));
+            if (code !== 429 && code !== 403) allQuotaExceeded = false;
           }
+        }
+
+        // 모든 모델이 할당량 초과인 경우 → Mock 대신 에러 반환
+        if (!response && allQuotaExceeded) {
+          return NextResponse.json(
+            { error: "AI 이미지 생성 할당량이 초과되었습니다. 잠시 후 다시 시도해주세요.", code: "RATE_LIMIT" },
+            { status: 429 }
+          );
         }
         if (!response) throw lastModelError ?? new Error("All image models failed");
 
@@ -186,22 +209,8 @@ export async function POST(request: NextRequest) {
 
         // Gemini가 이미지를 생성하지 않은 경우 Imagen 시도
       } catch (err: unknown) {
-        const error = err as { status?: number; message?: string };
-        console.error("Gemini image generation error:", error.message);
-
-        if (error.status === 429) {
-          return NextResponse.json(
-            { error: "API 요청 한도를 초과했습니다. 잠시 후 다시 시도해주세요.", code: "RATE_LIMIT" },
-            { status: 429 }
-          );
-        }
-        if (error.status === 403) {
-          return NextResponse.json(
-            { error: "API 할당량이 초과되었습니다.", code: "QUOTA_EXCEEDED" },
-            { status: 403 }
-          );
-        }
-        // 기타 에러 → Mock 폴백
+        console.error("[generate-image] Gemini error:", (err as Error).message?.substring(0, 120));
+        // 모든 모델 실패 → Mock 폴백
       }
     }
 
