@@ -184,9 +184,13 @@ export async function POST(request: NextRequest) {
         };
       } catch (err: unknown) {
         const error = err as { status?: number; message?: string };
-        console.error(`[design-ai-image] ${room.label} generation error:`, error.message);
+        const msg = error.message || "";
+        // SDK wraps HTTP status in JSON message: {"error":{"code":429,...}}
+        const codeMatch = msg.match(/"code"\s*:\s*(\d+)/);
+        const httpCode = codeMatch ? parseInt(codeMatch[1]) : (error.status || 0);
+        console.error(`[design-ai-image] ${room.label} error (code=${httpCode}):`, msg.slice(0, 300));
 
-        if (error.status === 429) {
+        if (httpCode === 429) {
           return {
             room: room.key,
             label: room.label,
@@ -199,7 +203,7 @@ export async function POST(request: NextRequest) {
           room: room.key,
           label: room.label,
           imageData: null,
-          description: `${room.label} 이미지 생성에 실패했습니다.`,
+          description: `${room.label} 이미지 생성에 실패했습니다. (${httpCode || "unknown"})`,
         };
       }
     });
@@ -217,9 +221,11 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      // 모두 실패한 경우 mock 폴백
-      return createMockResponse(designPreferences);
-    } catch {
+      // 모두 실패한 경우: 에러 메시지 포함해서 반환 (mock 폴백 대신 실패 상세 노출)
+      console.error("[design-ai-image] All rooms failed:", images.map(i => ({ room: i.room, desc: i.description })));
+      return NextResponse.json({ images, isMock: false });
+    } catch (e) {
+      console.error("[design-ai-image] Promise.all error:", e);
       return createMockResponse(designPreferences);
     }
   } catch (err) {
