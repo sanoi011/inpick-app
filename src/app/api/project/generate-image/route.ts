@@ -136,17 +136,34 @@ export async function POST(request: NextRequest) {
           `[Negative Prompt - AVOID these]: ${negativeItems.join(", ")}`,
         ].filter(Boolean).join("\n");
 
-        // AI 이미지 생성
-        const response = await client.models.generateContent({
-          model: "gemini-3-pro-preview",
-          contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
-          config: {
-            responseModalities: ["IMAGE", "TEXT"],
-          },
-        });
+        // AI 이미지 생성 (이미지 생성 지원 모델 순차 시도)
+        const imageModels = [
+          "gemini-2.5-flash-image",
+          "gemini-3.1-flash-image-preview",
+          "gemini-3-pro-image-preview",
+        ];
+        let response: Awaited<ReturnType<typeof client.models.generateContent>> | null = null;
+        let lastModelError: Error | null = null;
+        for (const imageModel of imageModels) {
+          try {
+            response = await client.models.generateContent({
+              model: imageModel,
+              contents: [{ role: "user", parts: [...floorPlanParts, { text: fullPrompt }] }],
+              config: {
+                responseModalities: ["IMAGE", "TEXT"],
+              },
+            });
+            console.log(`[generate-image] Used model: ${imageModel}`);
+            break;
+          } catch (modelErr: unknown) {
+            lastModelError = modelErr as Error;
+            console.warn(`[generate-image] Model ${imageModel} failed:`, (modelErr as Error).message?.substring(0, 80));
+          }
+        }
+        if (!response) throw lastModelError ?? new Error("All image models failed");
 
         // 응답에서 이미지 데이터 추출
-        const parts = response.candidates?.[0]?.content?.parts || [];
+        const parts = response!.candidates?.[0]?.content?.parts || [];
         let imageData: string | null = null;
         let description = "";
 
