@@ -64,8 +64,8 @@ export async function GET(request: NextRequest) {
     try {
       const naverDetail = await findComplexByAddress(cortarNo, buildingName || undefined);
       if (naverDetail && naverDetail.pyeongList.length > 0) {
-        console.log(`[building] matched=naver_land, complexName=${naverDetail.complex.complexName}, pyeongCount=${naverDetail.pyeongList.length}`);
-        const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined);
+        console.log(`[building] matched=naver_land, complexName=${naverDetail.complex.complexName}, pyeongCount=${naverDetail.pyeongList.length}, type=${naverDetail.realEstateType || "APT"}`);
+        const buildings = generateNaverBuildings(naverDetail, address, buildingName || undefined, naverDetail.realEstateType);
         return NextResponse.json({
           buildings,
           source: "naver_land",
@@ -81,8 +81,8 @@ export async function GET(request: NextRequest) {
     try {
       const cachedDetail = findCachedComplexDetail(cortarNo, buildingName || undefined);
       if (cachedDetail && cachedDetail.pyeongList.length > 0) {
-        console.log(`[building] matched=naver_cache, complexName=${cachedDetail.complex.complexName}, pyeongCount=${cachedDetail.pyeongList.length}`);
-        const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined);
+        console.log(`[building] matched=naver_cache, complexName=${cachedDetail.complex.complexName}, pyeongCount=${cachedDetail.pyeongList.length}, type=${cachedDetail.realEstateType || "APT"}`);
+        const buildings = generateNaverBuildings(cachedDetail, address, buildingName || undefined, cachedDetail.realEstateType);
         return NextResponse.json({
           buildings,
           source: "naver_land_cache",
@@ -159,16 +159,29 @@ function mapBuildingType(purposeName: string): string {
 }
 
 
+/** realEstateType → 건물 유형 한글명 */
+function mapRealEstateType(type?: string): string {
+  switch (type) {
+    case "VL": return "빌라";
+    case "OPST": return "오피스텔";
+    case "ABYG": return "아파트분양권";
+    case "JGC": return "재건축";
+    default: return "아파트";
+  }
+}
+
 /**
  * 네이버 부동산 데이터 → BuildingInfo[] 생성
  */
 function generateNaverBuildings(
   detail: NaverComplexDetail,
   address: string,
-  buildingName?: string
+  buildingName?: string,
+  realEstateType?: string
 ): BuildingInfo[] {
   const buildings: BuildingInfo[] = [];
   const { complex, pyeongList } = detail;
+  const buildingType = mapRealEstateType(realEstateType);
 
   // 동 목록: 실제 동 데이터 → 생성 폴백
   let dongs: string[];
@@ -203,7 +216,7 @@ function generateNaverBuildings(
           buildingName: buildingName || complex.complexName,
           dongName: dong,
           hoName: `${hoNum}호`,
-          buildingType: "아파트",
+          buildingType,
           totalFloor: maxFloor,
           floor,
           exclusiveArea: pyeong.exclusiveArea,

@@ -1,19 +1,22 @@
 /**
- * 전국 아파트 데이터 자동 수집 스크립트
+ * 전국 부동산 데이터 자동 수집 스크립트
  *
  * 네이버 부동산 지역 계층 API를 순회하여 전국 모든 읍면동의
- * 아파트 단지 정보를 naver-cache.json에 저장합니다.
+ * 아파트/빌라/오피스텔 단지 정보를 naver-cache.json에 저장합니다.
  *
  * --enrich 모드: 기존 캐시의 각 단지별 평형 상세(pyeong) 데이터 추가 수집
  *
  * 사용법:
- *   node scripts/cache-naver-nationwide.mjs                    # 전국 전체
+ *   node scripts/cache-naver-nationwide.mjs                    # 전국 전체 (APT)
  *   node scripts/cache-naver-nationwide.mjs --sido 30          # 대전시만
  *   node scripts/cache-naver-nationwide.mjs --sigungu 30200    # 유성구만
  *   node scripts/cache-naver-nationwide.mjs --force            # 캐시 무시 재수집
  *   node scripts/cache-naver-nationwide.mjs --delay 2000       # 딜레이 조정(ms)
  *   node scripts/cache-naver-nationwide.mjs --enrich           # 평형 상세 수집
  *   node scripts/cache-naver-nationwide.mjs --enrich --sido 30 # 대전만 평형 수집
+ *   node scripts/cache-naver-nationwide.mjs --type VL          # 빌라/연립만
+ *   node scripts/cache-naver-nationwide.mjs --type OPST        # 오피스텔만
+ *   node scripts/cache-naver-nationwide.mjs --type all         # APT+VL+OPST 전부
  */
 
 import fs from "fs";
@@ -33,6 +36,7 @@ function parseArgs() {
     force: false,    // 캐시 무시 강제 재수집
     delay: 1500,     // 요청 간 딜레이 (ms)
     enrich: false,   // 평형 상세 수집 모드
+    types: ["APT"],  // 건물 유형 (APT, VL, OPST, ABYG, JGC)
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -52,6 +56,18 @@ function parseArgs() {
       case "--enrich":
         options.enrich = true;
         break;
+      case "--type": {
+        const t = (args[++i] || "").toUpperCase();
+        if (t === "ALL") {
+          options.types = ["APT", "VL", "OPST"];
+        } else if (["APT", "VL", "OPST", "ABYG", "JGC"].includes(t)) {
+          options.types = [t];
+        } else {
+          console.error(`Unknown type: ${t}. Use APT, VL, OPST, or all`);
+          process.exit(1);
+        }
+        break;
+      }
       case "--help":
       case "-h":
         console.log(`
@@ -63,6 +79,7 @@ Options:
   --force            Re-fetch already cached regions
   --delay <ms>       Delay between requests (default: 1500)
   --enrich           Fetch pyeong detail for each complex (adds to cache)
+  --type <type>      Building type: APT (default), VL (villa), OPST (officetel), all
   -h, --help         Show this help
 `);
         process.exit(0);
@@ -203,10 +220,20 @@ async function getRegionList(cortarNo) {
   }));
 }
 
+// ─── Building Type Mapping ───
+
+const TYPE_MAP = {
+  APT: { apiType: "APT", overviewType: "APARTMENT", label: "아파트" },
+  VL: { apiType: "VL", overviewType: "VL", label: "빌라/연립" },
+  OPST: { apiType: "OPST", overviewType: "OPST", label: "오피스텔" },
+  ABYG: { apiType: "ABYG", overviewType: "ABYG", label: "아파트분양권" },
+  JGC: { apiType: "JGC", overviewType: "JGC", label: "재건축" },
+};
+
 // ─── Complex Fetcher ───
 
-async function fetchComplexes(cortarNo) {
-  const url = `${NAVER_LAND_API}/regions/complexes?cortarNo=${cortarNo}&realEstateType=APT&order=`;
+async function fetchComplexes(cortarNo, realEstateType = "APT") {
+  const url = `${NAVER_LAND_API}/regions/complexes?cortarNo=${cortarNo}&realEstateType=${realEstateType}&order=`;
   const res = await naverFetch(url);
   if (!res) return [];
 
@@ -217,6 +244,7 @@ async function fetchComplexes(cortarNo) {
     complexNo: String(c.complexNo || ""),
     complexName: String(c.complexName || ""),
     cortarNo: String(c.cortarNo || cortarNo),
+    realEstateType,
     totalDongCount: Number(c.totalBuildingCount || c.totalDongCount || 0),
     totalHouseholdCount: Number(c.totalHouseholdCount || 0),
     approvalDate: String(c.useApproveYmd || ""),
@@ -228,10 +256,10 @@ async function fetchComplexes(cortarNo) {
 
 /**
  * 단지 overview 조회 (평형 + 동 + 도면 URL)
- * /api/complexes/overview/{complexNo}?type=APARTMENT
+ * /api/complexes/overview/{complexNo}?type=APARTMENT|VL|OPST
  */
-async function fetchComplexOverview(complexNo) {
-  const url = `${NAVER_LAND_API}/complexes/overview/${complexNo}?type=APARTMENT`;
+async function fetchComplexOverview(complexNo, overviewType = "APARTMENT") {
+  const url = `${NAVER_LAND_API}/complexes/overview/${complexNo}?type=${overviewType}`;
   const res = await naverFetch(url);
   if (!res) return null;
 
@@ -410,30 +438,53 @@ async function collectAll(options) {
     process.exit(0);
   }
 
-  // Step 5: Collect apartment data for each dong
+  // Step 5: Collect data for each dong (all requested types)
+  const typeLabels = options.types.map((t) => TYPE_MAP[t]?.label || t).join("+");
+  console.log(`[types] Collecting: ${typeLabels} (${options.types.join(",")})\n`);
+
   let savedSigungu = "";
 
   for (const dong of dongList) {
     const regionLabel = `${dong.sidoName} ${dong.sigunguName} ${dong.cortarName}`;
 
-    // Skip if already cached (unless --force)
-    if (cache[dong.cortarNo] && !options.force) {
+    // For APT type, skip if already cached (unless --force)
+    // For non-APT types, always check for new data to merge
+    const hasNonApt = options.types.some((t) => t !== "APT");
+    if (cache[dong.cortarNo] && !options.force && !hasNonApt) {
       progress.addSkipped();
       progress.printProgress(regionLabel + " (skip)");
       continue;
     }
 
-    // Fetch complexes
+    // Fetch complexes for all requested types
     try {
-      const complexes = await fetchComplexes(dong.cortarNo);
-      const households = complexes.reduce((sum, c) => sum + c.totalHouseholdCount, 0);
+      let allComplexes = cache[dong.cortarNo]?.complexes || [];
+      const existingNos = new Set(allComplexes.map((c) => c.complexNo));
+
+      for (const type of options.types) {
+        // Skip APT if already cached and not force
+        if (type === "APT" && cache[dong.cortarNo] && !options.force) continue;
+
+        const complexes = await fetchComplexes(dong.cortarNo, type);
+        // Merge: add only new complexes (by complexNo)
+        for (const c of complexes) {
+          if (!existingNos.has(c.complexNo)) {
+            allComplexes.push(c);
+            existingNos.add(c.complexNo);
+          }
+        }
+
+        if (options.types.length > 1) await sleep(randomDelay(options.delay * 0.5));
+      }
+
+      const households = allComplexes.reduce((sum, c) => sum + c.totalHouseholdCount, 0);
 
       cache[dong.cortarNo] = {
-        complexes,
+        complexes: allComplexes,
         fetchedAt: new Date().toISOString(),
       };
 
-      progress.addProcessed(complexes.length, households);
+      progress.addProcessed(allComplexes.length, households);
       progress.printProgress(regionLabel);
     } catch (err) {
       progress.addError();
@@ -490,7 +541,7 @@ async function enrichAll(options) {
   const cache = loadCache();
 
   // Build list of complexes to enrich
-  const complexList = []; // { cortarNo, complexNo, complexName }
+  const complexList = []; // { cortarNo, complexNo, complexName, realEstateType }
   for (const [cortarNo, region] of Object.entries(cache)) {
     if (options.sido && !cortarNo.startsWith(options.sido)) continue;
     if (options.sigungu && !cortarNo.startsWith(options.sigungu)) continue;
@@ -498,7 +549,12 @@ async function enrichAll(options) {
     for (const c of (region.complexes || [])) {
       // Skip if already enriched (has pyeongList AND dongList)
       if (c.pyeongList && c.pyeongList.length > 0 && c.dongList && c.dongList.length > 0 && !options.force) continue;
-      complexList.push({ cortarNo, complexNo: c.complexNo, complexName: c.complexName });
+      complexList.push({
+        cortarNo,
+        complexNo: c.complexNo,
+        complexName: c.complexName,
+        realEstateType: c.realEstateType || "APT",
+      });
     }
   }
 
@@ -515,14 +571,17 @@ async function enrichAll(options) {
   let savedSigungu = "";
 
   for (let i = 0; i < complexList.length; i++) {
-    const { cortarNo, complexNo, complexName } = complexList[i];
+    const { cortarNo, complexNo, complexName, realEstateType } = complexList[i];
     const pct = ((i + 1) / complexList.length * 100).toFixed(1);
     const elapsed = formatTime(Date.now() - startTime);
     const rate = (Date.now() - startTime) / (i + 1);
     const eta = formatTime((complexList.length - i - 1) * rate);
 
+    // Determine overview API type based on realEstateType
+    const overviewType = TYPE_MAP[realEstateType]?.overviewType || "APARTMENT";
+
     try {
-      const overview = await fetchComplexOverview(complexNo);
+      const overview = await fetchComplexOverview(complexNo, overviewType);
       if (overview) {
         const region = cache[cortarNo];
         if (region) {

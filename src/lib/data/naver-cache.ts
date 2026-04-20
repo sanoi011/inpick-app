@@ -39,6 +39,7 @@ interface CachedComplex {
   complexNo: string;
   complexName: string;
   cortarNo?: string;
+  realEstateType?: string; // APT, VL, OPST
   totalDongCount: number;
   totalHouseholdCount: number;
   approvalDate: string;
@@ -164,7 +165,7 @@ export function findCachedComplexDetail(
     dongName: d.dongName,
   }));
 
-  return { complex, pyeongList, dongList };
+  return { complex, pyeongList, dongList, realEstateType: matched.realEstateType };
 }
 
 function findCachedComplexRaw(

@@ -152,18 +152,21 @@ export interface NaverComplexDetail {
   complex: NaverComplex;
   pyeongList: NaverPyeongDetail[];
   dongList?: NaverDong[];
+  realEstateType?: string; // APT, VL, OPST
 }
 
 // ─── API Functions ───
 
 /**
- * 법정동 코드로 해당 지역의 아파트 단지 목록 조회
+ * 법정동 코드로 해당 지역의 단지 목록 조회
+ * @param realEstateType - APT(아파트), VL(빌라/연립), OPST(오피스텔)
  */
 export async function searchComplexByRegion(
-  cortarNo: string
+  cortarNo: string,
+  realEstateType: string = "APT"
 ): Promise<NaverComplex[]> {
   try {
-    const url = `${NAVER_LAND_API}/regions/complexes?cortarNo=${cortarNo}&realEstateType=APT&order=`;
+    const url = `${NAVER_LAND_API}/regions/complexes?cortarNo=${cortarNo}&realEstateType=${realEstateType}&order=`;
     const res = await naverFetch(url);
 
     if (!res.ok) return [];
@@ -266,6 +269,7 @@ function matchesComplexName(searchName: string, complexName: string): boolean {
 /**
  * 주소 + 건물명으로 네이버 부동산 단지 검색 → 상세 반환
  * cortarNo: 법정동/행정동코드 10자리 (JUSO API의 admCd)
+ * 아파트 → 빌라 → 오피스텔 순서로 검색
  */
 export async function findComplexByAddress(
   cortarNo: string,
@@ -273,44 +277,47 @@ export async function findComplexByAddress(
 ): Promise<NaverComplexDetail | null> {
   if (!cortarNo || cortarNo.length < 5) return null;
 
-  try {
-    // 1. 해당 지역의 아파트 단지 목록
-    const complexes = await searchComplexByRegion(cortarNo);
-    if (complexes.length === 0) return null;
+  // 아파트 → 빌라 → 오피스텔 순서로 검색
+  const typesToSearch = ["APT", "VL", "OPST"];
 
-    // 2. 건물명으로 매칭 (direct includes → fuzzy matching)
-    let matched: NaverComplex | undefined;
+  for (const realEstateType of typesToSearch) {
+    try {
+      const complexes = await searchComplexByRegion(cortarNo, realEstateType);
+      if (complexes.length === 0) continue;
 
-    if (buildingName) {
-      const name = buildingName.toLowerCase().replace(/\s/g, "");
-      // 2a. Direct includes
-      matched = complexes.find((c) => {
-        const cName = c.complexName.toLowerCase().replace(/\s/g, "");
-        return cName.includes(name) || name.includes(cName);
-      });
-      // 2b. Fuzzy matching (단지 number + prefix)
-      if (!matched) {
-        matched = complexes.find((c) =>
-          matchesComplexName(buildingName, c.complexName)
-        );
+      // 건물명으로 매칭 (direct includes → fuzzy matching)
+      let matched: NaverComplex | undefined;
+
+      if (buildingName) {
+        const name = buildingName.toLowerCase().replace(/\s/g, "");
+        // Direct includes
+        matched = complexes.find((c) => {
+          const cName = c.complexName.toLowerCase().replace(/\s/g, "");
+          return cName.includes(name) || name.includes(cName);
+        });
+        // Fuzzy matching (단지 number + prefix)
+        if (!matched) {
+          matched = complexes.find((c) =>
+            matchesComplexName(buildingName, c.complexName)
+          );
+        }
       }
+
+      // 건물명 매칭 실패 시 단지가 1개면 자동 선택 (첫 번째 타입만)
+      if (!matched && complexes.length === 1 && realEstateType === "APT") {
+        matched = complexes[0];
+      }
+
+      if (matched) {
+        return {
+          complex: matched,
+          pyeongList: [],
+        };
+      }
+    } catch (err) {
+      console.error(`Naver findComplexByAddress error (${realEstateType}):`, err);
     }
-
-    // 건물명 매칭 실패 시 단지가 1개면 자동 선택
-    if (!matched && complexes.length === 1) {
-      matched = complexes[0];
-    }
-
-    if (!matched) return null;
-
-    // 3. 목록 데이터로 반환 (상세 API는 네이버 로그인 필요 → 401)
-    // pyeongList는 비어있지만, 실제 동수/세대수/층수 정보를 활용
-    return {
-      complex: matched,
-      pyeongList: [],
-    };
-  } catch (err) {
-    console.error("Naver findComplexByAddress error:", err);
-    return null;
   }
+
+  return null;
 }
