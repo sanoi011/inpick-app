@@ -90,6 +90,9 @@ export default function FloorPlanPage() {
   const [generatedDesigns, setGeneratedDesigns] = useState<{room: string; label: string; imageData: string | null; description: string}[]>([]);
   const [designSlideIndex, setDesignSlideIndex] = useState(0);
   const [generatingDesign, setGeneratingDesign] = useState(false);
+  // Vision 자재 분석 상태
+  const [analyzingVision, setAnalyzingVision] = useState(false);
+  const [visionResults, setVisionResults] = useState<Record<string, unknown> | null>(null);
   // 디자인 ↔ 도면 뷰 전환 (데이터 유지, 뷰만 전환)
   const [showingFloorPlan, setShowingFloorPlan] = useState(false);
   const [designPrefs, setDesignPrefs] = useState<DesignPreferences>(
@@ -525,6 +528,76 @@ export default function FloorPlanPage() {
       setGeneratingDesign(false);
     }
   }, [generatingDesign, aiMessages, designPrefs, floorPlanImageUrl, floorPlan, addGeneratedImage]);
+
+  // === Vision 자재 분석 (AI 이미지 → 자재 추출 → 견적 연결) ===
+  const handleVisionAnalysis = useCallback(async () => {
+    if (analyzingVision || generatedDesigns.length === 0) return;
+    setAnalyzingVision(true);
+
+    try {
+      const results: Record<string, unknown>[] = [];
+
+      for (const design of generatedDesigns) {
+        if (!design.imageData) continue;
+
+        const res = await fetch("/api/project/analyze-design-image", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageData: design.imageData,
+            roomType: design.room,
+            roomName: design.label,
+          }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          results.push({ roomKey: design.room, ...data });
+        }
+      }
+
+      if (results.length > 0) {
+        setVisionResults({ analyses: results });
+
+        // 자재 정보를 project state에 저장 (rendering 페이지에서 사용)
+        const allMaterials: Array<{
+          categoryCode: string;
+          categoryName: string;
+          materialName: string;
+          specification: string;
+          priceGrade: string;
+          estimatedUnitPrice: number;
+          estimatedLaborPrice: number;
+          unit: string;
+        }> = [];
+        for (const r of results) {
+          const mats = (r as { materials?: Array<Record<string, unknown>> }).materials;
+          if (mats) allMaterials.push(...mats as typeof allMaterials);
+        }
+
+        // AI 채팅에 분석 결과 메시지 추가
+        const materialSummary = allMaterials
+          .map((m) => `• ${m.categoryName}: ${m.materialName} (${m.specification}) - ${m.priceGrade}`)
+          .join("\n");
+
+        setAiMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: `🔍 **AI Vision 자재 분석 완료** (${allMaterials.length}개 자재 식별)\n\n${materialSummary}\n\n"물량산출" 탭에서 이 자재 기반 견적을 확인할 수 있습니다.`,
+          },
+        ]);
+
+        toast({ type: "success", title: "자재 분석 완료", message: `${allMaterials.length}개 자재가 식별되었습니다` });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "알 수 없는 오류";
+      toast({ type: "error", title: "분석 실패", message: msg });
+    } finally {
+      setAnalyzingVision(false);
+    }
+  }, [analyzingVision, generatedDesigns]);
 
   // === YOLO model load ===
   useEffect(() => {
@@ -1527,6 +1600,22 @@ export default function FloorPlanPage() {
                             </button>
                           ))}
                         </div>
+
+                        {/* AI 자재 분석 버튼 (좌측 하단) */}
+                        <button
+                          onClick={handleVisionAnalysis}
+                          disabled={analyzingVision}
+                          className="absolute bottom-16 left-3 z-20 flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-xs font-semibold rounded-lg shadow-lg transition-all hover:scale-105 disabled:scale-100"
+                          title="이 디자인의 자재를 AI가 분석하여 견적에 반영합니다"
+                        >
+                          {analyzingVision ? (
+                            <><Loader2 className="w-3.5 h-3.5 animate-spin" /> 자재 분석 중...</>
+                          ) : visionResults ? (
+                            <><Sparkles className="w-3.5 h-3.5" /> 자재 재분석</>
+                          ) : (
+                            <><Sparkles className="w-3.5 h-3.5" /> AI 자재 분석</>
+                          )}
+                        </button>
 
                         {/* 도면 썸네일 (우측 상단) → 도면 보기로 전환 */}
                         {floorPlanImageUrl && (
