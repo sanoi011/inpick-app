@@ -27,9 +27,13 @@ export default function EmotionAnalyticsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/emotion-stats")
+    const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+    fetch("/api/admin/emotion-stats", {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
       .then((r) => r.json())
       .then((d) => setStats(d))
+      .catch(() => setStats(null))
       .finally(() => setLoading(false));
   }, []);
 
