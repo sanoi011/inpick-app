@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
@@ -12,7 +12,7 @@ function getSupabase() {
 
 // GET /api/admin/emotion-stats — 관리자 대시보드용 집계.
 // 반환: {overview, byPalette, byEvent, avgDwellByEmotion, topSwaps, recentFeedback, emptyHint}
-export async function GET(_req: NextRequest) {
+export async function GET() {
   const supabase = getSupabase();
 
   try {
