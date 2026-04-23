@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Heart, Activity, Clock, ArrowRightLeft, MessageSquare, AlertCircle, Loader2 } from "lucide-react";
+import { Heart, Activity, Clock, ArrowRightLeft, MessageSquare, AlertCircle, Loader2, Image as ImageIcon } from "lucide-react";
 
 interface Overview {
   totalEvents: number;
@@ -22,19 +22,37 @@ interface StatsResponse {
   detail?:           string;
 }
 
+interface VisionStatsResponse {
+  total: number;
+  bySpace:      { key: string; count: number }[];
+  byStyle:      { key: string; count: number }[];
+  byQuality:    { key: string; count: number }[];
+  topEmotions:  { key: string; count: number }[];
+  topMaterials: { key: string; count: number }[];
+  recent: Array<{
+    id: number; source: string; track: string | null;
+    space: string | null; style: string | null; quality: string | null;
+    emotion_tags: string[]; dominant_colors: string[]; labeled_at: string;
+  }>;
+  error?: string;
+}
+
 export default function EmotionAnalyticsPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [vision, setVision] = useState<VisionStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
-    fetch("/api/admin/emotion-stats", {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-      .then((r) => r.json())
-      .then((d) => setStats(d))
-      .catch(() => setStats(null))
-      .finally(() => setLoading(false));
+    const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+    Promise.all([
+      fetch("/api/admin/emotion-stats", { headers }).then((r) => r.json()).catch(() => null),
+      fetch("/api/admin/vision-stats",  { headers }).then((r) => r.json()).catch(() => null),
+    ]).then(([s, v]) => {
+      setStats(s);
+      setVision(v);
+      setLoading(false);
+    });
   }, []);
 
   if (loading) {
@@ -188,6 +206,135 @@ export default function EmotionAnalyticsPage() {
           </div>
         )}
       </Card>
+
+      {/* Vision 라벨 통계 */}
+      {vision && (
+        <Card title={`Vision 라벨된 감성 이미지 (${vision.total.toLocaleString()}장)`} icon={ImageIcon}>
+          {vision.total === 0 ? (
+            <Empty label="아직 라벨된 이미지 없음" />
+          ) : (
+            <div className="space-y-5">
+              {/* 공간 + 스타일 분포 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">공간 분포 (top 12)</p>
+                  <div className="space-y-1">
+                    {vision.bySpace.slice(0, 12).map((s) => {
+                      const max = vision.bySpace[0]?.count || 1;
+                      const pct = Math.round((s.count / max) * 100);
+                      return (
+                        <div key={s.key} className="flex items-center gap-2 text-xs">
+                          <div className="w-16 text-gray-700">{s.key}</div>
+                          <div className="flex-1 bg-gray-100 rounded h-3.5 overflow-hidden">
+                            <div className="bg-pink-400 h-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="w-10 text-right font-mono text-gray-600">{s.count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">스타일 분포 (top 12)</p>
+                  <div className="space-y-1">
+                    {vision.byStyle.slice(0, 12).map((s) => {
+                      const max = vision.byStyle[0]?.count || 1;
+                      const pct = Math.round((s.count / max) * 100);
+                      return (
+                        <div key={s.key} className="flex items-center gap-2 text-xs">
+                          <div className="w-24 text-gray-700">{s.key}</div>
+                          <div className="flex-1 bg-gray-100 rounded h-3.5 overflow-hidden">
+                            <div className="bg-rose-400 h-full" style={{ width: `${pct}%` }} />
+                          </div>
+                          <div className="w-10 text-right font-mono text-gray-600">{s.count}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* 품질·감성·재질 */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">품질 등급</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {vision.byQuality.map((q) => (
+                      <span key={q.key} className={`px-2 py-1 rounded text-xs ${
+                        q.key === "A" ? "bg-green-100 text-green-700" :
+                        q.key === "B" ? "bg-blue-100 text-blue-700" :
+                        q.key === "C" ? "bg-amber-100 text-amber-700" :
+                        "bg-gray-100 text-gray-600"
+                      }`}>{q.key} <strong>{q.count}</strong></span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">감성 태그 top</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {vision.topEmotions.slice(0, 10).map((e) => (
+                      <span key={e.key} className="px-2 py-0.5 bg-pink-50 text-pink-700 text-xs rounded">
+                        {e.key} <strong>{e.count}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">재질 top</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {vision.topMaterials.slice(0, 10).map((m) => (
+                      <span key={m.key} className="px-2 py-0.5 bg-amber-50 text-amber-700 text-xs rounded">
+                        {m.key} <strong>{m.count}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* 최근 라벨된 이미지 미리보기 */}
+              {vision.recent.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 mb-2">최근 라벨 (12개)</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead className="bg-gray-50 text-gray-600">
+                        <tr>
+                          <th className="px-2 py-1.5 text-left">출처</th>
+                          <th className="px-2 py-1.5 text-left">트랙</th>
+                          <th className="px-2 py-1.5 text-left">공간</th>
+                          <th className="px-2 py-1.5 text-left">스타일</th>
+                          <th className="px-2 py-1.5 text-left">감성</th>
+                          <th className="px-2 py-1.5 text-left">컬러</th>
+                          <th className="px-2 py-1.5 text-left">Q</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vision.recent.map((r) => (
+                          <tr key={r.id} className="border-t">
+                            <td className="px-2 py-1.5">{r.source}</td>
+                            <td className="px-2 py-1.5 text-gray-500">{r.track || "-"}</td>
+                            <td className="px-2 py-1.5">{r.space || "-"}</td>
+                            <td className="px-2 py-1.5">{r.style || "-"}</td>
+                            <td className="px-2 py-1.5 text-gray-700">{(r.emotion_tags || []).join(", ")}</td>
+                            <td className="px-2 py-1.5">
+                              <div className="flex gap-1">
+                                {(r.dominant_colors || []).slice(0, 3).map((c, i) => (
+                                  <div key={i} className="w-4 h-4 rounded border" style={{ backgroundColor: c }} title={c} />
+                                ))}
+                              </div>
+                            </td>
+                            <td className="px-2 py-1.5 font-mono">{r.quality || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* 최근 피드백 */}
       <Card title="최근 감정 피드백" icon={MessageSquare}>
