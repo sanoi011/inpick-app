@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+
+// service role key가 있으면 RLS 우회하여 전체 조회. 없으면 일반 client 폴백.
+function getSupabase() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (url && serviceKey) return createServiceClient(url, serviceKey);
+  return createClient();
+}
 
 // GET /api/admin/emotion-stats — 관리자 대시보드용 집계.
 // 반환: {overview, byPalette, byEvent, avgDwellByEmotion, topSwaps, recentFeedback, emptyHint}
 export async function GET(_req: NextRequest) {
-  const supabase = createClient();
+  const supabase = getSupabase();
 
   try {
     const [
