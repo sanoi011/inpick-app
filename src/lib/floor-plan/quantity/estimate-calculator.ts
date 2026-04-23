@@ -4,7 +4,13 @@ import type { QuantityItem, TradeCode } from './types';
 import { round, TRADE_NAMES } from './types';
 import type { QuantityResult } from './quantity-calculator';
 import { findUnitPrice } from './unit-price-db';
+import { expandAuxMaterials, findFallbackPrice, type AuxCoefficient, type PriceLookupRow } from './aux-expander';
 import type { SelectedMaterial } from '@/types/consumer-project';
+
+export interface QuantityExtensions {
+  auxCoefficients?: AuxCoefficient[];
+  priceLookup?: PriceLookupRow[];
+}
 
 // 자재 카테고리 → 공종 itemCode 매핑 (AI 디자인 자재 연동용)
 const CATEGORY_TO_ITEM_MAP: Record<string, string[]> = {
@@ -101,9 +107,10 @@ export function calculateEstimate(
     vatRate?: number;
     ceilingHeight?: number;
     materialOverrides?: SelectedMaterial[];
+    extensions?: QuantityExtensions;
   } = {}
 ): EstimateResult {
-  const { overheadRate = 6, profitRate = 5, vatRate = 10, ceilingHeight = 2200, materialOverrides } = options;
+  const { overheadRate = 6, profitRate = 5, vatRate = 10, ceilingHeight = 2200, materialOverrides, extensions } = options;
   const heightSurcharge = ceilingHeight > 2500;
   const laborMultiplier = heightSurcharge ? 1.5 : 1.0;
 
@@ -124,10 +131,30 @@ export function calculateEstimate(
 
   const lines: EstimateLine[] = [];
   const unmatchedItems: QuantityItem[] = [];
+  const priceLookup = extensions?.priceLookup || [];
 
   // Step 1: 물량 x 단가 = 금액
   for (const item of qtyResult.items) {
-    const basePrice = findUnitPrice(item.itemCode);
+    let basePrice = findUnitPrice(item.itemCode);
+
+    // Fallback: material_price_lookup (G2B median) 기반 단가
+    if (!basePrice && priceLookup.length > 0) {
+      const fb = findFallbackPrice(item.itemCode, priceLookup);
+      if (fb) {
+        basePrice = {
+          itemCode: item.itemCode,
+          itemName: item.itemName,
+          unit: item.unit,
+          materialCost: fb.materialCost,
+          laborCost: fb.laborCost,
+          totalUnitCost: fb.materialCost + fb.laborCost,
+          source: fb.source,
+          updatedAt: new Date().toISOString().slice(0, 7),
+          priceGrade: 'standard',
+          priceReference: fb.source,
+        };
+      }
+    }
 
     if (!basePrice) {
       unmatchedItems.push(item);
@@ -162,6 +189,12 @@ export function calculateEstimate(
       roomName: item.roomName,
       priceSource: source,
     });
+  }
+
+  // Step 1.5: 부자재 자동 확장 (aux_material_coefficients)
+  if (extensions?.auxCoefficients && extensions.auxCoefficients.length > 0) {
+    const auxLines = expandAuxMaterials(lines, extensions.auxCoefficients, priceLookup);
+    lines.push(...auxLines);
   }
 
   // Step 2: 집계

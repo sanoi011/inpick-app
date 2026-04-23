@@ -19,6 +19,7 @@ const NAV_LINKS = [
   { label: "업체 찾기", href: "/find-contractors" },
   { label: "커뮤니티", href: "/community" },
   { label: "이용 요금", href: "#pricing" },
+  { label: "AIOD", href: "/aiod" },
 ];
 
 import { useState, useEffect } from "react";

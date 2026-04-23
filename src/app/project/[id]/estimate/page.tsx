@@ -30,7 +30,7 @@ import { isStatusAtLeast } from "@/types/consumer-project";
 import { loadFloorPlan } from "@/lib/services/drawing-service";
 import { adaptParsedFloorPlan } from "@/lib/floor-plan/quantity/adapter";
 import { calculateAllQuantities } from "@/lib/floor-plan/quantity/quantity-calculator";
-import { calculateEstimate, type EstimateResult } from "@/lib/floor-plan/quantity/estimate-calculator";
+import { calculateEstimate, type EstimateResult, type QuantityExtensions } from "@/lib/floor-plan/quantity/estimate-calculator";
 import { TRADE_NAMES } from "@/lib/floor-plan/quantity/types";
 import { generateSyntheticFloorPlan } from "@/lib/floor-plan/quantity/synthetic-floorplan";
 
@@ -184,6 +184,22 @@ export default function EstimatePage() {
   const [viewMode, setViewMode] = useState<"room" | "trade">("room");
   const [exporting, setExporting] = useState(false);
   const [ceilingHeight, setCeilingHeight] = useState(2200); // mm 기본값
+  const [extensions, setExtensions] = useState<QuantityExtensions>({});
+
+  // 견적 엔진 확장 데이터 (부자재 계수 + 단가 lookup) 프리페치
+  useEffect(() => {
+    fetch("/api/quantity/extensions")
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (d && (d.auxCoefficients || d.priceLookup)) {
+          setExtensions({
+            auxCoefficients: d.auxCoefficients,
+            priceLookup: d.priceLookup,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // AI 자재 추천 상태
   const [aiMaterials, setAiMaterials] = useState<SelectedMaterial[]>([]);
@@ -288,6 +304,7 @@ export default function EstimatePage() {
         estResult = calculateEstimate(qtyResult, {
           ceilingHeight,
           materialOverrides: userMaterials.length > 0 ? userMaterials : undefined,
+          extensions,
         });
 
         secs = viewMode === "trade"
@@ -328,7 +345,7 @@ export default function EstimatePage() {
       summary: smry,
       engineResult: estResult,
     };
-  }, [useEngine, floorPlan, projectId, viewMode, ceilingHeight, userMaterials]);
+  }, [useEngine, floorPlan, projectId, viewMode, ceilingHeight, userMaterials, extensions]);
 
   // 편집 가능한 sections 상태 (내역 추가/삭제용)
   const [editedSections, setEditedSections] = useState<RoomCostSection[] | null>(null);

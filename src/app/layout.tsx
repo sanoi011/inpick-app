@@ -14,8 +14,10 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://inpick-app.vercel.app";
+
 export const metadata: Metadata = {
-  metadataBase: new URL("https://inpick-app.vercel.app"),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "INPICK - AI 인테리어 견적 플랫폼",
     template: "%s | INPICK",

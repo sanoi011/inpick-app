@@ -50,6 +50,7 @@ export default function LandingFooter() {
                   <a href="/find-contractors" className="text-sm text-gray-400 hover:text-white transition-colors">업체 찾기</a>
                   <a href="/community" className="text-sm text-gray-400 hover:text-white transition-colors">커뮤니티</a>
                   <a href="/contractor/login" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 로그인</a>
+                  <a href="/aiod" className="text-sm text-gray-400 hover:text-white transition-colors">AIOD 소개</a>
                   <a href="#contact" className="text-sm text-gray-400 hover:text-white transition-colors">문의하기</a>
                 </div>
               </div>

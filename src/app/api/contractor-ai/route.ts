@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
+import { searchRegulations, formatRegulations } from "@/lib/regulations-search";
 import { getGeminiClient } from "@/lib/gemini-client";
 
 function buildSystemPrompt(context?: Record<string, unknown>) {
@@ -130,11 +131,14 @@ export async function POST(request: NextRequest) {
       context = await collectContext(contractorId);
     }
 
-    // 지식베이스 검색
+    // 지식베이스 + 법규 병렬 검색
     const lastUserMsg = messages[messages.length - 1]?.content || "";
-    const knowledgeContext = await searchKnowledgeSemantic(lastUserMsg);
+    const [knowledgeContext, regulations] = await Promise.all([
+      searchKnowledgeSemantic(lastUserMsg),
+      searchRegulations(lastUserMsg),
+    ]);
 
-    const systemPrompt = buildSystemPrompt(context) + knowledgeContext;
+    const systemPrompt = buildSystemPrompt(context) + knowledgeContext + formatRegulations(regulations);
 
     // Gemini API 사용
     const client = getGeminiClient();

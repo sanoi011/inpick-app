@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
+import { searchRegulations, formatRegulations } from "@/lib/regulations-search";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -39,15 +40,20 @@ export async function POST(request: NextRequest) {
       return createMockResponse(messages);
     }
 
-    // 지식베이스 검색 (마지막 메시지 기반)
+    // 지식베이스 + 법규 병렬 검색 (마지막 메시지 기반)
     const lastUserMsg = messages[messages.length - 1]?.content || "";
-    const knowledgeContext = await searchKnowledgeSemantic(lastUserMsg);
+    const [knowledgeContext, regulations] = await Promise.all([
+      searchKnowledgeSemantic(lastUserMsg),
+      searchRegulations(lastUserMsg),
+    ]);
+    const regulationContext = formatRegulations(regulations);
 
     try {
       // Gemini 멀티턴 대화 구성
       const systemInstruction = [
         DESIGN_SYSTEM_PROMPT,
         knowledgeContext ? `\n\n[참고 지식]\n${knowledgeContext}` : "",
+        regulationContext,
         floorPlanContext ? `\n\n[도면 정보]\n공간 구성: ${floorPlanContext}` : "",
       ].filter(Boolean).join("");
 

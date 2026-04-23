@@ -1918,6 +1918,40 @@ PDF/이미지 업로드 → POST /api/project/parse-drawing
 - **사업자 AI 비서**: contractor-ai SSE 스트리밍 2건 테스트 완료
 - **업체 디렉토리**: contractors API 200 OK, 8개 업체 정상 반환
 
+## 완료된 작업 (2026-04-23) - 법규 API + 견적 v0 + 부자재 DB + 이미지 품질
+
+### B1: 법규 조회 API
+- `src/app/api/regulations/route.ts` (신규) - Supabase `building_regulations` 조회
+  - 쿼리: `?tag=리모델링`, `?law_name=건축법`, `?q=비내력벽`, `?facet=tags`
+  - limit 기본 20/최대 100, offset 지원
+
+### B2: 견적 엔진 v0 DB 테이블
+- `supabase/migrations/20260423000000_material_price_lookup.sql` (신규)
+  - `material_price_lookup` 테이블 (61 버킷: prdct_clsfc_no / median / p10 / p90 / confidence A~E)
+- `D:/InPick/data/materials/upload_price_lookup.py` (신규 업로더)
+
+### 부자재 공종별 마스터 DB (505행)
+- 소스: `D:/InPick/data/InPick_공종별_부자재_완전판.xlsx` + `reports/aux_materials_coefficient_template.xlsx`
+- `supabase/migrations/20260423010000_aux_materials_tables.sql` (신규)
+  - `aux_materials_master` (337행, 15 공종, trade_code 18종)
+  - `aux_material_coefficients` (67행, 주자재→부자재 계수 + 손실률)
+  - `aux_material_crawl_targets` (44행, P1~P4 크롤링 사이트)
+- `D:/InPick/data/materials/parse_aux_materials_xlsx.py` (엑셀→JSON 파서)
+- `D:/InPick/data/materials/upload_aux_materials.py` (Supabase 업로더)
+
+### B3: 이미지 품질 전수 스캔
+- `D:/InPick/data/materials/quality_filter_images_full.py` (2단계 스캐너)
+  - 1단계 meta(stat): 29.5초 / 2단계 deep(PIL): 84.8초
+- **257,897 파일 / 33.38 GB / 57 sources** 전수 스캔 완료
+- 저해상도 확정: 583장 (lx_hausys 478, lixil_jp 78, toto_jp 20 등)
+- IKEA 51개국 246k 파일 전부 양호
+- 액션: `reharvest_lx_images.py` 실행 (lx_hausys 478장 재크롤)
+- 리포트: `reports/task-log/IMAGE-QUALITY-FULL-20260423.md`
+
+### 대표님 대기
+1. Supabase SQL Editor에서 신규 마이그레이션 2개 실행
+2. `upload_price_lookup.py` + `upload_aux_materials.py` 실행 (DB 반영)
+
 ## 다음 작업 (우선순위 순)
 
 ### 즉시 필요 (수동 작업)
