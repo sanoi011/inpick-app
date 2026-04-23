@@ -26,6 +26,17 @@ export interface EmotionMatchResult {
     thumbnail_url?: string | null;
     source: "furniture_synthetic" | "material_products" | "archetype";
   }>;
+  referenceImages: Array<{
+    id: number;
+    source: string;
+    local_path: string;
+    public_url: string | null;
+    space: string | null;
+    style: string | null;
+    emotion_tags: string[];
+    dominant_colors: string[];
+    quality: string | null;
+  }>;
   archetypes: Array<{ archetype: string; materials: string[]; emotion_tags: string[]; reference_brands?: string[] }>;
 }
 
@@ -103,6 +114,7 @@ export async function matchEmotion(query: string, limit = 20): Promise<EmotionMa
 
   // Supabase 자재 후보
   const candidates: EmotionMatchResult["materialCandidates"] = [];
+  const referenceImages: EmotionMatchResult["referenceImages"] = [];
   try {
     const supabase = createClient();
 
@@ -153,6 +165,28 @@ export async function matchEmotion(query: string, limit = 20): Promise<EmotionMa
         }
       }
     }
+    // 3) emotion_reference_images — Vision 라벨된 감성 참고 이미지 (UX 미리보기용)
+    if (Array.from(paletteEmotionTags).length > 0) {
+      const { data: refs } = await supabase
+        .from("emotion_reference_images")
+        .select("id, source, local_path, public_url, space, style, emotion_tags, dominant_colors, quality")
+        .overlaps("emotion_tags", Array.from(paletteEmotionTags))
+        .in("quality", ["A", "B"])
+        .limit(8);
+      for (const row of refs || []) {
+        referenceImages.push({
+          id:              row.id as number,
+          source:          row.source as string,
+          local_path:      row.local_path as string,
+          public_url:      (row.public_url as string | null) ?? null,
+          space:           (row.space as string | null) ?? null,
+          style:           (row.style as string | null) ?? null,
+          emotion_tags:    (row.emotion_tags as string[]) || [],
+          dominant_colors: (row.dominant_colors as string[]) || [],
+          quality:         (row.quality as string | null) ?? null,
+        });
+      }
+    }
   } catch {
     // DB 없거나 실패 시 아키타입 fallback
   }
@@ -172,6 +206,7 @@ export async function matchEmotion(query: string, limit = 20): Promise<EmotionMa
     detectedMoods: moods,
     palettes:      matchedPalettes,
     materialCandidates: candidates.slice(0, limit),
+    referenceImages,
     archetypes:    matchedArchetypes,
   };
 }
