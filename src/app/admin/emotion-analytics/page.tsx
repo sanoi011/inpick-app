@@ -46,9 +46,21 @@ interface VisionStatsResponse {
   error?: string;
 }
 
+interface AihubStatsResponse {
+  total: number;
+  extracted: number;
+  extractedPct: number;
+  bySourceType: { key: string; count: number }[];
+  byAptType:    { key: string; count: number }[];
+  topCategories: { key: string; count: number }[];
+  avgAnnotationsPerImage: number;
+  error?: string;
+}
+
 export default function EmotionAnalyticsPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [vision, setVision] = useState<VisionStatsResponse | null>(null);
+  const [aihub, setAihub] = useState<AihubStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,9 +69,11 @@ export default function EmotionAnalyticsPage() {
     Promise.all([
       fetch("/api/admin/emotion-stats", { headers }).then((r) => r.json()).catch(() => null),
       fetch("/api/admin/vision-stats",  { headers }).then((r) => r.json()).catch(() => null),
-    ]).then(([s, v]) => {
+      fetch("/api/admin/aihub-stats",   { headers }).then((r) => r.json()).catch(() => null),
+    ]).then(([s, v, a]) => {
       setStats(s);
       setVision(v);
+      setAihub(a);
       setLoading(false);
     });
   }, []);
@@ -215,6 +229,50 @@ export default function EmotionAnalyticsPage() {
           </div>
         )}
       </Card>
+
+      {/* AI Hub 239 건축도면 통계 */}
+      {aihub && aihub.total > 0 && (
+        <Card title={`AI Hub 239 건축도면 (${aihub.total.toLocaleString()}개 라벨)`}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+            <StatPill label="총 라벨 JSON" value={aihub.total} highlight />
+            <StatPill label="이미지 풀림" value={aihub.extracted} />
+            <StatPill label="풀림 비율 (%)" value={Math.round(aihub.extractedPct)} />
+            <StatPill label="도면당 주석 평균" value={Math.round(aihub.avgAnnotationsPerImage)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">소스 타입</p>
+              <div className="flex flex-wrap gap-1.5">
+                {aihub.bySourceType.map((s) => (
+                  <span key={s.key} className="px-2 py-1 bg-indigo-50 text-indigo-700 text-xs rounded">
+                    {s.key} <strong>{s.count}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">도면 타입 (CS/FP)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {aihub.byAptType.map((a) => (
+                  <span key={a.key} className="px-2 py-1 bg-purple-50 text-purple-700 text-xs rounded">
+                    {a.key} <strong>{a.count}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">top 카테고리 (총 주석)</p>
+              <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+                {aihub.topCategories.slice(0, 12).map((c) => (
+                  <span key={c.key} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded">
+                    {c.key}: <strong>{c.count.toLocaleString()}</strong>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Loom Drawings 공종 분포 (drawing_render_pairs 기반) */}
       {vision?.loomPairs && vision.loomPairs.totalPosts > 0 && (
