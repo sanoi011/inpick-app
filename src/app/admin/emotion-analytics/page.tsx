@@ -34,6 +34,15 @@ interface VisionStatsResponse {
     space: string | null; style: string | null; quality: string | null;
     emotion_tags: string[]; dominant_colors: string[]; labeled_at: string;
   }>;
+  loomPairs?: {
+    totalPosts: number;
+    hasPlan: number;
+    hasElevation: number;
+    hasRender: number;
+    multiElev: number;
+    byTrade: { key: string; count: number }[];
+    bySpace: { key: string; count: number }[];
+  };
   error?: string;
 }
 
@@ -206,6 +215,57 @@ export default function EmotionAnalyticsPage() {
           </div>
         )}
       </Card>
+
+      {/* Loom Drawings 공종 분포 (drawing_render_pairs 기반) */}
+      {vision?.loomPairs && vision.loomPairs.totalPosts > 0 && (
+        <Card title={`Loom Drawings 포스트 분석 (${vision.loomPairs.totalPosts}개)`}>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+            <StatPill label="평면 포함" value={vision.loomPairs.hasPlan} />
+            <StatPill label="입면 포함" value={vision.loomPairs.hasElevation} highlight />
+            <StatPill label="3D 렌더 포함" value={vision.loomPairs.hasRender} />
+            <StatPill label="다면 전개 ≥2" value={vision.loomPairs.multiElev} highlight />
+            <StatPill label="입면+렌더" value={vision.loomPairs.byTrade.filter((t) => t.key === "ARCH_ELEV").reduce((s, t) => s + t.count, 0)} />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">공종 분포 (포스트 개수)</p>
+              <div className="space-y-1">
+                {vision.loomPairs.byTrade.slice(0, 10).map((t) => {
+                  const max = vision.loomPairs!.byTrade[0]?.count || 1;
+                  const pct = Math.round((t.count / max) * 100);
+                  return (
+                    <div key={t.key} className="flex items-center gap-2 text-xs">
+                      <div className="w-24 text-gray-700 font-mono">{t.key}</div>
+                      <div className="flex-1 bg-gray-100 rounded h-3.5 overflow-hidden">
+                        <div className="bg-emerald-400 h-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="w-10 text-right font-mono text-gray-600">{t.count}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-gray-500 mb-2">공간 분포</p>
+              <div className="space-y-1">
+                {vision.loomPairs.bySpace.slice(0, 10).map((s) => {
+                  const max = vision.loomPairs!.bySpace[0]?.count || 1;
+                  const pct = Math.round((s.count / max) * 100);
+                  return (
+                    <div key={s.key} className="flex items-center gap-2 text-xs">
+                      <div className="w-20 text-gray-700">{s.key}</div>
+                      <div className="flex-1 bg-gray-100 rounded h-3.5 overflow-hidden">
+                        <div className="bg-sky-400 h-full" style={{ width: `${pct}%` }} />
+                      </div>
+                      <div className="w-10 text-right font-mono text-gray-600">{s.count}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Vision 라벨 통계 */}
       {vision && (
@@ -395,6 +455,15 @@ function StatCard({ icon: Icon, label, value, color }: {
         <p className="text-xs text-gray-500">{label}</p>
         <p className="text-2xl font-bold">{value.toLocaleString()}</p>
       </div>
+    </div>
+  );
+}
+
+function StatPill({ label, value, highlight }: { label: string; value: number; highlight?: boolean }) {
+  return (
+    <div className={`rounded-lg p-3 border ${highlight ? "bg-emerald-50 border-emerald-200" : "bg-gray-50 border-gray-200"}`}>
+      <p className="text-[11px] text-gray-500">{label}</p>
+      <p className={`text-xl font-bold ${highlight ? "text-emerald-700" : "text-gray-800"}`}>{value.toLocaleString()}</p>
     </div>
   );
 }

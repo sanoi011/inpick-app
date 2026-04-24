@@ -92,7 +92,11 @@ export function detectMoods(query: string): string[] {
   return Array.from(moods);
 }
 
-export async function matchEmotion(query: string, limit = 20): Promise<EmotionMatchResult> {
+export async function matchEmotion(
+  query: string,
+  limit = 20,
+  filters: { trade?: string; drawingType?: string; space?: string } = {}
+): Promise<EmotionMatchResult> {
   const { palettes, moodMap } = loadPalettes();
   const archetypes = loadArchetypes();
 
@@ -167,12 +171,14 @@ export async function matchEmotion(query: string, limit = 20): Promise<EmotionMa
     }
     // 3) emotion_reference_images — Vision 라벨된 감성 참고 이미지 (UX 미리보기용)
     if (Array.from(paletteEmotionTags).length > 0) {
-      const { data: refs } = await supabase
+      let refQ = supabase
         .from("emotion_reference_images")
         .select("id, source, local_path, public_url, space, style, emotion_tags, dominant_colors, quality")
         .overlaps("emotion_tags", Array.from(paletteEmotionTags))
-        .in("quality", ["A", "B"])
-        .limit(8);
+        .in("quality", ["A", "B"]);
+      if (filters.trade)       refQ = refQ.eq("style", filters.trade);  // future: add trade_code column
+      if (filters.space)       refQ = refQ.eq("space", filters.space);
+      const { data: refs } = await refQ.limit(8);
       for (const row of refs || []) {
         referenceImages.push({
           id:              row.id as number,
