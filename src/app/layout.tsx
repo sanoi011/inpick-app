@@ -73,27 +73,38 @@ export default function RootLayout({
 }
 
 function ServiceWorkerRegistration() {
+  // 옛 inpick-v1 SW 강제 정리: 페이지 진입 즉시 모든 SW unregister + 모든 cache 삭제 → 1회 reload.
+  // 사용자가 옛 캐시에 갇혀있는 경우 새 코드가 즉시 도달하도록 함.
   return (
     <script
       dangerouslySetInnerHTML={{
         __html: `
-          if ('serviceWorker' in navigator) {
-            window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
-                .then(function(reg) { reg.update().catch(function(){}); })
-                .catch(function() {});
-              // 새 SW가 활성화되면 자동 새로고침 (옛 캐시 사용자 즉시 반영)
-              navigator.serviceWorker.addEventListener('message', function(e) {
-                if (e.data && e.data.type === 'SW_UPDATED') {
-                  // 한 번만 reload (재귀 방지)
-                  if (!sessionStorage.getItem('inpick_sw_reloaded')) {
-                    sessionStorage.setItem('inpick_sw_reloaded', '1');
-                    window.location.reload();
-                  }
-                }
-              });
-            });
-          }
+(function () {
+  if (typeof window === 'undefined') return;
+  var purged = sessionStorage.getItem('inpick_purged_v4');
+  if (purged) return;
+  if (!('serviceWorker' in navigator)) return;
+  Promise.all([
+    navigator.serviceWorker.getRegistrations().then(function (regs) {
+      return Promise.all(regs.map(function (r) { return r.unregister().catch(function(){}); }));
+    }),
+    ('caches' in window)
+      ? caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (k) { return caches.delete(k).catch(function(){}); }));
+        })
+      : Promise.resolve()
+  ]).then(function () {
+    sessionStorage.setItem('inpick_purged_v4', '1');
+    if (performance && performance.navigation && performance.navigation.type !== 1) {
+      window.location.reload();
+    } else {
+      // 이미 reload 중이거나 첫 진입 — reload 한 번
+      try { window.location.reload(); } catch (e) {}
+    }
+  }).catch(function(){
+    sessionStorage.setItem('inpick_purged_v4', '1');
+  });
+})();
         `,
       }}
     />
