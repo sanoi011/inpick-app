@@ -79,7 +79,19 @@ function ServiceWorkerRegistration() {
         __html: `
           if ('serviceWorker' in navigator) {
             window.addEventListener('load', function() {
-              navigator.serviceWorker.register('/sw.js').catch(function() {});
+              navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+                .then(function(reg) { reg.update().catch(function(){}); })
+                .catch(function() {});
+              // 새 SW가 활성화되면 자동 새로고침 (옛 캐시 사용자 즉시 반영)
+              navigator.serviceWorker.addEventListener('message', function(e) {
+                if (e.data && e.data.type === 'SW_UPDATED') {
+                  // 한 번만 reload (재귀 방지)
+                  if (!sessionStorage.getItem('inpick_sw_reloaded')) {
+                    sessionStorage.setItem('inpick_sw_reloaded', '1');
+                    window.location.reload();
+                  }
+                }
+              });
             });
           }
         `,
