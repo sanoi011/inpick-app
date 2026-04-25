@@ -1,133 +1,227 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 
 /**
- * 토큰 상태 훅 — Phase 8(Supabase 스키마)이 들어가기 전 임시 로컬 구현.
- * 가입 시 5토큰 자동 증정. localStorage 영속.
+ * 토큰 상태 훅 — Supabase user_tokens 기반.
+ * 로그인 안 된 경우 localStorage 폴백 (가입 시 5토큰 자동 시뮬레이션).
  */
 
-const STORAGE_KEY = "inpick_token_state_v1";
+const FALLBACK_KEY = "inpick_token_state_v2";
 const SIGNUP_BONUS = 5;
+
+export interface TokenTransaction {
+  id: string;
+  type: "signup_bonus" | "purchase" | "use" | "refund" | "admin_adjust";
+  feature?: "ai_render" | "ar_session" | "drawing_option" | "welcome" | "manual";
+  amount: number;
+  balance_after: number;
+  payment_id?: string | null;
+  created_at: string;
+}
 
 interface TokenState {
   balance: number;
   totalUsed: number;
   totalPurchased: number;
   history: TokenTransaction[];
+  loading: boolean;
+  authenticated: boolean;
 }
 
-export interface TokenTransaction {
-  id: string;
-  type: "signup_bonus" | "purchase" | "use" | "refund";
-  feature?: "ai_render" | "ar_session" | "drawing_option";
-  amount: number; // 양수=충전, 음수=사용
-  balanceAfter: number;
-  at: number; // ms
-}
-
-const init: TokenState = {
+const initial: TokenState = {
   balance: SIGNUP_BONUS,
   totalUsed: 0,
   totalPurchased: 0,
-  history: [
-    {
-      id: "init",
-      type: "signup_bonus",
-      amount: SIGNUP_BONUS,
-      balanceAfter: SIGNUP_BONUS,
-      at: Date.now(),
-    },
-  ],
+  history: [],
+  loading: true,
+  authenticated: false,
 };
 
-function read(): TokenState {
-  if (typeof window === "undefined") return init;
+function readFallback(): Pick<TokenState, "balance" | "totalUsed" | "totalPurchased" | "history"> {
+  if (typeof window === "undefined") {
+    return { balance: SIGNUP_BONUS, totalUsed: 0, totalPurchased: 0, history: [] };
+  }
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return init;
-    return JSON.parse(raw) as TokenState;
+    const raw = localStorage.getItem(FALLBACK_KEY);
+    if (!raw) {
+      const init = {
+        balance: SIGNUP_BONUS,
+        totalUsed: 0,
+        totalPurchased: 0,
+        history: [
+          {
+            id: "init",
+            type: "signup_bonus" as const,
+            feature: "welcome" as const,
+            amount: SIGNUP_BONUS,
+            balance_after: SIGNUP_BONUS,
+            created_at: new Date().toISOString(),
+          },
+        ],
+      };
+      localStorage.setItem(FALLBACK_KEY, JSON.stringify(init));
+      return init;
+    }
+    return JSON.parse(raw);
   } catch {
-    return init;
+    return { balance: SIGNUP_BONUS, totalUsed: 0, totalPurchased: 0, history: [] };
   }
 }
 
-function write(s: TokenState) {
+function writeFallback(s: Pick<TokenState, "balance" | "totalUsed" | "totalPurchased" | "history">) {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(s));
+  localStorage.setItem(FALLBACK_KEY, JSON.stringify(s));
 }
 
 export function useTokens() {
-  const [state, setState] = useState<TokenState>(init);
+  const [state, setState] = useState<TokenState>(initial);
+  const supabase = createClient();
+
+  const loadFromSupabase = useCallback(async (userId: string) => {
+    const { data: tok } = await supabase
+      .from("user_tokens")
+      .select("balance, total_purchased, total_used")
+      .eq("user_id", userId)
+      .single();
+    const { data: txs } = await supabase
+      .from("token_transactions")
+      .select("id, type, feature, amount, balance_after, payment_id, created_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setState({
+      balance: tok?.balance ?? SIGNUP_BONUS,
+      totalUsed: tok?.total_used ?? 0,
+      totalPurchased: tok?.total_purchased ?? 0,
+      history: (txs as TokenTransaction[]) ?? [],
+      loading: false,
+      authenticated: true,
+    });
+  }, [supabase]);
 
   useEffect(() => {
-    setState(read());
-  }, []);
+    let cancelled = false;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (cancelled) return;
+      if (user) {
+        await loadFromSupabase(user.id);
+      } else {
+        const f = readFallback();
+        setState({ ...f, loading: false, authenticated: false });
+      }
+    })();
+    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (session?.user) await loadFromSupabase(session.user.id);
+      else {
+        const f = readFallback();
+        setState({ ...f, loading: false, authenticated: false });
+      }
+    });
+    return () => {
+      cancelled = true;
+      sub.subscription.unsubscribe();
+    };
+  }, [supabase, loadFromSupabase]);
 
-  const persist = useCallback((next: TokenState) => {
-    setState(next);
-    write(next);
-  }, []);
-
-  /** amount 만큼 차감. 잔액 부족 시 false 반환. */
+  /** 차감 — 인증 시 RPC, 비인증 시 fallback */
   const consume = useCallback(
-    async (amount: number, feature: TokenTransaction["feature"]): Promise<boolean> => {
+    async (
+      amount: number,
+      feature: NonNullable<TokenTransaction["feature"]>
+    ): Promise<boolean> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase.rpc("deduct_tokens", {
+          p_user_id: user.id,
+          p_amount: amount,
+          p_feature: feature,
+        });
+        if (error || !data?.success) return false;
+        await loadFromSupabase(user.id);
+        return true;
+      }
+      // fallback
       let ok = false;
       setState((curr) => {
         if (curr.balance < amount) {
           ok = false;
           return curr;
         }
-        const next: TokenState = {
+        const tx: TokenTransaction = {
+          id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: "use",
+          feature,
+          amount: -amount,
+          balance_after: curr.balance - amount,
+          created_at: new Date().toISOString(),
+        };
+        const next = {
           ...curr,
           balance: curr.balance - amount,
           totalUsed: curr.totalUsed + amount,
-          history: [
-            {
-              id: `t_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              type: "use",
-              feature,
-              amount: -amount,
-              balanceAfter: curr.balance - amount,
-              at: Date.now(),
-            },
-            ...curr.history,
-          ],
+          history: [tx, ...curr.history],
         };
-        write(next);
+        writeFallback({
+          balance: next.balance,
+          totalUsed: next.totalUsed,
+          totalPurchased: next.totalPurchased,
+          history: next.history,
+        });
         ok = true;
         return next;
       });
-      // 상태 setter는 비동기이지만, ok는 동기 capture됨
       return ok;
     },
-    []
+    [supabase, loadFromSupabase]
   );
 
-  /** amount 만큼 충전. */
-  const purchase = useCallback((amount: number) => {
-    setState((curr) => {
-      const next: TokenState = {
-        ...curr,
-        balance: curr.balance + amount,
-        totalPurchased: curr.totalPurchased + amount,
-        history: [
-          {
-            id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            type: "purchase",
-            amount,
-            balanceAfter: curr.balance + amount,
-            at: Date.now(),
-          },
-          ...curr.history,
-        ],
-      };
-      write(next);
-      return next;
-    });
-  }, []);
+  /** 충전 — 결제 성공 후 호출 (PG paymentKey 전달) */
+  const purchase = useCallback(
+    async (amount: number, paymentId: string, metadata?: Record<string, unknown>): Promise<boolean> => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase.rpc("purchase_tokens", {
+          p_user_id: user.id,
+          p_amount: amount,
+          p_payment_id: paymentId,
+          p_metadata: metadata ?? {},
+        });
+        if (error || !data?.success) return false;
+        await loadFromSupabase(user.id);
+        return true;
+      }
+      // fallback
+      setState((curr) => {
+        const tx: TokenTransaction = {
+          id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: "purchase",
+          feature: "manual",
+          amount,
+          balance_after: curr.balance + amount,
+          payment_id: paymentId,
+          created_at: new Date().toISOString(),
+        };
+        const next = {
+          ...curr,
+          balance: curr.balance + amount,
+          totalPurchased: curr.totalPurchased + amount,
+          history: [tx, ...curr.history],
+        };
+        writeFallback({
+          balance: next.balance,
+          totalUsed: next.totalUsed,
+          totalPurchased: next.totalPurchased,
+          history: next.history,
+        });
+        return next;
+      });
+      return true;
+    },
+    [supabase, loadFromSupabase]
+  );
 
-  const reset = useCallback(() => persist(init), [persist]);
-
-  return { ...state, consume, purchase, reset };
+  return { ...state, consume, purchase };
 }

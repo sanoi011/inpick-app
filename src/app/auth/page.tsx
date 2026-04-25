@@ -675,30 +675,33 @@ function AuthContent() {
   const [activeTab, setActiveTab] = useState<"consumer" | "contractor">(initialTab);
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-offwhite px-4 py-12 text-ink">
-      {/* 배경 메쉬 */}
+    <div className="font-kr relative flex min-h-screen items-center justify-center overflow-hidden bg-burgundy px-4 py-12 text-ink">
+      {/* 백그라운드 인테리어 콜라주 */}
+      <InteriorCollage />
+      {/* 살구 그라데이션 오버랩 (가독성) */}
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-x-0 top-0 h-[60%] bg-[radial-gradient(ellipse_at_top,rgba(254,233,230,0.95),transparent_60%)]" />
-        <div className="absolute -right-[15%] top-[10%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.18),transparent_70%)] blur-3xl" />
-        <div className="absolute -left-[12%] top-[40%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.16),transparent_70%)] blur-3xl" />
+        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(54,8,2,0.55)_0%,rgba(247,59,32,0.32)_45%,rgba(54,8,2,0.65)_100%)]" />
+        <div className="absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(ellipse_at_top,rgba(253,203,196,0.30),transparent_60%)]" />
+        <div className="absolute -right-[15%] top-[15%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.30),transparent_70%)] blur-3xl" />
+        <div className="absolute -left-[12%] top-[45%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.40),transparent_70%)] blur-3xl" />
       </div>
 
       <div className="relative w-full max-w-[440px]">
-        {/* 로고 */}
-        <div className="mb-8 text-center">
+        {/* 브랜드 배지 (Archisketch 패턴) */}
+        <div className="mx-auto mb-6 flex w-fit items-center gap-2 rounded-full bg-white px-5 py-2.5 shadow-card ring-1 ring-primary-100">
           <Link
             href="/"
-            className="inline-flex items-center gap-2 text-[28px] font-extrabold tracking-[-0.04em] text-ink"
+            className="inline-flex items-center gap-2 text-[18px] font-extrabold tracking-[-0.04em] text-ink"
           >
-            <span className="hex-mask h-6 w-6 text-primary-500" />
+            <span className="hex-mask h-5 w-5 text-primary-500" />
             <span className="font-en">inpick</span>
           </Link>
-          <p className="mt-2 text-[14px] text-ink-60">
-            {activeTab === "consumer"
-              ? "한 계정으로 인테리어의 모든 단계를."
-              : "사업자로 입찰·매칭을 받아보세요."}
-          </p>
         </div>
+        <p className="mb-6 text-center text-[13px] font-medium tracking-tight text-offwhite/85">
+          {activeTab === "consumer"
+            ? "한 계정으로 인테리어의 모든 단계를."
+            : "사업자로 입찰·매칭을 받아보세요."}
+        </p>
 
         {/* 소비자 / 사업자 탭 */}
         <div className="mb-5 flex gap-2.5">
@@ -729,10 +732,38 @@ function AuthContent() {
           {activeTab === "consumer" ? <ConsumerAuthForm /> : <ContractorAuthForm />}
         </div>
 
-        <p className="font-mono mt-6 text-center text-[11px] tracking-[0.08em] text-ink-40">
+        <p className="font-mono mt-6 text-center text-[11px] tracking-[0.08em] text-offwhite/60">
           로그인 시 <span className="underline">서비스 이용약관</span> 및{" "}
           <span className="underline">개인정보처리방침</span>에 동의합니다.
         </p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── 인테리어 백그라운드 콜라주 (Archisketch 결) ─── */
+function InteriorCollage() {
+  // 12장 그리드. 화면 사이즈 기준 4×3 (데스크톱) / 3×4 (모바일)
+  const tiles = Array.from({ length: 12 }, (_, i) => ({
+    src: `/auth-bg/${i + 1}.jpg`,
+    rot: [-3, 2, -1.5, 1.8, -2.4, 1.2, -1.6, 2.6, -2, 1.4, -1.8, 2.2][i],
+  }));
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      <div className="grid h-full w-full grid-cols-2 grid-rows-6 gap-[6px] p-[6px] sm:grid-cols-3 sm:grid-rows-4 lg:grid-cols-4 lg:grid-rows-3">
+        {tiles.map((t, i) => (
+          <div
+            key={i}
+            className="relative overflow-hidden rounded-[14px] shadow-[0_10px_24px_-8px_rgba(54,8,2,0.5)]"
+            style={{ transform: `rotate(${t.rot}deg) scale(1.04)` }}
+          >
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${t.src})` }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(54,8,2,0.10),rgba(247,59,32,0.08))]" />
+          </div>
+        ))}
       </div>
     </div>
   );
