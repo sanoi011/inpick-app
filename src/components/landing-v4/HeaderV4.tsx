@@ -38,14 +38,27 @@ export default function HeaderV4() {
           isDark ? "text-offwhite" : "text-ink"
         }`}
       >
-        <a href="/" className="flex items-center gap-2">
-          <span
-            className={`hex-mask h-5 w-5 transition-colors ${
-              isDark ? "text-offwhite" : "text-primary-500"
+        <div className="flex items-end gap-2.5">
+          <a href="/" className="flex items-center gap-2">
+            <span
+              className={`hex-mask h-5 w-5 transition-colors ${
+                isDark ? "text-offwhite" : "text-primary-500"
+              }`}
+            />
+            <span className="font-en text-[20px] font-extrabold tracking-[-0.04em]">inpick</span>
+          </a>
+          <a
+            href="https://www.aiod.kr"
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`font-en mb-[2px] hidden text-[13px] font-light tracking-[0.04em] opacity-80 transition-opacity hover:opacity-100 sm:inline ${
+              isDark ? "text-offwhite" : "text-ink"
             }`}
-          />
-          <span className="font-en text-[20px] font-extrabold tracking-[-0.04em]">inpick</span>
-        </a>
+            title="AIOD — 한국 건축의 디지털 표준"
+          >
+            AIOD
+          </a>
+        </div>
 
         <div className="flex items-center gap-2 text-[13px] sm:gap-2.5 sm:text-[14px]">
           <motion.a

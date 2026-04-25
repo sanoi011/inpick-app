@@ -2,14 +2,14 @@ import type { Metadata } from "next";
 import AiodLandingClient from "./AiodLandingClient";
 
 export const metadata: Metadata = {
-  title: "AIOD — 건축·인테리어 AI 솔루션",
+  title: "AIOD 아이오드 — 한국 건축의 디지털 표준",
   description:
-    "AIOD는 건축 도메인 8년의 실무 경험과 AI 기술을 결합해, 인테리어·건설 공사의 견적·설계·계약 과정을 자동화합니다. INPICK 플랫폼의 운영사.",
+    "AIOD는 한국 건축·인테리어 산업의 디지털 인프라를 만드는 딥테크 스타트업입니다. 견적·설계·매칭·계약을 하나의 흐름으로.",
   alternates: { canonical: "/aiod" },
   openGraph: {
-    title: "AIOD — 건축·인테리어 AI 솔루션",
+    title: "AIOD 아이오드 — 한국 건축의 디지털 표준",
     description:
-      "건축 도메인 실무 + AI 기술. INPICK 플랫폼의 운영사 AIOD.",
+      "30초의 정확한 견적, 검증된 시공자 매칭, 공정거래위 표준 계약.",
     url: "/aiod",
     type: "website",
   },
