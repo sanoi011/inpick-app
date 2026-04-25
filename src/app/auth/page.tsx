@@ -3,11 +3,120 @@
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Loader2, User, Building2, Mail, Lock, ArrowRight } from "lucide-react";
+import {
+  Loader2,
+  User,
+  Building2,
+  Mail,
+  Lock,
+  ArrowRight,
+  Hexagon,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
-// ─── 소비자 로그인 폼 ───
+type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
+/* ─── 공용: OAuth 버튼 묶음 ────────────────────── */
+function OAuthRow({
+  onProvider,
+  loadingProvider,
+}: {
+  onProvider: (p: OAuthProvider) => void;
+  loadingProvider: OAuthProvider | null;
+}) {
+  const items: {
+    key: OAuthProvider;
+    label: string;
+    bg: string;
+    fg: string;
+    border?: string;
+    disabled?: boolean;
+    icon: React.ReactNode;
+  }[] = [
+    {
+      key: "google",
+      label: "Google",
+      bg: "bg-white",
+      fg: "text-ink",
+      border: "border border-primary-100",
+      icon: (
+        <svg className="h-4 w-4" viewBox="0 0 24 24">
+          <path
+            d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
+            fill="#4285F4"
+          />
+          <path
+            d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+            fill="#34A853"
+          />
+          <path
+            d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+            fill="#FBBC05"
+          />
+          <path
+            d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+            fill="#EA4335"
+          />
+        </svg>
+      ),
+    },
+    {
+      key: "kakao",
+      label: "카카오",
+      bg: "bg-[#FEE500]",
+      fg: "text-[#3C1E1E]",
+      icon: (
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="#3C1E1E">
+          <path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.76 5.01 4.41 6.36l-1.12 4.12c-.1.36.3.65.62.45l4.84-3.2c.41.04.82.07 1.25.07 5.52 0 10-3.36 10-7.5S17.52 3 12 3z" />
+        </svg>
+      ),
+    },
+    {
+      key: "apple",
+      label: "Apple",
+      bg: "bg-ink",
+      fg: "text-offwhite",
+      icon: (
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16.365 1.43c0 1.14-.493 2.27-1.177 3.08-.744.9-1.99 1.57-2.987 1.57-.12 0-.23-.02-.3-.03-.01-.06-.04-.22-.04-.39 0-1.15.572-2.27 1.206-2.98.804-.94 2.142-1.64 3.248-1.68.03.13.05.28.05.43zm4.565 15.71c-.03.07-.463 1.58-1.518 3.12-.945 1.34-1.94 2.71-3.43 2.71-1.517 0-1.9-.88-3.63-.88-1.698 0-2.302.91-3.67.91-1.377 0-2.332-1.26-3.428-2.8-1.287-1.82-2.323-4.63-2.323-7.28 0-4.28 2.797-6.55 5.552-6.55 1.448 0 2.675.95 3.6.95.865 0 2.222-1.01 3.902-1.01.613 0 2.886.06 4.374 2.19-.13.09-2.383 1.37-2.383 4.19 0 3.26 2.854 4.42 2.955 4.45z" />
+        </svg>
+      ),
+    },
+    {
+      key: "naver",
+      label: "네이버",
+      bg: "bg-[#03C75A]",
+      fg: "text-white",
+      icon: (
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M16.273 12.845L7.376 0H0v24h7.726V11.155L16.624 24H24V0h-7.727v12.845z" />
+        </svg>
+      ),
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-2 gap-2.5">
+      {items.map((it) => {
+        const loading = loadingProvider === it.key;
+        return (
+          <button
+            key={it.key}
+            type="button"
+            onClick={() => !it.disabled && !loadingProvider && onProvider(it.key)}
+            disabled={!!loadingProvider || it.disabled}
+            className={`inline-flex h-11 items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-all ${it.bg} ${it.fg} ${it.border ?? ""} disabled:opacity-50`}
+          >
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : it.icon}
+            <span>{it.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── 소비자 로그인 폼 ────────────────────────── */
 function ConsumerAuthForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -19,8 +128,7 @@ function ConsumerAuthForm() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
-  const [oauthLoading, setOauthLoading] = useState<string | null>(null);
-
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -37,14 +145,14 @@ function ConsumerAuthForm() {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        if (error.message.includes("Invalid login")) {
-          setError("이메일 또는 비밀번호가 올바르지 않습니다.");
-        } else {
-          setError(error.message);
-        }
+        setError(
+          error.message.includes("Invalid login")
+            ? "이메일 또는 비밀번호가 올바르지 않습니다."
+            : error.message
+        );
       } else {
         const returnUrl = searchParams.get("returnUrl");
-        router.push(returnUrl || "/workflow");
+        router.push(returnUrl || "/");
       }
     } catch {
       setError("로그인 중 오류가 발생했습니다.");
@@ -62,16 +170,16 @@ function ConsumerAuthForm() {
         email,
         password,
         options: {
-          data: { full_name: name },
+          data: { full_name: name, account_type: "consumer" },
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
       if (error) {
-        if (error.message.includes("already registered")) {
-          setError("이미 가입된 이메일입니다.");
-        } else {
-          setError(error.message);
-        }
+        setError(
+          error.message.includes("already registered")
+            ? "이미 가입된 이메일입니다."
+            : error.message
+        );
       } else {
         setMessage("확인 이메일을 발송했습니다. 이메일을 확인해주세요.");
         setEmail("");
@@ -85,23 +193,28 @@ function ConsumerAuthForm() {
     }
   };
 
-  const handleOAuth = async (provider: "google" | "kakao") => {
+  const handleOAuth = async (provider: OAuthProvider) => {
     setError("");
+    if (provider === "naver") {
+      // Naver는 Supabase 미지원 — 추후 커스텀 OAuth 라우트 구현 예정
+      setError("네이버 로그인은 곧 지원됩니다.");
+      return;
+    }
+    if (provider === "kakao" || provider === "apple") {
+      // Supabase에서 활성 시 즉시 작동. 미설정 시 supabase 측 에러 안내.
+    }
     setOauthLoading(provider);
     try {
       const returnUrl = searchParams.get("returnUrl");
       const callbackUrl = returnUrl
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
         : `${window.location.origin}/auth/callback`;
-
       const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: {
-          redirectTo: callbackUrl,
-        },
+        provider: provider as "google" | "kakao" | "apple",
+        options: { redirectTo: callbackUrl },
       });
       if (error) {
-        setError(`${provider === "google" ? "Google" : "카카오"} 로그인에 실패했습니다: ${error.message}`);
+        setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
         setOauthLoading(null);
       }
     } catch {
@@ -114,17 +227,17 @@ function ConsumerAuthForm() {
     e.preventDefault();
     setError("");
     setMessage("");
-    if (!email) { setError("이메일을 입력해주세요."); return; }
+    if (!email) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
     setLoading(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
-      if (error) {
-        setError(error.message);
-      } else {
-        setMessage("비밀번호 재설정 이메일을 발송했습니다. 이메일을 확인해주세요.");
-      }
+      if (error) setError(error.message);
+      else setMessage("비밀번호 재설정 이메일을 발송했습니다. 이메일을 확인해주세요.");
     } catch {
       setError("이메일 발송 중 오류가 발생했습니다.");
     } finally {
@@ -134,175 +247,142 @@ function ConsumerAuthForm() {
 
   if (forgotMode) {
     return (
-      <>
-        {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        {message && (
-          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-            {message}
-          </div>
-        )}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2">비밀번호 찾기</h3>
-        <p className="text-sm text-neutral-500 mb-6">가입한 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
-        <form onSubmit={handleForgotPassword} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
-            <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+      <FormFrame>
+        {error && <Alert kind="danger">{error}</Alert>}
+        {message && <Alert kind="success">{message}</Alert>}
+        <h3 className="text-lg font-extrabold tracking-tight text-ink">비밀번호 찾기</h3>
+        <p className="mt-1 text-[13px] text-ink-60">
+          가입한 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.
+        </p>
+        <form onSubmit={handleForgotPassword} className="mt-5 flex flex-col gap-4">
+          <Field label="이메일">
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               placeholder="이메일을 입력하세요"
-              className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-              required autoFocus
+              required
+              autoFocus
             />
-          </div>
-          <button
-            type="submit" disabled={loading}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-          >
-            {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+          </Field>
+          <PrimaryButton type="submit" loading={loading}>
             재설정 이메일 보내기
-          </button>
+          </PrimaryButton>
         </form>
         <button
-          onClick={() => { setForgotMode(false); setError(""); setMessage(""); }}
-          className="mt-4 w-full text-sm text-neutral-500 hover:text-neutral-700"
+          onClick={() => {
+            setForgotMode(false);
+            setError("");
+            setMessage("");
+          }}
+          className="mt-4 w-full text-[13px] text-ink-60 hover:text-ink"
         >
           로그인으로 돌아가기
         </button>
-      </>
+      </FormFrame>
     );
   }
 
   return (
-    <>
-      {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {error}
-        </div>
-      )}
-      {message && (
-        <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-          {message}
-        </div>
-      )}
+    <FormFrame>
+      {error && <Alert kind="danger">{error}</Alert>}
+      {message && <Alert kind="success">{message}</Alert>}
 
-      {/* 소셜 로그인 */}
-      <div className="space-y-3 mb-6">
-        <button
-          onClick={() => handleOAuth("google")}
-          disabled={!!oauthLoading}
-          className="w-full flex items-center justify-center gap-3 py-3 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors disabled:opacity-50"
-        >
-          {oauthLoading === "google" ? (
-            <Loader2 className="w-5 h-5 animate-spin text-neutral-400" />
-          ) : (
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
-            </svg>
-          )}
-          <span className="font-medium text-neutral-700">Google로 계속하기</span>
-        </button>
-        <button
-          disabled
-          className="w-full flex items-center justify-center gap-3 py-3 bg-[#FEE500] rounded-lg opacity-50 cursor-not-allowed"
-        >
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="#3C1E1E">
-            <path d="M12 3C6.48 3 2 6.36 2 10.5c0 2.67 1.76 5.01 4.41 6.36l-1.12 4.12c-.1.36.3.65.62.45l4.84-3.2c.41.04.82.07 1.25.07 5.52 0 10-3.36 10-7.5S17.52 3 12 3z" />
-          </svg>
-          <span className="font-medium text-neutral-900">카카오 로그인 (준비중)</span>
-        </button>
-      </div>
+      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} />
 
-      {/* 구분선 */}
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-neutral-200" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-neutral-500">또는 이메일로</span>
-        </div>
-      </div>
+      <Divider>또는 이메일로</Divider>
 
-      {/* 로그인/회원가입 토글 */}
-      <div className="flex rounded-lg bg-neutral-100 p-1 mb-6">
+      <div className="mb-5 flex rounded-full bg-primary-50 p-1">
         <button
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            !isSignUp ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+          className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors ${
+            !isSignUp ? "bg-white text-ink shadow-sm" : "text-ink-60"
           }`}
-          onClick={() => { setIsSignUp(false); setError(""); setMessage(""); }}
+          onClick={() => {
+            setIsSignUp(false);
+            setError("");
+            setMessage("");
+          }}
         >
           로그인
         </button>
         <button
-          className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-            isSignUp ? "bg-white text-neutral-900 shadow-sm" : "text-neutral-500"
+          className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors ${
+            isSignUp ? "bg-white text-ink shadow-sm" : "text-ink-60"
           }`}
-          onClick={() => { setIsSignUp(true); setError(""); setMessage(""); }}
+          onClick={() => {
+            setIsSignUp(true);
+            setError("");
+            setMessage("");
+          }}
         >
           회원가입
         </button>
       </div>
 
-      <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="space-y-4">
+      <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="flex flex-col gap-3.5">
         {isSignUp && (
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">이름</label>
-            <input
-              type="text" value={name} onChange={(e) => setName(e.target.value)}
+          <Field label="이름">
+            <Input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
               placeholder="이름을 입력하세요"
-              className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
               required
             />
-          </div>
+          </Field>
         )}
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
-          <input
-            type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+        <Field label="이메일">
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="이메일을 입력하세요"
-            className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
             required
           />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">비밀번호</label>
-          <input
-            type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+        </Field>
+        <Field label="비밀번호">
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호를 입력하세요"
-            className="w-full px-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-            required minLength={6}
+            required
+            minLength={6}
           />
-        </div>
-        <button
-          type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
-        >
-          {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-          {isSignUp ? "회원가입" : "로그인"}
-        </button>
+        </Field>
+        <PrimaryButton type="submit" loading={loading}>
+          {isSignUp ? (
+            <>
+              회원가입 <Hexagon className="h-3.5 w-3.5 fill-current" />
+              <span className="text-[12px] opacity-90">+5 토큰 증정</span>
+            </>
+          ) : (
+            <>
+              로그인 <ArrowRight className="h-3.5 w-3.5" />
+            </>
+          )}
+        </PrimaryButton>
       </form>
 
       {!isSignUp && (
         <div className="mt-4 text-center">
           <button
-            onClick={() => { setForgotMode(true); setError(""); setMessage(""); }}
-            className="text-sm text-neutral-500 hover:text-blue-600 transition-colors"
+            onClick={() => {
+              setForgotMode(true);
+              setError("");
+              setMessage("");
+            }}
+            className="text-[13px] text-ink-60 hover:text-primary-500"
           >
             비밀번호를 잊으셨나요?
           </button>
         </div>
       )}
-    </>
+    </FormFrame>
   );
 }
 
-// ─── 사업자 로그인 폼 ───
-
+/* ─── 사업자 로그인 폼 ────────────────────────── */
 function ContractorAuthForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
@@ -311,14 +391,21 @@ function ContractorAuthForm() {
   const [error, setError] = useState("");
   const [forgotMode, setForgotMode] = useState(false);
   const [message, setMessage] = useState("");
+  const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) { setError("이메일을 입력해주세요."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("올바른 이메일 형식을 입력해주세요."); return; }
+    if (!email) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("올바른 이메일 형식을 입력해주세요.");
+      return;
+    }
     setLoading(true);
     setError("");
-
     try {
       const res = await fetch("/api/contractor/login", {
         method: "POST",
@@ -326,12 +413,10 @@ function ContractorAuthForm() {
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();
-
       if (!res.ok) {
         setError(data.error || "로그인에 실패했습니다.");
         return;
       }
-
       localStorage.setItem("contractor_token", data.token);
       localStorage.setItem("contractor_id", data.contractor.id);
       localStorage.setItem("contractor_name", data.contractor.company_name);
@@ -343,12 +428,41 @@ function ContractorAuthForm() {
     }
   };
 
+  const handleOAuth = async (provider: OAuthProvider) => {
+    setError("");
+    if (provider === "naver") {
+      setError("네이버 로그인은 곧 지원됩니다.");
+      return;
+    }
+    setOauthLoading(provider);
+    try {
+      // 사업자도 supabase OAuth 사용 — callback에서 contractor 등록 페이지로 분기
+      const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/contractor")}`;
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider as "google" | "kakao" | "apple",
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: { account_type: "contractor" },
+        },
+      });
+      if (error) {
+        setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
+        setOauthLoading(null);
+      }
+    } catch {
+      setError("소셜 로그인 중 오류가 발생했습니다.");
+      setOauthLoading(null);
+    }
+  };
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setMessage("");
-    if (!email) { setError("이메일을 입력해주세요."); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError("올바른 이메일 형식을 입력해주세요."); return; }
+    if (!email) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
     setLoading(true);
     try {
       const res = await fetch("/api/contractor/forgot-password", {
@@ -358,10 +472,6 @@ function ContractorAuthForm() {
       });
       const data = await res.json();
       setMessage(data.message || "비밀번호 재설정 이메일을 발송했습니다.");
-      // 개발용: resetUrl이 있으면 콘솔에 표시
-      if (data.resetUrl) {
-        console.log("[dev] Reset URL:", data.resetUrl);
-      }
     } catch {
       setError("서버 오류가 발생했습니다.");
     } finally {
@@ -371,176 +481,291 @@ function ContractorAuthForm() {
 
   if (forgotMode) {
     return (
-      <>
-        {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-            {error}
-          </div>
-        )}
-        {message && (
-          <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-700">
-            {message}
-          </div>
-        )}
-        <h3 className="text-lg font-semibold text-neutral-900 mb-2">비밀번호 찾기</h3>
-        <p className="text-sm text-neutral-500 mb-6">등록된 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.</p>
-        <form onSubmit={handleForgotPassword} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-                placeholder="info@company.com" autoFocus
-              />
-            </div>
-          </div>
-          <button
-            type="submit" disabled={loading || !email}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> 처리중...</> : "재설정 이메일 보내기"}
-          </button>
+      <FormFrame>
+        {error && <Alert kind="danger">{error}</Alert>}
+        {message && <Alert kind="success">{message}</Alert>}
+        <h3 className="text-lg font-extrabold tracking-tight text-ink">사업자 비밀번호 찾기</h3>
+        <p className="mt-1 text-[13px] text-ink-60">
+          등록된 이메일로 재설정 링크를 보내드립니다.
+        </p>
+        <form onSubmit={handleForgotPassword} className="mt-5 flex flex-col gap-4">
+          <Field label="이메일" icon={<Mail className="h-4 w-4 text-ink-40" />}>
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="info@company.com"
+              autoFocus
+              hasIcon
+            />
+          </Field>
+          <PrimaryButton type="submit" loading={loading} disabled={!email}>
+            재설정 이메일 보내기
+          </PrimaryButton>
         </form>
         <button
-          onClick={() => { setForgotMode(false); setError(""); setMessage(""); }}
-          className="mt-4 w-full text-sm text-neutral-500 hover:text-neutral-700"
+          onClick={() => {
+            setForgotMode(false);
+            setError("");
+            setMessage("");
+          }}
+          className="mt-4 w-full text-[13px] text-ink-60 hover:text-ink"
         >
           로그인으로 돌아가기
         </button>
-      </>
+      </FormFrame>
     );
   }
 
   return (
-    <>
-      {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {error}
-        </div>
-      )}
+    <FormFrame>
+      {error && <Alert kind="danger">{error}</Alert>}
 
-      <form onSubmit={handleLogin} className="space-y-4">
+      {/* 사업자 등록 강조 배너 */}
+      <Link
+        href="/contractor/register"
+        className="mb-5 flex items-center justify-between rounded-2xl border border-primary-200 bg-primary-50/70 p-4 text-left transition-colors hover:border-primary-400"
+      >
         <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">이메일</label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-              placeholder="info@company.com" autoFocus
-            />
-          </div>
+          <p className="text-[12px] font-bold uppercase tracking-widest text-primary-500">
+            STEP 0 · 처음이세요?
+          </p>
+          <p className="mt-1 text-[15px] font-bold tracking-tight text-ink">사업자 등록 먼저</p>
+          <p className="mt-0.5 text-[12px] text-ink-60">
+            사업자등록증 + 사업장 주소만 있으면 OK
+          </p>
         </div>
+        <ArrowRight className="h-4 w-4 text-primary-500" />
+      </Link>
 
-        <div>
-          <label className="block text-sm font-medium text-neutral-700 mb-1">비밀번호</label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input
-              type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
-              placeholder="비밀번호 입력"
-            />
-          </div>
-        </div>
+      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} />
+      <Divider>또는 이메일로</Divider>
 
-        <button
-          type="submit" disabled={loading || !email}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
-        >
-          {loading ? <><Loader2 className="w-4 h-4 animate-spin" /> 로그인중...</> : "사업자 로그인"}
-        </button>
+      <form onSubmit={handleLogin} className="flex flex-col gap-3.5">
+        <Field label="이메일" icon={<Mail className="h-4 w-4 text-ink-40" />}>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="info@company.com"
+            autoFocus
+            hasIcon
+          />
+        </Field>
+        <Field label="비밀번호" icon={<Lock className="h-4 w-4 text-ink-40" />}>
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="비밀번호 입력"
+            hasIcon
+          />
+        </Field>
+        <PrimaryButton type="submit" loading={loading} disabled={!email}>
+          {loading ? "로그인 중…" : "사업자 로그인"} <ArrowRight className="h-3.5 w-3.5" />
+        </PrimaryButton>
       </form>
 
       <div className="mt-3 text-center">
         <button
-          onClick={() => { setForgotMode(true); setError(""); setMessage(""); }}
-          className="text-sm text-neutral-500 hover:text-blue-600 transition-colors"
+          onClick={() => {
+            setForgotMode(true);
+            setError("");
+            setMessage("");
+          }}
+          className="text-[13px] text-ink-60 hover:text-primary-500"
         >
           비밀번호를 잊으셨나요?
         </button>
       </div>
-
-      <div className="mt-4 pt-4 border-t border-neutral-100 text-center">
-        <p className="text-sm text-neutral-500">
-          아직 등록하지 않으셨나요?{" "}
-          <Link href="/contractor/register" className="text-blue-600 hover:underline font-medium">
-            사업자 등록 <ArrowRight className="w-3 h-3 inline" />
-          </Link>
-        </p>
-      </div>
-    </>
+    </FormFrame>
   );
 }
 
-// ─── 통합 인증 페이지 ───
+/* ─── 폼 공통 컴포넌트 ─────────────────────── */
+function FormFrame({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+function Alert({
+  kind,
+  children,
+}: {
+  kind: "danger" | "success";
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={`mb-4 rounded-2xl border px-4 py-3 text-[13px] ${
+        kind === "danger"
+          ? "border-danger-text/20 bg-danger-bg text-danger-text"
+          : "border-success-text/20 bg-success-bg text-success-text"
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+function Divider({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="relative my-5">
+      <div className="absolute inset-0 flex items-center">
+        <div className="w-full border-t border-primary-100" />
+      </div>
+      <div className="font-mono relative flex justify-center text-[11px] uppercase tracking-[0.16em]">
+        <span className="bg-white px-2 text-ink-40">{children}</span>
+      </div>
+    </div>
+  );
+}
+function Field({
+  label,
+  icon,
+  children,
+}: {
+  label: string;
+  icon?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-[12px] font-bold tracking-tight text-ink-60">
+        {label}
+      </label>
+      <div className="relative">
+        {icon && <span className="absolute left-3.5 top-1/2 -translate-y-1/2">{icon}</span>}
+        {children}
+      </div>
+    </div>
+  );
+}
+function Input({
+  hasIcon,
+  ...props
+}: React.InputHTMLAttributes<HTMLInputElement> & { hasIcon?: boolean }) {
+  return (
+    <input
+      {...props}
+      className={`w-full rounded-2xl border border-primary-100 bg-white py-3 text-[14px] tracking-tight text-ink outline-none transition-all placeholder:text-ink-40 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 ${
+        hasIcon ? "pl-10 pr-4" : "px-4"
+      }`}
+    />
+  );
+}
+function PrimaryButton({
+  loading,
+  children,
+  ...props
+}: React.ButtonHTMLAttributes<HTMLButtonElement> & { loading?: boolean }) {
+  return (
+    <button
+      {...props}
+      disabled={props.disabled || loading}
+      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-500 text-[14px] font-semibold tracking-tight text-white shadow-cta transition-colors hover:bg-primary-600 disabled:bg-primary-100 disabled:text-ink-40 disabled:shadow-none"
+    >
+      {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+    </button>
+  );
+}
 
+/* ─── 통합 인증 페이지 ─────────────────────── */
 function AuthContent() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("type") === "contractor" ? "contractor" : "consumer";
+  const initialTab =
+    searchParams.get("type") === "contractor" ? "contractor" : "consumer";
   const [activeTab, setActiveTab] = useState<"consumer" | "contractor">(initialTab);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-12 bg-neutral-50">
-      <div className="w-full max-w-md">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-offwhite px-4 py-12 text-ink">
+      {/* 배경 메쉬 */}
+      <div className="pointer-events-none absolute inset-0">
+        <div className="absolute inset-x-0 top-0 h-[60%] bg-[radial-gradient(ellipse_at_top,rgba(254,233,230,0.95),transparent_60%)]" />
+        <div className="absolute -right-[15%] top-[10%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.18),transparent_70%)] blur-3xl" />
+        <div className="absolute -left-[12%] top-[40%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.16),transparent_70%)] blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-[440px]">
         {/* 로고 */}
-        <div className="text-center mb-8">
-          <Link href="/" className="text-3xl font-bold text-blue-600">
-            INPICK
+        <div className="mb-8 text-center">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 text-[28px] font-extrabold tracking-[-0.04em] text-ink"
+          >
+            <span className="hex-mask h-6 w-6 text-primary-500" />
+            <span className="font-en">inpick</span>
           </Link>
-          <p className="mt-2 text-neutral-500">
-            로그인하여 서비스를 이용하세요
+          <p className="mt-2 text-[14px] text-ink-60">
+            {activeTab === "consumer"
+              ? "한 계정으로 인테리어의 모든 단계를."
+              : "사업자로 입찰·매칭을 받아보세요."}
           </p>
         </div>
 
-        {/* 소비자/사업자 탭 선택 */}
-        <div className="flex gap-3 mb-6">
-          <button
+        {/* 소비자 / 사업자 탭 */}
+        <div className="mb-5 flex gap-2.5">
+          <TabButton
+            active={activeTab === "consumer"}
             onClick={() => setActiveTab("consumer")}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-4 rounded-xl border-2 transition-all ${
-              activeTab === "consumer"
-                ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm"
-                : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50"
-            }`}
-          >
-            <User className="w-5 h-5" />
-            <div className="text-left">
-              <p className="text-sm font-semibold">일반 고객</p>
-              <p className="text-xs opacity-70">인테리어 견적 받기</p>
-            </div>
-          </button>
-          <button
+            icon={<User className="h-4 w-4" />}
+            title="소비자"
+            sub="견적·디자인·계약"
+          />
+          <TabButton
+            active={activeTab === "contractor"}
             onClick={() => setActiveTab("contractor")}
-            className={`flex-1 flex items-center justify-center gap-2.5 py-4 rounded-xl border-2 transition-all ${
-              activeTab === "contractor"
-                ? "border-blue-600 bg-blue-50 text-blue-700 shadow-sm"
-                : "border-neutral-200 bg-white text-neutral-500 hover:border-neutral-300 hover:bg-neutral-50"
-            }`}
-          >
-            <Building2 className="w-5 h-5" />
-            <div className="text-left">
-              <p className="text-sm font-semibold">사업자</p>
-              <p className="text-xs opacity-70">입찰 및 프로젝트 관리</p>
-            </div>
-          </button>
+            icon={<Building2 className="h-4 w-4" />}
+            title="사업자"
+            sub="입찰·매칭·시공"
+          />
         </div>
 
-        {/* 로그인 카드 */}
-        <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 p-8">
-          {activeTab === "consumer" ? (
-            <ConsumerAuthForm />
-          ) : (
-            <ContractorAuthForm />
-          )}
+        {/* 카드 */}
+        <div className="relative overflow-hidden rounded-[28px] border border-primary-100 bg-white p-7 shadow-card">
+          <div
+            className="pointer-events-none absolute inset-x-0 top-0 h-px"
+            style={{
+              background: "linear-gradient(90deg, transparent, #F73B20, transparent)",
+            }}
+          />
+          {activeTab === "consumer" ? <ConsumerAuthForm /> : <ContractorAuthForm />}
         </div>
 
-        <p className="mt-6 text-center text-xs text-neutral-400">
-          로그인 시 <span className="underline">서비스 이용약관</span> 및 <span className="underline">개인정보처리방침</span>에 동의합니다.
+        <p className="font-mono mt-6 text-center text-[11px] tracking-[0.08em] text-ink-40">
+          로그인 시 <span className="underline">서비스 이용약관</span> 및{" "}
+          <span className="underline">개인정보처리방침</span>에 동의합니다.
         </p>
       </div>
     </div>
+  );
+}
+
+function TabButton({
+  active,
+  onClick,
+  icon,
+  title,
+  sub,
+}: {
+  active: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
+  title: string;
+  sub: string;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-2.5 rounded-2xl border-2 py-3.5 transition-all ${
+        active
+          ? "border-primary-500 bg-primary-50 text-primary-700 shadow-cta"
+          : "border-primary-100 bg-white text-ink-60 hover:border-primary-300"
+      }`}
+    >
+      {icon}
+      <div className="text-left">
+        <p className="text-[14px] font-bold tracking-tight">{title}</p>
+        <p className="text-[11px] opacity-70">{sub}</p>
+      </div>
+    </button>
   );
 }
 
@@ -548,8 +773,8 @@ export default function AuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <div className="flex min-h-screen items-center justify-center bg-offwhite">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500" />
         </div>
       }
     >

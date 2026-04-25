@@ -1,53 +1,45 @@
-// INPICK Service Worker - 오프라인 캐싱 + 성능 최적화
-const CACHE_NAME = "inpick-v1";
+// INPICK Service Worker — V4 랜딩/워크플로우 출시로 캐시 정책 갱신
+// CACHE_NAME bump → activate 시 옛 캐시 전부 무효화 + 모든 탭 즉시 새로고침
+const CACHE_NAME = "inpick-v4-landing";
 
-// 앱 셸 캐싱 (네비게이션 + 핵심 정적 자산)
+// 캐시할 정적 자산 (HTML 페이지는 캐시하지 않음)
 const APP_SHELL = [
-  "/",
   "/manifest.json",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png",
 ];
 
-// 캐싱 전략: 설치 시 앱 셸 프리캐시
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL).catch(() => undefined))
   );
   self.skipWaiting();
 });
 
-// 이전 캐시 정리
+// 이전 캐시 전부 정리 + 클라이언트에 reload 메시지 전송
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
+      );
+      await self.clients.claim();
+      const clients = await self.clients.matchAll({ type: "window" });
+      for (const c of clients) {
+        c.postMessage({ type: "SW_UPDATED", cache: CACHE_NAME });
+      }
+    })()
   );
-  self.clients.claim();
 });
 
-// 요청 가로채기
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // API 요청은 캐시하지 않음 (네트워크만)
-  if (url.pathname.startsWith("/api/")) {
-    return;
-  }
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/auth")) return;
 
-  // 정적 자산 (이미지, JS, CSS): Cache-First
-  if (
-    request.destination === "image" ||
-    request.destination === "script" ||
-    request.destination === "style" ||
-    url.pathname.startsWith("/_next/static/")
-  ) {
+  if (url.pathname.startsWith("/_next/static/")) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
@@ -63,23 +55,25 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // HTML 페이지: Network-First (오프라인 시 캐시 폴백)
-  if (request.mode === "navigate") {
+  if (request.destination === "image") {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
           if (response.ok) {
             const clone = response.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
           }
           return response;
-        })
-        .catch(() => {
-          return caches.match(request).then((cached) => {
-            return cached || caches.match("/");
-          });
-        })
+        });
+      })
     );
+    return;
+  }
+
+  // HTML(navigate)는 항상 네트워크
+  if (request.mode === "navigate") {
+    event.respondWith(fetch(request).catch(() => caches.match("/manifest.json")));
     return;
   }
 });

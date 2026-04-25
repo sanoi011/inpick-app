@@ -110,7 +110,7 @@ export default function ContractorDashboard() {
   if (!authChecked) {
     return (
       <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
       </div>
     );
   }
@@ -125,21 +125,21 @@ export default function ContractorDashboard() {
           <p className="text-gray-500">프로젝트와 입찰을 한눈에 관리하세요</p>
         </div>
         <Link href="/address"
-          className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors">
+          className="inline-flex items-center gap-2 bg-primary-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-primary-600 transition-colors">
           <Plus className="w-4 h-4" /> 새 견적
         </Link>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary-500" />
         </div>
       ) : (
         <>
           {/* 5개 요약 카드 */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-8">
             <div className="bg-white rounded-xl p-5 border border-gray-200">
-              <BarChart3 className="w-7 h-7 text-blue-600 mb-3" />
+              <BarChart3 className="w-7 h-7 text-primary-500 mb-3" />
               <p className="text-2xl font-bold text-gray-900">{stats.activeProjects}건</p>
               <p className="text-xs text-gray-500">진행 중 프로젝트</p>
             </div>
@@ -168,13 +168,13 @@ export default function ContractorDashboard() {
           {/* 빠른 액션 */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
             {[
-              { label: "입찰 확인", href: "/contractor/bids", icon: FileText, color: "text-blue-600" },
+              { label: "입찰 확인", href: "/contractor/bids", icon: FileText, color: "text-primary-500" },
               { label: "일정 보기", href: "/contractor/schedule", icon: Calendar, color: "text-green-600" },
               { label: "AI 비서", href: "/contractor/ai", icon: Users, color: "text-indigo-600" },
               { label: "재무 현황", href: "/contractor/finance", icon: DollarSign, color: "text-amber-600" },
             ].map((action) => (
               <Link key={action.label} href={action.href}
-                className="bg-white rounded-xl p-4 border border-gray-200 hover:border-blue-300 hover:shadow-sm transition-all flex items-center gap-3">
+                className="bg-white rounded-xl p-4 border border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all flex items-center gap-3">
                 <action.icon className={`w-6 h-6 ${action.color} flex-shrink-0`} />
                 <span className="text-sm font-medium text-gray-700">{action.label}</span>
               </Link>
@@ -186,9 +186,9 @@ export default function ContractorDashboard() {
             <div className="bg-white rounded-xl border border-gray-200 mb-8">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900 flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-blue-600" /> 진행 중 프로젝트
+                  <BarChart3 className="w-5 h-5 text-primary-500" /> 진행 중 프로젝트
                 </h2>
-                <Link href="/contractor/projects" className="text-xs text-blue-600 hover:underline flex items-center gap-1">
+                <Link href="/contractor/projects" className="text-xs text-primary-500 hover:underline flex items-center gap-1">
                   전체 보기 <ChevronRight className="w-3 h-3" />
                 </Link>
               </div>
@@ -207,7 +207,7 @@ export default function ContractorDashboard() {
                           opacity: ph.status === "completed" ? 1 : ph.status === "in_progress" ? 0.6 : 0.2,
                         }} />
                       )) : (
-                        <div className="h-full bg-blue-600 rounded-full transition-all" style={{ width: `${proj.progressPct}%` }} />
+                        <div className="h-full bg-primary-500 rounded-full transition-all" style={{ width: `${proj.progressPct}%` }} />
                       )}
                     </div>
                   </Link>
@@ -270,7 +270,7 @@ export default function ContractorDashboard() {
                         </p>
                         <span className={`text-xs px-2 py-0.5 rounded-full ${
                           est.status === "completed" ? "bg-green-100 text-green-700" :
-                          est.status === "in_progress" ? "bg-blue-100 text-blue-700" :
+                          est.status === "in_progress" ? "bg-primary-100 text-primary-700" :
                           est.status === "confirmed" ? "bg-purple-100 text-purple-700" :
                           "bg-gray-100 text-gray-600"
                         }`}>

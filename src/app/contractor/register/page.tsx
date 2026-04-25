@@ -128,7 +128,7 @@ export default function ContractorRegisterPage() {
             <Link href="/" className="px-6 py-3 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50">
               홈으로
             </Link>
-            <Link href="/contractor/login" className="px-6 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            <Link href="/contractor/login" className="px-6 py-3 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600">
               로그인하기
             </Link>
           </div>
@@ -144,7 +144,7 @@ export default function ContractorRegisterPage() {
           <Link href="/" className="text-gray-400 hover:text-gray-600">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
+          <Link href="/" className="text-xl font-bold text-primary-500">INPICK</Link>
           <span className="text-sm text-gray-400">|</span>
           <span className="text-sm font-medium text-gray-700">사업자 등록</span>
         </div>
@@ -161,7 +161,7 @@ export default function ContractorRegisterPage() {
             <div key={s.n} className="flex items-center gap-2">
               <button onClick={() => s.n < step && setStep(s.n)}
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-colors ${
-                  step >= s.n ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-500"
+                  step >= s.n ? "bg-primary-500 text-white" : "bg-gray-200 text-gray-500"
                 }`}>
                 {step > s.n ? <CheckCircle2 className="w-4 h-4" /> : s.n}
               </button>
@@ -177,7 +177,7 @@ export default function ContractorRegisterPage() {
         {step === 1 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-blue-600" /> 기본 정보
+              <Building2 className="w-5 h-5 text-primary-500" /> 기본 정보
             </h2>
 
             {/* 업체 유형 선택 */}
@@ -191,12 +191,12 @@ export default function ContractorRegisterPage() {
                   onClick={() => updateField("contractorType", "general")}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                     form.contractorType === "general"
-                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-200"
+                      ? "border-primary-500 bg-primary-50 ring-1 ring-blue-200"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <Building2 className={`w-6 h-6 ${form.contractorType === "general" ? "text-blue-600" : "text-gray-400"}`} />
-                  <span className={`text-sm font-bold ${form.contractorType === "general" ? "text-blue-700" : "text-gray-700"}`}>
+                  <Building2 className={`w-6 h-6 ${form.contractorType === "general" ? "text-primary-500" : "text-gray-400"}`} />
+                  <span className={`text-sm font-bold ${form.contractorType === "general" ? "text-primary-700" : "text-gray-700"}`}>
                     종합 인테리어
                   </span>
                   <span className="text-xs text-gray-500 text-center">전체 시공 관리</span>
@@ -206,12 +206,12 @@ export default function ContractorRegisterPage() {
                   onClick={() => updateField("contractorType", "specialty")}
                   className={`flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all ${
                     form.contractorType === "specialty"
-                      ? "border-blue-600 bg-blue-50 ring-1 ring-blue-200"
+                      ? "border-primary-500 bg-primary-50 ring-1 ring-blue-200"
                       : "border-gray-200 hover:border-gray-300"
                   }`}
                 >
-                  <Briefcase className={`w-6 h-6 ${form.contractorType === "specialty" ? "text-blue-600" : "text-gray-400"}`} />
-                  <span className={`text-sm font-bold ${form.contractorType === "specialty" ? "text-blue-700" : "text-gray-700"}`}>
+                  <Briefcase className={`w-6 h-6 ${form.contractorType === "specialty" ? "text-primary-500" : "text-gray-400"}`} />
+                  <span className={`text-sm font-bold ${form.contractorType === "specialty" ? "text-primary-700" : "text-gray-700"}`}>
                     전문 공종
                   </span>
                   <span className="text-xs text-gray-500 text-center">도배, 타일 등 전문</span>
@@ -226,7 +226,7 @@ export default function ContractorRegisterPage() {
                 </label>
                 <input type="text" value={form.companyName}
                   onChange={(e) => updateField("companyName", e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                   placeholder="예: 드림인테리어" />
               </div>
               <div>
@@ -237,7 +237,7 @@ export default function ContractorRegisterPage() {
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="text" value={form.representativeName}
                     onChange={(e) => updateField("representativeName", e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                     placeholder="홍길동" />
                 </div>
               </div>
@@ -252,7 +252,7 @@ export default function ContractorRegisterPage() {
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="tel" value={form.phone}
                     onChange={(e) => updateField("phone", e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                     placeholder="010-1234-5678" />
                 </div>
               </div>
@@ -264,7 +264,7 @@ export default function ContractorRegisterPage() {
                   <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <input type="email" value={form.email}
                     onChange={(e) => updateField("email", e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                     placeholder="info@company.com" />
                 </div>
               </div>
@@ -278,13 +278,13 @@ export default function ContractorRegisterPage() {
                 <FileText className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input type="text" value={form.licenseNumber}
                   onChange={(e) => updateField("licenseNumber", e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                   placeholder="000-00-00000" />
               </div>
             </div>
 
             <button onClick={() => setStep(2)} disabled={!canGoStep2}
-              className="w-full py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+              className="w-full py-3 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
               다음 단계
             </button>
           </div>
@@ -294,7 +294,7 @@ export default function ContractorRegisterPage() {
         {step === 2 && (
           <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-              <Briefcase className="w-5 h-5 text-blue-600" /> 전문 분야
+              <Briefcase className="w-5 h-5 text-primary-500" /> 전문 분야
             </h2>
 
             <div>
@@ -307,7 +307,7 @@ export default function ContractorRegisterPage() {
                   <button key={t.code} onClick={() => toggleTrade(t.code)}
                     className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
                       form.selectedTrades.includes(t.code)
-                        ? "bg-blue-600 text-white ring-2 ring-blue-300"
+                        ? "bg-primary-500 text-white ring-2 ring-blue-300"
                         : "bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100"
                     }`}>
                     {t.label}
@@ -324,7 +324,7 @@ export default function ContractorRegisterPage() {
                 <div className="relative">
                   <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <select value={form.region} onChange={(e) => updateField("region", e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none bg-white">
+                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none appearance-none bg-white">
                     <option value="">선택해주세요</option>
                     {REGION_OPTIONS.map((r) => <option key={r} value={r}>{r}</option>)}
                   </select>
@@ -334,7 +334,7 @@ export default function ContractorRegisterPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">경력 (년)</label>
                 <input type="number" min={0} max={50} value={form.experienceYears}
                   onChange={(e) => updateField("experienceYears", parseInt(e.target.value) || 0)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" />
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none" />
               </div>
             </div>
 
@@ -342,7 +342,7 @@ export default function ContractorRegisterPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">사업장 주소</label>
               <input type="text" value={form.address}
                 onChange={(e) => updateField("address", e.target.value)}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none"
                 placeholder="서울시 강남구..." />
             </div>
 
@@ -351,7 +351,7 @@ export default function ContractorRegisterPage() {
               <textarea value={form.introduction}
                 onChange={(e) => updateField("introduction", e.target.value)}
                 rows={3}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-none"
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-primary-300 focus:border-primary-400 outline-none resize-none"
                 placeholder="업체 소개, 주요 시공 사례, 강점 등을 자유롭게 작성해주세요" />
             </div>
 
@@ -360,7 +360,7 @@ export default function ContractorRegisterPage() {
                 이전
               </button>
               <button onClick={() => setStep(3)} disabled={!canGoStep3}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+                className="flex-1 py-3 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
                 다음 단계
               </button>
             </div>
@@ -419,7 +419,7 @@ export default function ContractorRegisterPage() {
                     {form.selectedTrades.map((code) => {
                       const trade = TRADE_OPTIONS.find((t) => t.code === code);
                       return (
-                        <span key={code} className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium">
+                        <span key={code} className="px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium">
                           {trade?.label || code}
                         </span>
                       );
@@ -447,7 +447,7 @@ export default function ContractorRegisterPage() {
                 수정하기
               </button>
               <button onClick={handleSubmit} disabled={submitting}
-                className="flex-1 py-3 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2">
+                className="flex-1 py-3 bg-primary-500 text-white rounded-lg text-sm font-medium hover:bg-primary-600 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2">
                 {submitting ? <><Loader2 className="w-4 h-4 animate-spin" /> 등록중...</> : "사업자 등록 신청"}
               </button>
             </div>
@@ -458,7 +458,7 @@ export default function ContractorRegisterPage() {
         <div className="text-center mt-6">
           <p className="text-sm text-gray-500">
             이미 등록하셨나요?{" "}
-            <Link href="/contractor/login" className="text-blue-600 hover:underline font-medium">로그인</Link>
+            <Link href="/contractor/login" className="text-primary-500 hover:underline font-medium">로그인</Link>
           </p>
         </div>
       </main>

@@ -68,7 +68,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       `}>
         {/* 로고 */}
         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
+          <Link href="/" className="text-xl font-bold text-primary-500">INPICK</Link>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
           </button>
@@ -85,11 +85,11 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
                 onClick={() => setSidebarOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   active
-                    ? "bg-blue-50 text-blue-700"
+                    ? "bg-primary-50 text-primary-700"
                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
                 }`}
               >
-                <item.icon className={`w-5 h-5 ${active ? "text-blue-600" : "text-gray-400"}`} />
+                <item.icon className={`w-5 h-5 ${active ? "text-primary-500" : "text-gray-400"}`} />
                 {item.label}
               </Link>
             );
@@ -118,7 +118,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
           <button onClick={() => setSidebarOpen(true)} className="text-gray-600 hover:text-gray-900">
             <Menu className="w-6 h-6" />
           </button>
-          <Link href="/" className="text-lg font-bold text-blue-600">INPICK</Link>
+          <Link href="/" className="text-lg font-bold text-primary-500">INPICK</Link>
           <div className="w-6" />
         </header>
 
