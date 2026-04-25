@@ -1,13 +1,190 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
+  /* 베이스 */
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0F1419;
+
+  /* 메인 (오렌지-레드 #f73b20) */
+  --color-primary: #F73B20;
+  --color-primary-hover: #DC3636;
+  --color-primary-soft: #FEE9E6;
+  --color-primary-strong: #A21906;
+  --color-wine: #7A2739;
+  --color-burgundy: #6B3843;
+  --color-burgundy-deep: #360802;
+  --color-peach: #FDCBC4;
+
+  /* 토큰 (앰버) */
+  --color-token: #BA7517;
+  --color-token-glow: #FAC775;
+  --color-token-soft: #FFF8EE;
+
+  /* 뉴트럴 */
+  --color-bg: #FAFBFC;
+  --color-bg-soft: #F4F6F8;
+  --color-text: #0F1419;
+  --color-text-secondary: #4A4E53;
+  --color-text-muted: #6E7378;
+  --color-border: rgba(15, 20, 25, 0.08);
+  --color-border-strong: rgba(15, 20, 25, 0.14);
+
+  /* 다크 (AR/푸터/CTA 다크) */
+  --color-dark-bg: #1A1F2E;
+  --color-dark-bg-deep: #0F1419;
+}
+
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--foreground);
   background: var(--background);
+  font-feature-settings: "ss01", "ss02", "tnum";
+  letter-spacing: -0.01em;
+}
+
+/* 셀렉션 컬러 — 오렌지-레드 톤 */
+::selection {
+  background-color: rgba(247, 59, 32, 0.18);
+  color: #360802;
+}
+
+/* 스크롤바 */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 20, 25, 0.18);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 20, 25, 0.32);
+}
+
+/* 마키 베이스 */
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee 40s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+
+/* 폰트 패밀리 클래스 */
+.font-en { font-family: "Inter", "Inter Display", -apple-system, BlinkMacSystemFont, sans-serif; }
+.font-kr { font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif; }
+.font-mono { font-family: "JetBrains Mono", ui-monospace, "SF Mono", monospace; }
+
+/* Hex 토큰 아이콘 */
+.hex-mask {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='25,6.7 75,6.7 100,50 75,93.3 25,93.3 0,50'/></svg>") center/contain no-repeat;
+  mask: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><polygon points='25,6.7 75,6.7 100,50 75,93.3 25,93.3 0,50'/></svg>") center/contain no-repeat;
+}
+
+/* 그라데이션 텍스트 유틸 */
+.text-gradient-primary {
+  background: linear-gradient(90deg, #F73B20 0%, #DC3636 50%, #7A2739 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.text-gradient-peach {
+  background: linear-gradient(180deg, #FFFFFF 0%, #FDCBC4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* 글래스 효과 */
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+.glass-dark {
+  background: rgba(15, 20, 25, 0.6);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+}
+
+/* 노치 (workflow STEP 페이지에서 재사용) */
+.notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 1.8rem;
+  background: var(--color-dark-bg);
+  border-bottom-left-radius: 1.4rem;
+  border-bottom-right-radius: 1.4rem;
+  padding: 0.25rem 1.6rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  color: rgba(255,255,255,0.78);
+  letter-spacing: 0.04em;
+  z-index: 40;
+}
+.notch::before,
+.notch::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 0.7rem;
+  height: 0.7rem;
+  background: var(--color-dark-bg);
+}
+.notch::before {
+  left: -0.7rem;
+  -webkit-mask-image: radial-gradient(circle at 0 100%, transparent 0.7rem, #000 0.7rem);
+  mask-image: radial-gradient(circle at 0 100%, transparent 0.7rem, #000 0.7rem);
+}
+.notch::after {
+  right: -0.7rem;
+  -webkit-mask-image: radial-gradient(circle at 100% 100%, transparent 0.7rem, #000 0.7rem);
+  mask-image: radial-gradient(circle at 100% 100%, transparent 0.7rem, #000 0.7rem);
+}
+
+/* 컨테이너 쿼리 (workflow 페이지 전용) */
+.cq {
+  container-type: inline-size;
+}
+
+/* 스크롤 스냅 (5단계 플로우용) */
+.snap-x-mandatory {
+  scroll-snap-type: x mandatory;
+}
+.snap-start {
+  scroll-snap-align: start;
+}
+
+/* 노이즈 텍스처 */
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+}
+
+/* 견적 카운트업용 tabular nums */
+.tabular {
+  font-variant-numeric: tabular-nums;
 }

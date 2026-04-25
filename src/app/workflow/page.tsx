@@ -1,0 +1,198 @@
+"use client";
+
+import { useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import { ArrowLeft } from "lucide-react";
+import Notch from "@/components/workflow/Notch";
+import TokenBadge from "@/components/workflow/TokenBadge";
+import Step1Cards, { Step1Data } from "@/components/workflow/Step1Cards";
+import Step2Designer, { Step2Data } from "@/components/workflow/Step2Designer";
+import { useTokens } from "@/hooks/useTokens";
+import { useRouter } from "next/navigation";
+import LenisProvider from "@/components/landing-v4/LenisProvider";
+
+const TOTAL_STEPS = 5;
+
+export default function WorkflowPage() {
+  const router = useRouter();
+  const { balance, consume } = useTokens();
+
+  const [step, setStep] = useState<1 | 2>(1);
+  const [step1, setStep1] = useState<Step1Data>({
+    address: "",
+    type: null,
+    budget: 3500,
+    buildingType: null,
+    rooms: [],
+  });
+  const [step2, setStep2] = useState<Step2Data>({
+    selectedByRoom: {},
+    generations: {},
+  });
+
+  const goNext = () => setStep(2);
+  const goPrev = () => setStep(1);
+  const goBranch = () => {
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
+      sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
+    }
+    router.push("/workflow/branch");
+  };
+
+  return (
+    <LenisProvider>
+      <main className="relative min-h-screen overflow-hidden bg-[#FFF6F5] text-primary-900">
+        {/* STEP 01 — 이미지 배경 + 메인 톤 오버랩 */}
+        {step === 1 && (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: "url(/images/workflow-step1-bg.jpg)" }}
+            />
+            {/* 메인 톤 오버랩 (오렌지-레드 #F73B20 + 살구 그라데이션) */}
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(247,59,32,0.55)_0%,rgba(255,107,53,0.45)_45%,rgba(253,203,196,0.55)_100%)]" />
+            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,246,245,0.35),transparent_55%)]" />
+            <div className="absolute -right-[15%] top-[5%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.32),transparent_70%)] blur-3xl" />
+            <div className="absolute -left-[10%] top-[40%] h-[460px] w-[460px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.28),transparent_70%)] blur-3xl" />
+          </div>
+        )}
+
+        {/* STEP 02 — 이미지 배경 + 메인 톤 오버랩 */}
+        {step === 2 && (
+          <div className="pointer-events-none absolute inset-0" aria-hidden>
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: "url(/images/workflow-step2-bg.jpg)" }}
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(247,59,32,0.50)_0%,rgba(253,203,196,0.55)_55%,rgba(255,246,245,0.65)_100%)]" />
+            <div className="absolute inset-x-0 top-0 h-[60%] bg-[radial-gradient(ellipse_at_top,rgba(255,246,245,0.30),transparent_60%)]" />
+            <div className="absolute right-[-10%] top-[10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.20),transparent_70%)] blur-3xl" />
+            <div className="absolute left-[-12%] top-[40%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.18),transparent_70%)] blur-3xl" />
+          </div>
+        )}
+
+        <Notch step={step} total={TOTAL_STEPS} />
+
+        {/* 헤더 */}
+        <header className="relative z-30 mx-auto flex max-w-7xl items-center justify-between px-6 pt-12 lg:px-8 lg:pt-14">
+          <div className="flex items-center gap-3">
+            {step === 2 ? (
+              <button
+                onClick={goPrev}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white/80 text-primary-900 backdrop-blur hover:bg-white"
+                aria-label="이전 단계"
+              >
+                <ArrowLeft className="h-4 w-4" />
+              </button>
+            ) : (
+              <a
+                href="/"
+                className="text-[1.3rem] font-extrabold tracking-tightest text-primary-900"
+              >
+                In<span className="text-primary-500">Pick</span>
+              </a>
+            )}
+          </div>
+          <TokenBadge balance={balance} onClick={() => router.push("/account/tokens")} />
+        </header>
+
+        {/* 본문 */}
+        <section className="relative z-20 mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
+          <AnimatePresence mode="wait">
+            {step === 1 && (
+              <motion.div
+                key="step1"
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="max-w-3xl">
+                  <p className="text-[0.78rem] font-semibold uppercase tracking-widest text-primary-600">
+                    STEP 01
+                  </p>
+                  <h1 className="mt-3 text-[2.4rem] font-extrabold leading-[1.02] tracking-tightest text-primary-900 sm:text-[3.4rem] lg:text-[4rem]">
+                    주소·예산·시공범위만
+                    <br />
+                    <span className="text-gradient-primary">알려주세요.</span>
+                  </h1>
+                  <p className="mt-5 max-w-xl text-[0.98rem] leading-relaxed text-primary-900/70">
+                    이 세 가지로 평면도 자동 인식·공식 단가 적용·공간별 디자인 시안까지 다 자동입니다.
+                  </p>
+                </div>
+
+                <div className="mt-12">
+                  <Step1Cards value={step1} onChange={setStep1} onNext={goNext} />
+                </div>
+              </motion.div>
+            )}
+
+            {step === 2 && (
+              <motion.div
+                key="step2"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 20 }}
+                transition={{ duration: 0.4 }}
+              >
+                <div className="flex items-end justify-between gap-6">
+                  <div className="max-w-2xl">
+                    <p className="text-[0.78rem] font-semibold uppercase tracking-widest text-primary-600">
+                      STEP 02
+                    </p>
+                    <h1 className="mt-3 text-[2.4rem] font-extrabold leading-[1.02] tracking-tightest text-primary-900 sm:text-[3.4rem] lg:text-[4rem]">
+                      실별로
+                      <br />
+                      <span className="text-gradient-primary">디자인 8장.</span>
+                    </h1>
+                    <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-primary-900/70">
+                      스타일 고르고 생성. 마음에 든 컷의 자재가 다음 단계 견적으로 그대로 흘러갑니다.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-12">
+                  <Step2Designer
+                    rooms={step1.rooms}
+                    value={step2}
+                    onChange={setStep2}
+                    tokenBalance={balance}
+                    onConsumeToken={() => consume(1, "ai_render")}
+                    onComplete={goBranch}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </section>
+
+        {/* 하단 stepper — jeton walkthrough 패턴 (활성 dot width 확장) */}
+        <footer className="sticky bottom-6 z-30 mx-auto flex max-w-md items-center justify-center px-6 pb-6">
+          <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/60 bg-white/85 px-4 py-2 backdrop-blur-md">
+            {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
+              const idx = i + 1;
+              const active = idx === step;
+              const done = idx < step;
+              return (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full transition-all duration-500 ${
+                    active
+                      ? "w-7 bg-primary-500"
+                      : done
+                      ? "w-3 bg-primary-300"
+                      : "w-3 bg-primary-100"
+                  }`}
+                />
+              );
+            })}
+            <span className="ml-2 text-[0.7rem] font-semibold tabular text-primary-900/60">
+              {step}/{TOTAL_STEPS}
+            </span>
+          </div>
+        </footer>
+      </main>
+    </LenisProvider>
+  );
+}

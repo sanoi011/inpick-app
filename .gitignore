@@ -66,6 +66,12 @@ scripts/floorplan-pipeline/__pycache__/
 test-results/
 python/floorplan-ai/src/__pycache__/
 
+# Editor
+/.vscode/
+
+# Session reports (local only)
+/reports/
+
 # v4.7 services/pdf_parser artifacts
 services/pdf_parser/models/*.pt
 services/pdf_parser/outputs/
