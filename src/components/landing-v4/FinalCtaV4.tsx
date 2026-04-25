@@ -61,7 +61,7 @@ export default function FinalCtaV4() {
         </p>
         <div className="mt-9 flex justify-center gap-3">
           <a
-            href="/project/new"
+            href="/workflow"
             className="font-kr inline-flex items-center gap-2 rounded-full bg-primary-500 px-[26px] py-4 text-[15px] font-semibold text-white"
           >
             무료 견적 시작 →

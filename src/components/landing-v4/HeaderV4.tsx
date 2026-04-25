@@ -64,14 +64,14 @@ export default function HeaderV4() {
             Log in
           </a>
           <motion.a
-            href="/project/new"
+            href="/workflow"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
             className={`rounded-full px-[18px] py-[9px] font-semibold transition-colors ${
               isDark ? "bg-offwhite text-primary-500" : "bg-ink text-offwhite"
             }`}
           >
-            Sign up
+            무료 견적 시작
           </motion.a>
         </div>
       </nav>

@@ -171,7 +171,7 @@ function CtaRow({ progress }: { progress: MotionValue<number> }) {
   return (
     <motion.div style={{ opacity, y }} className="mt-7 flex gap-3">
       <a
-        href="/project/new"
+        href="/workflow"
         className="font-kr inline-flex items-center gap-2 rounded-full bg-ink px-[26px] py-4 text-[15px] font-semibold text-offwhite"
       >
         무료 견적 시작 →

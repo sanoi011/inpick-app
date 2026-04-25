@@ -44,7 +44,7 @@ function ConsumerAuthForm() {
         }
       } else {
         const returnUrl = searchParams.get("returnUrl");
-        router.push(returnUrl || "/project/new");
+        router.push(returnUrl || "/workflow");
       }
     } catch {
       setError("로그인 중 오류가 발생했습니다.");
