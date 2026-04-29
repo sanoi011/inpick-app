@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
+import { Bodoni_Moda, Manrope } from "next/font/google";
 import { ToastContainer } from "@/components/ui/Toast";
 import "./globals.css";
 
@@ -12,6 +13,19 @@ const geistMono = localFont({
   src: "./fonts/GeistMonoVF.woff",
   variable: "--font-geist-mono",
   weight: "100 900",
+});
+const bodoni = Bodoni_Moda({
+  subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  variable: "--font-bodoni",
+  display: "swap",
+});
+// Host Grotesk 가 next/font 14.2 에 아직 미수록 → Manrope 로 대체 (가장 흡사한 모던 그로테스크)
+const hostGrotesk = Manrope({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "700"],
+  variable: "--font-host",
+  display: "swap",
 });
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://inpick-app.vercel.app";
@@ -62,7 +76,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
+        className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} ${hostGrotesk.variable} antialiased font-sans`}
       >
         {children}
         <ToastContainer />

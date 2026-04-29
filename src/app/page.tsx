@@ -1,6 +1,6 @@
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import HeaderV4 from "@/components/landing-v4/HeaderV4";
-import HeroV4 from "@/components/landing-v4/HeroV4";
+import HeroV4 from "@/components/landing-v4/HeroV4Bird";
 import WalkthroughV4 from "@/components/landing-v4/WalkthroughV4";
 import EstimateLiveV4 from "@/components/landing-v4/EstimateLiveV4";
 import MobileMockV4 from "@/components/landing-v4/MobileMockV4";

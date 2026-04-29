@@ -112,6 +112,10 @@ const config: Config = {
           "sans-serif",
         ],
         mono: ["var(--font-geist-mono)", "monospace"],
+        // 히어로 큰 워드마크용 (Marko 대체) — 고대비 디스플레이 세리프
+        wordmark: ["var(--font-bodoni)", "Bodoni Moda", "Marko", "serif"],
+        // 영문 본문/카피 (Figma 원본 Host Grotesk)
+        host: ["var(--font-host)", "Host Grotesk", "Inter", "sans-serif"],
       },
       letterSpacing: {
         tightest: "-0.04em",
