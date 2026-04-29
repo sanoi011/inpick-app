@@ -353,12 +353,11 @@ function GlassCard({
 }
 
 /**
- * ㄴ자 박스 카드 (Integrated AI Designer)
- * — 메인 본체(280×240) + 좌상단 protrusion(120×60)이 한 덩어리 outline 으로 연결
- * — 외곽 모서리 둥글고, 안쪽 만남 부분은 concave 둥근 corner
- * — clip-path 로 흰 글래스 본체 + SVG stroke 로 외곽선 + 별도 absolute 자식으로 orb/카피/arrow
+ * ㄴ자 박스 카드 (보류) — 정사각 카드로 단순화 후 미사용
+ * 향후 다시 쓰려면 여기 함수 부활시키고 Card 2 자리에서 호출하면 됨
  */
-function LShapeCard() {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _LShapeCard() {
   // bbox: 280w × 320h (80 protrusion + 240 main body)
   // protrusion: x=30..170 (140w), y=0..80
   // main body:  x=0..280, y=80..320
@@ -444,10 +443,11 @@ function LShapeCard() {
 }
 
 /**
- * 3D 글래스 자물쇠 (SVG + radial gradient + 하이라이트)
- * — 임시 자산. 진짜 3D 렌더 PNG 가 들어오면 <img src="/hero/lock-3d.png"> 로 교체
+ * 3D 글래스 자물쇠 SVG (보류) — 다홍 변환 PNG 로 교체 후 미사용
+ * 향후 다시 쓰려면 함수명에서 _ 제거
  */
-function Glass3DLock() {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _Glass3DLock() {
   return (
     <div
       className="pointer-events-none absolute -left-[36px] top-[14px] h-[180px] w-[150px] 2xl:-left-[42px] 2xl:top-[20px] 2xl:h-[200px] 2xl:w-[170px]"
