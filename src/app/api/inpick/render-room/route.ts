@@ -17,9 +17,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "roomName, widthMm, depthMm 필수" }, { status: 400 });
     }
     const result = await generateRoomRender({
-      heightMm: 2400,
-      style: "modern minimal",
       ...body,
+      heightMm: body.heightMm || 2400,
+      style: body.style || "modern minimal",
     });
     return NextResponse.json(result);
   } catch (e: any) {
