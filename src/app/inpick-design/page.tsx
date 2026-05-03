@@ -108,13 +108,51 @@ export default function InPickDesignPage() {
   const [elevations, setElevations] = useState<{ roomName: string; svg: string }[]>([]);
 
   // ---------- handlers ----------
+  async function resizeImage(file: File, maxSide = 1280, quality = 0.85): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          let { width, height } = img;
+          if (Math.max(width, height) > maxSide) {
+            if (width >= height) {
+              height = Math.round((height * maxSide) / width);
+              width = maxSide;
+            } else {
+              width = Math.round((width * maxSide) / height);
+              height = maxSide;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) return reject(new Error("canvas ctx"));
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", quality));
+        };
+        img.onerror = reject;
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
     setFloorplanFile(f);
-    const reader = new FileReader();
-    reader.onload = (ev) => setFloorplanUrl(ev.target?.result as string);
-    reader.readAsDataURL(f);
+    try {
+      const dataUrl = await resizeImage(f, 1280, 0.85); // 1280px JPG q85 → ~300KB
+      setFloorplanUrl(dataUrl);
+    } catch (err) {
+      console.error("resize fail, fallback to original", err);
+      const reader = new FileReader();
+      reader.onload = (ev) => setFloorplanUrl(ev.target?.result as string);
+      reader.readAsDataURL(f);
+    }
   }
 
   async function handleAnalyze() {
@@ -124,17 +162,21 @@ export default function InPickDesignPage() {
     }
     setAnalyzing(true);
     try {
-      const body: any = {
+      const body: Record<string, unknown> = {
         imageBase64: floorplanUrl.split(",")[1],
-        imageMimeType: floorplanFile?.type || "image/jpeg",
+        imageMimeType: "image/jpeg", // resize 후 항상 jpeg
       };
       if (exclusiveArea) body.exclusiveAreaM2 = parseFloat(exclusiveArea);
       const res = await fetch("/api/inpick/analyze-floorplan", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      const text = await res.text();
+      let data;
+      try { data = JSON.parse(text); } catch {
+        throw new Error(`서버 응답 비정상 (HTTP ${res.status}): ${text.slice(0, 100)}`);
+      }
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       setAnalyzeResult(data);
       setSelectedRooms(Object.keys(data.rooms).filter((n) => !n.includes("발코니") && !n.includes("현관")));
       setStep(3);

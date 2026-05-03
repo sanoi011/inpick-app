@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Notch from "@/components/workflow/Notch";
 import TokenBadge from "@/components/workflow/TokenBadge";
 import Step1Cards, { Step1Data } from "@/components/workflow/Step1Cards";
@@ -19,18 +19,72 @@ export default function WorkflowPage() {
 
   const [step, setStep] = useState<1 | 2>(1);
   const [step1, setStep1] = useState<Step1Data>({
-    address: "",
-    type: null,
-    budget: 3500,
+    basicInfo: {
+      mode: "address",
+      budget: 3500,
+      expansionType: null,
+    },
     buildingType: null,
     rooms: [],
   });
   const [step2, setStep2] = useState<Step2Data>({
     selectedByRoom: {},
     generations: {},
+    rendersByRoom: {},
   });
 
-  const goNext = () => setStep(2);
+  const [normalizing, setNormalizing] = useState(false);
+  const [normalizeError, setNormalizeError] = useState<string | null>(null);
+
+  const goNext = async () => {
+    // 평면도가 있으면 정형화 API 호출 후 step2로 이동
+    const bi = step1.basicInfo;
+    const imageUrl = bi.selectedPyeong?.grandPlanUrl;
+    const imageBase64 =
+      bi.uploadedFloorplan?.dataUrl?.split(",")[1] || bi.lidarScan?.dataUrl?.split(",")[1];
+
+    if (!imageUrl && !imageBase64) {
+      setStep(2);
+      return;
+    }
+
+    setNormalizing(true);
+    setNormalizeError(null);
+    try {
+      const res = await fetch("/api/inpick/normalize-floorplan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl,
+          imageBase64,
+          imageMimeType: imageBase64 ? "image/jpeg" : undefined,
+          exclusiveAreaM2: bi.selectedPyeong?.exclusiveArea,
+          isHandDrawn: bi.uploadedFloorplan?.isHandDrawn,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "정형화 실패");
+      }
+      setStep1((prev) => ({
+        ...prev,
+        normalizedFloorplan: {
+          pyeong: data.pyeong,
+          rooms: data.rooms,
+          openings: data.openings,
+          notes: data.notes,
+        },
+      }));
+      setStep(2);
+    } catch (e) {
+      console.error(e);
+      setNormalizeError(e instanceof Error ? e.message : String(e));
+      // 실패해도 표준 fallback으로 진행 가능 (Step2가 평형 기준 표준치수 사용)
+      setStep(2);
+    } finally {
+      setNormalizing(false);
+    }
+  };
   const goPrev = () => setStep(1);
   const goBranch = () => {
     if (typeof window !== "undefined") {
@@ -73,6 +127,35 @@ export default function WorkflowPage() {
         )}
 
         <Notch step={step} total={TOTAL_STEPS} />
+
+        {/* 평면도 정형화 진행 오버레이 */}
+        <AnimatePresence>
+          {normalizing && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-primary-900/60 backdrop-blur-sm"
+            >
+              <motion.div
+                initial={{ scale: 0.95, y: 12 }}
+                animate={{ scale: 1, y: 0 }}
+                className="rounded-[24px] bg-white p-7 shadow-card-hover max-w-sm w-full mx-6 text-center"
+              >
+                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500">
+                  <Loader2 className="h-6 w-6 animate-spin" />
+                </div>
+                <h3 className="mt-4 text-lg font-extrabold tracking-tight text-primary-900">
+                  AI 평면도 정형화 중
+                </h3>
+                <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                  실별 치수·구조·개구부를 자동 추출하고 있습니다.
+                  <br />약 10–20초 소요
+                </p>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* 헤더 */}
         <header className="relative z-30 mx-auto flex max-w-7xl items-center justify-between px-6 pt-12 lg:px-8 lg:pt-14">
@@ -153,12 +236,19 @@ export default function WorkflowPage() {
                 </div>
 
                 <div className="mt-12">
+                  {normalizeError && (
+                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
+                      평면도 정형화 실패 — 표준 평형 치수로 진행합니다. ({normalizeError})
+                    </div>
+                  )}
                   <Step2Designer
                     rooms={step1.rooms}
+                    basicInfo={step1.basicInfo}
+                    normalizedFloorplan={step1.normalizedFloorplan}
                     value={step2}
                     onChange={setStep2}
                     tokenBalance={balance}
-                    onConsumeToken={() => consume(1, "ai_render")}
+                    onConsumeToken={(amount, feature) => consume(amount, feature)}
                     onComplete={goBranch}
                   />
                 </div>
