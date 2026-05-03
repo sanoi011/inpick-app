@@ -1,18 +1,29 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Hexagon, Check, CreditCard, Loader2 } from "lucide-react";
+import {
+  ArrowLeft,
+  Hexagon,
+  CreditCard,
+  Loader2,
+  Lock,
+  Check,
+  Building2,
+} from "lucide-react";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
-import { useTokens, TokenTransaction } from "@/hooks/useTokens";
+import { useTokens } from "@/hooks/useTokens";
 
 const PACKAGES = [
-  { id: "p10",  tokens: 10,  price: 5000,   discount: 0,  hot: false },
-  { id: "p30",  tokens: 30,  price: 14000,  discount: 7,  hot: false },
-  { id: "p50",  tokens: 50,  price: 22000,  discount: 12, hot: true  },
-  { id: "p100", tokens: 100, price: 40000,  discount: 20, hot: false },
+  { id: "p10", tokens: 10, price: 5000, discount: 0, hot: false },
+  { id: "p30", tokens: 30, price: 14000, discount: 7, hot: false },
+  { id: "p50", tokens: 50, price: 22000, discount: 12, hot: true },
+  { id: "p100", tokens: 100, price: 40000, discount: 20, hot: false },
 ];
+
+type PayMethod = "card" | "kakao" | "toss" | "bank";
 
 export default function TokensPage() {
   const router = useRouter();
@@ -20,26 +31,24 @@ export default function TokensPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ amount: number } | null>(null);
+  const [payMethod, setPayMethod] = useState<PayMethod>("card");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
 
   const pkg = PACKAGES.find((p) => p.id === selected);
 
-  // 토스페이먼츠 SDK 자리. 실제 가맹점 등록 후 client key 입력 시 즉시 작동.
-  // 지금은 결제 시뮬레이션 (1.2초 후 성공) — purchase RPC 호출.
   const handlePay = async () => {
     if (!pkg) return;
     setPaying(true);
     try {
-      // ── 토스페이먼츠 통합 자리 ──────────────────
-      // const tossPayments = await loadTossPayments(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY!);
-      // await tossPayments.requestPayment("카드", { amount: pkg.price, orderId: ..., orderName: `InPick 토큰 ${pkg.tokens}개`, successUrl, failUrl });
-      // 결제 성공 시 successUrl 페이지에서 paymentKey/orderId/amount 받아 백엔드 confirm → purchase_tokens RPC 호출.
-      // ──────────────────────────────────────────────
-      // 임시: 결제 시뮬레이션
+      // 토스/카카오/카드 시뮬레이션 — 실제 PG 통합 자리
       await new Promise((r) => setTimeout(r, 1200));
       const fakePaymentId = `sim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const ok = await tokens.purchase(pkg.tokens, fakePaymentId, {
         package_id: pkg.id,
         price: pkg.price,
+        method: payMethod,
         simulated: true,
       });
       if (ok) {
@@ -53,190 +62,320 @@ export default function TokensPage() {
 
   return (
     <LenisProvider>
-      <main className="font-kr relative min-h-screen overflow-hidden bg-offwhite text-ink">
-        <div className="pointer-events-none absolute inset-0">
+      <main className="relative min-h-screen bg-[#FDF7F4] text-primary-900">
+        <div className="pointer-events-none absolute inset-0 opacity-50">
           <div className="absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(ellipse_at_top,rgba(254,233,230,0.85),transparent_60%)]" />
-          <div className="absolute -right-[12%] top-[10%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.14),transparent_70%)] blur-3xl" />
         </div>
 
         <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-6 pt-10 lg:px-8">
           <button
             onClick={() => router.back()}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white/85 text-ink backdrop-blur hover:bg-white"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
             aria-label="이전"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <a href="/" className="font-en text-[20px] font-extrabold tracking-tightest text-ink">
-            in<span className="text-primary-500">pick</span>
+          <a href="/" className="text-[1.3rem] font-extrabold tracking-tightest text-primary-900">
+            In<span className="text-primary-500">Pick</span>
           </a>
-          <div className="w-10" />
+          <div className="inline-flex items-center gap-2 rounded-full bg-white border border-primary-100 px-3 py-1.5">
+            <Hexagon className="h-3.5 w-3.5 fill-token-400 text-token-400" />
+            <span className="font-bold tabular text-primary-900">
+              {tokens.balance}
+            </span>
+          </div>
         </header>
 
-        <section className="relative z-20 mx-auto max-w-6xl px-6 py-10 lg:px-8 lg:py-14">
-          {/* 헤드 */}
-          <div className="grid gap-8 lg:grid-cols-12">
-            <div className="lg:col-span-7">
-              <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-primary-500">
-                ◇ INPICK TOKENS
-              </p>
-              <h1 className="mt-3 text-[2.4rem] font-extrabold leading-[1.02] tracking-tightest sm:text-[3.4rem] lg:text-[4rem]">
-                토큰 충전
-                <br />
-                <span className="text-gradient-primary">필요한 만큼만.</span>
-              </h1>
-              <p className="mt-5 max-w-md text-[0.98rem] leading-relaxed text-ink-60">
-                AI 디자인 1세트 = ⬢ 1 · AR 진입 = ⬢ 3 · 추가 도면 옵션 = ⬢ 2~8.
-                토큰은 환급되지 않으며 한 번 사용된 토큰은 복구되지 않습니다.
-              </p>
-            </div>
-
-            {/* 잔액 카드 */}
-            <div className="lg:col-span-5">
-              <div className="relative overflow-hidden rounded-[28px] border border-primary-100 bg-white p-7 shadow-card">
-                <div
-                  className="pointer-events-none absolute inset-x-0 top-0 h-px"
-                  style={{
-                    background: "linear-gradient(90deg,transparent,#F73B20,transparent)",
-                  }}
-                />
-                <p className="font-mono text-[11px] uppercase tracking-[0.16em] text-ink-40">
-                  현재 잔액
-                </p>
-                <p className="mt-2 flex items-end gap-2 text-[3.4rem] font-extrabold tabular leading-none tracking-tightest">
-                  <Hexagon className="h-8 w-8 fill-primary-500 text-primary-500" />
-                  <span className="text-gradient-primary">
-                    {tokens.loading ? "—" : tokens.balance}
-                  </span>
-                </p>
-                <div className="mt-5 grid grid-cols-2 gap-3 text-[0.85rem]">
-                  <div className="rounded-2xl bg-primary-50 p-3">
-                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-700">
-                      누적 충전
-                    </p>
-                    <p className="mt-1 font-bold tabular text-ink">
-                      ⬢ {tokens.totalPurchased}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl bg-neutral-100 p-3">
-                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-ink-40">
-                      누적 사용
-                    </p>
-                    <p className="mt-1 font-bold tabular text-ink">
-                      ⬢ {tokens.totalUsed}
-                    </p>
-                  </div>
-                </div>
-                {!tokens.authenticated && !tokens.loading && (
-                  <p className="mt-4 rounded-xl bg-warning-bg px-3 py-2 text-[0.78rem] text-warning-text">
-                    로그인 후 결제·이력이 영구 보관됩니다 (현재는 로컬 임시).
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* 패키지 4종 */}
-          <div className="mt-12">
-            <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-ink-40">
-              CHARGE PACKAGES
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {PACKAGES.map((p) => {
-                const sel = selected === p.id;
-                return (
-                  <motion.button
-                    key={p.id}
-                    onClick={() => setSelected(p.id)}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    className={`relative overflow-hidden rounded-[28px] border-2 p-6 text-left transition-all ${
-                      sel
-                        ? "border-primary-500 bg-white shadow-card-hover"
-                        : "border-primary-100 bg-white/85 hover:border-primary-300"
-                    }`}
-                  >
-                    {p.hot && (
-                      <span className="font-mono absolute right-4 top-4 rounded-full bg-primary-500 px-2 py-0.5 text-[0.65rem] font-bold tracking-widest text-white">
-                        HOT
-                      </span>
-                    )}
-                    <p className="font-mono text-[11px] uppercase tracking-widest text-primary-500">
-                      ⬢ {p.tokens} 토큰
-                    </p>
-                    <p className="mt-3 text-[2rem] font-extrabold tabular leading-none tracking-tightest">
-                      ₩ {p.price.toLocaleString()}
-                    </p>
-                    {p.discount > 0 ? (
-                      <p className="mt-1 text-[0.78rem] font-bold text-success-text">
-                        -{p.discount}% 할인
-                      </p>
-                    ) : (
-                      <p className="mt-1 text-[0.78rem] text-ink-40">기본가</p>
-                    )}
-                    {sel && (
-                      <span className="absolute bottom-5 right-5 inline-flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white">
-                        <Check className="h-4 w-4" strokeWidth={3} />
-                      </span>
-                    )}
-                  </motion.button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* 결제 버튼 */}
-          <div className="mt-8 flex items-center justify-between rounded-[28px] border border-primary-100 bg-white p-6 shadow-card">
-            <div>
-              <p className="font-mono text-[11px] uppercase tracking-widest text-ink-40">
-                선택 패키지
-              </p>
-              <p className="mt-1 text-[1.2rem] font-bold tracking-tight text-ink">
-                {pkg ? `⬢ ${pkg.tokens} 토큰 · ₩ ${pkg.price.toLocaleString()}` : "패키지를 선택해주세요"}
-              </p>
-              {pkg && (
-                <p className="text-[0.78rem] text-ink-60">
-                  결제 후 잔액 ⬢ {tokens.balance + pkg.tokens}
-                </p>
-              )}
-            </div>
-            <button
-              onClick={handlePay}
-              disabled={!pkg || paying}
-              className="inline-flex h-12 items-center gap-2 rounded-full bg-primary-500 px-6 text-[14px] font-semibold tracking-tight text-white shadow-cta transition-colors hover:bg-primary-600 disabled:bg-primary-100 disabled:text-ink-40 disabled:shadow-none"
-            >
-              {paying ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" /> 결제 중…
-                </>
-              ) : (
-                <>
-                  <CreditCard className="h-4 w-4" /> 결제하기
-                </>
-              )}
-            </button>
-          </div>
-          <p className="mt-3 text-center text-[0.72rem] text-ink-40">
-            결제 시스템 자리 (토스페이먼츠) — 가맹점 등록 후 즉시 활성화됩니다.
+        <section className="relative z-20 mx-auto max-w-6xl px-6 py-12 lg:px-8">
+          <h1 className="text-[2.2rem] lg:text-[2.8rem] font-extrabold tracking-tightest leading-none text-primary-900">
+            토큰 충전
+          </h1>
+          <p className="mt-3 text-sm text-primary-900/60">
+            AI 디자인 1장 = 1토큰. 패키지가 클수록 단가가 저렴합니다.
           </p>
 
-          {/* 거래 이력 */}
-          <div className="mt-14">
-            <p className="font-mono text-[12px] uppercase tracking-[0.16em] text-ink-40">
-              TRANSACTION HISTORY
-            </p>
-            <div className="mt-4 overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-card">
-              {tokens.history.length === 0 ? (
-                <p className="px-6 py-10 text-center text-[0.85rem] text-ink-40">
-                  거래 이력이 없습니다
-                </p>
-              ) : (
-                <ul className="divide-y divide-primary-100">
-                  {tokens.history.slice(0, 30).map((t) => (
-                    <HistoryRow key={t.id} tx={t} />
-                  ))}
-                </ul>
-              )}
+          <div className="mt-10 grid gap-8 lg:grid-cols-12">
+            {/* ── 좌: 패키지 선택 + 결제 카드 (Stripe 스타일) ── */}
+            <div className="lg:col-span-5">
+              <div className="rounded-2xl bg-white border border-primary-100 shadow-card overflow-hidden">
+                {/* 상단 — 브랜드 + 금액 */}
+                <div className="border-b border-primary-100 px-7 py-6">
+                  <div className="flex items-center gap-2 text-primary-900/70">
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="text-sm font-bold tracking-tight text-primary-900">
+                      InPick
+                    </span>
+                  </div>
+                  <p className="mt-3 text-[2.6rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
+                    ₩ {pkg ? pkg.price.toLocaleString() : "0"}
+                  </p>
+                  <p className="mt-1 text-[0.78rem] text-primary-900/50">
+                    {pkg ? `토큰 ${pkg.tokens}개 충전` : "패키지를 선택해주세요"}
+                  </p>
+
+                  <div className="mt-5 space-y-1 text-[0.78rem]">
+                    <Row label="To" value={tokens.authenticated ? "로그인 사용자" : "게스트"} />
+                    <Row label="From" value="InPick" />
+                    <Row
+                      label="Memo"
+                      value={pkg ? `토큰 ${pkg.tokens}개 (${pkg.discount > 0 ? `${pkg.discount}% 할인` : "기본가"})` : "—"}
+                    />
+                  </div>
+                </div>
+
+                {/* 결제 수단 — 큰 메인 버튼 (간편결제) */}
+                <div className="px-7 py-5">
+                  <button
+                    disabled={!pkg || paying}
+                    onClick={() => setPayMethod("toss")}
+                    className={`relative inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 text-base font-bold tracking-tight transition-all ${
+                      payMethod === "toss"
+                        ? "bg-[#0064FF] text-white"
+                        : "bg-zinc-900 text-white hover:bg-zinc-800"
+                    } disabled:opacity-50`}
+                  >
+                    <span className="text-lg">⚡</span>
+                    토스페이로 결제
+                    {payMethod === "toss" && (
+                      <span className="absolute right-3"><Check className="h-3.5 w-3.5" /></span>
+                    )}
+                  </button>
+
+                  <div className="my-4 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-primary-100" />
+                    <span className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/40">
+                      Or pay another way
+                    </span>
+                    <div className="h-px flex-1 bg-primary-100" />
+                  </div>
+
+                  {/* 결제 수단 탭 */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <PayTab
+                      active={payMethod === "card"}
+                      icon={CreditCard}
+                      label="Card"
+                      onClick={() => setPayMethod("card")}
+                    />
+                    <PayTab
+                      active={payMethod === "kakao"}
+                      label="카카오페이"
+                      onClick={() => setPayMethod("kakao")}
+                      kakao
+                    />
+                    <PayTab
+                      active={payMethod === "bank"}
+                      icon={Building2}
+                      label="계좌이체"
+                      onClick={() => setPayMethod("bank")}
+                    />
+                  </div>
+
+                  {/* Card Information (Card 선택 시) */}
+                  {payMethod === "card" && (
+                    <div className="mt-5">
+                      <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/50">
+                        Card Information
+                      </p>
+                      <div className="mt-2 rounded-xl border border-primary-200 overflow-hidden">
+                        <div className="relative flex items-center border-b border-primary-100 px-3 py-3">
+                          <input
+                            type="text"
+                            value={cardNumber}
+                            onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
+                            placeholder="1234 1234 1234 1234"
+                            maxLength={19}
+                            className="flex-1 bg-transparent text-sm tabular outline-none placeholder:text-primary-900/30"
+                          />
+                          <div className="flex gap-1">
+                            <CardLogo brand="visa" />
+                            <CardLogo brand="master" />
+                            <CardLogo brand="amex" />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2">
+                          <input
+                            type="text"
+                            value={cardExpiry}
+                            onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
+                            placeholder="MM / YY"
+                            maxLength={7}
+                            className="border-r border-primary-100 px-3 py-3 text-sm tabular outline-none placeholder:text-primary-900/30"
+                          />
+                          <div className="relative flex items-center">
+                            <input
+                              type="text"
+                              value={cardCvc}
+                              onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, "").slice(0, 4))}
+                              placeholder="CVC"
+                              maxLength={4}
+                              className="flex-1 px-3 py-3 text-sm tabular outline-none placeholder:text-primary-900/30"
+                            />
+                            <span className="pr-3 text-[0.65rem] text-primary-900/40">⊟</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {payMethod === "kakao" && (
+                    <p className="mt-4 rounded-lg bg-[#FEE500]/30 border border-[#FEE500] px-3 py-2 text-[0.78rem] text-primary-900">
+                      카카오페이 앱으로 인증하여 결제합니다 (시뮬레이션 모드)
+                    </p>
+                  )}
+
+                  {payMethod === "bank" && (
+                    <p className="mt-4 rounded-lg bg-primary-50 border border-primary-100 px-3 py-2 text-[0.78rem] text-primary-900/70">
+                      계좌이체 가상계좌가 발급됩니다 (시뮬레이션 모드)
+                    </p>
+                  )}
+
+                  <button
+                    onClick={handlePay}
+                    disabled={!pkg || paying}
+                    className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3.5 text-base font-bold tracking-tight text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+                  >
+                    {paying ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        결제 중…
+                      </>
+                    ) : (
+                      <>Pay ₩ {pkg ? pkg.price.toLocaleString() : "—"}</>
+                    )}
+                  </button>
+
+                  <p className="mt-4 text-center text-[0.7rem] text-primary-900/40">
+                    Powered by <span className="font-bold text-primary-900/60">InPick · 토스페이먼츠</span>
+                    <br />
+                    <a className="underline hover:text-primary-900/70" href="#terms">Terms</a>
+                    {" · "}
+                    <a className="underline hover:text-primary-900/70" href="#privacy">Privacy</a>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* ── 우: 패키지 + 영수증 (Invoice from InPick) ── */}
+            <div className="lg:col-span-7">
+              {/* Invoice 헤더 */}
+              <div className="mb-3 px-1 flex items-center gap-2 text-[0.78rem] text-primary-900/60">
+                <span>New invoice from InPick</span>
+                <span className="text-primary-900/30">✉</span>
+              </div>
+              <div className="mb-1 px-1 flex items-center justify-between text-[0.7rem] text-primary-900/40">
+                <span>InPick &lt;billing@inpick.kr&gt;</span>
+                <span className="tabular">방금</span>
+              </div>
+              <div className="mb-4 px-1 text-[0.7rem] text-primary-900/40">
+                To: {tokens.authenticated ? "회원" : "게스트"}
+              </div>
+
+              {/* Invoice 카드 */}
+              <div className="rounded-2xl bg-white border border-primary-100 shadow-card overflow-hidden">
+                <div className="px-7 py-6 border-b border-primary-100">
+                  <div className="flex items-center gap-2 text-primary-900/70">
+                    <Lock className="h-3.5 w-3.5" />
+                    <span className="text-sm font-bold tracking-tight text-primary-900">
+                      InPick
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[0.78rem] text-primary-900/50">
+                    Invoice from InPick
+                  </p>
+                  <p className="mt-2 text-[2.2rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
+                    ₩ {pkg ? pkg.price.toLocaleString() : "0"}
+                  </p>
+                  <p className="mt-1 text-[0.78rem] text-primary-900/50">
+                    {pkg ? `토큰 ${pkg.tokens}개` : "패키지 미선택"}
+                  </p>
+                </div>
+
+                {/* 패키지 그리드 */}
+                <div className="px-7 py-5">
+                  <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
+                    토큰 패키지
+                  </p>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {PACKAGES.map((p) => {
+                      const sel = selected === p.id;
+                      return (
+                        <motion.button
+                          key={p.id}
+                          onClick={() => setSelected(p.id)}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          className={`relative rounded-xl border p-4 text-left transition-all ${
+                            sel
+                              ? "border-primary-500 bg-primary-50/70 shadow-card"
+                              : "border-primary-100 bg-white hover:border-primary-300"
+                          }`}
+                        >
+                          {p.hot && (
+                            <span className="absolute -top-2 -right-2 rounded-full bg-primary-500 px-2 py-0.5 text-[0.6rem] font-bold text-white">
+                              HOT
+                            </span>
+                          )}
+                          <div className="flex items-center justify-between">
+                            <span className="text-2xl font-extrabold tabular text-primary-900">
+                              {p.tokens}
+                            </span>
+                            <Hexagon className={`h-5 w-5 ${sel ? "fill-primary-500 text-primary-500" : "fill-token-400 text-token-400"}`} />
+                          </div>
+                          <p className="mt-2 text-base font-bold tabular text-primary-900">
+                            ₩ {p.price.toLocaleString()}
+                          </p>
+                          {p.discount > 0 ? (
+                            <p className="mt-0.5 text-[0.7rem] font-semibold text-emerald-600">
+                              {p.discount}% 할인
+                            </p>
+                          ) : (
+                            <p className="mt-0.5 text-[0.7rem] text-primary-900/40">기본가</p>
+                          )}
+                          {sel && (
+                            <span className="absolute right-3 top-3 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary-500 text-white">
+                              <Check className="h-3 w-3" strokeWidth={3} />
+                            </span>
+                          )}
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 영수증 상세 */}
+                {pkg && (
+                  <div className="border-t border-primary-100 px-7 py-5">
+                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
+                      Invoice #INPICK-{Date.now().toString().slice(-6)}
+                    </p>
+                    <div className="mt-3 space-y-2 text-[0.85rem]">
+                      <div className="flex items-center justify-between">
+                        <span className="text-primary-900/70">{pkg.tokens} 토큰 패키지</span>
+                        <span className="tabular text-primary-900">₩ {Math.round(pkg.price / 1.1).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-primary-900/70">VAT 10%</span>
+                        <span className="tabular text-primary-900">₩ {Math.round(pkg.price - pkg.price / 1.1).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between border-t border-primary-100 pt-2">
+                        <span className="font-bold text-primary-900">Total due</span>
+                        <span className="text-lg font-extrabold tabular text-primary-900">
+                          ₩ {pkg.price.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="border-t border-primary-100 px-7 py-3 text-center text-[0.7rem] text-primary-900/40">
+                  Powered by <span className="font-bold text-primary-900/60">토스페이먼츠</span>
+                  {" | "}
+                  <a className="underline hover:text-primary-900/70" href="#terms">Terms</a>
+                  {" "}
+                  <a className="underline hover:text-primary-900/70" href="#privacy">Privacy</a>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -250,30 +389,34 @@ export default function TokensPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSuccessInfo(null)}
-                className="fixed inset-0 z-[80] bg-burgundy/60 backdrop-blur-sm"
+                className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                className="fixed left-1/2 top-1/2 z-[81] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 text-center shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[81] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover text-center"
               >
-                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-success-bg text-success-text">
+                <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                   <Check className="h-6 w-6" strokeWidth={3} />
                 </div>
-                <h3 className="mt-4 text-lg font-extrabold tracking-tight text-ink">
+                <h3 className="mt-4 text-xl font-extrabold tracking-tight text-primary-900">
                   결제 완료
                 </h3>
-                <p className="mt-2 text-[14px] text-ink-60">
-                  ⬢ {successInfo.amount} 토큰이 충전되었습니다.
-                  <br />
-                  현재 잔액 <span className="font-bold tabular text-ink">⬢ {tokens.balance}</span>
+                <p className="mt-2 text-sm text-primary-900/70">
+                  <span className="font-bold text-primary-700">+{successInfo.amount} 토큰</span>이 충전되었습니다.
+                </p>
+                <p className="mt-1 text-[0.78rem] text-primary-900/50">
+                  현재 잔액: <span className="font-bold tabular">{tokens.balance}</span>
                 </p>
                 <button
-                  onClick={() => setSuccessInfo(null)}
-                  className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-primary-500 px-4 py-3 text-sm font-semibold tracking-tight text-white shadow-cta hover:bg-primary-600"
+                  onClick={() => {
+                    setSuccessInfo(null);
+                    router.back();
+                  }}
+                  className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-primary-500 px-4 py-3 text-sm font-bold text-white shadow-cta hover:bg-primary-600"
                 >
-                  확인
+                  계속하기
                 </button>
               </motion.div>
             </>
@@ -284,52 +427,76 @@ export default function TokensPage() {
   );
 }
 
-function HistoryRow({ tx }: { tx: TokenTransaction }) {
-  const date = new Date(tx.created_at);
-  const dateStr = `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, "0")}.${String(
-    date.getDate()
-  ).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(
-    date.getMinutes()
-  ).padStart(2, "0")}`;
-  const isPlus = tx.amount > 0;
-  const labelMap: Record<string, string> = {
-    signup_bonus: "가입 증정",
-    purchase: "충전",
-    use: "사용",
-    refund: "환불",
-    admin_adjust: "관리자 조정",
-  };
-  const featureMap: Record<string, string> = {
-    ai_render: "AI 디자인",
-    ar_session: "AR 세션",
-    drawing_option: "도면 옵션",
-    welcome: "환영 보너스",
-    manual: "결제",
-  };
+function Row({ label, value }: { label: string; value: string }) {
   return (
-    <li className="flex items-center justify-between px-5 py-4 text-[0.88rem]">
-      <div>
-        <p className="font-bold tracking-tight text-ink">
-          {labelMap[tx.type] ?? tx.type}
-          {tx.feature && (
-            <span className="ml-2 text-[0.78rem] font-normal text-ink-40">
-              {featureMap[tx.feature] ?? tx.feature}
-            </span>
-          )}
-        </p>
-        <p className="font-mono text-[0.7rem] text-ink-40">{dateStr}</p>
-      </div>
-      <div className="text-right">
-        <p
-          className={`tabular text-[1rem] font-extrabold tracking-tighter ${
-            isPlus ? "text-success-text" : "text-ink"
-          }`}
-        >
-          {isPlus ? "+" : ""}
-          {tx.amount} ⬢
-        </p>
-        <p className="font-mono text-[0.7rem] text-ink-40">잔액 {tx.balance_after}</p>
-      </div>
-    </li>
+    <div className="flex items-baseline gap-3">
+      <span className="w-12 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/40">
+        {label}
+      </span>
+      <span className="text-primary-900/80">{value}</span>
+    </div>
   );
+}
+
+function PayTab({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+  kakao,
+}: {
+  active: boolean;
+  icon?: typeof CreditCard;
+  label: string;
+  onClick: () => void;
+  kakao?: boolean;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`relative flex flex-col items-center gap-1 rounded-xl border px-2 py-3 text-xs font-bold transition-all ${
+        active
+          ? "border-primary-500 bg-primary-50/50 shadow-sm"
+          : "border-primary-100 bg-white hover:border-primary-300"
+      }`}
+    >
+      {kakao ? (
+        <span className="text-base font-bold text-[#3C1E1E]">K</span>
+      ) : (
+        Icon && <Icon className="h-4 w-4 text-primary-900/70" />
+      )}
+      <span className="text-primary-900">{label}</span>
+      {active && (
+        <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary-500" />
+      )}
+    </button>
+  );
+}
+
+function CardLogo({ brand }: { brand: "visa" | "master" | "amex" | "jcb" }) {
+  const labels: Record<typeof brand, string> = {
+    visa: "VISA",
+    master: "MC",
+    amex: "AMEX",
+    jcb: "JCB",
+  } as const;
+  return (
+    <span className="rounded bg-zinc-100 px-1.5 py-0.5 text-[0.55rem] font-extrabold tracking-tight text-zinc-700">
+      {labels[brand]}
+    </span>
+  );
+}
+
+function formatCardNumber(s: string): string {
+  return s
+    .replace(/\D/g, "")
+    .slice(0, 16)
+    .replace(/(.{4})/g, "$1 ")
+    .trim();
+}
+
+function formatExpiry(s: string): string {
+  const digits = s.replace(/\D/g, "").slice(0, 4);
+  if (digits.length < 3) return digits;
+  return `${digits.slice(0, 2)} / ${digits.slice(2)}`;
 }
