@@ -303,8 +303,7 @@ function AddressMode({ value, onChange }: Props) {
     });
     if (!p.grandPlanUrl) return;
     try {
-      // 비용 절감을 위해 raster cleaning 스킵 — 치수 추론이 우선 (Step2 렌더 기반 데이터)
-      // 사용자가 명시 요청 시 skipImageClean=false 로 변경
+      // 워터마크/로고 제거 + 바닥 패턴 고화질화 (gpt-image-1 image edit, ~$0.19/장)
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -312,7 +311,7 @@ function AddressMode({ value, onChange }: Props) {
           imageUrl: p.grandPlanUrl,
           exclusiveAreaM2: p.exclusiveArea,
           unitName: value.selectedAddress?.buildingName,
-          skipImageClean: true,
+          skipImageClean: false,
         }),
       });
       const data = await res.json();
@@ -426,7 +425,7 @@ function AddressMode({ value, onChange }: Props) {
             {value.normalizing && (
               <span className="inline-flex items-center gap-1 text-primary-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                Vision 분석 중 (10–15초)
+                워터마크 제거 + 치수 추출 (20–40초)
               </span>
             )}
             {value.dimensionOverlaySvg && !value.normalizing && (
