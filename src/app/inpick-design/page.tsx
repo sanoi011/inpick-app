@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-img-element */
 /**
  * InPick Design — 1차 기본 버전
  *
@@ -9,6 +10,8 @@
  *  5. 자재 매핑 + 견적서
  *  6. 입면전개도 (SVG)
  *  7. PDF 출력 / 시공업자 매칭
+ *
+ * <img> 사용 사유: DALL-E 동적 URL + base64 사용자 업로드 — next/image 도메인 설정 불요한 단순 표시.
  */
 "use client";
 
