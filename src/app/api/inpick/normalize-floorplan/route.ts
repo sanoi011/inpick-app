@@ -85,11 +85,11 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 - 명시 치수 우선, 미표시면 표준 비율 추정
 - 욕실/침실 2개+면 "욕실1","욕실2"`;
 
-/** gpt-image-1로 평면도 raster cleaning (워터마크 제거 + 바닥 패턴 고화질) */
+/** 평면도 raster cleaning — gpt-image-2 → gpt-image-1 fallback */
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
-): Promise<{ b64: string; costUsd: number }> {
+): Promise<{ b64: string; costUsd: number; model: string }> {
   const prompt =
     "한국 아파트 평면도. 모든 워터마크, 로고, NAVER/네이버 텍스트, 광고 텍스트 완전 제거. " +
     "동일한 실 레이아웃과 비율 유지. " +
@@ -98,30 +98,34 @@ async function cleanFloorplanRaster(
     "깨끗한 흰 배경. 한국 인테리어 평면도 스타일. " +
     "치수 텍스트는 그리지 마세요 (별도 오버레이됨).";
 
-  const form = new FormData();
-  form.append("model", "gpt-image-1");
-  form.append(
-    "image",
-    new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
-    "image.png",
-  );
-  form.append("prompt", prompt);
-  form.append("size", "1024x1024");
-  form.append("quality", "high");
+  const errors: string[] = [];
+  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+    const form = new FormData();
+    form.append("model", modelName);
+    form.append(
+      "image",
+      new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
+      "image.png",
+    );
+    form.append("prompt", prompt);
+    form.append("size", "1024x1024");
+    form.append("quality", "high");
 
-  const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`gpt-image-1 cleaning 실패: ${res.status} ${err.slice(0, 300)}`);
+    const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (b64) return { b64, costUsd: 0.19, model: modelName };
+    } else {
+      const err = await res.text();
+      errors.push(`${modelName} ${res.status}: ${err.slice(0, 200)}`);
+    }
   }
-  const data = await res.json();
-  const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error("cleaning 응답에 이미지 없음");
-  return { b64, costUsd: 0.19 };
+  throw new Error(`cleaning 실패 — ${errors.join(" | ")}`);
 }
 
 export async function POST(req: NextRequest) {

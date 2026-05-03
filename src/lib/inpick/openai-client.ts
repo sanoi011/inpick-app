@@ -60,6 +60,59 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     `한국 아파트 표준 마감 (걸레받이·천장 몰딩·창호 표현 정확히).`;
 
   const size = input.size || "1024x1024";
+  const apiKey = getKey();
+
+  // 1차: gpt-image-2 (ChatGPT 이미지 2 엔진 — 사용자 요청)
+  // 모델 미존재 시 dall-e-3 자동 폴백
+  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+    try {
+      const body: Record<string, unknown> = {
+        model: modelName,
+        prompt,
+        size,
+        n: 1,
+        quality: "high",
+        output_format: "png",
+      };
+      const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data.data?.[0]?.b64_json;
+        const url = data.data?.[0]?.url;
+        if (b64) {
+          return {
+            imageUrl: `data:image/png;base64,${b64}`,
+            imageBase64: b64,
+            revisedPrompt: prompt,
+            model: modelName,
+            costUsd: 0.19,
+          };
+        }
+        if (url) {
+          return {
+            imageUrl: url,
+            revisedPrompt: prompt,
+            model: modelName,
+            costUsd: 0.19,
+          };
+        }
+      } else {
+        const errText = await res.text();
+        console.warn(`[render] ${modelName} ${res.status}: ${errText.slice(0, 200)}`);
+      }
+    } catch (e) {
+      console.warn(`[render] ${modelName} throw:`, e);
+    }
+  }
+
+  // 2차 fallback: dall-e-3 HD (조직 인증 불필요, 어떤 OpenAI 계정이든 작동)
   const body = {
     model: "dall-e-3",
     prompt,
@@ -68,11 +121,10 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     quality: "hd",
     response_format: "url",
   };
-
   const res = await fetch(`${OPENAI_BASE}/images/generations`, {
     method: "POST",
     headers: {
-      "Authorization": `Bearer ${getKey()}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
@@ -86,7 +138,7 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     imageUrl: data.data?.[0]?.url,
     revisedPrompt: data.data?.[0]?.revised_prompt,
     model: "dall-e-3",
-    costUsd: size === "1024x1024" ? 0.080 : 0.120, // dall-e-3 hd
+    costUsd: size === "1024x1024" ? 0.08 : 0.12,
   };
 }
 

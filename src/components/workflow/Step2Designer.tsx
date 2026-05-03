@@ -218,6 +218,83 @@ export default function Step2Designer({
     }
   };
 
+  // 모든 빈 방에 일괄 컨셉 적용 + 한 번에 렌더 (기본 동작)
+  const handleBulkGenerate = async (conceptPrompt: string) => {
+    const emptyTabs = availableTabs.filter((t) => (value.rendersByRoom[t.v] || []).length === 0);
+    if (emptyTabs.length === 0) {
+      setErrorMsg("이미 모든 방에 시안이 생성됐습니다 — 개별 방을 선택해 재생성하세요");
+      return;
+    }
+    if (tokenBalance < emptyTabs.length) {
+      setInsufficientOpen(true);
+      return;
+    }
+    const ok = await onConsumeToken(emptyTabs.length, "ai_render");
+    if (!ok) {
+      setInsufficientOpen(true);
+      return;
+    }
+    setErrorMsg(null);
+    setGenerating(true);
+    try {
+      const results = await Promise.allSettled(
+        emptyTabs.map(async (tab) => {
+          const dim = roomDims[tab.dimKey] || roomDims["거실"];
+          const res = await fetch("/api/inpick/render-room", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              roomName: tab.label,
+              widthMm: dim.widthMm,
+              depthMm: dim.depthMm,
+              heightMm: dim.heightMm,
+              style: conceptPrompt,
+              expansion: basicInfo.expansionType === "extended",
+              size: "1024x1024",
+            }),
+          });
+          const data = await res.json();
+          if (!res.ok || !data.imageUrl) {
+            throw new Error(`${tab.label}: ${data.error || "렌더링 실패"}${data.hint ? ` — ${data.hint}` : ""}`);
+          }
+          return {
+            tabKey: tab.v,
+            item: {
+              url: data.imageUrl,
+              prompt: conceptPrompt,
+              revisedPrompt: data.revisedPrompt,
+              costUsd: data.costUsd ?? 0.08,
+              timestamp: new Date().toISOString(),
+            } as RenderItem,
+          };
+        }),
+      );
+      const next = { ...value };
+      next.rendersByRoom = { ...next.rendersByRoom };
+      next.selectedByRoom = { ...next.selectedByRoom };
+      next.generations = { ...next.generations };
+      next.promptByRoom = { ...(next.promptByRoom || {}) };
+      const failures: string[] = [];
+      for (const r of results) {
+        if (r.status === "fulfilled") {
+          const { tabKey, item } = r.value;
+          const list = [...(next.rendersByRoom[tabKey] || []), item];
+          next.rendersByRoom[tabKey] = list;
+          next.selectedByRoom[tabKey] = list.length - 1;
+          next.generations[tabKey] = (next.generations[tabKey] ?? 0) + 1;
+        } else {
+          failures.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+        }
+      }
+      onChange(next);
+      if (failures.length > 0) {
+        setErrorMsg(`일부 방 실패: ${failures.slice(0, 2).join(" / ")}`);
+      }
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const updateRender = (idx: number, updated: RenderItem) => {
     const next = [...renders];
     next[idx] = updated;
@@ -391,6 +468,30 @@ export default function Step2Designer({
 
       {/* 중앙: 맥북 베젤 + 게이밍 HUD */}
       <section className="relative">
+        {/* 일괄 컨셉 선택 — 시안 0개 방이 있을 때만 노출 */}
+        {availableTabs.some((t) => (value.rendersByRoom[t.v] || []).length === 0) && (
+          <div className="mb-3 rounded-2xl border border-primary-500/40 bg-zinc-900/95 p-4 shadow-[0_0_20px_rgba(247,59,32,0.2)]">
+            <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-primary-400 mb-2">
+              ▸ 컨셉 일괄 선택 (모든 방 자동 생성)
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {STYLE_PRESETS.map((preset) => (
+                <button
+                  key={preset}
+                  onClick={() => handleBulkGenerate(preset)}
+                  disabled={generating}
+                  className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs font-bold uppercase tracking-wider text-zinc-300 hover:border-primary-500/60 hover:text-primary-300 hover:bg-primary-500/10 transition-all disabled:opacity-40"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
+            <p className="mt-2 text-[0.65rem] text-zinc-500">
+              컨셉 선택 시 비어있는 모든 방을 자동 생성 · 각 방 클릭해서 개별 재생성 가능
+            </p>
+          </div>
+        )}
+
         {/* 맥북 외부 알루미늄 프레임 */}
         <div className="rounded-[2rem] bg-gradient-to-br from-zinc-300 via-zinc-200 to-zinc-400 p-2 shadow-[0_24px_60px_rgba(0,0,0,0.35)]">
           {/* 맥북 검은 베젤 */}
