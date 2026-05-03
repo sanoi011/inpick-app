@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { analyzeImageVision } from "@/lib/inpick/openai-client";
+import { getOpenAIKey } from "@/lib/inpick/openai-env";
 import {
   classifyPyeong,
   estimateRoomDimsFromPyeong,
@@ -132,9 +133,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const apiKey = process.env.OPENAI_API_KEY;
+    const apiKey = getOpenAIKey();
     if (!apiKey) {
-      return NextResponse.json({ error: "OPENAI_API_KEY 미설정" }, { status: 500 });
+      return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
     }
 
     // 1) Vision으로 layout 추출 (병렬로 시작)

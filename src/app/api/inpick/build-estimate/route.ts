@@ -15,6 +15,7 @@ import {
   type MaterialItem,
   type RoomEstimate,
 } from "@/lib/inpick/estimate";
+import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -26,11 +27,11 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(rooms) || rooms.length === 0) {
       return NextResponse.json({ error: "rooms 배열 필수" }, { status: 400 });
     }
-    if (!process.env.OPENAI_API_KEY) {
+    if (!hasOpenAIKey()) {
       return NextResponse.json(
         {
-          error: "OPENAI_API_KEY 미설정 — GPT-4o Vision 자재 추출 불가",
-          hint: "Vercel 환경변수에 OPENAI_API_KEY 등록 필요",
+          error: "OpenAI 키 미설정 — GPT-4o Vision 자재 추출 불가",
+          hint: "Vercel에 OPENAI_API_KEY (또는 openai_api_key) 등록 필요",
         },
         { status: 500 },
       );

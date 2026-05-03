@@ -4,6 +4,7 @@
  * 외부 의존성 진단 — 실제 OpenAI API에 핑을 쳐서 키 유효성 확인.
  */
 import { NextResponse } from "next/server";
+import { getOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -26,8 +27,17 @@ async function pingOpenAI(key: string): Promise<{ ok: boolean; status?: number; 
 }
 
 export async function GET() {
-  const openaiKey = process.env.OPENAI_API_KEY;
+  const openaiKey = getOpenAIKey();
   const forceMock = process.env.INPICK_FORCE_MOCK_RENDER === "true";
+  // 어떤 변수명에서 발견됐는지 표시 (디버깅용)
+  const keySource =
+    process.env.OPENAI_API_KEY
+      ? "OPENAI_API_KEY"
+      : process.env.openai_api_key
+        ? "openai_api_key (소문자)"
+        : process.env.OPENAI_KEY
+          ? "OPENAI_KEY"
+          : null;
 
   let openaiPing: { ok: boolean; status?: number; error?: string } = { ok: false };
   if (openaiKey) {
@@ -37,6 +47,7 @@ export async function GET() {
   return NextResponse.json({
     openai: {
       configured: !!openaiKey,
+      keySource,
       keyHint: openaiKey ? `sk-...${openaiKey.slice(-4)}` : null,
       keyLength: openaiKey?.length ?? 0,
       forceMock,

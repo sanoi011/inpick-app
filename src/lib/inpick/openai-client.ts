@@ -11,7 +11,11 @@
 const OPENAI_BASE = "https://api.openai.com/v1";
 
 function getKey(): string {
-  const key = process.env.OPENAI_API_KEY;
+  // 대/소문자 변수명 둘 다 허용 (Vercel 환경변수가 소문자로 등록된 경우 호환)
+  const key =
+    process.env.OPENAI_API_KEY ||
+    process.env.openai_api_key ||
+    process.env.OPENAI_KEY;
   if (!key) throw new Error("OPENAI_API_KEY 환경변수 미설정");
   return key;
 }

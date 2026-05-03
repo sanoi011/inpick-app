@@ -14,6 +14,7 @@
  * 출력: { imageUrl: string, costUsd: number, model: string }
  */
 import { NextRequest, NextResponse } from "next/server";
+import { getOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 90;
@@ -37,9 +38,9 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    const key = process.env.OPENAI_API_KEY;
+    const key = getOpenAIKey();
     if (!key) {
-      return NextResponse.json({ error: "OPENAI_API_KEY 미설정" }, { status: 500 });
+      return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
     }
 
     // 1) 원본 이미지 다운로드 (DALL-E 임시 URL)

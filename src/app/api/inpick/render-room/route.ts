@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoomRender, type RenderRoomInput } from "@/lib/inpick/openai-client";
+import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -22,11 +23,11 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!process.env.OPENAI_API_KEY) {
+    if (!hasOpenAIKey()) {
       return NextResponse.json(
         {
-          error: "OPENAI_API_KEY 환경변수 미설정",
-          hint: "Vercel Settings → Environment Variables에 OPENAI_API_KEY를 추가하고 Redeploy 필요",
+          error: "OpenAI 키 환경변수 미설정",
+          hint: "Vercel에 OPENAI_API_KEY (또는 openai_api_key) 등록 + Redeploy 필요",
         },
         { status: 500 },
       );
