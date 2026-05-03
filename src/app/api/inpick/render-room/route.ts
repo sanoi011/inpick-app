@@ -44,11 +44,13 @@ export async function POST(req: NextRequest) {
     // OpenAI 에러를 그대로 사용자에게 노출 (디버깅용)
     let hint: string | undefined;
     if (msg.includes("Incorrect API key") || msg.includes("invalid_api_key")) {
-      hint = "API 키가 잘못되었습니다. https://platform.openai.com/api-keys 에서 새 키를 발급받아 Vercel 환경변수에 등록하세요";
+      hint = "API 키가 잘못되었습니다. https://platform.openai.com/api-keys 에서 새 키 발급 → Vercel 환경변수 갱신";
     } else if (msg.includes("billing") || msg.includes("quota") || msg.includes("insufficient")) {
-      hint = "OpenAI 결제 한도 초과 또는 잔액 부족. https://platform.openai.com/account/billing 에서 충전하세요";
+      hint = "OpenAI 결제 한도 초과 또는 잔액 부족. https://platform.openai.com/account/billing 에서 충전";
+    } else if (msg.includes("gpt-image-2")) {
+      hint = "gpt-image-2 access 없음 — https://platform.openai.com/settings/organization/general 에서 Verify Organization 클릭 (신분증·얼굴 인증). 인증 후 최대 15분 대기. 그래도 안 되면 tier upgrade 필요";
     } else if (msg.includes("organization") || msg.includes("verify")) {
-      hint = "OpenAI 조직 인증이 필요합니다. https://platform.openai.com/settings/organization 에서 인증하세요";
+      hint = "OpenAI 조직 인증이 필요합니다. https://platform.openai.com/settings/organization/general 에서 Verify Organization";
     } else if (msg.includes("rate limit") || msg.includes("429")) {
       hint = "OpenAI Rate limit 초과 — 잠시 후 다시 시도";
     }
