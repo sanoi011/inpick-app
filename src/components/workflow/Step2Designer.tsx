@@ -93,14 +93,24 @@ export default function Step2Designer({
   const [generating, setGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
-  const [apiMode, setApiMode] = useState<"loading" | "live" | "mock">("loading");
+  const [apiHealth, setApiHealth] = useState<{
+    mode: "loading" | "live" | "broken";
+    keyHint?: string;
+    pingError?: string;
+  }>({ mode: "loading" });
   const historyEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/inpick/health")
       .then((r) => r.json())
-      .then((d) => setApiMode(d.openai?.mode === "live" ? "live" : "mock"))
-      .catch(() => setApiMode("mock"));
+      .then((d) =>
+        setApiHealth({
+          mode: d.openai?.mode === "live" ? "live" : "broken",
+          keyHint: d.openai?.keyHint,
+          pingError: d.openai?.ping?.error,
+        }),
+      )
+      .catch((e) => setApiHealth({ mode: "broken", pingError: String(e) }));
   }, []);
 
   const roomDims: Record<string, RoomDim> = useMemo(() => {
@@ -179,7 +189,9 @@ export default function Step2Designer({
       });
       const data = await res.json();
       if (!res.ok || !data.imageUrl) {
-        throw new Error(data.error || "렌더링 실패");
+        const baseMsg = data.error || "렌더링 실패";
+        const hintMsg = data.hint ? ` — ${data.hint}` : "";
+        throw new Error(baseMsg + hintMsg);
       }
       const item: RenderItem = {
         url: data.imageUrl,
@@ -219,23 +231,39 @@ export default function Step2Designer({
     <div className="grid gap-4 lg:grid-cols-[200px_1fr] font-mono">
       {/* 좌측: 게이밍 HUD 스타일 방 선택 패널 */}
       <aside className="relative">
-        {/* API 모드 배지 */}
+        {/* OpenAI 진단 배지 */}
         <div
-          className={`mb-2 rounded-lg border px-2.5 py-1.5 text-[0.6rem] font-bold uppercase tracking-[0.18em] flex items-center justify-between ${
-            apiMode === "live"
+          className={`mb-2 rounded-lg border px-2.5 py-2 text-[0.6rem] font-bold uppercase tracking-[0.18em] ${
+            apiHealth.mode === "live"
               ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
-              : apiMode === "mock"
-                ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
+              : apiHealth.mode === "broken"
+                ? "border-red-500/40 bg-red-500/10 text-red-400"
                 : "border-zinc-700 bg-zinc-900 text-zinc-500"
           }`}
         >
-          <span>
-            {apiMode === "live" ? "● LIVE GPT" : apiMode === "mock" ? "● MOCK MODE" : "● ..."}
-          </span>
-          {apiMode === "mock" && (
-            <span className="text-[0.55rem] tracking-normal text-amber-300/80">
-              no API key
+          <div className="flex items-center justify-between">
+            <span>
+              {apiHealth.mode === "live"
+                ? "● LIVE OpenAI"
+                : apiHealth.mode === "broken"
+                  ? "● API ERROR"
+                  : "● 진단 중…"}
             </span>
+            {apiHealth.keyHint && (
+              <span className="text-[0.55rem] tracking-normal text-zinc-400">
+                {apiHealth.keyHint}
+              </span>
+            )}
+          </div>
+          {apiHealth.mode === "broken" && apiHealth.pingError && (
+            <p className="mt-1 normal-case tracking-normal text-[0.6rem] text-red-300/80 leading-tight">
+              {apiHealth.pingError.slice(0, 120)}
+            </p>
+          )}
+          {apiHealth.mode === "broken" && !apiHealth.pingError && !apiHealth.keyHint && (
+            <p className="mt-1 normal-case tracking-normal text-[0.6rem] text-red-300/80">
+              OPENAI_API_KEY 미설정. Vercel 환경변수에 등록하세요
+            </p>
           )}
         </div>
 
@@ -345,41 +373,7 @@ export default function Step2Designer({
             {allRoomsDecided && <ChevronRight className="h-3 w-3" />}
           </button>
 
-          {/* 테스트 모드: 시안 없어도 mock 채워서 결과 확인 (자동 진행 X) */}
-          {!allRoomsDecided && (
-            <button
-              onClick={() => {
-                const next = { ...value };
-                for (const t of availableTabs) {
-                  if ((value.rendersByRoom[t.v] || []).length === 0) {
-                    const mockItem: RenderItem = {
-                      url: `https://picsum.photos/seed/${t.v}-${Date.now()}/1024/1024`,
-                      prompt: "[TEST MODE] mock render — OPENAI_API_KEY 미설정 시 자동 사용",
-                      costUsd: 0,
-                      timestamp: new Date().toISOString(),
-                    };
-                    next.rendersByRoom = {
-                      ...next.rendersByRoom,
-                      [t.v]: [mockItem],
-                    };
-                    next.selectedByRoom = {
-                      ...next.selectedByRoom,
-                      [t.v]: 0,
-                    };
-                    next.generations = {
-                      ...next.generations,
-                      [t.v]: 1,
-                    };
-                  }
-                }
-                onChange(next);
-                // 자동 진행 X — 사용자가 이미지 확인 후 NEXT STAGE 직접 클릭
-              }}
-              className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[0.65rem] font-bold uppercase tracking-wider text-amber-300 hover:bg-amber-500/20"
-            >
-              ▸ FILL MOCK IMAGES (preview)
-            </button>
-          )}
+          {/* mock 버튼 제거 — 실제 OpenAI API로만 생성 */}
         </div>
 
         {/* 토큰 잔액 HUD */}

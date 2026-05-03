@@ -1,25 +1,47 @@
 /**
  * GET /api/inpick/health
  *
- * OpenAI / Supabase 등 외부 의존성 상태 진단.
- * - 키가 설정되어 있는지 (값은 노출 안 함)
- * - 모드 (mock vs real)
- * - 응답: { openai: { configured, mode }, ... }
+ * 외부 의존성 진단 — 실제 OpenAI API에 핑을 쳐서 키 유효성 확인.
  */
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 30;
+
+async function pingOpenAI(key: string): Promise<{ ok: boolean; status?: number; error?: string }> {
+  try {
+    // /v1/models 가 가장 가벼운 인증 체크
+    const res = await fetch("https://api.openai.com/v1/models", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${key}` },
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      return { ok: false, status: res.status, error: text.slice(0, 300) };
+    }
+    return { ok: true, status: 200 };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 export async function GET() {
   const openaiKey = process.env.OPENAI_API_KEY;
   const forceMock = process.env.INPICK_FORCE_MOCK_RENDER === "true";
 
+  let openaiPing: { ok: boolean; status?: number; error?: string } = { ok: false };
+  if (openaiKey) {
+    openaiPing = await pingOpenAI(openaiKey);
+  }
+
   return NextResponse.json({
     openai: {
       configured: !!openaiKey,
       keyHint: openaiKey ? `sk-...${openaiKey.slice(-4)}` : null,
+      keyLength: openaiKey?.length ?? 0,
       forceMock,
-      mode: !openaiKey || forceMock ? "mock" : "live",
+      ping: openaiPing,
+      mode: openaiKey && openaiPing.ok && !forceMock ? "live" : "broken",
     },
     supabase: {
       url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
