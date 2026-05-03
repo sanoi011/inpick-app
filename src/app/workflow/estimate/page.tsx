@@ -63,6 +63,44 @@ const ROOM_NAME_MAP: Record<string, string> = {
   dress: "드레스룸",
 };
 
+const ROOM_LABEL_EN: Record<string, string> = {
+  거실: "Living Room",
+  안방: "Master Bedroom",
+  주방: "Kitchen",
+  부엌: "Kitchen",
+  욕실: "Bathroom",
+  욕실1: "Bathroom",
+  욕실2: "Bathroom 2",
+  침실: "Bedroom",
+  침실1: "Bedroom",
+  침실2: "Bedroom 2",
+  현관: "Entrance",
+  발코니: "Balcony",
+  드레스룸: "Dressing Room",
+  다이닝: "Dining",
+  서재: "Study",
+};
+
+const SURFACE_LABEL_EN: Record<string, string> = {
+  바닥: "Floor",
+  벽: "Wall",
+  천장: "Ceiling",
+  fixture: "Fixture",
+  창호: "Window",
+  도어: "Door",
+};
+
+const ROOM_KEY_EN: Record<string, string> = {
+  living: "Living",
+  master: "Master",
+  kitchen: "Kitchen",
+  bath: "Bath",
+  bedroom: "Bedroom",
+  entrance: "Entrance",
+  balcony: "Balcony",
+  dress: "Closet",
+};
+
 const ROOM_ICONS: Record<string, typeof Home> = {
   living: Home,
   master: Bed,
@@ -95,32 +133,27 @@ export default function EstimatePage() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const s1 = sessionStorage.getItem("workflow_step1");
-      const s2 = sessionStorage.getItem("workflow_step2");
-      if (!s1 || !s2) {
-        setError("워크플로 데이터 없음 — 처음부터 다시 시작해주세요.");
-        setLoading(false);
-        return;
-      }
-      const parsedS1: Step1Data = JSON.parse(s1);
-      const parsedS2: Step2Data = JSON.parse(s2);
+      const s1raw = sessionStorage.getItem("workflow_step1");
+      const s2raw = sessionStorage.getItem("workflow_step2");
+      const parsedS1: Step1Data | null = s1raw ? JSON.parse(s1raw) : null;
+      const parsedS2: Step2Data | null = s2raw ? JSON.parse(s2raw) : null;
       setStep1(parsedS1);
       setStep2(parsedS2);
+      // sessionStorage 없어도 기본 데이터로 견적 생성 (테스트 가능)
       void runEstimate(parsedS1, parsedS2);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "데이터 파싱 실패");
-      setLoading(false);
+      // 파싱 실패해도 기본 견적 생성
+      void runEstimate(null, null);
+      console.error(e);
     }
   }, []);
 
-  async function runEstimate(s1: Step1Data, s2: Step2Data) {
+  async function runEstimate(s1: Step1Data | null, s2: Step2Data | null) {
     setLoading(true);
     setError(null);
     try {
-      const normalizedRooms = s1.normalizedFloorplan?.rooms || [];
-
-      // 평형 표준치수 (정형화 실패 시 자동 fallback)
-      const area = s1.basicInfo.selectedPyeong?.exclusiveArea;
+      const normalizedRooms = s1?.normalizedFloorplan?.rooms || [];
+      const area = s1?.basicInfo.selectedPyeong?.exclusiveArea;
       const pyeong = area ? classifyPyeong(area) : "30평";
       const standardDims = estimateRoomDimsFromPyeong(pyeong);
 
@@ -130,20 +163,18 @@ export default function EstimatePage() {
         renderImageUrl?: string;
       }> = [];
 
-      // step1.rooms 비어있으면 step2의 rendersByRoom 키 사용 (테스트 모드 호환)
       let selectedRoomKeys: string[] = [];
-      if (s1.rooms?.includes("all")) {
+      if (s1?.rooms?.includes("all")) {
         selectedRoomKeys = Object.keys(ROOM_NAME_MAP);
-      } else if (s1.rooms?.length) {
+      } else if (s1?.rooms?.length) {
         selectedRoomKeys = s1.rooms.filter((r) => r in ROOM_NAME_MAP);
       }
-      // 보조: step2 rendersByRoom에 데이터가 있는 방들 합치기
-      for (const k of Object.keys(s2.rendersByRoom || {})) {
+      for (const k of Object.keys(s2?.rendersByRoom || {})) {
         if (!selectedRoomKeys.includes(k) && k in ROOM_NAME_MAP) {
           selectedRoomKeys.push(k);
         }
       }
-      // 그래도 비어있으면 buildingType=apartment 기본 (거실/안방/주방/욕실)
+      // Fallback: default 4 rooms (apartment standard)
       if (selectedRoomKeys.length === 0) {
         selectedRoomKeys = ["living", "master", "kitchen", "bath"];
       }
@@ -151,13 +182,13 @@ export default function EstimatePage() {
       for (const key of selectedRoomKeys) {
         const koreanName = ROOM_NAME_MAP[key];
         if (!koreanName) continue;
-        // 1) 정형화 결과 찾기
-        let dim = normalizedRooms.find((r) =>
-          r.name === koreanName || r.name.includes(koreanName.replace(/\d+$/, "")),
+        let dim = normalizedRooms.find(
+          (r) =>
+            r.name === koreanName || r.name.includes(koreanName.replace(/\d+$/, "")),
         );
-        // 2) fallback: 평형 표준치수
         if (!dim) {
-          const std = standardDims[koreanName] || standardDims[koreanName.replace(/\d+$/, "")];
+          const std =
+            standardDims[koreanName] || standardDims[koreanName.replace(/\d+$/, "")];
           if (std) {
             dim = {
               name: koreanName,
@@ -168,7 +199,6 @@ export default function EstimatePage() {
             };
           }
         }
-        // 3) 마지막 fallback: 일반 표준 (3000×2800×2400)
         if (!dim) {
           dim = {
             name: koreanName,
@@ -178,9 +208,8 @@ export default function EstimatePage() {
             source: "standard",
           };
         }
-
-        const renders = s2.rendersByRoom?.[key] || [];
-        const idx = s2.selectedByRoom?.[key];
+        const renders = s2?.rendersByRoom?.[key] || [];
+        const idx = s2?.selectedByRoom?.[key];
         const selectedRender = idx != null ? renders[idx] : renders[renders.length - 1];
         requestRooms.push({
           roomName: koreanName,
@@ -189,20 +218,17 @@ export default function EstimatePage() {
         });
       }
 
-      if (requestRooms.length === 0) {
-        setError("처리할 방 데이터를 찾지 못했습니다. 처음부터 다시 시도해주세요.");
-        setLoading(false);
-        return;
-      }
-
       const res = await fetch("/api/inpick/build-estimate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ rooms: requestRooms }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "견적 산출 실패");
+      if (!res.ok) throw new Error(data.error || "Estimate failed");
       setEstimates(data.estimates || []);
+      if ((data.estimates || []).length === 0) {
+        setError("No estimate generated. Please try again.");
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -210,7 +236,6 @@ export default function EstimatePage() {
     }
   }
 
-  // 필터·정렬 적용된 표 데이터
   const filteredRooms = useMemo(() => {
     return estimates
       .filter((r) => !filterRoom || r.roomName === filterRoom)
@@ -249,20 +274,21 @@ export default function EstimatePage() {
   const budgetWon = budgetMan * 10000;
   const budgetDelta = finalTotal - budgetWon;
 
-  const availableRoomKeys = step1?.rooms.includes("all")
-    ? Object.keys(ROOM_NAME_MAP)
-    : step1?.rooms.filter((r) => r in ROOM_NAME_MAP) || [];
+  const availableRoomKeys =
+    step1?.rooms?.includes("all")
+      ? Object.keys(ROOM_NAME_MAP)
+      : step1?.rooms?.filter((r) => r in ROOM_NAME_MAP) || [];
 
   return (
     <LenisProvider>
       <main className="relative min-h-screen bg-[#FDF7F4] text-primary-900">
         <div className="flex min-h-screen">
-          {/* ── 좌측 작은 아이콘 사이드바 (Wave 스타일) ── */}
+          {/* Left icon sidebar */}
           <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-1 border-r border-primary-100 bg-white py-6">
             <button
               onClick={() => router.push("/workflow")}
               className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white shadow-cta hover:bg-primary-600"
-              aria-label="홈"
+              aria-label="Home"
             >
               <span className="font-extrabold text-sm">iP</span>
             </button>
@@ -273,7 +299,7 @@ export default function EstimatePage() {
                   ? "bg-primary-500 text-white"
                   : "text-primary-900/50 hover:bg-primary-50"
               }`}
-              title="모든 방"
+              title="All rooms"
             >
               <Layers className="h-4 w-4" />
             </button>
@@ -285,9 +311,11 @@ export default function EstimatePage() {
                 <button
                   key={key}
                   onClick={() => setFilterRoom(sel ? null : koreanName)}
-                  title={koreanName}
+                  title={ROOM_LABEL_EN[koreanName] || koreanName}
                   className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                    sel ? "bg-primary-500 text-white" : "text-primary-900/50 hover:bg-primary-50"
+                    sel
+                      ? "bg-primary-500 text-white"
+                      : "text-primary-900/50 hover:bg-primary-50"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -297,16 +325,14 @@ export default function EstimatePage() {
             <div className="flex-1" />
             <button
               onClick={() => router.push("/account/tokens")}
-              title="토큰"
+              title="Tokens"
               className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-primary-900/50 hover:bg-primary-50"
             >
               <Wallet className="h-4 w-4" />
             </button>
           </aside>
 
-          {/* ── 메인 ── */}
           <div className="flex-1 min-w-0">
-            {/* 상단 액션 바 */}
             <div className="flex items-center justify-between gap-3 px-6 lg:px-10 pt-8 pb-4">
               <button
                 onClick={() => router.push("/workflow/branch")}
@@ -316,31 +342,30 @@ export default function EstimatePage() {
               </button>
               <div className="flex items-center gap-2 ml-auto">
                 <button
-                  onClick={() => step1 && step2 && runEstimate(step1, step2)}
+                  onClick={() => runEstimate(step1, step2)}
                   disabled={loading}
                   className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-primary-900 hover:bg-primary-50 disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
-                  재산출
+                  Refresh
                 </button>
                 <button
                   onClick={() => router.push("/workflow/bidding")}
                   disabled={loading || estimates.length === 0}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold tracking-tight text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
                 >
-                  업체 매칭으로 <ArrowRight className="h-3.5 w-3.5" />
+                  Bidding <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
 
-            {/* ── Wave 스타일 헤더 ── */}
             <div className="px-6 lg:px-10">
               <h1 className="text-[2.4rem] lg:text-[3rem] font-extrabold tracking-tightest text-primary-900 leading-none">
-                견적
+                Estimate
               </h1>
               <div className="mt-4 inline-flex items-center gap-3 rounded-xl border border-primary-100 bg-white px-4 py-2.5">
                 <span className="text-sm font-semibold text-primary-900/70">
-                  {step1?.basicInfo.selectedAddress?.buildingName || "선택한 공간"}
+                  {step1?.basicInfo.selectedAddress?.buildingName || "Selected space"}
                 </span>
                 <span className="text-[2rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
                   ₩ {finalTotal.toLocaleString()}
@@ -351,27 +376,24 @@ export default function EstimatePage() {
                 <div className="mt-3 flex flex-wrap gap-2 text-[0.78rem] text-primary-900/60">
                   {step1.basicInfo.selectedPyeong && (
                     <span className="rounded-full bg-white px-3 py-1 border border-primary-100">
-                      {step1.basicInfo.selectedPyeong.pyeongName} · 전용 {step1.basicInfo.selectedPyeong.exclusiveArea}㎡
+                      {step1.basicInfo.selectedPyeong.pyeongName} · {step1.basicInfo.selectedPyeong.exclusiveArea}㎡
                     </span>
                   )}
                   {step1.basicInfo.expansionType && (
                     <span className="rounded-full bg-white px-3 py-1 border border-primary-100">
-                      {step1.basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
+                      {step1.basicInfo.expansionType === "extended" ? "Extended" : "Standard"}
                     </span>
                   )}
                   <span className="rounded-full bg-primary-50 px-3 py-1 border border-primary-200 font-bold tabular text-primary-700">
-                    목표 {budgetMan.toLocaleString()}만원
+                    Budget ₩ {budgetWon.toLocaleString()}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* ── 메인 그리드 ── */}
             <div className="grid gap-5 px-6 lg:px-10 py-8 lg:grid-cols-12">
               <div className="lg:col-span-8">
-                {/* ── 필터 바 (Wave 스타일 라운드 버튼) ── */}
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
-                  {/* 카테고리 필터 */}
                   <div className="relative">
                     <button
                       onClick={() => {
@@ -384,7 +406,7 @@ export default function EstimatePage() {
                       Filter
                       {filterCat !== "all" && (
                         <span className="ml-1 rounded-full bg-primary-500 px-1.5 py-0.5 text-[0.65rem] text-white">
-                          {filterCat === "main" ? "주자재" : filterCat === "aux" ? "부자재" : "인건비"}
+                          {filterCat === "main" ? "Material" : filterCat === "aux" ? "Sub" : "Labor"}
                         </span>
                       )}
                     </button>
@@ -398,10 +420,12 @@ export default function EstimatePage() {
                               setFilterOpen(false);
                             }}
                             className={`flex w-full items-center justify-between px-4 py-2 text-[0.85rem] hover:bg-primary-50 ${
-                              filterCat === c ? "text-primary-700 font-bold" : "text-primary-900/70"
+                              filterCat === c
+                                ? "text-primary-700 font-bold"
+                                : "text-primary-900/70"
                             }`}
                           >
-                            {c === "all" ? "전체" : c === "main" ? "주자재" : c === "aux" ? "부자재" : "인건비"}
+                            {c === "all" ? "All" : c === "main" ? "Material" : c === "aux" ? "Sub-material (10%)" : "Labor (MOLIT)"}
                             {filterCat === c && <span className="text-primary-500">✓</span>}
                           </button>
                         ))}
@@ -409,7 +433,6 @@ export default function EstimatePage() {
                     )}
                   </div>
 
-                  {/* 정렬 */}
                   <div className="relative">
                     <button
                       onClick={() => {
@@ -422,7 +445,11 @@ export default function EstimatePage() {
                       Sort
                       {sortBy !== "default" && (
                         <span className="ml-1 text-[0.65rem] text-primary-700">
-                          {sortBy === "price-desc" ? "가격↓" : sortBy === "price-asc" ? "가격↑" : "이름"}
+                          {sortBy === "price-desc"
+                            ? "Price ↓"
+                            : sortBy === "price-asc"
+                              ? "Price ↑"
+                              : "Name"}
                         </span>
                       )}
                     </button>
@@ -430,10 +457,10 @@ export default function EstimatePage() {
                       <div className="absolute z-10 mt-1.5 w-44 rounded-xl border border-primary-100 bg-white shadow-card-hover py-1">
                         {(
                           [
-                            ["default", "기본"],
-                            ["price-desc", "가격 높은순"],
-                            ["price-asc", "가격 낮은순"],
-                            ["name", "이름순"],
+                            ["default", "Default"],
+                            ["price-desc", "Price High → Low"],
+                            ["price-asc", "Price Low → High"],
+                            ["name", "Name A → Z"],
                           ] as Array<[SortBy, string]>
                         ).map(([v, label]) => (
                           <button
@@ -454,7 +481,6 @@ export default function EstimatePage() {
                     )}
                   </div>
 
-                  {/* VAT 토글 */}
                   <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-3 py-1.5">
                     <span className="text-[0.78rem] font-semibold text-primary-900">VAT</span>
                     <button
@@ -472,25 +498,24 @@ export default function EstimatePage() {
                   </div>
 
                   <span className="ml-auto text-[0.78rem] text-primary-900/40 tabular">
-                    {filteredRooms.reduce((s, r) => s + r.items.length, 0)} 건
+                    {filteredRooms.reduce((s, r) => s + r.items.length, 0)} items
                   </span>
                 </div>
 
-                {/* ── 견적 표 (Wave 스타일) ── */}
                 <div className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden">
                   {loading && (
                     <div className="px-7 py-16 text-center">
                       <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
                       <p className="mt-3 text-sm font-semibold text-primary-900">
-                        AI 가 시안에서 자재를 추출하는 중…
+                        Extracting materials from designs...
                       </p>
                       <p className="mt-1 text-xs text-primary-900/50">
-                        각 실당 약 5–10초 · GPT-4o Vision 분석
+                        ~5–10s per room · GPT-4o Vision
                       </p>
                     </div>
                   )}
 
-                  {error && !loading && (
+                  {error && !loading && estimates.length === 0 && (
                     <div className="px-7 py-12 text-center">
                       <AlertCircle className="h-8 w-8 text-amber-500 mx-auto" />
                       <p className="mt-3 text-sm font-semibold text-amber-800">{error}</p>
@@ -498,22 +523,22 @@ export default function EstimatePage() {
                         onClick={() => router.push("/workflow")}
                         className="mt-4 inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-xs font-semibold text-white"
                       >
-                        처음으로
+                        Restart
                       </button>
                     </div>
                   )}
 
-                  {!loading && !error && filteredRooms.length > 0 && (
+                  {!loading && filteredRooms.length > 0 && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-[0.85rem]">
                         <thead>
                           <tr className="border-b border-primary-100 text-left text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
-                            <th className="px-5 py-3 w-16">방</th>
-                            <th className="px-3 py-3">자재</th>
-                            <th className="px-3 py-3">규격</th>
-                            <th className="px-3 py-3 text-right">수량</th>
-                            <th className="px-3 py-3 text-right">단가</th>
-                            <th className="px-3 py-3 text-right pr-5">합계</th>
+                            <th className="px-5 py-3 w-16">Room</th>
+                            <th className="px-3 py-3">Material</th>
+                            <th className="px-3 py-3">Spec</th>
+                            <th className="px-3 py-3 text-right">Qty</th>
+                            <th className="px-3 py-3 text-right">Unit Price</th>
+                            <th className="px-3 py-3 text-right pr-5">Subtotal</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -526,50 +551,49 @@ export default function EstimatePage() {
                   )}
                 </div>
 
-                {/* 합계 카드 */}
-                {!loading && !error && estimates.length > 0 && (
+                {!loading && estimates.length > 0 && (
                   <div className="mt-5 rounded-2xl border border-primary-100 bg-white p-6 shadow-card">
                     <div className="grid grid-cols-3 gap-4 mb-4">
-                      <SumCard label="주자재" value={grandTotal.main} />
-                      <SumCard label="부자재 (10%)" value={grandTotal.aux} />
-                      <SumCard label="인건비 (MOLIT)" value={grandTotal.labor} />
+                      <SumCard label="Materials" value={grandTotal.main} />
+                      <SumCard label="Sub (10%)" value={grandTotal.aux} />
+                      <SumCard label="Labor (MOLIT)" value={grandTotal.labor} />
                     </div>
                     <div className="flex items-center justify-between border-t border-primary-100 pt-4">
                       <span className="text-[0.85rem] text-primary-900/60">
-                        VAT 10% {vatIncl ? "(포함)" : "(별도)"}
+                        VAT 10% {vatIncl ? "(included)" : "(excluded)"}
                       </span>
                       <span className="tabular text-primary-900 font-semibold">
                         ₩ {vat.toLocaleString()}
                       </span>
                     </div>
                     <div className="mt-2 flex items-center justify-between">
-                      <span className="text-base font-bold text-primary-900">총액</span>
+                      <span className="text-base font-bold text-primary-900">Total</span>
                       <span className="text-[2rem] font-extrabold tabular leading-none tracking-tightest text-gradient-primary">
                         ₩ {finalTotal.toLocaleString()}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[0.75rem] text-primary-900/50">
-                      <span>InPick 수수료 5%</span>
+                      <span>InPick fee 5%</span>
                       <span className="tabular">₩ {inpickFee.toLocaleString()}</span>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* 우측 사이드 */}
               <aside className="lg:col-span-4">
                 <div className="space-y-4 lg:sticky lg:top-6">
-                  {/* 예산 비교 */}
-                  {!loading && !error && estimates.length > 0 && (
+                  {!loading && estimates.length > 0 && (
                     <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                       <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
-                        예산 vs 견적
+                        Budget vs Estimate
                       </p>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                         <div className="rounded-xl bg-primary-50 p-3">
-                          <p className="text-[0.65rem] text-primary-900/60 font-semibold">목표</p>
+                          <p className="text-[0.65rem] text-primary-900/60 font-semibold">
+                            Target
+                          </p>
                           <p className="mt-1 text-base font-extrabold tabular text-primary-900">
-                            {budgetMan.toLocaleString()}만
+                            ₩{budgetWon.toLocaleString()}
                           </p>
                         </div>
                         <div
@@ -582,7 +606,7 @@ export default function EstimatePage() {
                               budgetDelta > 0 ? "text-amber-700/70" : "text-emerald-700/70"
                             }`}
                           >
-                            {budgetDelta > 0 ? "초과" : "여유"}
+                            {budgetDelta > 0 ? "Over" : "Under"}
                           </p>
                           <p
                             className={`mt-1 text-base font-extrabold tabular ${
@@ -590,7 +614,7 @@ export default function EstimatePage() {
                             }`}
                           >
                             {budgetDelta > 0 ? "+" : ""}
-                            {Math.round(budgetDelta / 10000).toLocaleString()}만
+                            ₩{Math.abs(budgetDelta).toLocaleString()}
                           </p>
                         </div>
                       </div>
@@ -609,11 +633,10 @@ export default function EstimatePage() {
                     </div>
                   )}
 
-                  {/* 시안 thumbnails */}
                   {step2 && Object.keys(step2.rendersByRoom || {}).length > 0 && (
                     <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                       <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
-                        적용된 시안
+                        Applied Designs
                       </p>
                       <div className="grid grid-cols-3 gap-1.5">
                         {Object.entries(step2.rendersByRoom).map(([roomKey, items]) => {
@@ -631,7 +654,7 @@ export default function EstimatePage() {
                                 className="h-full w-full object-cover"
                               />
                               <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[0.6rem] font-bold p-1 text-center">
-                                {ROOM_NAME_MAP[roomKey] || roomKey}
+                                {ROOM_KEY_EN[roomKey] || roomKey}
                               </span>
                             </div>
                           );
@@ -640,43 +663,41 @@ export default function EstimatePage() {
                     </div>
                   )}
 
-                  {/* 다운로드 잠금 */}
                   <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                     <div className="flex items-center gap-2">
                       <Lock className="h-3.5 w-3.5 text-amber-600" />
                       <p className="text-[0.85rem] font-bold tracking-tight text-primary-900">
-                        출력 제한
+                        Export Locked
                       </p>
                     </div>
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-primary-900/60">
-                      PDF·엑셀 다운로드는 계약 진행 단계에서 활성화됩니다.
+                      PDF / Excel download is unlocked at the contract stage.
                     </p>
                     <div className="mt-3 space-y-1.5">
-                      <LockedButton icon={Download} label="견적서 PDF" />
-                      <LockedButton icon={FileSpreadsheet} label="상세 내역 엑셀" />
+                      <LockedButton icon={Download} label="Estimate PDF" />
+                      <LockedButton icon={FileSpreadsheet} label="Detail Excel" />
                     </div>
                   </div>
 
-                  {/* 산정 근거 */}
                   <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                     <div className="flex items-center gap-2 mb-2">
                       <Sparkles className="h-3.5 w-3.5 text-primary-500" />
                       <p className="text-[0.85rem] font-bold tracking-tight text-primary-900">
-                        산정 근거
+                        Methodology
                       </p>
                     </div>
                     <ul className="space-y-1 text-[0.75rem] text-primary-900/70 leading-relaxed">
                       <li>
-                        · <b>주자재</b>: GPT-4o Vision 추출 + 한국 카탈로그 시세
+                        · <b>Materials</b>: GPT-4o Vision extraction + Korean catalog price
                       </li>
                       <li>
-                        · <b>부자재</b>: 주자재의 10% 일괄
+                        · <b>Sub-materials</b>: 10% of main material (bulk)
                       </li>
                       <li>
-                        · <b>인건비</b>: 국토부 표준품셈
+                        · <b>Labor</b>: MOLIT 표준품셈 (Korea standard)
                       </li>
                       <li>
-                        · <b>치수</b>: 평면도 Vision + 평형 표준
+                        · <b>Dimensions</b>: Vision floorplan + standard pyeong fallback
                       </li>
                     </ul>
                   </div>
@@ -691,6 +712,7 @@ export default function EstimatePage() {
 }
 
 function RoomRows({ room }: { room: EstimateRoom }) {
+  const roomEn = ROOM_LABEL_EN[room.roomName] || room.roomName;
   return (
     <>
       {room.items.map((item, i) => (
@@ -706,7 +728,7 @@ function RoomRows({ room }: { room: EstimateRoom }) {
               className="px-5 py-3 align-top border-r border-primary-50"
             >
               <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-500">
-                {room.roomName}
+                {roomEn}
               </p>
               <p className="text-[0.65rem] text-primary-900/40 tabular mt-0.5">
                 {room.totalAreaM2}㎡
@@ -726,15 +748,20 @@ function RoomRows({ room }: { room: EstimateRoom }) {
               {item.materialName}
             </p>
             <p className="text-[0.65rem] text-primary-900/40 mt-0.5">
-              {item.surface} ·{" "}
-              {item.category === "main" ? "주자재" : item.category === "aux" ? "부자재" : "인건비"}
+              {SURFACE_LABEL_EN[item.surface] || item.surface} ·{" "}
+              {item.category === "main"
+                ? "Main"
+                : item.category === "aux"
+                  ? "Sub (10%)"
+                  : "Labor"}
             </p>
           </td>
           <td className="px-3 py-3 align-middle text-[0.78rem] text-primary-900/60">
             {item.spec}
           </td>
           <td className="px-3 py-3 align-middle text-right text-[0.82rem] tabular text-primary-900">
-            {item.quantity} <span className="text-[0.7rem] text-primary-900/40">{item.unit}</span>
+            {item.quantity}{" "}
+            <span className="text-[0.7rem] text-primary-900/40">{item.unit}</span>
           </td>
           <td className="px-3 py-3 align-middle text-right tabular text-primary-900/80">
             ₩ {item.unitPriceWon.toLocaleString()}

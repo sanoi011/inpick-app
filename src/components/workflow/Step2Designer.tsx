@@ -93,7 +93,15 @@ export default function Step2Designer({
   const [generating, setGenerating] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const [apiMode, setApiMode] = useState<"loading" | "live" | "mock">("loading");
   const historyEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    fetch("/api/inpick/health")
+      .then((r) => r.json())
+      .then((d) => setApiMode(d.openai?.mode === "live" ? "live" : "mock"))
+      .catch(() => setApiMode("mock"));
+  }, []);
 
   const roomDims: Record<string, RoomDim> = useMemo(() => {
     if (normalizedFloorplan?.rooms?.length) {
@@ -211,6 +219,26 @@ export default function Step2Designer({
     <div className="grid gap-4 lg:grid-cols-[200px_1fr] font-mono">
       {/* 좌측: 게이밍 HUD 스타일 방 선택 패널 */}
       <aside className="relative">
+        {/* API 모드 배지 */}
+        <div
+          className={`mb-2 rounded-lg border px-2.5 py-1.5 text-[0.6rem] font-bold uppercase tracking-[0.18em] flex items-center justify-between ${
+            apiMode === "live"
+              ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-400"
+              : apiMode === "mock"
+                ? "border-amber-500/40 bg-amber-500/10 text-amber-400"
+                : "border-zinc-700 bg-zinc-900 text-zinc-500"
+          }`}
+        >
+          <span>
+            {apiMode === "live" ? "● LIVE GPT" : apiMode === "mock" ? "● MOCK MODE" : "● ..."}
+          </span>
+          {apiMode === "mock" && (
+            <span className="text-[0.55rem] tracking-normal text-amber-300/80">
+              no API key
+            </span>
+          )}
+        </div>
+
         {/* HUD 패널 — 다크 + 네온 오렌지 보더 */}
         <div className="rounded-2xl bg-zinc-900/95 border border-primary-500/40 p-3 shadow-[0_0_20px_rgba(247,59,32,0.15)]">
           <div className="flex items-center justify-between mb-3 px-1">
@@ -317,17 +345,16 @@ export default function Step2Designer({
             {allRoomsDecided && <ChevronRight className="h-3 w-3" />}
           </button>
 
-          {/* 테스트 모드: 시안 없어도 mock 채워서 다음 단계 진행 */}
+          {/* 테스트 모드: 시안 없어도 mock 채워서 결과 확인 (자동 진행 X) */}
           {!allRoomsDecided && (
             <button
               onClick={() => {
-                // 시안 없는 모든 방에 mock RenderItem 채우기
                 const next = { ...value };
                 for (const t of availableTabs) {
                   if ((value.rendersByRoom[t.v] || []).length === 0) {
                     const mockItem: RenderItem = {
                       url: `https://picsum.photos/seed/${t.v}-${Date.now()}/1024/1024`,
-                      prompt: "[TEST MODE] mock render",
+                      prompt: "[TEST MODE] mock render — OPENAI_API_KEY 미설정 시 자동 사용",
                       costUsd: 0,
                       timestamp: new Date().toISOString(),
                     };
@@ -346,11 +373,11 @@ export default function Step2Designer({
                   }
                 }
                 onChange(next);
-                setTimeout(() => onComplete(), 100);
+                // 자동 진행 X — 사용자가 이미지 확인 후 NEXT STAGE 직접 클릭
               }}
               className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[0.65rem] font-bold uppercase tracking-wider text-amber-300 hover:bg-amber-500/20"
             >
-              ▸ TEST MODE (skip render)
+              ▸ FILL MOCK IMAGES (preview)
             </button>
           )}
         </div>
