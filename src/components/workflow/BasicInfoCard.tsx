@@ -249,10 +249,51 @@ function TabBtn({
 }
 
 // ─── Mode 1: 주소 검색 ───
+const RECENT_KEY = "inpick_recent_addresses";
+const RECENT_MAX = 8;
+
+function loadRecent(): AddressSearchResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(RECENT_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.slice(0, RECENT_MAX) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveRecent(addr: AddressSearchResult) {
+  if (typeof window === "undefined") return;
+  try {
+    const curr = loadRecent();
+    // 중복 제거 (roadAddress 기준)
+    const filtered = curr.filter((a) => a.roadAddress !== addr.roadAddress);
+    const next = [addr, ...filtered].slice(0, RECENT_MAX);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* localStorage quota / private mode */
+  }
+}
+
+function removeRecent(roadAddress: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const curr = loadRecent();
+    const next = curr.filter((a) => a.roadAddress !== roadAddress);
+    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
+  } catch {
+    /* ignore */
+  }
+}
+
 function AddressMode({ value, onChange }: Props) {
   const [keyword, setKeyword] = useState("");
   const [results, setResults] = useState<AddressSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
+  const [recent, setRecent] = useState<AddressSearchResult[]>([]);
+  const [focused, setFocused] = useState(false);
   const [pyeongList, setPyeongList] = useState<
     Array<{
       pyeongNo: number;
@@ -263,6 +304,11 @@ function AddressMode({ value, onChange }: Props) {
     }>
   >([]);
   const [loadingBuilding, setLoadingBuilding] = useState(false);
+
+  // 마운트 시 최근 검색 로드
+  useEffect(() => {
+    setRecent(loadRecent());
+  }, []);
 
   // 자동완성 (300ms 디바운스)
   useEffect(() => {
@@ -287,9 +333,12 @@ function AddressMode({ value, onChange }: Props) {
 
   const handleSelectAddress = useCallback(
     async (addr: AddressSearchResult) => {
+      saveRecent(addr);
+      setRecent(loadRecent());
       onChange({ ...value, mode: "address", selectedAddress: addr });
       setKeyword(addr.roadAddress);
       setResults([]);
+      setFocused(false);
       setLoadingBuilding(true);
       try {
         const params = new URLSearchParams({
@@ -310,6 +359,12 @@ function AddressMode({ value, onChange }: Props) {
     },
     [onChange, value]
   );
+
+  const handleRemoveRecent = (roadAddress: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    removeRecent(roadAddress);
+    setRecent(loadRecent());
+  };
 
   const handleSelectPyeong = async (p: {
     pyeongNo: number;
@@ -370,6 +425,8 @@ function AddressMode({ value, onChange }: Props) {
           type="text"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="아파트 단지명 또는 도로명 주소 (예: 대전, 잠실)"
           className="w-full rounded-xl border border-primary-100 bg-white pl-10 pr-4 py-3 text-sm font-medium tracking-tight text-primary-900 outline-none placeholder:text-primary-900/30 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
         />
@@ -378,6 +435,7 @@ function AddressMode({ value, onChange }: Props) {
         )}
       </div>
 
+      {/* 검색 결과 우선 */}
       {results.length > 0 && (
         <div className="mt-2 max-h-56 overflow-y-auto rounded-xl border border-primary-100 bg-white">
           {results.map((r, i) => (
@@ -392,6 +450,57 @@ function AddressMode({ value, onChange }: Props) {
               <div className="text-xs text-primary-900/60">{r.roadAddress}</div>
             </button>
           ))}
+        </div>
+      )}
+
+      {/* 최근 검색 (focus + 검색결과 없음 + keyword 비어있음) */}
+      {focused && results.length === 0 && keyword.trim().length < 2 && recent.length > 0 && (
+        <div className="mt-2 rounded-xl border border-primary-100 bg-white overflow-hidden">
+          <div className="px-4 py-2 flex items-center justify-between border-b border-primary-50 bg-primary-50/30">
+            <span className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/50">
+              최근 검색
+            </span>
+            <button
+              onMouseDown={(e) => {
+                e.preventDefault();
+                if (typeof window !== "undefined") {
+                  localStorage.removeItem(RECENT_KEY);
+                  setRecent([]);
+                }
+              }}
+              className="text-[0.65rem] text-primary-900/40 hover:text-primary-700"
+            >
+              모두 지우기
+            </button>
+          </div>
+          <div className="max-h-56 overflow-y-auto">
+            {recent.map((r, i) => (
+              <div
+                key={i}
+                className="group relative flex items-center border-b border-primary-50 last:border-0 hover:bg-primary-50/50"
+              >
+                <button
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    void handleSelectAddress(r);
+                  }}
+                  className="flex-1 text-left px-4 py-2 transition-colors"
+                >
+                  <div className="text-sm font-medium text-primary-900">
+                    {r.buildingName || r.roadAddress}
+                  </div>
+                  <div className="text-xs text-primary-900/60">{r.roadAddress}</div>
+                </button>
+                <button
+                  onMouseDown={(e) => handleRemoveRecent(r.roadAddress, e)}
+                  className="opacity-0 group-hover:opacity-100 text-primary-900/40 hover:text-primary-700 px-3 text-sm"
+                  aria-label="삭제"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
