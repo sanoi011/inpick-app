@@ -316,6 +316,43 @@ export default function Step2Designer({
             {allRoomsDecided ? "▸ NEXT STAGE" : "LOCKED"}
             {allRoomsDecided && <ChevronRight className="h-3 w-3" />}
           </button>
+
+          {/* 테스트 모드: 시안 없어도 mock 채워서 다음 단계 진행 */}
+          {!allRoomsDecided && (
+            <button
+              onClick={() => {
+                // 시안 없는 모든 방에 mock RenderItem 채우기
+                const next = { ...value };
+                for (const t of availableTabs) {
+                  if ((value.rendersByRoom[t.v] || []).length === 0) {
+                    const mockItem: RenderItem = {
+                      url: `https://picsum.photos/seed/${t.v}-${Date.now()}/1024/1024`,
+                      prompt: "[TEST MODE] mock render",
+                      costUsd: 0,
+                      timestamp: new Date().toISOString(),
+                    };
+                    next.rendersByRoom = {
+                      ...next.rendersByRoom,
+                      [t.v]: [mockItem],
+                    };
+                    next.selectedByRoom = {
+                      ...next.selectedByRoom,
+                      [t.v]: 0,
+                    };
+                    next.generations = {
+                      ...next.generations,
+                      [t.v]: 1,
+                    };
+                  }
+                }
+                onChange(next);
+                setTimeout(() => onComplete(), 100);
+              }}
+              className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[0.65rem] font-bold uppercase tracking-wider text-amber-300 hover:bg-amber-500/20"
+            >
+              ▸ TEST MODE (skip render)
+            </button>
+          )}
         </div>
 
         {/* 토큰 잔액 HUD */}

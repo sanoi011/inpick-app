@@ -63,7 +63,9 @@ export interface BasicInfoData {
   normalizedPyeong?: string;
 }
 
-const QUICK_BUDGETS = [1500, 3000, 5000];
+const QUICK_BUDGETS = [1500, 3000, 5000, 10000, 20000];
+const BUDGET_MIN = 500;
+const BUDGET_MAX = 50000;
 
 interface Props {
   value: BasicInfoData;
@@ -155,22 +157,44 @@ export default function BasicInfoCard({ value, onChange }: Props) {
           })}
         </div>
 
-        <p className="text-[2rem] font-extrabold tabular leading-none tracking-tightest">
-          <span className="text-gradient-primary">{value.budget.toLocaleString()}</span>
-          <span className="ml-1 text-sm font-bold text-primary-600">만원</span>
-        </p>
+        <div className="flex items-end gap-3">
+          <p className="text-[2rem] font-extrabold tabular leading-none tracking-tightest">
+            <span className="text-gradient-primary">{value.budget.toLocaleString()}</span>
+            <span className="ml-1 text-sm font-bold text-primary-600">만원</span>
+          </p>
+          {/* 직접 입력 */}
+          <div className="flex-1 flex items-center gap-1.5 rounded-lg border border-primary-200 bg-white px-2 py-1.5">
+            <input
+              type="number"
+              min={BUDGET_MIN}
+              max={BUDGET_MAX}
+              step={100}
+              value={value.budget}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                if (!Number.isFinite(v)) return;
+                onChange({
+                  ...value,
+                  budget: Math.max(BUDGET_MIN, Math.min(BUDGET_MAX, Math.round(v))),
+                });
+              }}
+              className="flex-1 w-full bg-transparent text-right text-sm font-bold tabular text-primary-900 outline-none"
+            />
+            <span className="text-[0.7rem] font-semibold text-primary-900/50">만원</span>
+          </div>
+        </div>
         <input
           type="range"
-          min={500}
-          max={10000}
+          min={BUDGET_MIN}
+          max={BUDGET_MAX}
           step={100}
           value={value.budget}
           onChange={(e) => onChange({ ...value, budget: Number(e.target.value) })}
           className="mt-3 w-full accent-primary-500"
         />
         <div className="mt-1 flex items-center justify-between text-[0.7rem] tabular text-primary-900/40">
-          <span>500</span>
-          <span>10,000</span>
+          <span>{BUDGET_MIN.toLocaleString()}</span>
+          <span>{BUDGET_MAX.toLocaleString()}</span>
         </div>
         <div className="mt-3 flex flex-wrap gap-1.5">
           {QUICK_BUDGETS.map((b) => (
