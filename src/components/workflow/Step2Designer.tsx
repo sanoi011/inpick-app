@@ -382,8 +382,8 @@ export default function Step2Designer({
 
             {/* 스크린 — 실제 콘텐츠 */}
             <div className="relative rounded-xl overflow-hidden bg-zinc-950 ring-1 ring-zinc-800">
-              {/* 메인 이미지 — 16:9 비율로 모니터 가득 */}
-              <div className="relative w-full aspect-[16/9] min-h-[60vh]">
+              {/* 메인 이미지 — 16:10 비율로 모니터 더 가득 */}
+              <div className="relative w-full aspect-[16/10] min-h-[72vh]">
             {!hasGenerated && !generating && (
               <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950">
                 {/* 그리드 패턴 배경 */}

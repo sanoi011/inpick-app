@@ -173,7 +173,11 @@ export default function WorkflowPage() {
         </AnimatePresence>
 
         {/* 헤더 */}
-        <header className="relative z-30 mx-auto flex max-w-7xl items-center justify-between px-6 pt-12 lg:px-8 lg:pt-14">
+        <header
+          className={`relative z-30 mx-auto flex items-center justify-between px-4 lg:px-6 ${
+            step === 2 ? "max-w-screen-2xl pt-4 lg:pt-5" : "max-w-7xl px-6 pt-12 lg:px-8 lg:pt-14"
+          }`}
+        >
           <div className="flex items-center gap-3">
             {step === 2 ? (
               <button
@@ -196,15 +200,21 @@ export default function WorkflowPage() {
         </header>
 
         {/* 본문 */}
-        <section className="relative z-20 mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
+        <section
+          className={`relative z-20 mx-auto ${
+            step === 2
+              ? "max-w-screen-2xl px-4 lg:px-6 py-3 lg:py-4"
+              : "max-w-7xl px-6 lg:px-8 py-12 lg:py-16"
+          }`}
+        >
           <AnimatePresence mode="wait">
             {step === 1 && (
               <motion.div
                 key="step1"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.4 }}
+                initial={{ opacity: 0, y: -16 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -60 }}
+                transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
               >
                 <div className="max-w-3xl">
                   <p className="text-[0.78rem] font-semibold uppercase tracking-widest text-primary-600">
@@ -229,44 +239,37 @@ export default function WorkflowPage() {
             {step === 2 && (
               <motion.div
                 key="step2"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.4 }}
+                initial={{ opacity: 0, y: -80 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -60 }}
+                transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
               >
-                <div className="flex items-end justify-between gap-6">
-                  <div className="max-w-2xl">
-                    <p className="text-[0.78rem] font-semibold uppercase tracking-widest text-primary-600">
-                      STEP 02
-                    </p>
-                    <h1 className="mt-3 text-[2.4rem] font-extrabold leading-[1.02] tracking-tightest text-primary-900 sm:text-[3.4rem] lg:text-[4rem]">
-                      실별로
-                      <br />
-                      <span className="text-gradient-primary">디자인 8장.</span>
-                    </h1>
-                    <p className="mt-4 max-w-xl text-[0.95rem] leading-relaxed text-primary-900/70">
-                      스타일 고르고 생성. 마음에 든 컷의 자재가 다음 단계 견적으로 그대로 흘러갑니다.
-                    </p>
-                  </div>
+                {/* Step2 — 한 줄 압축 헤더 (큰 여백 제거) */}
+                <div className="mb-3 flex items-center gap-3 flex-wrap">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-primary-600">
+                    STEP 02
+                  </p>
+                  <span className="text-primary-300">·</span>
+                  <h1 className="text-base font-bold tracking-tight text-primary-900">
+                    실별 AI 디자인 → <span className="text-gradient-primary">자재 견적 자동 흐름</span>
+                  </h1>
+                  {normalizeError && (
+                    <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[0.65rem] text-amber-700">
+                      ⚠ 평면도 정형화 실패 — 표준 치수로 진행
+                    </span>
+                  )}
                 </div>
 
-                <div className="mt-12">
-                  {normalizeError && (
-                    <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-900">
-                      평면도 정형화 실패 — 표준 평형 치수로 진행합니다. ({normalizeError})
-                    </div>
-                  )}
-                  <Step2Designer
-                    rooms={step1.rooms}
-                    basicInfo={step1.basicInfo}
-                    normalizedFloorplan={step1.normalizedFloorplan}
-                    value={step2}
-                    onChange={setStep2}
-                    tokenBalance={balance}
-                    onConsumeToken={(amount, feature) => consume(amount, feature)}
-                    onComplete={goBranch}
-                  />
-                </div>
+                <Step2Designer
+                  rooms={step1.rooms}
+                  basicInfo={step1.basicInfo}
+                  normalizedFloorplan={step1.normalizedFloorplan}
+                  value={step2}
+                  onChange={setStep2}
+                  tokenBalance={balance}
+                  onConsumeToken={(amount, feature) => consume(amount, feature)}
+                  onComplete={goBranch}
+                />
               </motion.div>
             )}
           </AnimatePresence>

@@ -28,6 +28,10 @@ import {
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
 import type { Step2Data } from "@/components/workflow/Step2Designer";
+import {
+  classifyPyeong,
+  estimateRoomDimsFromPyeong,
+} from "@/lib/inpick/korean-apt-dimensions";
 
 interface EstimateRoom {
   roomName: string;
@@ -114,34 +118,79 @@ export default function EstimatePage() {
     setError(null);
     try {
       const normalizedRooms = s1.normalizedFloorplan?.rooms || [];
+
+      // 평형 표준치수 (정형화 실패 시 자동 fallback)
+      const area = s1.basicInfo.selectedPyeong?.exclusiveArea;
+      const pyeong = area ? classifyPyeong(area) : "30평";
+      const standardDims = estimateRoomDimsFromPyeong(pyeong);
+
       const requestRooms: Array<{
         roomName: string;
         dim: { widthMm: number; depthMm: number; heightMm: number };
         renderImageUrl?: string;
       }> = [];
 
-      const selectedRoomKeys = s1.rooms.includes("all")
-        ? Object.keys(ROOM_NAME_MAP)
-        : s1.rooms.filter((r) => r in ROOM_NAME_MAP);
+      // step1.rooms 비어있으면 step2의 rendersByRoom 키 사용 (테스트 모드 호환)
+      let selectedRoomKeys: string[] = [];
+      if (s1.rooms?.includes("all")) {
+        selectedRoomKeys = Object.keys(ROOM_NAME_MAP);
+      } else if (s1.rooms?.length) {
+        selectedRoomKeys = s1.rooms.filter((r) => r in ROOM_NAME_MAP);
+      }
+      // 보조: step2 rendersByRoom에 데이터가 있는 방들 합치기
+      for (const k of Object.keys(s2.rendersByRoom || {})) {
+        if (!selectedRoomKeys.includes(k) && k in ROOM_NAME_MAP) {
+          selectedRoomKeys.push(k);
+        }
+      }
+      // 그래도 비어있으면 buildingType=apartment 기본 (거실/안방/주방/욕실)
+      if (selectedRoomKeys.length === 0) {
+        selectedRoomKeys = ["living", "master", "kitchen", "bath"];
+      }
 
       for (const key of selectedRoomKeys) {
         const koreanName = ROOM_NAME_MAP[key];
-        const dimRoom = normalizedRooms.find((r) =>
+        if (!koreanName) continue;
+        // 1) 정형화 결과 찾기
+        let dim = normalizedRooms.find((r) =>
           r.name === koreanName || r.name.includes(koreanName.replace(/\d+$/, "")),
         );
-        if (!dimRoom) continue;
+        // 2) fallback: 평형 표준치수
+        if (!dim) {
+          const std = standardDims[koreanName] || standardDims[koreanName.replace(/\d+$/, "")];
+          if (std) {
+            dim = {
+              name: koreanName,
+              widthMm: std.widthMm,
+              depthMm: std.depthMm,
+              heightMm: std.heightMm,
+              source: "standard",
+            };
+          }
+        }
+        // 3) 마지막 fallback: 일반 표준 (3000×2800×2400)
+        if (!dim) {
+          dim = {
+            name: koreanName,
+            widthMm: 3000,
+            depthMm: 2800,
+            heightMm: 2400,
+            source: "standard",
+          };
+        }
+
         const renders = s2.rendersByRoom?.[key] || [];
         const idx = s2.selectedByRoom?.[key];
         const selectedRender = idx != null ? renders[idx] : renders[renders.length - 1];
         requestRooms.push({
           roomName: koreanName,
-          dim: { widthMm: dimRoom.widthMm, depthMm: dimRoom.depthMm, heightMm: dimRoom.heightMm },
+          dim: { widthMm: dim.widthMm, depthMm: dim.depthMm, heightMm: dim.heightMm },
           renderImageUrl: selectedRender?.refinedUrl || selectedRender?.url,
         });
       }
 
       if (requestRooms.length === 0) {
-        setError("선택된 방이 없거나 시안 미생성 — Step2로 돌아가 디자인을 생성해주세요.");
+        setError("처리할 방 데이터를 찾지 못했습니다. 처음부터 다시 시도해주세요.");
         setLoading(false);
         return;
       }
