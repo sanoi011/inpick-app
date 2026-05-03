@@ -28,7 +28,7 @@ import {
 } from "@/lib/inpick/floorplan-svg";
 
 export const runtime = "nodejs";
-export const maxDuration = 90;
+export const maxDuration = 180;
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 
@@ -99,7 +99,7 @@ async function cleanFloorplanRaster(
     "치수 텍스트는 그리지 마세요 (별도 오버레이됨).";
 
   const errors: string[] = [];
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+  for (const modelName of ["gpt-image-1", "gpt-image-2"]) {
     const form = new FormData();
     form.append("model", modelName);
     form.append(

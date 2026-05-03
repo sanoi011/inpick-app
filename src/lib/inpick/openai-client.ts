@@ -62,9 +62,10 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // 1차: gpt-image-2 (ChatGPT 이미지 2 엔진 — 사용자 요청)
-  // 모델 미존재 시 dall-e-3 자동 폴백
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+  // 1차: gpt-image-1 (조직 인증 완료, 즉시 사용 가능)
+  // 2차: gpt-image-2 (사용자 요청 — 추가 access verify 필요 시 폴백 됨)
+  // 3차: dall-e-3 (안전망)
+  for (const modelName of ["gpt-image-1", "gpt-image-2"]) {
     try {
       const body: Record<string, unknown> = {
         model: modelName,
