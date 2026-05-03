@@ -94,9 +94,15 @@ export interface VisionAnalyzeInput {
   responseFormat?: "json_object" | "text";
 }
 
+interface OpenAIUsage {
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+}
+
 export async function analyzeImageVision(
   input: VisionAnalyzeInput,
-): Promise<{ content: string; usage: any }> {
+): Promise<{ content: string; usage: OpenAIUsage | undefined }> {
   const imageContent = input.imageUrl
     ? { type: "image_url", image_url: { url: input.imageUrl, detail: "high" } }
     : {
@@ -107,7 +113,7 @@ export async function analyzeImageVision(
         },
       };
 
-  const body: any = {
+  const body: Record<string, unknown> = {
     model: "gpt-4o",
     messages: [
       {
@@ -193,7 +199,6 @@ export function generateElevationSVG(input: ElevationInput): string {
     // 개구부 (벽별로 출입문/창호)
     const wall = input.walls?.[i];
     if (wall?.openings) {
-      let offsetX = x;
       for (const op of wall.openings) {
         const opW = op.widthMm * scale;
         const opH = op.heightMm * scale;
