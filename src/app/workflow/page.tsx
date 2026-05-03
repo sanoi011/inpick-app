@@ -31,14 +31,31 @@ export default function WorkflowPage() {
     selectedByRoom: {},
     generations: {},
     rendersByRoom: {},
+    promptByRoom: {},
   });
 
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeError, setNormalizeError] = useState<string | null>(null);
 
   const goNext = async () => {
-    // 평면도가 있으면 정형화 API 호출 후 step2로 이동
     const bi = step1.basicInfo;
+
+    // BasicInfoCard에서 이미 정형화 끝났으면 재호출 없이 그대로 복사
+    if (bi.normalizedRooms?.length) {
+      setStep1((prev) => ({
+        ...prev,
+        normalizedFloorplan: {
+          pyeong: bi.normalizedPyeong || "30평",
+          rooms: bi.normalizedRooms!,
+          openings: bi.normalizedOpenings || [],
+          notes: bi.normalizedNotes || "",
+        },
+      }));
+      setStep(2);
+      return;
+    }
+
+    // 도면 업로드/LIDAR 모드면 여기서 정형화 호출
     const imageUrl = bi.selectedPyeong?.grandPlanUrl;
     const imageBase64 =
       bi.uploadedFloorplan?.dataUrl?.split(",")[1] || bi.lidarScan?.dataUrl?.split(",")[1];
@@ -60,12 +77,11 @@ export default function WorkflowPage() {
           imageMimeType: imageBase64 ? "image/jpeg" : undefined,
           exclusiveAreaM2: bi.selectedPyeong?.exclusiveArea,
           isHandDrawn: bi.uploadedFloorplan?.isHandDrawn,
+          skipImageClean: true,
         }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "정형화 실패");
-      }
+      if (!res.ok) throw new Error(data.error || "정형화 실패");
       setStep1((prev) => ({
         ...prev,
         normalizedFloorplan: {
@@ -79,7 +95,6 @@ export default function WorkflowPage() {
     } catch (e) {
       console.error(e);
       setNormalizeError(e instanceof Error ? e.message : String(e));
-      // 실패해도 표준 fallback으로 진행 가능 (Step2가 평형 기준 표준치수 사용)
       setStep(2);
     } finally {
       setNormalizing(false);

@@ -45,6 +45,22 @@ export interface BasicInfoData {
   // 예산
   budget: number; // 만원
   expansionType: "basic" | "extended" | null;
+  // 정형화 평면도 (워터마크 제거된 raster + 치수 SVG 오버레이)
+  cleanedImageUrl?: string;
+  dimensionOverlaySvg?: string;
+  totalWidthMm?: number;
+  totalDepthMm?: number;
+  normalizing?: boolean;
+  normalizedRooms?: Array<{
+    name: string;
+    widthMm: number;
+    depthMm: number;
+    heightMm: number;
+    source: "vision" | "standard";
+  }>;
+  normalizedOpenings?: Array<{ wall?: string; type?: string; widthMm?: number; heightMm?: number }>;
+  normalizedNotes?: string;
+  normalizedPyeong?: string;
 }
 
 const QUICK_BUDGETS = [1500, 3000, 5000];
@@ -271,14 +287,56 @@ function AddressMode({ value, onChange }: Props) {
     [onChange, value]
   );
 
-  const handleSelectPyeong = (p: {
+  const handleSelectPyeong = async (p: {
     pyeongNo: number;
     pyeongName: string;
     exclusiveArea: number;
     grandPlanUrl?: string;
     roomCnt?: number;
   }) => {
-    onChange({ ...value, selectedPyeong: p });
+    onChange({
+      ...value,
+      selectedPyeong: p,
+      cleanedImageUrl: undefined,
+      dimensionOverlaySvg: undefined,
+      normalizing: !!p.grandPlanUrl,
+    });
+    if (!p.grandPlanUrl) return;
+    try {
+      // 비용 절감을 위해 raster cleaning 스킵 — 치수 추론이 우선 (Step2 렌더 기반 데이터)
+      // 사용자가 명시 요청 시 skipImageClean=false 로 변경
+      const res = await fetch("/api/inpick/normalize-floorplan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: p.grandPlanUrl,
+          exclusiveAreaM2: p.exclusiveArea,
+          unitName: value.selectedAddress?.buildingName,
+          skipImageClean: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        onChange({
+          ...value,
+          selectedPyeong: p,
+          cleanedImageUrl: data.cleanedImageUrl,
+          dimensionOverlaySvg: data.dimensionOverlaySvg,
+          totalWidthMm: data.totalWidthMm,
+          totalDepthMm: data.totalDepthMm,
+          normalizedRooms: data.rooms,
+          normalizedOpenings: data.openings,
+          normalizedNotes: data.notes,
+          normalizedPyeong: data.pyeong,
+          normalizing: false,
+        });
+      } else {
+        onChange({ ...value, selectedPyeong: p, normalizing: false });
+      }
+    } catch (e) {
+      console.error("normalize fail", e);
+      onChange({ ...value, selectedPyeong: p, normalizing: false });
+    }
   };
 
   return (
@@ -363,14 +421,43 @@ function AddressMode({ value, onChange }: Props) {
 
       {value.selectedPyeong?.grandPlanUrl && (
         <div className="mt-3">
-          <div className="text-xs font-semibold text-primary-900/70 mb-2">평면도 미리보기 (네이버)</div>
-          <img
-            src={value.selectedPyeong.grandPlanUrl}
-            alt="평면도"
-            className="w-full rounded-xl border border-primary-100 bg-white"
-          />
+          <div className="text-xs font-semibold text-primary-900/70 mb-2 flex items-center gap-2 flex-wrap">
+            평면도 + AI 치수 추출
+            {value.normalizing && (
+              <span className="inline-flex items-center gap-1 text-primary-500">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Vision 분석 중 (10–15초)
+              </span>
+            )}
+            {value.dimensionOverlaySvg && !value.normalizing && (
+              <span className="text-emerald-600 text-[0.65rem] font-bold bg-emerald-50 px-1.5 py-0.5 rounded-full">
+                ✓ {value.normalizedRooms?.length ?? 0}개 실 치수 추출
+              </span>
+            )}
+          </div>
+          <div className="relative w-full rounded-xl border border-primary-100 bg-white overflow-hidden">
+            <img
+              src={value.cleanedImageUrl || value.selectedPyeong.grandPlanUrl}
+              alt="평면도"
+              className="w-full"
+            />
+            {value.dimensionOverlaySvg && (
+              <div
+                className="absolute inset-0 pointer-events-none"
+                dangerouslySetInnerHTML={{ __html: value.dimensionOverlaySvg }}
+              />
+            )}
+            {value.normalizing && (
+              <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
+                  <p className="mt-2 text-xs text-primary-900/70 font-semibold">치수 추출 중…</p>
+                </div>
+              </div>
+            )}
+          </div>
           <p className="mt-2 text-xs text-primary-900/50">
-            다음 단계에서 AI 가 워터마크 제거·고화질화·실별 치수 추출을 자동 수행합니다.
+            추출된 실별 mm 치수가 다음 단계 인테리어 렌더링의 기반 데이터로 사용됩니다.
           </p>
         </div>
       )}

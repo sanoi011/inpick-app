@@ -1,9 +1,17 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Wand2, Hexagon, Loader2, Check, Sparkles, ChevronRight, AlertCircle } from "lucide-react";
+import {
+  Hexagon,
+  Loader2,
+  Check,
+  ChevronRight,
+  AlertCircle,
+  Send,
+  ImageIcon,
+} from "lucide-react";
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
 import {
@@ -11,6 +19,8 @@ import {
   estimateRoomDimsFromPyeong,
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
+import MaterialEditor from "./MaterialEditor";
+import type { MaterialRegion } from "./MaterialEditor";
 
 const ROOM_TABS: Array<{ v: string; label: string; dimKey: string }> = [
   { v: "all", label: "전체", dimKey: "거실" },
@@ -24,34 +34,31 @@ const ROOM_TABS: Array<{ v: string; label: string; dimKey: string }> = [
   { v: "dress", label: "드레스룸", dimKey: "드레스룸" },
 ];
 
-const STYLES = [
-  { v: "modern", label: "모던", prompt: "modern minimal" },
-  { v: "natural", label: "내추럴", prompt: "natural warm wood tones" },
-  { v: "classic", label: "클래식", prompt: "classic elegant" },
-  { v: "minimal", label: "미니멀", prompt: "ultra minimal japandi" },
-  { v: "scandi", label: "스칸디", prompt: "scandinavian bright airy" },
-  { v: "industrial", label: "인더스트리얼", prompt: "industrial loft" },
+const STYLE_PRESETS = [
+  "모던 미니멀",
+  "내추럴 우드 톤",
+  "스칸디 화이트",
+  "클래식 럭셔리",
+  "재패니즈 미니멀",
+  "인더스트리얼 로프트",
 ];
-
-const RENDER_COUNT = 4; // DALL-E 3 비용 절약 (8장 → 4장)
-
-import MaterialEditor from "./MaterialEditor";
-import type { MaterialRegion } from "./MaterialEditor";
 
 export interface RenderItem {
   url: string;
+  prompt: string;
   revisedPrompt?: string;
-  style: string;
   costUsd: number;
+  timestamp: string;
   materialRegions?: MaterialRegion[];
-  refinedUrl?: string;       // 고화질 재렌더 결과 (data:image/png;base64,...)
-  refinedAt?: string;        // ISO timestamp
+  refinedUrl?: string;
+  refinedAt?: string;
 }
 
 export interface Step2Data {
-  selectedByRoom: Record<string, number | null>;
+  selectedByRoom: Record<string, number | null>;        // 활성 방의 갤러리 인덱스
   generations: Record<string, number>;
-  rendersByRoom: Record<string, RenderItem[]>;
+  rendersByRoom: Record<string, RenderItem[]>;          // 방별 채팅 히스토리 (시간순)
+  promptByRoom: Record<string, string>;                 // 방별 현재 입력
 }
 
 type ConsumeFeature = "ai_render" | "drawing_option";
@@ -77,20 +84,17 @@ export default function Step2Designer({
   onConsumeToken,
   onComplete,
 }: Props) {
-  // "전체" 선택 시 모든 탭 노출
   const availableTabs = useMemo(() => {
     if (rooms.includes("all")) return ROOM_TABS.filter((t) => t.v !== "all");
     return ROOM_TABS.filter((t) => rooms.includes(t.v));
   }, [rooms]);
 
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
-  const [styleKey, setStyleKey] = useState<string>("modern");
   const [generating, setGenerating] = useState(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
-  const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [insufficientOpen, setInsufficientOpen] = useState(false);
+  const historyEndRef = useRef<HTMLDivElement>(null);
 
-  // 정형화된 평면도가 있으면 그걸 우선, 없으면 평형 표준치수 fallback
   const roomDims: Record<string, RoomDim> = useMemo(() => {
     if (normalizedFloorplan?.rooms?.length) {
       const map: Record<string, RoomDim> = {};
@@ -114,93 +118,98 @@ export default function Step2Designer({
     return area ? classifyPyeong(area) : "30평";
   }, [basicInfo.selectedPyeong?.exclusiveArea]);
 
-  const selectedIdx = value.selectedByRoom[activeRoom] ?? null;
   const renders = value.rendersByRoom[activeRoom] || [];
+  const currentPrompt = value.promptByRoom?.[activeRoom] || "";
+  const selectedIdx = value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
+  const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
   const hasGenerated = renders.length > 0;
-  const allRoomsDecided = availableTabs.every((t) => value.selectedByRoom[t.v] != null);
+  const allRoomsDecided = availableTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
 
-  const handleGenerate = () => {
+  // 채팅 히스토리 자동 스크롤
+  useEffect(() => {
+    historyEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [renders.length]);
+
+  const setPrompt = (text: string) => {
+    onChange({
+      ...value,
+      promptByRoom: { ...(value.promptByRoom || {}), [activeRoom]: text },
+    });
+  };
+
+  const handleGenerate = async () => {
+    if (!currentPrompt.trim()) {
+      setErrorMsg("프롬프트를 입력해주세요");
+      return;
+    }
     if (tokenBalance < 1) {
       setInsufficientOpen(true);
       return;
     }
-    setConfirmOpen(true);
-  };
-
-  const performGenerate = async () => {
-    setConfirmOpen(false);
-    setErrorMsg(null);
     const ok = await onConsumeToken(1, "ai_render");
     if (!ok) {
       setInsufficientOpen(true);
       return;
     }
+    setErrorMsg(null);
     setGenerating(true);
-
     try {
       const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
-      const stylePrompt = STYLES.find((s) => s.v === styleKey)?.prompt || "modern minimal";
-
-      // RENDER_COUNT 장 병렬 생성 (다양한 시안 위해 약간 다른 feeling 추가)
-      const feelings = ["warm cozy", "bright airy", "luxury sophisticated", "clean fresh"];
-      const promises = Array.from({ length: RENDER_COUNT }).map((_, i) =>
-        fetch("/api/inpick/render-room", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            roomName: tab.label,
-            widthMm: dim.widthMm,
-            depthMm: dim.depthMm,
-            heightMm: dim.heightMm,
-            style: stylePrompt,
-            expansion: basicInfo.expansionType === "extended",
-            feeling: feelings[i % feelings.length],
-            size: "1024x1024",
-          }),
-        }).then(async (r) => {
-          if (!r.ok) {
-            const err = await r.text();
-            throw new Error(err.slice(0, 200));
-          }
-          return r.json();
-        })
-      );
-
-      const results = await Promise.allSettled(promises);
-      const items: RenderItem[] = results
-        .filter((r): r is PromiseFulfilledResult<{ imageUrl: string; revisedPrompt?: string; costUsd: number }> => r.status === "fulfilled" && !!r.value.imageUrl)
-        .map((r) => ({
-          url: r.value.imageUrl,
-          revisedPrompt: r.value.revisedPrompt,
-          style: stylePrompt,
-          costUsd: r.value.costUsd ?? 0.08,
-        }));
-
-      if (items.length === 0) {
-        const firstReason = results.find((r) => r.status === "rejected") as PromiseRejectedResult | undefined;
-        throw new Error(firstReason?.reason?.message || "렌더링 실패 — OpenAI API 응답 없음");
+      const res = await fetch("/api/inpick/render-room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          roomName: tab.label,
+          widthMm: dim.widthMm,
+          depthMm: dim.depthMm,
+          heightMm: dim.heightMm,
+          style: currentPrompt,
+          expansion: basicInfo.expansionType === "extended",
+          size: "1024x1024",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.imageUrl) {
+        throw new Error(data.error || "렌더링 실패");
       }
-
+      const item: RenderItem = {
+        url: data.imageUrl,
+        prompt: currentPrompt,
+        revisedPrompt: data.revisedPrompt,
+        costUsd: data.costUsd ?? 0.08,
+        timestamp: new Date().toISOString(),
+      };
+      const nextRenders = [...renders, item];
       onChange({
         ...value,
-        rendersByRoom: { ...value.rendersByRoom, [activeRoom]: items },
+        rendersByRoom: { ...value.rendersByRoom, [activeRoom]: nextRenders },
+        selectedByRoom: { ...value.selectedByRoom, [activeRoom]: nextRenders.length - 1 },
         generations: {
           ...value.generations,
           [activeRoom]: (value.generations[activeRoom] ?? 0) + 1,
         },
+        promptByRoom: { ...(value.promptByRoom || {}), [activeRoom]: "" },
       });
     } catch (e) {
-      console.error(e);
       setErrorMsg(e instanceof Error ? e.message : String(e));
     } finally {
       setGenerating(false);
     }
   };
 
+  const updateRender = (idx: number, updated: RenderItem) => {
+    const next = [...renders];
+    next[idx] = updated;
+    onChange({
+      ...value,
+      rendersByRoom: { ...value.rendersByRoom, [activeRoom]: next },
+    });
+  };
+
   return (
     <div className="grid gap-5 lg:grid-cols-12">
-      {/* 좌측 사이드: 방 탭 */}
+      {/* 좌측: 방 탭 */}
       <aside className="lg:col-span-2">
         <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
           방 ({pyeongLabel})
@@ -208,7 +217,7 @@ export default function Step2Designer({
         <div className="mt-3 flex gap-2 overflow-x-auto pb-2 lg:flex-col lg:overflow-visible">
           {availableTabs.map((t) => {
             const sel = activeRoom === t.v;
-            const decided = value.selectedByRoom[t.v] != null;
+            const count = (value.rendersByRoom[t.v] || []).length;
             return (
               <button
                 key={t.v}
@@ -220,8 +229,14 @@ export default function Step2Designer({
                 }`}
               >
                 <span>{t.label}</span>
-                {decided && (
-                  <Check className={`h-3.5 w-3.5 ${sel ? "text-white" : "text-primary-600"}`} />
+                {count > 0 && (
+                  <span
+                    className={`text-[0.65rem] font-bold tabular px-1.5 py-0.5 rounded-full ${
+                      sel ? "bg-white/25 text-white" : "bg-primary-100 text-primary-700"
+                    }`}
+                  >
+                    {count}
+                  </span>
                 )}
               </button>
             );
@@ -229,197 +244,204 @@ export default function Step2Designer({
         </div>
       </aside>
 
-      {/* 중앙: 디자인 시안 */}
-      <section className="lg:col-span-7">
-        <div className="relative overflow-hidden rounded-[28px] border border-primary-100 bg-white/75 p-7 shadow-card backdrop-blur-2xl">
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px"
-            style={{ background: "linear-gradient(90deg, transparent, #F73B20, transparent)" }}
-          />
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold tracking-tight text-primary-900/60">
-                {availableTabs.find((t) => t.v === activeRoom)?.label} · AI 디자인
-              </p>
-              <p className="mt-0.5 text-[0.72rem] text-primary-900/40">
-                {(() => {
-                  const tab = ROOM_TABS.find((t) => t.v === activeRoom);
-                  const d = tab ? roomDims[tab.dimKey] : null;
-                  return d
-                    ? `치수 ${d.widthMm} × ${d.depthMm} × ${d.heightMm} mm · 생성 `
-                    : "생성 ";
-                })()}
-                <span className="tabular font-semibold">
-                  {value.generations[activeRoom] ?? 0}
-                </span>
-                회
-              </p>
-            </div>
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className={`group relative inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold tracking-tight transition-all ${
-                tokenBalance < 1
-                  ? "bg-primary-100 text-primary-900/40"
-                  : "bg-primary-500 text-white shadow-cta hover:bg-primary-600"
-              } disabled:opacity-60`}
-            >
-              {generating ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  생성 중…
-                </>
-              ) : tokenBalance < 1 ? (
-                <>
-                  <Hexagon className="h-3.5 w-3.5" />
-                  토큰 충전 필요
-                </>
-              ) : (
-                <>
-                  <Wand2 className="h-3.5 w-3.5" />
-                  AI 디자인 생성하기
-                  <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.7rem]">
-                    <Hexagon className="h-3 w-3 fill-white" /> 1
-                  </span>
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="mt-6">
-            <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
-              스타일
-            </p>
-            <div className="mt-2.5 flex flex-wrap gap-1.5">
-              {STYLES.map((s) => (
-                <button
-                  key={s.v}
-                  onClick={() => setStyleKey(s.v)}
-                  className={`rounded-full border px-3 py-1 text-[0.78rem] font-semibold tracking-tight transition-all ${
-                    styleKey === s.v
-                      ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                      : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {errorMsg && (
-            <div className="mt-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
-              <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-              <div>
-                <div className="font-semibold">생성 실패</div>
-                <div className="mt-0.5 opacity-80">{errorMsg}</div>
+      {/* 중앙: 이미지 + 채팅 */}
+      <section className="lg:col-span-7 relative">
+        <div className="relative min-h-[640px] rounded-[28px] overflow-hidden bg-primary-50/30 border border-primary-100">
+          {/* 메인 이미지 카드 */}
+          <div className="relative w-full aspect-square">
+            {!hasGenerated && !generating && (
+              <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100/50">
+                <div className="text-center px-8">
+                  <ImageIcon className="h-12 w-12 text-primary-300 mx-auto mb-4" />
+                  <p className="text-sm font-semibold text-primary-900/60">
+                    {ROOM_TABS.find((t) => t.v === activeRoom)?.label} AI 디자인
+                  </p>
+                  <p className="mt-1 text-xs text-primary-900/40">
+                    하단에 원하는 스타일·자재·분위기를 입력하면 이미지가 생성됩니다
+                  </p>
+                  <p className="mt-3 text-[0.7rem] text-primary-900/30 tabular">
+                    치수 {(() => {
+                      const tab = ROOM_TABS.find((t) => t.v === activeRoom);
+                      const d = tab ? roomDims[tab.dimKey] : null;
+                      return d ? `${d.widthMm}×${d.depthMm}×${d.heightMm}mm` : "—";
+                    })()}
+                  </p>
+                </div>
               </div>
+            )}
+
+            {generating && (
+              <div className="absolute inset-0 flex items-center justify-center bg-primary-50">
+                <div className="text-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-primary-500 mx-auto" />
+                  <p className="mt-3 text-sm font-semibold text-primary-900">생성 중…</p>
+                  <p className="mt-1 text-xs text-primary-900/50">DALL-E 3 HD · 약 15–25초</p>
+                </div>
+              </div>
+            )}
+
+            {activeRender && !generating && (
+              <img
+                src={activeRender.refinedUrl || activeRender.url}
+                alt="design"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+            )}
+
+            {activeRender?.refinedUrl && (
+              <div className="absolute right-3 top-3 rounded-full bg-emerald-500 px-2.5 py-1 text-[0.7rem] font-bold text-white shadow-md">
+                ✓ 고화질 재렌더
+              </div>
+            )}
+          </div>
+
+          {/* 갤러리 (이전 시안) — 2장 이상부터 */}
+          {renders.length > 1 && (
+            <div className="absolute left-3 right-3 top-3 flex gap-1.5 overflow-x-auto">
+              {renders.map((r, i) => {
+                const sel = i === selectedIdx;
+                return (
+                  <button
+                    key={i}
+                    onClick={() =>
+                      onChange({
+                        ...value,
+                        selectedByRoom: { ...value.selectedByRoom, [activeRoom]: i },
+                      })
+                    }
+                    className={`shrink-0 h-14 w-14 rounded-lg overflow-hidden border-2 transition-all ${
+                      sel
+                        ? "border-primary-500 ring-2 ring-white"
+                        : "border-white/60 hover:border-white"
+                    }`}
+                  >
+                    <img src={r.refinedUrl || r.url} alt={`v${i + 1}`} className="h-full w-full object-cover" />
+                  </button>
+                );
+              })}
             </div>
           )}
 
-          {/* 4장 시안 그리드 */}
-          <div className="mt-6 grid grid-cols-2 gap-2.5">
-            {Array.from({ length: RENDER_COUNT }).map((_, i) => {
-              const isSel = selectedIdx === i;
-              const item = renders[i];
-              return (
-                <button
-                  key={i}
-                  disabled={!hasGenerated}
-                  onClick={() =>
-                    onChange({
-                      ...value,
-                      selectedByRoom: { ...value.selectedByRoom, [activeRoom]: i },
-                    })
-                  }
-                  className={`group relative aspect-square overflow-hidden rounded-xl border-2 transition-all ${
-                    isSel
-                      ? "border-primary-500 ring-2 ring-primary-200 shadow-card-hover"
-                      : hasGenerated
-                        ? "border-primary-100 hover:border-primary-300"
-                        : "border-dashed border-primary-200"
-                  }`}
-                >
-                  {!item && (
-                    <div className="flex h-full items-center justify-center bg-primary-50/50">
-                      {generating ? (
-                        <Loader2 className="h-5 w-5 animate-spin text-primary-400" />
-                      ) : (
-                        <span className="text-[0.7rem] font-medium tabular text-primary-900/30">
-                          #{i + 1}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                  {item && (
-                    <img
-                      src={item.url}
-                      alt={`design-${i + 1}`}
-                      className="h-full w-full object-cover"
-                    />
-                  )}
-                  {item && (
-                    <div className="absolute left-1.5 top-1.5 rounded-full bg-white/85 px-1.5 py-0.5 text-[0.6rem] font-semibold tabular text-primary-900 backdrop-blur">
-                      #{String(i + 1).padStart(2, "0")}
-                    </div>
-                  )}
-                  {isSel && (
-                    <motion.div
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="absolute right-1.5 top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-primary-500 text-white"
-                    >
-                      <Check className="h-3 w-3" strokeWidth={3} />
-                    </motion.div>
-                  )}
-                </button>
-              );
-            })}
-          </div>
+          {/* 채팅 히스토리 (1차 생성 후 = 투명, 생성 전 = 숨김) */}
+          {hasGenerated && (
+            <div className="absolute inset-x-0 bottom-[88px] max-h-48 overflow-y-auto px-5 py-3 space-y-2 bg-gradient-to-t from-black/40 via-black/20 to-transparent backdrop-blur-[2px] pointer-events-none">
+              {renders.slice(-3).map((r, i) => (
+                <div key={i} className="text-xs text-white/90 drop-shadow-md">
+                  <span className="font-bold opacity-70">→ </span>
+                  {r.prompt}
+                </div>
+              ))}
+              <div ref={historyEndRef} />
+            </div>
+          )}
 
-          {/* 자재 수정 — 시안 선택 후 노출 */}
-          {selectedIdx != null && renders[selectedIdx] && (
+          {/* 프롬프트 입력 바 (생성 전 = 80% 투명, 생성 후 = 흰색 sticky 하단) */}
+          <div
+            className={`absolute inset-x-0 bottom-0 p-3 transition-all ${
+              hasGenerated ? "bg-white shadow-lg" : "bg-white/80 backdrop-blur-md"
+            }`}
+          >
+            <div className="flex items-end gap-2">
+              <div className="flex-1">
+                {!hasGenerated && (
+                  <div className="mb-2 flex flex-wrap gap-1">
+                    {STYLE_PRESETS.map((p) => (
+                      <button
+                        key={p}
+                        onClick={() => setPrompt(currentPrompt ? `${currentPrompt}, ${p}` : p)}
+                        className="rounded-full border border-primary-200 bg-white px-2.5 py-1 text-[0.7rem] font-semibold text-primary-900/70 hover:border-primary-400 hover:text-primary-900"
+                      >
+                        + {p}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <textarea
+                  value={currentPrompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleGenerate();
+                    }
+                  }}
+                  placeholder={
+                    hasGenerated
+                      ? "예: 소파를 회색 패브릭으로 바꿔줘 / TV 뒷벽에 우드 패널"
+                      : "원하는 스타일·자재·분위기를 입력하세요. 예: 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 자연광"
+                  }
+                  rows={hasGenerated ? 1 : 2}
+                  className="w-full resize-none rounded-xl border border-primary-100 bg-white px-3 py-2 text-sm text-primary-900 outline-none placeholder:text-primary-900/40 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                />
+              </div>
+              <button
+                onClick={handleGenerate}
+                disabled={generating || !currentPrompt.trim()}
+                className="shrink-0 inline-flex h-10 items-center gap-1.5 rounded-full bg-primary-500 px-4 text-sm font-semibold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+              >
+                {generating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">생성</span>
+                    <span className="inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.65rem]">
+                      <Hexagon className="h-2.5 w-2.5 fill-white" /> 1
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+            {errorMsg && (
+              <div className="mt-2 flex items-center gap-1.5 text-[0.7rem] text-amber-700">
+                <AlertCircle className="h-3.5 w-3.5" />
+                {errorMsg}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* 자재 수정 — 선택된 시안 아래 */}
+        {activeRender && selectedIdx != null && (
+          <div className="mt-4">
             <MaterialEditor
-              roomLabel={availableTabs.find((t) => t.v === activeRoom)?.label || activeRoom}
-              styleHint={STYLES.find((s) => s.v === styleKey)?.prompt}
-              renderItem={renders[selectedIdx]}
+              roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
+              styleHint={activeRender.prompt}
+              renderItem={activeRender}
               tokenBalance={tokenBalance}
               onConsumeToken={onConsumeToken}
-              onUpdate={(updated) => {
-                const next = [...renders];
-                next[selectedIdx] = updated;
-                onChange({
-                  ...value,
-                  rendersByRoom: { ...value.rendersByRoom, [activeRoom]: next },
-                });
-              }}
+              onUpdate={(updated) => updateRender(selectedIdx, updated)}
             />
-          )}
-        </div>
+          </div>
+        )}
       </section>
 
-      {/* 우측: 선택된 디자인 요약 */}
+      {/* 우측: 선택 현황 + 다음 단계 */}
       <aside className="lg:col-span-3">
-        <div className="relative overflow-hidden rounded-[28px] border border-primary-100 bg-white/75 p-6 shadow-card backdrop-blur-2xl">
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px"
-            style={{ background: "linear-gradient(90deg, transparent, #F73B20, transparent)" }}
-          />
+        <div className="rounded-[28px] border border-primary-100 bg-white/90 p-6 shadow-card backdrop-blur-2xl sticky top-6">
           <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
-            선택 현황
+            방별 진행 상황
           </p>
           <ul className="mt-4 space-y-2.5">
             {availableTabs.map((t) => {
-              const idx = value.selectedByRoom[t.v];
+              const count = (value.rendersByRoom[t.v] || []).length;
+              const decided = count > 0;
               return (
                 <li key={t.v} className="flex items-center justify-between text-[0.85rem]">
-                  <span className="font-medium tracking-tight text-primary-900/80">{t.label}</span>
-                  {idx != null ? (
-                    <span className="rounded-full bg-primary-500 px-2 py-0.5 text-[0.7rem] font-bold tabular text-white">
-                      #{String(idx + 1).padStart(2, "0")}
+                  <span
+                    className={`font-medium tracking-tight ${
+                      decided ? "text-primary-900" : "text-primary-900/40"
+                    }`}
+                  >
+                    {t.label}
+                  </span>
+                  {decided ? (
+                    <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[0.7rem] font-bold tabular text-white inline-flex items-center gap-1">
+                      <Check className="h-2.5 w-2.5" strokeWidth={3} />
+                      {count}장
                     </span>
                   ) : (
-                    <span className="text-[0.7rem] text-primary-900/30">미선택</span>
+                    <span className="text-[0.7rem] text-primary-900/30">미생성</span>
                   )}
                 </li>
               );
@@ -435,46 +457,14 @@ export default function Step2Designer({
           </button>
           {!allRoomsDecided && (
             <p className="mt-3 text-center text-[0.7rem] text-primary-900/50">
-              모든 방의 디자인을 골라주세요
+              모든 방의 디자인을 1장 이상 생성해주세요
             </p>
           )}
         </div>
       </aside>
 
-      {/* 토큰 차감 확인 모달 */}
+      {/* 토큰 부족 모달 */}
       <AnimatePresence>
-        {confirmOpen && (
-          <Modal onClose={() => setConfirmOpen(false)}>
-            <div className="text-center">
-              <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-token-50 text-token-400">
-                <Sparkles className="h-6 w-6" />
-              </div>
-              <h3 className="mt-4 text-lg font-extrabold tracking-tight text-primary-900">
-                AI 디자인 생성
-              </h3>
-              <p className="mt-2 text-sm text-primary-900/70">
-                {RENDER_COUNT}장 동시 생성 · <span className="font-bold text-token-400">⬢ 1 토큰</span> 사용
-                <br />
-                현재 잔액 {tokenBalance} → 생성 후 {tokenBalance - 1}
-              </p>
-              <div className="mt-6 flex gap-2">
-                <button
-                  onClick={() => setConfirmOpen(false)}
-                  className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
-                >
-                  취소
-                </button>
-                <button
-                  onClick={performGenerate}
-                  className="flex-1 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
-                >
-                  생성하기
-                </button>
-              </div>
-            </div>
-          </Modal>
-        )}
-
         {insufficientOpen && (
           <Modal onClose={() => setInsufficientOpen(false)}>
             <div className="text-center">
@@ -485,9 +475,9 @@ export default function Step2Designer({
                 토큰이 부족합니다
               </h3>
               <p className="mt-2 text-sm text-primary-900/70">
-                AI 디자인 1세트에 1토큰이 필요합니다.
+                AI 디자인 1장에 1토큰이 필요합니다.
                 <br />
-                현재 보유 토큰: <span className="font-bold">{tokenBalance}</span>
+                현재 보유: <span className="font-bold">{tokenBalance}</span>
               </p>
               <div className="mt-6 flex gap-2">
                 <button
@@ -507,6 +497,7 @@ export default function Step2Designer({
           </Modal>
         )}
       </AnimatePresence>
+
     </div>
   );
 }
@@ -532,4 +523,3 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
     </>
   );
 }
-
