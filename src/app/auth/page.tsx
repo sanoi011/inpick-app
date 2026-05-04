@@ -153,6 +153,8 @@ function ConsumerAuthForm() {
       } else {
         const returnUrl = searchParams.get("returnUrl");
         router.push(returnUrl || "/");
+        // server component 세션 동기화 — 미들웨어가 새 쿠키 읽도록
+        router.refresh();
       }
     } catch {
       setError("로그인 중 오류가 발생했습니다.");
