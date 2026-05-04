@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { Bodoni_Moda, Manrope } from "next/font/google";
 import { ToastContainer } from "@/components/ui/Toast";
+import { TokensProvider } from "@/contexts/TokensContext";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -78,8 +79,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} ${hostGrotesk.variable} antialiased font-sans`}
       >
-        {children}
-        <ToastContainer />
+        <TokensProvider>
+          {children}
+          <ToastContainer />
+        </TokensProvider>
         <ServiceWorkerRegistration />
       </body>
     </html>
