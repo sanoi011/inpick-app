@@ -157,20 +157,22 @@ export default function Step2Designer({
 
   const handleGenerate = async () => {
     if (!currentPrompt.trim()) {
-      setErrorMsg("프롬프트를 입력해주세요");
+      setErrorMsg("프롬프트를 입력해주세요. 예: '모던 미니멀, 화이트 + 라이트 우드'");
       return;
     }
     if (tokenBalance < 1) {
       setInsufficientOpen(true);
       return;
     }
+    setErrorMsg(null);
+    setGenerating(true); // 즉시 로딩 UI 표시 (토큰 차감 전)
     const ok = await onConsumeToken(1, "ai_render");
     if (!ok) {
+      setGenerating(false);
+      setErrorMsg("토큰 차감 실패 — 잔액 확인 후 다시 시도해주세요");
       setInsufficientOpen(true);
       return;
     }
-    setErrorMsg(null);
-    setGenerating(true);
     try {
       const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
@@ -229,13 +231,15 @@ export default function Step2Designer({
       setInsufficientOpen(true);
       return;
     }
+    setErrorMsg(null);
+    setGenerating(true); // 즉시 로딩 UI
     const ok = await onConsumeToken(emptyTabs.length, "ai_render");
     if (!ok) {
+      setGenerating(false);
+      setErrorMsg("토큰 차감 실패 — 잔액 확인 후 다시 시도해주세요");
       setInsufficientOpen(true);
       return;
     }
-    setErrorMsg(null);
-    setGenerating(true);
     try {
       const results = await Promise.allSettled(
         emptyTabs.map(async (tab) => {
@@ -498,9 +502,15 @@ export default function Step2Designer({
                   backgroundSize: "32px 32px",
                 }} />
                 <div className="text-center px-8 relative z-10">
-                  <div className="inline-block mb-6 px-4 py-1 rounded-full border border-primary-500/40 bg-primary-500/10 text-xs font-bold text-primary-400">
-                    이미지 생성 대기 중
-                  </div>
+                  {errorMsg ? (
+                    <div className="inline-block mb-6 px-4 py-2 rounded-lg border border-amber-500/60 bg-amber-500/15 text-sm font-bold text-amber-300 max-w-md">
+                      ⚠ {errorMsg}
+                    </div>
+                  ) : (
+                    <div className="inline-block mb-6 px-4 py-1 rounded-full border border-primary-500/40 bg-primary-500/10 text-xs font-bold text-primary-400">
+                      이미지 생성 대기 중
+                    </div>
+                  )}
                   <ImageIcon className="h-20 w-20 text-primary-500/60 mx-auto mb-6" />
                   <p className="text-3xl font-extrabold tracking-tight text-zinc-100">
                     {ROOM_TABS.find((t) => t.v === activeRoom)?.label}
@@ -536,7 +546,7 @@ export default function Step2Designer({
                     잠시만 기다려주세요
                   </p>
                   <p className="mt-2 text-xs text-zinc-500 tabular">
-                    약 30–60초 소요 (gpt-image / DALL-E)
+                    약 30–60초 소요 — 화면 닫지 말고 잠시 기다려주세요
                   </p>
                 </div>
               </div>
