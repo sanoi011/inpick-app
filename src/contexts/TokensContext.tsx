@@ -113,8 +113,25 @@ export function TokensProvider({ children }: { children: ReactNode }) {
 
   const loadFromSupabase = useCallback(
     async (userId: string) => {
-      // user_tokens (신규) + user_credits (구) 양쪽 모두 조회 → 큰 잔액 사용
-      const [tokRes, credRes, txRes] = await Promise.all([
+      // server route 통해 service_role로 RLS 우회 (client는 user_credits 직접 read 불가)
+      try {
+        const res = await fetch("/api/user/balance", { cache: "no-store" });
+        const d = await res.json();
+        setState({
+          balance: d.balance ?? SIGNUP_BONUS,
+          totalUsed: d.totalUsed ?? 0,
+          totalPurchased: d.totalPurchased ?? 0,
+          history: [],
+          loading: false,
+          authenticated: !!d.authenticated,
+          userId: d.userId ?? userId,
+        });
+        return;
+      } catch (e) {
+        console.warn("[tokens] /api/user/balance 실패, client 직접 조회 fallback:", e);
+      }
+      // 폴백: client 직접 조회 (RLS 통과되는 케이스)
+      const [tokRes, credRes] = await Promise.all([
         supabase
           .from("user_tokens")
           .select("balance, total_purchased, total_used")
@@ -125,27 +142,18 @@ export function TokensProvider({ children }: { children: ReactNode }) {
           .select("balance")
           .eq("user_id", userId)
           .maybeSingle(),
-        supabase
-          .from("token_transactions")
-          .select("id, type, feature, amount, balance_after, payment_id, created_at")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false })
-          .limit(50),
       ]);
-
       const tokBalance = tokRes.data?.balance ?? null;
       const credBalance = credRes.data?.balance ?? null;
-      // 둘 중 큰 값 사용 (옛 user_credits에 누적된 잔액 보존)
       const effectiveBalance =
         tokBalance != null && credBalance != null
           ? Math.max(tokBalance, credBalance)
           : (tokBalance ?? credBalance ?? SIGNUP_BONUS);
-
       setState({
         balance: effectiveBalance,
         totalUsed: tokRes.data?.total_used ?? 0,
         totalPurchased: tokRes.data?.total_purchased ?? 0,
-        history: (txRes.data as TokenTransaction[]) ?? [],
+        history: [],
         loading: false,
         authenticated: true,
         userId,
@@ -208,45 +216,25 @@ export function TokensProvider({ children }: { children: ReactNode }) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        // 1) RPC deduct_tokens 시도
+        // server route — service_role로 RLS 우회 (가장 신뢰할 수 있는 경로)
         try {
-          const { data, error } = await supabase.rpc("deduct_tokens", {
-            p_user_id: user.id,
-            p_amount: amount,
-            p_feature: feature,
+          const res = await fetch("/api/user/consume", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount, feature }),
           });
-          if (!error && data?.success) {
+          const d = await res.json();
+          if (res.ok && d.success) {
             await loadFromSupabase(user.id);
             return true;
           }
-          console.warn("[tokens] RPC deduct_tokens 실패:", error);
-        } catch (e) {
-          console.warn("[tokens] RPC throw:", e);
-        }
-        // 2) user_credits 직접 차감 (옛 시스템 호환)
-        try {
-          const { data: cur } = await supabase
-            .from("user_credits")
-            .select("balance")
-            .eq("user_id", user.id)
-            .maybeSingle();
-          const curBal = cur?.balance ?? 0;
-          if (curBal >= amount) {
-            await supabase
-              .from("user_credits")
-              .update({ balance: curBal - amount })
-              .eq("user_id", user.id);
-            await supabase.from("credit_transactions").insert({
-              user_id: user.id,
-              amount: -amount,
-              type: "USE",
-              description: `토큰 사용 (${feature})`,
-            });
-            await loadFromSupabase(user.id);
-            return true;
+          if (res.status === 402) {
+            console.warn("[tokens] 잔액 부족:", d);
+            return false;
           }
+          console.warn("[tokens] /api/user/consume 실패:", d);
         } catch (e) {
-          console.warn("[tokens] user_credits 차감 실패:", e);
+          console.warn("[tokens] /api/user/consume throw:", e);
         }
       }
       let ok = false;
