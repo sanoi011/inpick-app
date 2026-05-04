@@ -92,6 +92,27 @@ export default function FinalCtaV4() {
               <br />
               대전광역시 · tjsqhs011@naver.com
             </div>
+            {/* 운영자 진입점 */}
+            <div className="mt-4 flex flex-wrap gap-1.5">
+              <a
+                href="/admin/login"
+                className="inline-flex items-center gap-1 rounded-full border border-apricot-300/20 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold tracking-wider text-apricot-300/70 hover:border-primary-500/60 hover:text-primary-400 transition-colors"
+              >
+                ◇ 관리자
+              </a>
+              <a
+                href="/contractor/login"
+                className="inline-flex items-center gap-1 rounded-full border border-apricot-300/20 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold tracking-wider text-apricot-300/70 hover:border-primary-500/60 hover:text-primary-400 transition-colors"
+              >
+                ◇ 사업자
+              </a>
+              <a
+                href="/mypage"
+                className="inline-flex items-center gap-1 rounded-full border border-apricot-300/20 bg-white/[0.04] px-2.5 py-1 text-[10px] font-semibold tracking-wider text-apricot-300/70 hover:border-primary-500/60 hover:text-primary-400 transition-colors"
+              >
+                ◇ 마이페이지
+              </a>
+            </div>
           </div>
           {FOOTER_COLS.map((c) => (
             <div key={c.title}>
@@ -108,7 +129,7 @@ export default function FinalCtaV4() {
         </div>
         <div className="font-mono mx-auto mt-8 flex max-w-[1280px] justify-between border-t border-apricot-300/10 pt-[18px] text-[11px] tracking-[0.08em] text-apricot-300/40">
           <span>© 2026 INPICK INC. ALL RIGHTS RESERVED.</span>
-          <span>v 2.4.1 · UPDATED 2026.04</span>
+          <span>v 2.4.1 · UPDATED 2026.05</span>
         </div>
       </footer>
     </section>
