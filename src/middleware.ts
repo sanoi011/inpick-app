@@ -12,11 +12,12 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Contractor API 인증 (login/register 제외)
+  // Contractor API 인증 (login/register/test-accounts 제외)
   if (
     pathname.startsWith("/api/contractor/") &&
     !pathname.startsWith("/api/contractor/login") &&
-    !pathname.startsWith("/api/contractor/register")
+    !pathname.startsWith("/api/contractor/register") &&
+    !pathname.startsWith("/api/contractor/test-accounts")
   ) {
     const authHeader = request.headers.get("authorization");
     if (!authHeader?.startsWith("Bearer ")) {
