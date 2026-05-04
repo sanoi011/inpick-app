@@ -441,7 +441,7 @@ export default function Step2Designer({
             onClick={onComplete}
             className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2 text-xs font-bold transition-all bg-primary-500 text-white shadow-[0_0_16px_rgba(247,59,32,0.5)] hover:bg-primary-400 hover:shadow-[0_0_24px_rgba(247,59,32,0.7)]"
           >
-            {allRoomsDecided ? "다음 단계로" : "다음 단계로 (일부만 생성)"}
+            {allRoomsDecided ? "디자인 완료 (견적 요청)" : "디자인 완료 · 견적 요청"}
             <ChevronRight className="h-3 w-3" />
           </button>
 
@@ -463,13 +463,13 @@ export default function Step2Designer({
 
       {/* 중앙: 맥북 베젤 + 게이밍 HUD */}
       <section className="relative">
-        {/* 다음 단계 큰 버튼 — 시안 1개 이상 있을 때 노출 */}
+        {/* 디자인 완료 — 시안 1개 이상 있을 때 노출 */}
         {availableTabs.some((t) => (value.rendersByRoom[t.v] || []).length > 0) && (
           <button
             onClick={onComplete}
             className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-bold text-white shadow-[0_0_24px_rgba(247,59,32,0.5)] hover:bg-primary-400 hover:shadow-[0_0_32px_rgba(247,59,32,0.7)] transition-all"
           >
-            견적 페이지로 →
+            디자인 완료 (견적 요청)
             <ChevronRight className="h-4 w-4" />
           </button>
         )}
