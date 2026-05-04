@@ -44,16 +44,28 @@ interface Stats {
   lowConfidence: number;
 }
 
+// 현재 시스템 (2026-05) — GPT-4o Vision 기반 정형화 + gpt-image / DALL-E 렌더링
 const METHOD_LABELS: Record<string, string> = {
-  gemini_vision: "Gemini Vision",
-  dxf_parser: "DXF 파서",
+  gpt4o_vision: "GPT-4o Vision (정형화)",
+  normalize_floorplan: "/api/normalize-floorplan",
+  extract_regions: "자재 영역 추출 (Vision)",
+  render_room: "AI 디자인 렌더 (gpt-image-1)",
+  refine_render: "고화질 재렌더 (gpt-image-1 inpaint)",
+  // legacy
+  gemini_vision: "Gemini Vision (구)",
+  dxf_parser: "DXF 파서 (구)",
   mock: "Mock 데이터",
 };
 
 const METHOD_FILTERS = [
   { value: "", label: "전체" },
-  { value: "gemini_vision", label: "Gemini Vision" },
-  { value: "dxf_parser", label: "DXF 파서" },
+  { value: "gpt4o_vision", label: "GPT-4o Vision" },
+  { value: "normalize_floorplan", label: "평면도 정형화" },
+  { value: "extract_regions", label: "자재 영역 추출" },
+  { value: "render_room", label: "AI 디자인 렌더" },
+  { value: "refine_render", label: "고화질 재렌더" },
+  { value: "gemini_vision", label: "Gemini (구)" },
+  { value: "dxf_parser", label: "DXF (구)" },
   { value: "mock", label: "Mock" },
 ];
 
