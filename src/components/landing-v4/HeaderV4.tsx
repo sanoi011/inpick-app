@@ -32,14 +32,25 @@ export default function HeaderV4() {
 
   const isDark = mode === "dark";
 
+  // 메인 카테고리 (홈 헤더 가운데)
+  const MAIN_CATEGORIES: Array<{ label: string; href: string }> = [
+    { label: "소개", href: "/#walkthrough" },
+    { label: "요금제", href: "/account/tokens" },
+    { label: "디자인 커뮤니티", href: "/community" },
+    { label: "무료 인테리어 견적", href: "/workflow" },
+    { label: "리소스", href: "/community/library" },
+    { label: "비즈니스", href: "/contractor" },
+    { label: "문의하기", href: "/mypage/support" },
+  ];
+
   return (
     <header className="fixed inset-x-0 top-0 z-[100] h-[72px]">
       <nav
-        className={`mx-auto flex h-full max-w-[1280px] items-center justify-between px-6 transition-colors duration-300 lg:px-10 ${
+        className={`mx-auto flex h-full max-w-[1400px] items-center justify-between gap-3 px-6 transition-colors duration-300 lg:px-10 ${
           isDark ? "text-offwhite" : "text-ink"
         }`}
       >
-        <div className="flex items-end gap-2.5">
+        <div className="flex items-end gap-2.5 shrink-0">
           <a href="/" className="flex items-center gap-2">
             <span
               className={`hex-mask h-5 w-5 transition-colors ${
@@ -60,6 +71,35 @@ export default function HeaderV4() {
             title="AIOD — 한국 건축의 디지털 표준"
           >
             AIOD
+          </a>
+        </div>
+
+        {/* 메인 카테고리 nav (데스크탑) */}
+        <div className="hidden xl:flex items-center gap-0.5 flex-1 justify-center">
+          {MAIN_CATEGORIES.map((c) => (
+            <a
+              key={c.href}
+              href={c.href}
+              className={`px-3 py-2 text-[13px] font-semibold tracking-tight rounded-full transition-colors ${
+                isDark
+                  ? "text-offwhite/85 hover:bg-offwhite/10 hover:text-offwhite"
+                  : "text-ink/75 hover:bg-ink/5 hover:text-ink"
+              }`}
+            >
+              {c.label}
+            </a>
+          ))}
+          {/* 사업자 페이지 — 강조 */}
+          <a
+            href="/contractor"
+            className={`ml-2 px-3 py-2 text-[13px] font-bold tracking-tight rounded-full inline-flex items-center gap-1 transition-colors ${
+              isDark
+                ? "border border-offwhite/30 text-offwhite hover:bg-offwhite/10"
+                : "border border-ink/20 text-ink hover:bg-ink/5"
+            }`}
+          >
+            <Building2 className="h-3 w-3" />
+            사업자페이지
           </a>
         </div>
 
