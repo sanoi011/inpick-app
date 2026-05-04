@@ -83,6 +83,7 @@ export interface LineItem {
   materialName: string;
   brand?: string;
   spec?: string;
+  sku?: string;
   quantity: number;
   unit: string;
   unitPriceWon: number;
@@ -124,6 +125,7 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
       materialName: m.materialName,
       brand: m.brand,
       spec: m.spec,
+      sku: m.sku,
       quantity: qty,
       unit: m.unit,
       unitPriceWon: m.unitPriceWon,
@@ -204,18 +206,18 @@ export async function extractMaterialsFromRender(
 {
   "materials": [
     {
-      "surface": "바닥|벽|천장|fixture",
+      "surface": "바닥|벽|천장|fixture|조명|창호|도어|가구",
       "materialName": "구체 자재명 (예: 오크 원목마루 12T 헤링본)",
-      "brand": "LX하우시스|한솔홈데코|KCC|대림|미상",
-      "spec": "두께·규격·패턴",
-      "sku": "추정 SKU 또는 미상",
-      "unitPriceWon": 0,  // 한국 시세 평균 원/m² 또는 원/EA
+      "brand": "한국 실제 브랜드 (LX하우시스 / 한솔홈데코 / KCC / 동화자연마루 / 한샘 / 이누스 / 대림바스 / 삼성가전 / LG가전 / 시디즈 / 데스커 등) — 모르면 '추정 미상'",
+      "spec": "두께·규격·패턴 (예: 12T·900×150mm·헤링본)",
+      "sku": "구체 SKU 또는 모델명 (예: LX-MR3015·한샘제트4.2m / 모르면 빈 문자열)",
+      "unitPriceWon": 0,
       "unit": "m²|m|EA|set",
       "confidence": 0.0
     }
   ]
 }
-한국 인테리어 자재 카탈로그 (LX/한솔/KCC) 기준. 일반어 금지, "오크 원목마루 12T 헤링본" 수준 구체화.`;
+한국 인테리어 자재 카탈로그 기준. 일반어 금지, "LX하우시스 강마루 12T 헤링본 오크" 수준 구체화. brand는 실제 한국 브랜드명만 (없으면 "추정 미상"), sku는 가능한 모델명/품번 추정.`;
 
   const v = await analyzeImageVision({
     imageUrl: input.renderImageUrl,
