@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -25,7 +25,21 @@ const PACKAGES = [
 
 type PayMethod = "card" | "kakao" | "toss" | "bank";
 
-export default function TokensPage() {
+export default function TokensPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-[#FDF7F4] flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+        </div>
+      }
+    >
+      <TokensPage />
+    </Suspense>
+  );
+}
+
+function TokensPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("return");
