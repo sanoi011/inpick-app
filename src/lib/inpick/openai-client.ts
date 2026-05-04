@@ -25,11 +25,16 @@ export interface RenderRoomInput {
   widthMm: number;
   depthMm: number;
   heightMm: number;
-  style: string;             // "modern minimal" | "korean_traditional" | "scandinavian"
-  materialHints?: string[];  // ["오크 원목마루", "월넛 가구", ...]
-  expansion?: boolean;       // 평면 확장 여부
-  feeling?: string;          // "warm cozy" | "luxury" | ...
-  size?: "1024x1024" | "1024x1792" | "1792x1024"; // dall-e-3 sizes
+  style: string;
+  materialHints?: string[];
+  expansion?: boolean;
+  feeling?: string;
+  size?: "1024x1024" | "1024x1792" | "1792x1024";
+  // 평면도 신뢰성 — 창문·문·구조 context
+  windows?: number;          // 창문 개수 (0이면 명시적으로 "창문 없음")
+  windowSide?: string;       // "남측" | "북측" | "외벽" | "안쪽 (창문 없음)"
+  doors?: number;            // 출입문 개수
+  isInteriorRoom?: boolean;  // 내부방 (욕실/드레스룸/팬트리 등 — 창문 없는 게 일반적)
 }
 
 export interface RenderRoomResult {
@@ -52,12 +57,26 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const expStr = input.expansion ? "평면 확장 시공된 모습." : "";
   const feelStr = input.feeling ? `분위기: ${input.feeling}.` : "";
 
+  // 창문·구조 명시 (도면 신뢰성)
+  let structStr = "";
+  if (input.isInteriorRoom || input.windows === 0) {
+    structStr = "창문 없는 내부 공간 (외벽 없음, 자연광 들어오지 않음, 인공 조명만). ";
+  } else if (input.windows && input.windows > 0) {
+    structStr = `창문 ${input.windows}개 (${input.windowSide || "외벽측"}). `;
+  }
+  const lightStr = input.isInteriorRoom || input.windows === 0
+    ? "조명: 천장 매입 LED만, 자연광 X."
+    : "조명: 자연광 + 보조 조명.";
+
   const prompt =
-    `한국 아파트 ${input.roomName} 실내 인테리어 렌더링 이미지. ` +
+    `한국 아파트 ${input.roomName} 실내 인테리어 사진. ` +
     `공간 치수: 가로 ${sizes.width}m × 깊이 ${sizes.depth}m × 천장고 ${sizes.height}m. ` +
+    `${structStr}` +
     `스타일: ${input.style}. ${matStr} ${feelStr} ${expStr} ` +
-    `포토리얼리스틱, 자연광, 사람 없음, 가구 배치 자연스럽게. ` +
-    `한국 아파트 표준 마감 (걸레받이·천장 몰딩·창호 표현 정확히).`;
+    `${lightStr} ` +
+    `포토리얼리스틱, 사람 없음, 가구 배치 자연스럽게. ` +
+    `한국 아파트 표준 마감 (걸레받이·천장 몰딩·창호 표현 정확히). ` +
+    `중요: 평면도에 명시되지 않은 창문·문 임의 추가 금지.`;
 
   const size = input.size || "1024x1024";
   const apiKey = getKey();
@@ -113,13 +132,13 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     }
   }
 
-  // 2차 fallback: dall-e-3 HD (조직 인증 불필요, 어떤 OpenAI 계정이든 작동)
+  // 2차 fallback: dall-e-3 standard (조직 인증 불필요, 빠르고 저렴 — 1차 무료 미리보기에 적합)
   const body = {
     model: "dall-e-3",
     prompt,
     size,
     n: 1,
-    quality: "hd",
+    quality: "standard",
     response_format: "url",
   };
   const res = await fetch(`${OPENAI_BASE}/images/generations`, {

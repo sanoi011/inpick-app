@@ -160,18 +160,18 @@ export default function MaterialEditor({
           <button
             onClick={handleExtract}
             disabled={extracting}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-3 py-1.5 text-xs font-semibold text-white shadow-cta hover:bg-primary-600 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-60"
           >
             {extracting ? (
               <>
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                분석 중…
+                <Loader2 className="h-4 w-4 animate-spin" />
+                AI 분석 중… (5–10초)
               </>
             ) : (
               <>
-                <Sparkles className="h-3.5 w-3.5" />
-                자재 영역 분석
-                <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1 py-0.5 text-[0.65rem]">
+                <Sparkles className="h-4 w-4" />
+                자재 영역 분석 시작
+                <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-white/20 px-1.5 py-0.5 text-[0.7rem]">
                   <Hexagon className="h-2.5 w-2.5 fill-white" /> 1
                 </span>
               </>
@@ -179,6 +179,30 @@ export default function MaterialEditor({
           </button>
         )}
       </div>
+
+      {/* 분석 중 큰 로딩 패널 — 즉시 시각 피드백 */}
+      {extracting && (
+        <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/50 p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-3 text-sm font-bold text-primary-900">
+            AI가 자재 영역을 분석 중입니다
+          </p>
+          <p className="mt-1 text-xs text-primary-900/60">
+            GPT-4o Vision이 바닥·벽·가구·조명 폴리곤 추출 — 5~10초 소요
+          </p>
+        </div>
+      )}
+      {refining && (
+        <div className="mt-4 rounded-xl border border-primary-300 bg-primary-50 p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-3 text-sm font-bold text-primary-900">
+            고화질 재렌더 중입니다
+          </p>
+          <p className="mt-1 text-xs text-primary-900/60">
+            gpt-image-1로 수정 영역만 inpaint — 30~60초 소요
+          </p>
+        </div>
+      )}
 
       {error && (
         <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">

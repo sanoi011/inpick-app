@@ -155,27 +155,38 @@ export default function Step2Designer({
     });
   };
 
+  // 평면도 정보 → 방별 창문/구조 자동 추론
+  const inferStructure = (roomLabel: string) => {
+    const interiorRooms = ["욕실", "드레스룸", "팬트리", "현관", "다용도실", "보일러실"];
+    const exteriorRooms = ["거실", "안방", "침실", "주방", "발코니", "다이닝"];
+    const isInterior = interiorRooms.some((k) => roomLabel.includes(k));
+    const isExterior = exteriorRooms.some((k) => roomLabel.includes(k));
+    // normalizedFloorplan.openings에서 해당 방의 창문 개수 카운트
+    let windows = 0;
+    if (normalizedFloorplan?.openings) {
+      for (const op of normalizedFloorplan.openings) {
+        if ((op.type === "window" || op.type === "sliding") && op.wall?.includes(roomLabel)) {
+          windows++;
+        }
+      }
+    }
+    // 옵셔너 못 찾으면 기본값
+    if (windows === 0 && isExterior) windows = 1;
+    return { windows, isInteriorRoom: isInterior };
+  };
+
   const handleGenerate = async () => {
     if (!currentPrompt.trim()) {
       setErrorMsg("프롬프트를 입력해주세요. 예: '모던 미니멀, 화이트 + 라이트 우드'");
       return;
     }
-    if (tokenBalance < 1) {
-      setInsufficientOpen(true);
-      return;
-    }
+    // 1차 렌더는 무료 (저화질·벡터화 friendly) — 토큰 차감 X
     setErrorMsg(null);
-    setGenerating(true); // 즉시 로딩 UI 표시 (토큰 차감 전)
-    const ok = await onConsumeToken(1, "ai_render");
-    if (!ok) {
-      setGenerating(false);
-      setErrorMsg("토큰 차감 실패 — 잔액 확인 후 다시 시도해주세요");
-      setInsufficientOpen(true);
-      return;
-    }
+    setGenerating(true);
     try {
       const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
+      const struct = inferStructure(tab.label);
       const res = await fetch("/api/inpick/render-room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -187,6 +198,8 @@ export default function Step2Designer({
           style: currentPrompt,
           expansion: basicInfo.expansionType === "extended",
           size: "1024x1024",
+          windows: struct.windows,
+          isInteriorRoom: struct.isInteriorRoom,
         }),
       });
       const data = await res.json();
@@ -227,23 +240,14 @@ export default function Step2Designer({
       setErrorMsg("이미 모든 방에 시안이 생성됐습니다 — 개별 방을 선택해 재생성하세요");
       return;
     }
-    if (tokenBalance < emptyTabs.length) {
-      setInsufficientOpen(true);
-      return;
-    }
+    // 1차 렌더 일괄 — 무료 (저화질 미리보기, 자재 수정 후 최종 고화질에서 과금)
     setErrorMsg(null);
     setGenerating(true);
-    const ok = await onConsumeToken(emptyTabs.length, "ai_render");
-    if (!ok) {
-      setGenerating(false);
-      setErrorMsg("토큰 차감 실패 — 잔액 확인 후 다시 시도해주세요");
-      setInsufficientOpen(true);
-      return;
-    }
     try {
       const results = await Promise.allSettled(
         emptyTabs.map(async (tab) => {
           const dim = roomDims[tab.dimKey] || roomDims["거실"];
+          const struct = inferStructure(tab.label);
           const res = await fetch("/api/inpick/render-room", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -255,6 +259,8 @@ export default function Step2Designer({
               style: conceptPrompt,
               expansion: basicInfo.expansionType === "extended",
               size: "1024x1024",
+              windows: struct.windows,
+              isInteriorRoom: struct.isInteriorRoom,
             }),
           });
           const data = await res.json();
@@ -457,12 +463,28 @@ export default function Step2Designer({
 
       {/* 중앙: 맥북 베젤 + 게이밍 HUD */}
       <section className="relative">
+        {/* 다음 단계 큰 버튼 — 시안 1개 이상 있을 때 노출 */}
+        {availableTabs.some((t) => (value.rendersByRoom[t.v] || []).length > 0) && (
+          <button
+            onClick={onComplete}
+            className="mb-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary-500 px-4 py-3 text-sm font-bold text-white shadow-[0_0_24px_rgba(247,59,32,0.5)] hover:bg-primary-400 hover:shadow-[0_0_32px_rgba(247,59,32,0.7)] transition-all"
+          >
+            견적 페이지로 →
+            <ChevronRight className="h-4 w-4" />
+          </button>
+        )}
+
         {/* 일괄 컨셉 선택 — 시안 0개 방이 있을 때만 노출 */}
         {availableTabs.some((t) => (value.rendersByRoom[t.v] || []).length === 0) && (
           <div className="mb-3 rounded-2xl border border-primary-500/40 bg-zinc-900/95 p-4 shadow-[0_0_20px_rgba(247,59,32,0.2)]">
-            <p className="text-sm font-bold text-primary-400 mb-2">
-              컨셉 한번에 적용 (모든 방 자동 생성)
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-bold text-primary-400">
+                컨셉 한번에 적용 (모든 방 자동 생성)
+              </p>
+              <span className="rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2.5 py-0.5 text-[0.65rem] font-bold text-emerald-300">
+                1차 미리보기 무료
+              </span>
+            </div>
             <div className="flex flex-wrap gap-2">
               {STYLE_PRESETS.map((preset) => (
                 <button
@@ -476,7 +498,8 @@ export default function Step2Designer({
               ))}
             </div>
             <p className="mt-2 text-xs text-zinc-500">
-              위에서 컨셉을 누르면 비어있는 모든 방의 이미지를 한번에 자동 생성합니다 (방 1개당 1토큰). 이후 각 방을 클릭해서 개별 수정 가능합니다.
+              컨셉 클릭 시 모든 방의 1차 미리보기 이미지를 무료로 생성합니다.
+              이후 자재 영역 분석 → 자재 변경 → 고화질 최종 렌더 단계에서만 토큰이 차감됩니다.
             </p>
           </div>
         )}
@@ -665,9 +688,9 @@ export default function Step2Designer({
                 ) : (
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>AI 생성</span>
-                    <span className="inline-flex items-center gap-0.5 rounded bg-black/30 px-1.5 py-0.5 text-[0.65rem] tabular">
-                      <Hexagon className="h-2.5 w-2.5 fill-amber-300" /> 1
+                    <span>1차 미리보기</span>
+                    <span className="inline-flex items-center gap-0.5 rounded bg-emerald-500/30 px-1.5 py-0.5 text-[0.65rem] font-bold">
+                      무료
                     </span>
                   </>
                 )}

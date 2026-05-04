@@ -135,7 +135,9 @@ export default function WorkflowPage() {
       sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
       sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
     }
-    router.push("/workflow/branch");
+    // branch 페이지 우회 — 사용자가 견적으로 직접 가는 흐름 원함
+    // (AR은 branch 페이지에서 따로 들어갈 수 있음)
+    router.push("/workflow/estimate");
   };
 
   return (
