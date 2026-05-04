@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  BarChart3, Users, FolderKanban, FileText, DollarSign,
+  BarChart3, Users, FolderKanban, FileText, Hexagon,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
   Library, ExternalLink, Rocket, Heart,
 } from "lucide-react";
@@ -13,16 +13,16 @@ const NAV_ITEMS = [
   { label: "대시보드", href: "/admin", icon: BarChart3 },
   { label: "사용자 관리", href: "/admin/users", icon: Users },
   { label: "프로젝트", href: "/admin/projects", icon: FolderKanban },
-  { label: "계약/입찰", href: "/admin/contracts", icon: FileText },
-  { label: "크레딧", href: "/admin/credits", icon: DollarSign },
-  { label: "AI 로그", href: "/admin/ai-logs", icon: Bot },
-  { label: "감성 분석", href: "/admin/emotion-analytics", icon: Heart },
-  { label: "도면 로그", href: "/admin/drawing-logs", icon: FileImage },
-  { label: "도면 라이브러리", href: "/admin/floor-plans", icon: Library },
-  { label: "자재/단가", href: "/admin/materials", icon: Package },
-  { label: "크롤러", href: "/admin/crawlers", icon: RefreshCw },
-  { label: "로드맵", href: "/admin/roadmap", icon: Rocket },
-  { label: "설정", href: "/admin/settings", icon: Settings },
+  { label: "계약·입찰", href: "/admin/contracts", icon: FileText },
+  { label: "토큰 충전·환급", href: "/admin/credits", icon: Hexagon },
+  { label: "AI 호출 로그", href: "/admin/ai-logs", icon: Bot },
+  { label: "감성 분석 (Vision)", href: "/admin/emotion-analytics", icon: Heart },
+  { label: "도면 인식 로그", href: "/admin/drawing-logs", icon: FileImage },
+  { label: "평면도 라이브러리", href: "/admin/floor-plans", icon: Library },
+  { label: "자재 / 단가 DB", href: "/admin/materials", icon: Package },
+  { label: "크롤러 운영", href: "/admin/crawlers", icon: RefreshCw },
+  { label: "개발 로드맵", href: "/admin/roadmap", icon: Rocket },
+  { label: "환경 설정", href: "/admin/settings", icon: Settings },
 ];
 
 const EXCLUDE_LAYOUT = ["/admin/login"];

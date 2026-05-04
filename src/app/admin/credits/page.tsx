@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { DollarSign, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Hexagon, Loader2, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -72,7 +72,7 @@ export default function AdminCreditsPage() {
         setTransactions(data.transactions || []);
       }
       setTotal(data.total || 0);
-    } catch { toast({ type: "error", title: "오류", message: "크레딧 데이터를 불러올 수 없습니다" }); }
+    } catch { toast({ type: "error", title: "오류", message: "토큰 데이터를 불러올 수 없습니다" }); }
     setLoading(false);
   }, [tab, page, typeFilter]);
 
@@ -104,7 +104,7 @@ export default function AdminCreditsPage() {
         setGrantDesc("");
         load();
       }
-    } catch { toast({ type: "error", title: "오류", message: "크레딧 부여에 실패했습니다" }); }
+    } catch { toast({ type: "error", title: "오류", message: "토큰 부여에 실패했습니다" }); }
     setGranting(false);
   }
 
@@ -115,7 +115,7 @@ export default function AdminCreditsPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold text-gray-900">크레딧 관리</h2>
+        <h2 className="text-xl font-bold text-gray-900">토큰 관리</h2>
         <button onClick={() => setShowGrant(!showGrant)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 text-white text-sm rounded-lg hover:bg-gray-800">
           <Plus className="w-4 h-4" /> 수동 부여
@@ -147,11 +147,11 @@ export default function AdminCreditsPage() {
       {/* 수동 부여 폼 */}
       {showGrant && (
         <div className="bg-white rounded-xl border border-gray-200 p-4">
-          <h3 className="text-sm font-medium text-gray-900 mb-3">크레딧 수동 부여</h3>
+          <h3 className="text-sm font-medium text-gray-900 mb-3">토큰 수동 부여</h3>
           <div className="flex flex-col sm:flex-row gap-3">
             <input value={grantUserId} onChange={(e) => setGrantUserId(e.target.value)} placeholder="사용자 UUID"
               className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
-            <input value={grantAmount} onChange={(e) => setGrantAmount(e.target.value)} placeholder="크레딧 수량" type="number"
+            <input value={grantAmount} onChange={(e) => setGrantAmount(e.target.value)} placeholder="토큰 수량" type="number"
               className="w-32 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
             <input value={grantDesc} onChange={(e) => setGrantDesc(e.target.value)} placeholder="설명 (선택)"
               className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm" />
@@ -204,7 +204,7 @@ export default function AdminCreditsPage() {
             <tbody className="divide-y divide-gray-100">
               {credits.length === 0 ? (
                 <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">
-                  <DollarSign className="w-8 h-8 mx-auto mb-2 text-gray-300" />데이터가 없습니다
+                  <Hexagon className="w-8 h-8 mx-auto mb-2 text-gray-300" />데이터가 없습니다
                 </td></tr>
               ) : credits.map((c) => (
                 <tr key={c.id} className="hover:bg-gray-50">

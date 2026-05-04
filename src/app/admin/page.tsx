@@ -4,8 +4,8 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
   BarChart3, FileText, Users, RefreshCw, Loader2,
-  TrendingUp, Package, FolderKanban, DollarSign, Bot,
-  MapPin, Building2, Database,
+  TrendingUp, Package, FolderKanban, Hexagon, Bot,
+  MapPin, Building2, Database, ImageIcon, Sparkles,
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
@@ -120,17 +120,51 @@ export default function AdminDashboardPage() {
       {/* 주요 통계 */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         <StatCard icon={Users} label="소비자" value={`${stats.consumers}명`} color="text-blue-600" />
-        <StatCard icon={FolderKanban} label="프로젝트" value={`${stats.projects}건`} color="text-green-600" />
-        <StatCard icon={FileText} label="견적/계약" value={`${stats.estimates}건`} color="text-purple-600" />
-        <StatCard icon={DollarSign} label="총 크레딧" value={`${stats.totalCredits}`} color="text-orange-600" />
-        <StatCard icon={Bot} label="AI 대화" value={`${stats.aiConversations}건`} color="text-pink-600" />
+        <StatCard icon={FolderKanban} label="진행 프로젝트" value={`${stats.projects}건`} color="text-green-600" />
+        <StatCard icon={FileText} label="견적·계약" value={`${stats.estimates}건`} color="text-purple-600" />
+        <StatCard icon={Hexagon} label="총 보유 토큰" value={`${stats.totalCredits.toLocaleString()}`} color="text-amber-600" />
+        <StatCard icon={Bot} label="AI 호출 누적" value={`${stats.aiConversations}건`} color="text-pink-600" />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         <StatCard icon={Users} label="등록 업체" value={`${stats.contractors}개`} color="text-teal-600" />
-        <StatCard icon={Package} label="자재 단가" value={`${stats.materials}건`} color="text-indigo-600" />
+        <StatCard icon={Package} label="자재 단가 DB" value={`${stats.materials}건`} color="text-indigo-600" />
         <StatCard icon={TrendingUp} label="크롤 로그" value={`${stats.crawlLogs}건`} color="text-amber-600" />
         <StatCard icon={BarChart3} label="활성 계약" value={`${stats.contracts}건`} color="text-red-600" />
+      </div>
+
+      {/* AI 시스템 현황 — 현재 사용 중인 모델·엔드포인트 */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-amber-500" />
+          AI 시스템 현황 (2026-05)
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+            <p className="font-bold text-amber-700">이미지 생성</p>
+            <p className="text-amber-900/80 mt-1">gpt-image-2 → gpt-image-1 → dall-e-3 (자동 폴백)</p>
+            <p className="text-amber-700/60 mt-1 tabular">/api/inpick/render-room</p>
+          </div>
+          <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+            <p className="font-bold text-blue-700">Vision 분석</p>
+            <p className="text-blue-900/80 mt-1">GPT-4o (정형화 + 자재 영역)</p>
+            <p className="text-blue-700/60 mt-1 tabular">normalize-floorplan / extract-regions</p>
+          </div>
+          <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
+            <p className="font-bold text-purple-700">고화질 재렌더</p>
+            <p className="text-purple-900/80 mt-1">gpt-image-1 inpaint (마스크 기반)</p>
+            <p className="text-purple-700/60 mt-1 tabular">/api/inpick/refine-render</p>
+          </div>
+          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+            <p className="font-bold text-emerald-700">견적 산출</p>
+            <p className="text-emerald-900/80 mt-1">Vision 자재 추출 + MOLIT 일위대가 + 부자재 10%</p>
+            <p className="text-emerald-700/60 mt-1 tabular">/api/inpick/build-estimate</p>
+          </div>
+        </div>
+        <div className="mt-3 text-xs text-gray-500 flex items-center gap-2">
+          <ImageIcon className="w-3.5 h-3.5" />
+          <span>1차 미리보기 무료 → 자재 분석 1토큰 → 고화질 재렌더 2토큰 (사용자 명시)</span>
+        </div>
       </div>
 
       {/* 데이터 커버리지 */}
@@ -219,13 +253,22 @@ export default function AdminDashboardPage() {
               <span className="font-medium text-gray-900">전체 단가 갱신</span>
               <span className="text-gray-400 ml-auto">3대 기관 크롤링</span>
             </button>
-            <Link href="/project/new" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
-              <FileText className="w-4 h-4 text-green-600" />
-              <span className="font-medium text-gray-900">테스트 프로젝트 생성</span>
+            <Link href="/admin/materials" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+              <Package className="w-4 h-4 text-indigo-600" />
+              <span className="font-medium text-gray-900">자재 단가 직접 편집</span>
+              <span className="text-gray-400 ml-auto">인라인 게시판</span>
             </Link>
-            <Link href="/contractor" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+            <Link href="/admin/credits" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+              <Hexagon className="w-4 h-4 text-amber-600" />
+              <span className="font-medium text-gray-900">사용자 토큰 충전·환급</span>
+            </Link>
+            <Link href="/admin/drawing-logs" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+              <Bot className="w-4 h-4 text-pink-600" />
+              <span className="font-medium text-gray-900">도면 인식 로그 (GPT-4o Vision)</span>
+            </Link>
+            <Link href="/contractor" target="_blank" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
               <Users className="w-4 h-4 text-purple-600" />
-              <span className="font-medium text-gray-900">사업자 대시보드</span>
+              <span className="font-medium text-gray-900">사업자 대시보드 (새 탭)</span>
             </Link>
           </div>
         </div>
