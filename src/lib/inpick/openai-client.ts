@@ -35,6 +35,7 @@ export interface RenderRoomInput {
   windowSide?: string;       // "남측" | "북측" | "외벽" | "안쪽 (창문 없음)"
   doors?: number;            // 출입문 개수
   isInteriorRoom?: boolean;  // 내부방 (욕실/드레스룸/팬트리 등 — 창문 없는 게 일반적)
+  // ※ 가구·소품 제외는 prompt 고정값으로 무조건 적용 (옵션 X)
 }
 
 export interface RenderRoomResult {
@@ -69,15 +70,24 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     : "조명: 자연광 + 보조 조명.";
 
   const prompt =
-    `한국 아파트 ${input.roomName} 실내 마감 인테리어 사진 (빈 방, 시공 직후 상태). ` +
+    `Empty Korean apartment ${input.roomName} interior shell, just after construction completion, 2026 contemporary minimalist standard. ` +
+    `한국 아파트 ${input.roomName} 빈 방 마감 사진 (시공 직후, 가구 입주 전 상태, 2026년 최신 인테리어 트렌드). ` +
     `공간 치수: 가로 ${sizes.width}m × 깊이 ${sizes.depth}m × 천장고 ${sizes.height}m. ` +
     `${structStr}` +
     `스타일: ${input.style}. ${matStr} ${feelStr} ${expStr} ` +
     `${lightStr} ` +
     `포토리얼리스틱, 사람 없음. ` +
-    `중요 — 마감재만 표현: 바닥재(마루·타일), 벽지·페인트, 천장 마감, 걸레받이·몰딩, 창호·도어, 붙박이장(주방·드레스룸 한정), 천장 매입 조명. ` +
-    `가구 절대 금지: 소파·테이블·의자·침대·매트리스·러그·쿠션·이불·식기·책·꽃·관엽식물·장식 소품 모두 제외. ` +
-    `평면도에 명시되지 않은 창문·문 임의 추가 금지. 빈 공간(empty interior shell)으로 시공 직후 모델하우스 같은 사진.`;
+    // 2026 트렌드 강제 (옛날 몰딩·체리목·꽃벽지 금지)
+    `2026 트렌드 강제 — Modern Flat / Japandi / Warm Minimal / Quiet Luxury 톤. 깔끔한 미니멀 마감, 색감은 따뜻한 우드 + 화이트 + 그레이지 + 베이지 + 라이트 톤. ` +
+    `필수 금지 (구식 인테리어 절대 X) — 두꺼운 천장 몰딩·금장 몰딩·체리목 몰딩 X, 꽃무늬 벽지 X, 무늬 자개·옛 현관 카펫 X, 어두운 체리·로즈우드 가구 마감 X, 화려한 샹들리에 X, 고전 유럽 클래식 장식 X, 코너 곡선 천장 몰딩 X. ` +
+    `천장: 평평한 화이트 또는 아주 얇은 미니멀 라인 몰딩만 허용 (간접 조명 라인 OK). ` +
+    `걸레받이: 얇고 직선형(슬림 베이스보드, 5–8mm)만 허용. ` +
+    // 가구·소품 제외
+    `중요 — 마감재만 표현: 바닥재(마루·타일), 벽지·페인트, 천장 마감, 슬림 걸레받이, 창호·도어, 붙박이장(주방 싱크·드레스룸 한정), 천장 매입 조명. ` +
+    `STRICT NO FURNITURE: NO sofa, NO chair, NO table, NO bed, NO mattress, NO rug, NO cushion, NO curtain (only blinds/roller-shade allowed), NO bookshelf, NO TV, NO appliance(except built-in kitchen), NO art, NO plant, NO flower, NO decoration, NO book, NO dish, NO clothing. ` +
+    `절대 금지 (한글): 소파·의자·테이블·침대·매트리스·러그·쿠션·커튼(블라인드만 가능)·책장·TV·가전(붙박이 주방 외)·그림·관엽식물·꽃·장식·책·식기·옷가지 모두 제외. ` +
+    `평면도에 명시되지 않은 창문·문 임의 추가 금지. ` +
+    `Result: 2026 modern empty Korean apartment shell, ready for furniture move-in. 빈 공간 그 자체.`;
 
   const size = input.size || "1024x1024";
   const apiKey = getKey();
