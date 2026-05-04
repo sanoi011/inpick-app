@@ -713,7 +713,7 @@ export default function Step2Designer({
                   나중에
                 </button>
                 <a
-                  href="/account/tokens"
+                  href="/account/tokens?return=/workflow"
                   className="flex-1 rounded-full bg-primary-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
                 >
                   토큰 충전하기

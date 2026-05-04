@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   ArrowLeft,
@@ -27,7 +27,13 @@ type PayMethod = "card" | "kakao" | "toss" | "bank";
 
 export default function TokensPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const returnUrl = searchParams.get("return");
   const tokens = useTokens();
+  const goBack = () => {
+    if (returnUrl) router.push(returnUrl);
+    else router.back();
+  };
   const [selected, setSelected] = useState<string | null>(null);
   const [paying, setPaying] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ amount: number } | null>(null);
@@ -69,7 +75,7 @@ export default function TokensPage() {
 
         <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-6 pt-10 lg:px-8">
           <button
-            onClick={() => router.back()}
+            onClick={goBack}
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
             aria-label="이전"
           >
@@ -412,11 +418,11 @@ export default function TokensPage() {
                 <button
                   onClick={() => {
                     setSuccessInfo(null);
-                    router.back();
+                    goBack();
                   }}
                   className="mt-6 inline-flex w-full items-center justify-center rounded-full bg-primary-500 px-4 py-3 text-sm font-bold text-white shadow-cta hover:bg-primary-600"
                 >
-                  계속하기
+                  {returnUrl ? "워크플로 계속하기" : "계속하기"}
                 </button>
               </motion.div>
             </>

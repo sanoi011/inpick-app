@@ -382,7 +382,8 @@ function AddressMode({ value, onChange }: Props) {
     });
     if (!p.grandPlanUrl) return;
     try {
-      // 워터마크/로고 제거 + 바닥 패턴 고화질화 (gpt-image-1 image edit, ~$0.19/장)
+      // 평면도 raster cleaning은 비활성화 (gpt-image-1이 도면 구조 깨뜨림)
+      // 원본 raster + Vision 추출 치수 SVG 오버레이만 사용
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -390,7 +391,7 @@ function AddressMode({ value, onChange }: Props) {
           imageUrl: p.grandPlanUrl,
           exclusiveAreaM2: p.exclusiveArea,
           unitName: value.selectedAddress?.buildingName,
-          skipImageClean: false,
+          skipImageClean: true,
         }),
       });
       const data = await res.json();
@@ -558,7 +559,7 @@ function AddressMode({ value, onChange }: Props) {
             {value.normalizing && (
               <span className="inline-flex items-center gap-1 text-primary-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                워터마크 제거 + 치수 추출 (20–40초)
+                AI 치수 추출 중 (10–15초)
               </span>
             )}
             {value.dimensionOverlaySvg && !value.normalizing && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
-import { User, Building2, Hexagon, LayoutDashboard } from "lucide-react";
+import { User, Building2, Hexagon, LayoutDashboard, Shield } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
 
 /**
@@ -116,7 +116,7 @@ export default function HeaderV4() {
                 <span className="hidden sm:inline">소비자 </span>로그인
               </motion.a>
               <motion.a
-                href="/auth?type=contractor"
+                href="/contractor/login"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition-colors sm:px-4 ${
@@ -127,6 +127,21 @@ export default function HeaderV4() {
               >
                 <Building2 className="h-3.5 w-3.5" />
                 <span className="hidden sm:inline">사업자 </span>로그인
+              </motion.a>
+              {/* 관리자 진입점 (작은 아이콘만) */}
+              <motion.a
+                href="/admin/login"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                title="관리자"
+                aria-label="관리자 로그인"
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                  isDark
+                    ? "border-offwhite/30 text-offwhite/70 hover:bg-offwhite/10 hover:text-offwhite"
+                    : "border-ink/15 text-ink/60 hover:bg-ink/5 hover:text-ink"
+                }`}
+              >
+                <Shield className="h-3.5 w-3.5" />
               </motion.a>
             </>
           )}

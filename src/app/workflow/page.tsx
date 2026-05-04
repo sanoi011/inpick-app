@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import Notch from "@/components/workflow/Notch";
@@ -36,6 +36,35 @@ export default function WorkflowPage() {
 
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeError, setNormalizeError] = useState<string | null>(null);
+  const hydratedRef = useRef(false);
+
+  // 마운트 시 sessionStorage 복원 (토큰 충전 갔다 와도 진행 상태 유지)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const s1raw = sessionStorage.getItem("workflow_step1");
+      const s2raw = sessionStorage.getItem("workflow_step2");
+      const stepRaw = sessionStorage.getItem("workflow_step");
+      if (s1raw) setStep1(JSON.parse(s1raw));
+      if (s2raw) setStep2(JSON.parse(s2raw));
+      if (stepRaw === "2") setStep(2);
+    } catch (e) {
+      console.warn("workflow restore fail", e);
+    }
+    hydratedRef.current = true;
+  }, []);
+
+  // 변경 시 자동 저장
+  useEffect(() => {
+    if (!hydratedRef.current) return;
+    try {
+      sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
+      sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
+      sessionStorage.setItem("workflow_step", String(step));
+    } catch {
+      /* quota / private mode */
+    }
+  }, [step1, step2, step]);
 
   const goNext = async () => {
     const bi = step1.basicInfo;

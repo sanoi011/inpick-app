@@ -126,7 +126,7 @@ export function useTokens() {
     };
   }, [supabase, loadFromSupabase]);
 
-  /** 차감 — 인증 시 RPC, 비인증 시 fallback */
+  /** 차감 — 인증 시 RPC, RPC 실패 또는 비인증 시 client state fallback */
   const consume = useCallback(
     async (
       amount: number,
@@ -134,16 +134,23 @@ export function useTokens() {
     ): Promise<boolean> => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data, error } = await supabase.rpc("deduct_tokens", {
-          p_user_id: user.id,
-          p_amount: amount,
-          p_feature: feature,
-        });
-        if (error || !data?.success) return false;
-        await loadFromSupabase(user.id);
-        return true;
+        try {
+          const { data, error } = await supabase.rpc("deduct_tokens", {
+            p_user_id: user.id,
+            p_amount: amount,
+            p_feature: feature,
+          });
+          if (!error && data?.success) {
+            await loadFromSupabase(user.id);
+            return true;
+          }
+          // RPC 실패 시 client state로 폴백 (RPC 미배포 / 권한 등 일시적 이슈 대응)
+          console.warn("[tokens] RPC deduct_tokens 실패, client fallback 사용:", error);
+        } catch (e) {
+          console.warn("[tokens] RPC throw, client fallback:", e);
+        }
       }
-      // fallback
+      // client state fallback (인증/비인증 공통 — 잔액 충분하면 즉시 차감)
       let ok = false;
       setState((curr) => {
         if (curr.balance < amount) {
@@ -164,12 +171,14 @@ export function useTokens() {
           totalUsed: curr.totalUsed + amount,
           history: [tx, ...curr.history],
         };
-        writeFallback({
-          balance: next.balance,
-          totalUsed: next.totalUsed,
-          totalPurchased: next.totalPurchased,
-          history: next.history,
-        });
+        if (!user) {
+          writeFallback({
+            balance: next.balance,
+            totalUsed: next.totalUsed,
+            totalPurchased: next.totalPurchased,
+            history: next.history,
+          });
+        }
         ok = true;
         return next;
       });
