@@ -98,6 +98,8 @@ export default function EstimatePage() {
   const [sortOpen, setSortOpen] = useState(false);
   // 사용자가 견적에서 제외한 항목 ID set (`${room}::${idx}` 형식)
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
+  // 경비 비율 (기본 3% — 사용자 조정 가능, 0~15% 범위)
+  const [expenseRate, setExpenseRate] = useState(0.03);
 
   const itemKey = (roomName: string, idx: number) => `${roomName}::${idx}`;
   const toggleExcluded = (roomName: string, idx: number) => {
@@ -275,12 +277,11 @@ export default function EstimatePage() {
   // 표준 견적서 형식 — 재료비 / 노무비 / 경비
   const materialCost = grandTotal.main + grandTotal.aux; // 재료비 (주자재 + 부자재)
   const laborCost = grandTotal.labor; // 노무비
-  // 경비 = 재료비 + 노무비 의 6.5% (현장관리비, 안전관리비, 일반관리비 평균 — 표준품셈 기준)
-  const expenseCost = Math.round((materialCost + laborCost) * 0.065);
+  // 경비 = (재료비 + 노무비) × expenseRate (기본 3%, 사용자 조정 가능)
+  const expenseCost = Math.round((materialCost + laborCost) * expenseRate);
   const subtotal = materialCost + laborCost + expenseCost;
   const vat = Math.round(subtotal * 0.1);
   const finalTotal = vatIncl ? subtotal + vat : subtotal;
-  const inpickFee = Math.round(finalTotal * 0.05);
   const budgetMan = step1?.basicInfo.budget || 0;
   const budgetWon = budgetMan * 10000;
   const budgetDelta = finalTotal - budgetWon;
@@ -624,10 +625,39 @@ export default function EstimatePage() {
                           <td className="py-2.5 align-middle">
                             <p className="font-bold text-primary-900">경비</p>
                             <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
-                              현장관리비·안전관리비·일반관리비 (재료+노무의 6.5%)
+                              현장관리비·안전관리비·일반관리비
                             </p>
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className="text-[0.7rem] text-primary-900/60">비율</span>
+                              <input
+                                type="range"
+                                min={0}
+                                max={15}
+                                step={0.5}
+                                value={expenseRate * 100}
+                                onChange={(e) =>
+                                  setExpenseRate(Number(e.target.value) / 100)
+                                }
+                                className="flex-1 max-w-[140px] accent-primary-500"
+                              />
+                              <input
+                                type="number"
+                                min={0}
+                                max={15}
+                                step={0.5}
+                                value={(expenseRate * 100).toFixed(1)}
+                                onChange={(e) => {
+                                  const v = Math.max(0, Math.min(15, Number(e.target.value)));
+                                  setExpenseRate(v / 100);
+                                }}
+                                className="w-14 rounded border border-primary-200 px-1.5 py-0.5 text-[0.78rem] text-right tabular outline-none focus:border-primary-400"
+                              />
+                              <span className="text-[0.78rem] font-semibold text-primary-900/70">
+                                %
+                              </span>
+                            </div>
                           </td>
-                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                          <td className="py-2.5 text-right tabular font-bold text-primary-900 align-top">
                             ₩ {expenseCost.toLocaleString()}
                           </td>
                         </tr>
@@ -655,10 +685,6 @@ export default function EstimatePage() {
                       <span className="text-[2rem] font-extrabold tabular leading-none tracking-tightest text-gradient-primary">
                         ₩ {finalTotal.toLocaleString()}
                       </span>
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-[0.75rem] text-primary-900/50">
-                      <span>InPick 수수료 5% (계약 진행 시)</span>
-                      <span className="tabular">₩ {inpickFee.toLocaleString()}</span>
                     </div>
                   </div>
                 )}
@@ -784,7 +810,7 @@ export default function EstimatePage() {
                         · <b>노무비</b>: 국토부 표준품셈 일위대가 (2026 갱신)
                       </li>
                       <li>
-                        · <b>경비</b>: (재료비 + 노무비) × 6.5% — 현장관리비·안전관리비·일반관리비
+                        · <b>경비</b>: (재료비 + 노무비) × 비율 — 현장관리비·안전관리비·일반관리비 (기본 3%, 사용자 조정 가능)
                       </li>
                       <li>
                         · <b>VAT</b>: 10%
