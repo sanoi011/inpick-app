@@ -70,6 +70,88 @@ export interface MaterialItem {
   unitPriceWon: number;     // 자재 단가 (원/m² 또는 원/EA)
   unit: "m²" | "m" | "EA" | "set";
   confidence?: number;
+  priceSource?: "korea_price_assoc" | "vision_estimate" | "standard" | "manual";
+}
+
+/** 한국물가협회 표준 단가 (2026 Q1 평균 기준) — Vision이 단가 못 추정할 때 fallback */
+const KPA_PRICE: Record<string, number> = {
+  // 바닥 (원/m²)
+  "바닥/마루": 64000,
+  "바닥/원목마루": 110000,
+  "바닥/강마루": 64000,
+  "바닥/장판": 18000,
+  "바닥/타일": 75000,
+  "바닥/포세린": 78000,
+  // 벽 (원/m²)
+  "벽/도배": 9500,
+  "벽/실크벽지": 12000,
+  "벽/도장": 14000,
+  "벽/타일": 55000,
+  "벽/패널": 45000,
+  // 천장 (원/m²)
+  "천장/도배": 7500,
+  "천장/도장": 10500,
+  "천장/석고": 18000,
+  "천장/우물천장": 80000,
+  // 창호·도어 (원/EA or set)
+  "창호/창호": 280000,
+  "도어/현관문": 320000,
+  "도어/방문": 180000,
+  // 붙박이·위생 (원/set)
+  "fixture/싱크대": 8900000,
+  "fixture/주방가구": 8900000,
+  "fixture/욕실세트": 1900000,
+  "fixture/변기": 280000,
+  "fixture/세면대": 220000,
+  "fixture/욕조": 850000,
+  "fixture/중문": 2200000,
+  "fixture/붙박이장": 1800000,
+  // 조명
+  "조명/매입LED": 35000,
+  "조명/펜던트": 180000,
+  "조명/일괄": 2100000,
+};
+
+function lookupKpaPrice(surface: string, materialName: string): number | null {
+  const tradeMap: Record<string, string> = {
+    바닥: "바닥",
+    floor: "바닥",
+    벽: "벽",
+    wall: "벽",
+    천장: "천장",
+    ceil: "천장",
+    창호: "창호",
+    window: "창호",
+    도어: "도어",
+    door: "도어",
+    fixture: "fixture",
+    조명: "조명",
+    light: "조명",
+  };
+  const sLower = surface.toLowerCase();
+  const trade =
+    Object.keys(tradeMap).find((k) => sLower.includes(k.toLowerCase())) || surface;
+  const tradeKr = tradeMap[trade] || trade;
+  const matLower = materialName.toLowerCase();
+
+  for (const key of Object.keys(KPA_PRICE)) {
+    const [t, kw] = key.split("/");
+    if (t !== tradeKr) continue;
+    if (matLower.includes(kw.toLowerCase()) || materialName.includes(kw)) {
+      return KPA_PRICE[key];
+    }
+  }
+  // 카테고리 평균 fallback
+  const avg: Record<string, number> = {
+    바닥: 64000,
+    벽: 11000,
+    천장: 9500,
+    fixture: 1500000,
+    창호: 280000,
+    도어: 220000,
+    조명: 50000,
+  };
+  return avg[tradeKr] ?? null;
 }
 
 export interface RoomEstimateInput {
@@ -89,6 +171,7 @@ export interface LineItem {
   unitPriceWon: number;
   subtotalWon: number;
   category: "main" | "aux" | "labor";
+  priceSource?: "korea_price_assoc" | "vision_estimate" | "standard" | "manual" | "molit";
 }
 
 export interface RoomEstimate {
@@ -110,6 +193,17 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
   let laborTotal = 0;
 
   for (const m of input.surfaces) {
+    // 가구·소품은 견적에서 자동 제외 (시공 마감재만)
+    const sLower = m.surface.toLowerCase();
+    if (
+      sLower.includes("가구") ||
+      sLower.includes("furniture") ||
+      sLower === "소품" ||
+      sLower === "decor"
+    ) {
+      continue;
+    }
+
     // 1) 면적·수량 결정
     let qty = 1;
     if (m.unit === "m²") {
@@ -119,7 +213,25 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
     } else {
       qty = 1; // EA, set
     }
-    const subtotalMain = Math.round(qty * m.unitPriceWon);
+    // 2) 단가 — Vision이 못 채운 경우 한국물가협회 KPA 표준 fallback
+    let unitPrice = m.unitPriceWon;
+    let priceSource: "korea_price_assoc" | "vision_estimate" | "standard" =
+      m.priceSource === "korea_price_assoc" ? "korea_price_assoc" : "vision_estimate";
+    if (!unitPrice || unitPrice < 1000) {
+      const kpa = lookupKpaPrice(m.surface, m.materialName);
+      if (kpa) {
+        unitPrice = kpa;
+        priceSource = "korea_price_assoc";
+      }
+    } else {
+      // Vision이 단가 추정한 경우도 KPA 표준이 있으면 KPA 우선 (정밀성)
+      const kpa = lookupKpaPrice(m.surface, m.materialName);
+      if (kpa && Math.abs(kpa - unitPrice) / Math.max(unitPrice, 1) > 0.5) {
+        unitPrice = kpa;
+        priceSource = "korea_price_assoc";
+      }
+    }
+    const subtotalMain = Math.round(qty * unitPrice);
     items.push({
       surface: m.surface,
       materialName: m.materialName,
@@ -128,13 +240,14 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
       sku: m.sku,
       quantity: qty,
       unit: m.unit,
-      unitPriceWon: m.unitPriceWon,
+      unitPriceWon: unitPrice,
       subtotalWon: subtotalMain,
       category: "main",
+      priceSource,
     });
     mainTotal += subtotalMain;
 
-    // 2) 부자재 = 주자재의 10%
+    // 부자재 = 주자재의 10%
     const auxSub = Math.round(subtotalMain * AUX_RATE_PCT);
     items.push({
       surface: m.surface,
@@ -145,6 +258,7 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
       unitPriceWon: auxSub,
       subtotalWon: auxSub,
       category: "aux",
+      priceSource: "standard",
     });
     auxTotal += auxSub;
 
@@ -160,6 +274,7 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
       unitPriceWon: laborUnit,
       subtotalWon: laborSub,
       category: "labor",
+      priceSource: "molit",
     });
     laborTotal += laborSub;
   }
@@ -201,23 +316,28 @@ export interface ExtractMaterialsInput {
 export async function extractMaterialsFromRender(
   input: ExtractMaterialsInput,
 ): Promise<MaterialItem[]> {
-  const prompt = `이 인테리어 렌더 이미지(${input.roomName}, ${input.dim.widthMm}×${input.dim.depthMm}×${input.dim.heightMm}mm)에서 사용된 자재를 분석.
+  const prompt = `이 인테리어 렌더 이미지(${input.roomName}, ${input.dim.widthMm}×${input.dim.depthMm}×${input.dim.heightMm}mm)에서 시공 견적 대상 자재만 분석.
+
+규칙 (매우 중요):
+- 시공 마감재만 포함: 바닥, 벽, 천장, 창호, 도어, 붙박이장(주방·드레스룸 한정), 위생기구(욕실), 매입조명
+- 가구 / 소품 절대 제외: 소파·의자·테이블·침대·매트리스·러그·쿠션·이불·식기·꽃·관엽식물·장식 — 모두 응답에서 빼기
+- 펜던트·샹들리에는 fixture/조명으로만 (소품 X)
+
 다음 JSON으로만 응답:
 {
   "materials": [
     {
-      "surface": "바닥|벽|천장|fixture|조명|창호|도어|가구",
+      "surface": "바닥|벽|천장|fixture|조명|창호|도어",
       "materialName": "구체 자재명 (예: 오크 원목마루 12T 헤링본)",
-      "brand": "한국 실제 브랜드 (LX하우시스 / 한솔홈데코 / KCC / 동화자연마루 / 한샘 / 이누스 / 대림바스 / 삼성가전 / LG가전 / 시디즈 / 데스커 등) — 모르면 '추정 미상'",
+      "brand": "한국 실제 브랜드 (LX하우시스 / 한솔홈데코 / KCC / 동화자연마루 / 한샘 / 이누스 / 대림바스 등) — 모르면 '추정 미상'",
       "spec": "두께·규격·패턴 (예: 12T·900×150mm·헤링본)",
-      "sku": "구체 SKU 또는 모델명 (예: LX-MR3015·한샘제트4.2m / 모르면 빈 문자열)",
-      "unitPriceWon": 0,
-      "unit": "m²|m|EA|set",
-      "confidence": 0.0
+      "sku": "구체 SKU 또는 모델명 / 모르면 빈 문자열",
+      "unit": "m²|m|EA|set"
     }
   ]
 }
-한국 인테리어 자재 카탈로그 기준. 일반어 금지, "LX하우시스 강마루 12T 헤링본 오크" 수준 구체화. brand는 실제 한국 브랜드명만 (없으면 "추정 미상"), sku는 가능한 모델명/품번 추정.`;
+
+unitPriceWon 필드는 응답하지 마세요 — 단가는 서버에서 한국물가협회 DB로 자동 매칭.`;
 
   const v = await analyzeImageVision({
     imageUrl: input.renderImageUrl,

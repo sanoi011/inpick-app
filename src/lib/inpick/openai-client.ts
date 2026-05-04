@@ -69,14 +69,15 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     : "조명: 자연광 + 보조 조명.";
 
   const prompt =
-    `한국 아파트 ${input.roomName} 실내 인테리어 사진. ` +
+    `한국 아파트 ${input.roomName} 실내 마감 인테리어 사진 (빈 방, 시공 직후 상태). ` +
     `공간 치수: 가로 ${sizes.width}m × 깊이 ${sizes.depth}m × 천장고 ${sizes.height}m. ` +
     `${structStr}` +
     `스타일: ${input.style}. ${matStr} ${feelStr} ${expStr} ` +
     `${lightStr} ` +
-    `포토리얼리스틱, 사람 없음, 가구 배치 자연스럽게. ` +
-    `한국 아파트 표준 마감 (걸레받이·천장 몰딩·창호 표현 정확히). ` +
-    `중요: 평면도에 명시되지 않은 창문·문 임의 추가 금지.`;
+    `포토리얼리스틱, 사람 없음. ` +
+    `중요 — 마감재만 표현: 바닥재(마루·타일), 벽지·페인트, 천장 마감, 걸레받이·몰딩, 창호·도어, 붙박이장(주방·드레스룸 한정), 천장 매입 조명. ` +
+    `가구 절대 금지: 소파·테이블·의자·침대·매트리스·러그·쿠션·이불·식기·책·꽃·관엽식물·장식 소품 모두 제외. ` +
+    `평면도에 명시되지 않은 창문·문 임의 추가 금지. 빈 공간(empty interior shell)으로 시공 직후 모델하우스 같은 사진.`;
 
   const size = input.size || "1024x1024";
   const apiKey = getKey();

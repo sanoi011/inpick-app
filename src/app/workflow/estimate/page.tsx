@@ -44,6 +44,7 @@ interface EstimateItem {
   unitPriceWon: number;
   subtotalWon: number;
   category: "main" | "aux" | "labor";
+  priceSource?: "korea_price_assoc" | "vision_estimate" | "standard" | "manual" | "molit";
 }
 
 interface EstimateRoom {
@@ -271,8 +272,14 @@ export default function EstimatePage() {
     return { sum, count };
   }, [estimates, excluded]);
 
-  const vat = Math.round(grandTotal.total * 0.1);
-  const finalTotal = vatIncl ? grandTotal.total + vat : grandTotal.total;
+  // 표준 견적서 형식 — 재료비 / 노무비 / 경비
+  const materialCost = grandTotal.main + grandTotal.aux; // 재료비 (주자재 + 부자재)
+  const laborCost = grandTotal.labor; // 노무비
+  // 경비 = 재료비 + 노무비 의 6.5% (현장관리비, 안전관리비, 일반관리비 평균 — 표준품셈 기준)
+  const expenseCost = Math.round((materialCost + laborCost) * 0.065);
+  const subtotal = materialCost + laborCost + expenseCost;
+  const vat = Math.round(subtotal * 0.1);
+  const finalTotal = vatIncl ? subtotal + vat : subtotal;
   const inpickFee = Math.round(finalTotal * 0.05);
   const budgetMan = step1?.basicInfo.budget || 0;
   const budgetWon = budgetMan * 10000;
@@ -584,27 +591,73 @@ export default function EstimatePage() {
                         </span>
                       </div>
                     )}
-                    <div className="grid grid-cols-3 gap-4 mb-4">
-                      <SumCard label="주자재" value={grandTotal.main} />
-                      <SumCard label="부자재 (10%)" value={grandTotal.aux} />
-                      <SumCard label="인건비 (MOLIT)" value={grandTotal.labor} />
-                    </div>
-                    <div className="flex items-center justify-between border-t border-primary-100 pt-4">
-                      <span className="text-[0.85rem] text-primary-900/60">
-                        VAT 10% {vatIncl ? "(포함)" : "(별도)"}
-                      </span>
-                      <span className="tabular text-primary-900 font-semibold">
-                        ₩ {vat.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="mt-2 flex items-center justify-between">
+
+                    {/* 표준 견적서 정산 (재료비 / 노무비 / 경비) */}
+                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
+                      견적 정산 (표준 양식)
+                    </p>
+                    <table className="w-full text-sm">
+                      <tbody>
+                        <tr className="border-b border-primary-100">
+                          <td className="py-2.5 align-middle">
+                            <p className="font-bold text-primary-900">재료비</p>
+                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                              주자재 ₩{grandTotal.main.toLocaleString()} + 부자재 ₩{grandTotal.aux.toLocaleString()}
+                            </p>
+                          </td>
+                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                            ₩ {materialCost.toLocaleString()}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-primary-100">
+                          <td className="py-2.5 align-middle">
+                            <p className="font-bold text-primary-900">노무비</p>
+                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                              국토부 표준품셈 일위대가 기준
+                            </p>
+                          </td>
+                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                            ₩ {laborCost.toLocaleString()}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-primary-100">
+                          <td className="py-2.5 align-middle">
+                            <p className="font-bold text-primary-900">경비</p>
+                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                              현장관리비·안전관리비·일반관리비 (재료+노무의 6.5%)
+                            </p>
+                          </td>
+                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                            ₩ {expenseCost.toLocaleString()}
+                          </td>
+                        </tr>
+                        <tr className="border-b-2 border-primary-300">
+                          <td className="py-2.5 align-middle font-bold text-primary-900">
+                            소계
+                          </td>
+                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                            ₩ {subtotal.toLocaleString()}
+                          </td>
+                        </tr>
+                        <tr className="border-b border-primary-100">
+                          <td className="py-2 align-middle text-[0.85rem] text-primary-900/70">
+                            VAT 10% {vatIncl ? "(포함)" : "(별도)"}
+                          </td>
+                          <td className="py-2 text-right tabular text-primary-900/80">
+                            ₩ {vat.toLocaleString()}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+
+                    <div className="mt-3 flex items-center justify-between">
                       <span className="text-base font-bold text-primary-900">총액</span>
                       <span className="text-[2rem] font-extrabold tabular leading-none tracking-tightest text-gradient-primary">
                         ₩ {finalTotal.toLocaleString()}
                       </span>
                     </div>
                     <div className="mt-1 flex items-center justify-between text-[0.75rem] text-primary-900/50">
-                      <span>InPick 수수료 5%</span>
+                      <span>InPick 수수료 5% (계약 진행 시)</span>
                       <span className="tabular">₩ {inpickFee.toLocaleString()}</span>
                     </div>
                   </div>
@@ -719,20 +772,29 @@ export default function EstimatePage() {
                     </div>
                     <ul className="space-y-1 text-[0.75rem] text-primary-900/70 leading-relaxed">
                       <li>
-                        · <b>주자재</b>: GPT-4o Vision이 생성된 디자인 이미지에서 자재를 직접 추출
+                        · <b>주자재 종류·수량</b>: GPT-4o Vision이 생성된 이미지에서 추출
                       </li>
                       <li>
-                        · <b>부자재</b>: 주자재의 10% 일괄
+                        · <b>주자재 단가</b>: <span className="font-bold text-primary-700">한국물가협회 단가 기준 (2026 Q1)</span>
                       </li>
                       <li>
-                        · <b>인건비</b>: 국토부 표준품셈
+                        · <b>부자재</b>: 주자재의 10% (몰딩·본드·실링·자투리 일괄)
+                      </li>
+                      <li>
+                        · <b>노무비</b>: 국토부 표준품셈 일위대가 (2026 갱신)
+                      </li>
+                      <li>
+                        · <b>경비</b>: (재료비 + 노무비) × 6.5% — 현장관리비·안전관리비·일반관리비
+                      </li>
+                      <li>
+                        · <b>VAT</b>: 10%
                       </li>
                       <li>
                         · <b>치수</b>: 평면도 Vision + 평형 표준치수
                       </li>
                     </ul>
                     <p className="mt-2 text-[0.7rem] text-primary-700 font-semibold">
-                      이미지 분석 기반 — 표준 견적 카탈로그가 아닌 실제 디자인 자재로 산출
+                      Vision = 자재 종류·수량 추출 / 단가 = 한국물가협회 표준 (정밀 산출)
                     </p>
                   </div>
                 </div>
