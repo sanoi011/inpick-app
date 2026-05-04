@@ -113,22 +113,39 @@ export function TokensProvider({ children }: { children: ReactNode }) {
 
   const loadFromSupabase = useCallback(
     async (userId: string) => {
-      const { data: tok } = await supabase
-        .from("user_tokens")
-        .select("balance, total_purchased, total_used")
-        .eq("user_id", userId)
-        .single();
-      const { data: txs } = await supabase
-        .from("token_transactions")
-        .select("id, type, feature, amount, balance_after, payment_id, created_at")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(50);
+      // user_tokens (신규) + user_credits (구) 양쪽 모두 조회 → 큰 잔액 사용
+      const [tokRes, credRes, txRes] = await Promise.all([
+        supabase
+          .from("user_tokens")
+          .select("balance, total_purchased, total_used")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("user_credits")
+          .select("balance")
+          .eq("user_id", userId)
+          .maybeSingle(),
+        supabase
+          .from("token_transactions")
+          .select("id, type, feature, amount, balance_after, payment_id, created_at")
+          .eq("user_id", userId)
+          .order("created_at", { ascending: false })
+          .limit(50),
+      ]);
+
+      const tokBalance = tokRes.data?.balance ?? null;
+      const credBalance = credRes.data?.balance ?? null;
+      // 둘 중 큰 값 사용 (옛 user_credits에 누적된 잔액 보존)
+      const effectiveBalance =
+        tokBalance != null && credBalance != null
+          ? Math.max(tokBalance, credBalance)
+          : (tokBalance ?? credBalance ?? SIGNUP_BONUS);
+
       setState({
-        balance: tok?.balance ?? SIGNUP_BONUS,
-        totalUsed: tok?.total_used ?? 0,
-        totalPurchased: tok?.total_purchased ?? 0,
-        history: (txs as TokenTransaction[]) ?? [],
+        balance: effectiveBalance,
+        totalUsed: tokRes.data?.total_used ?? 0,
+        totalPurchased: tokRes.data?.total_purchased ?? 0,
+        history: (txRes.data as TokenTransaction[]) ?? [],
         loading: false,
         authenticated: true,
         userId,
@@ -191,6 +208,7 @@ export function TokensProvider({ children }: { children: ReactNode }) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
+        // 1) RPC deduct_tokens 시도
         try {
           const { data, error } = await supabase.rpc("deduct_tokens", {
             p_user_id: user.id,
@@ -201,9 +219,34 @@ export function TokensProvider({ children }: { children: ReactNode }) {
             await loadFromSupabase(user.id);
             return true;
           }
-          console.warn("[tokens] RPC deduct_tokens 실패, client fallback:", error);
+          console.warn("[tokens] RPC deduct_tokens 실패:", error);
         } catch (e) {
-          console.warn("[tokens] RPC throw, client fallback:", e);
+          console.warn("[tokens] RPC throw:", e);
+        }
+        // 2) user_credits 직접 차감 (옛 시스템 호환)
+        try {
+          const { data: cur } = await supabase
+            .from("user_credits")
+            .select("balance")
+            .eq("user_id", user.id)
+            .maybeSingle();
+          const curBal = cur?.balance ?? 0;
+          if (curBal >= amount) {
+            await supabase
+              .from("user_credits")
+              .update({ balance: curBal - amount })
+              .eq("user_id", user.id);
+            await supabase.from("credit_transactions").insert({
+              user_id: user.id,
+              amount: -amount,
+              type: "USE",
+              description: `토큰 사용 (${feature})`,
+            });
+            await loadFromSupabase(user.id);
+            return true;
+          }
+        } catch (e) {
+          console.warn("[tokens] user_credits 차감 실패:", e);
         }
       }
       let ok = false;

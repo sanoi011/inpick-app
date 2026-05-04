@@ -232,7 +232,7 @@ export default function Step2Designer({
       return;
     }
     setErrorMsg(null);
-    setGenerating(true); // 즉시 로딩 UI
+    setGenerating(true);
     const ok = await onConsumeToken(emptyTabs.length, "ai_render");
     if (!ok) {
       setGenerating(false);
