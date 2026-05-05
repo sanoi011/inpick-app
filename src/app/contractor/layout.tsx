@@ -12,6 +12,7 @@ import {
   Bell,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import CalculatorPopup from "@/components/contractor/CalculatorPopup";
 
 /**
  * 사업자 페이지 — 정부기관(나라장터) 스타일 상단 카테고리 + 메가메뉴
@@ -217,7 +218,8 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
               </span>
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <CalculatorPopup />
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
               aria-label="알림"

@@ -47,6 +47,59 @@ interface EstimateItem {
   priceSource?: "korea_price_assoc" | "vision_estimate" | "standard" | "manual" | "molit";
 }
 
+/** 자재 단위 행 — main+aux+labor 병합 */
+interface ConsolidatedRow {
+  no: number;
+  trade: string;        // 공정 (철거/목공/천장/바닥/벽/창호/주방/욕실/조명/잡철 등)
+  roomName: string;
+  materialName: string;
+  brand?: string;
+  spec?: string;
+  unit: string;
+  quantity: number;
+  materialCost: number; // 재료비 (main + aux)
+  laborCost: number;    // 노무비 (labor)
+  expenseCost: number;  // 경비 (재료+노무 × rate)
+  total: number;
+  excludeKey: string;   // 체크박스 토글용
+}
+
+// 자재 surface + 이름 → 공정 분류
+function inferTrade(surface: string, materialName: string): string {
+  const s = surface.toLowerCase();
+  const n = materialName.toLowerCase();
+  if (n.includes("철거") || n.includes("폐기")) return "철거";
+  if (s.includes("바닥") || s.includes("floor") || n.includes("마루") || n.includes("타일") && (n.includes("거실") || n.includes("바닥"))) return "바닥";
+  if (s.includes("천장") || s.includes("ceil")) return "천장";
+  if (s.includes("창호") || s.includes("window") || s.includes("도어") || s.includes("door") || n.includes("창호") || n.includes("문")) return "창호/문";
+  if (n.includes("주방") || n.includes("싱크") || n.includes("kitchen") || n.includes("후드") || n.includes("인덕션")) return "주방";
+  if (n.includes("욕실") || n.includes("변기") || n.includes("세면대") || n.includes("욕조") || n.includes("샤워")) return "욕실";
+  if (n.includes("조명") || n.includes("led") || n.includes("펜던트")) return "전기";
+  if (n.includes("도배") || n.includes("벽지")) return "도배";
+  if (n.includes("도장") || n.includes("페인트")) return "도장";
+  if (s.includes("벽") || s.includes("wall")) return "도배";
+  if (n.includes("드레스") || n.includes("붙박이") || n.includes("팬트리")) return "잡철/하드웨어";
+  return "공통";
+}
+
+const TRADE_ORDER = [
+  "철거",
+  "목공",
+  "천장",
+  "바닥",
+  "도배",
+  "도장",
+  "타일",
+  "창호/문",
+  "주방",
+  "욕실",
+  "전기",
+  "설비",
+  "잡철/하드웨어",
+  "청소",
+  "공통",
+];
+
 interface EstimateRoom {
   roomName: string;
   totalAreaM2: number;
@@ -102,12 +155,11 @@ export default function EstimatePage() {
   const [expenseRate, setExpenseRate] = useState(0.03);
 
   const itemKey = (roomName: string, idx: number) => `${roomName}::${idx}`;
-  const toggleExcluded = (roomName: string, idx: number) => {
+  const toggleExcluded = (key: string) => {
     setExcluded((prev) => {
       const next = new Set(prev);
-      const k = itemKey(roomName, idx);
-      if (next.has(k)) next.delete(k);
-      else next.add(k);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
   };
@@ -246,32 +298,107 @@ export default function EstimatePage() {
       .filter((r) => r.items.length > 0);
   }, [estimates, filterCat, sortBy, filterRoom]);
 
-  // 제외 항목 빼고 합계 재계산
+  // 자재 단위 행 + 공정별 그룹 (캡처 디자인 구조)
+  const tradeGroups = useMemo(() => {
+    const rows: ConsolidatedRow[] = [];
+    let no = 1;
+    for (const room of filteredRooms) {
+      // 같은 자재 이름 main/aux/labor 묶기
+      const byMaterial: Record<
+        string,
+        { main: number; aux: number; labor: number; item: EstimateItem }
+      > = {};
+      for (const item of room.items) {
+        const key = item.materialName.replace(/ 부자재 일괄| 시공/g, "").trim();
+        if (!byMaterial[key]) {
+          byMaterial[key] = {
+            main: 0,
+            aux: 0,
+            labor: 0,
+            item: { ...item, materialName: key },
+          };
+        }
+        if (item.category === "main") byMaterial[key].main = item.subtotalWon;
+        else if (item.category === "aux") byMaterial[key].aux = item.subtotalWon;
+        else if (item.category === "labor") byMaterial[key].labor = item.subtotalWon;
+        // 주자재 정보 우선 (수량/단위/규격 정확)
+        if (item.category === "main") byMaterial[key].item = { ...item, materialName: key };
+      }
+      for (const [, agg] of Object.entries(byMaterial)) {
+        const it = agg.item;
+        const materialCost = agg.main + agg.aux;
+        const laborCost = agg.labor;
+        const expenseCost = Math.round((materialCost + laborCost) * expenseRate);
+        const total = materialCost + laborCost + expenseCost;
+        rows.push({
+          no: no++,
+          trade: inferTrade(it.surface, it.materialName),
+          roomName: room.roomName,
+          materialName: it.materialName,
+          brand: it.brand,
+          spec: it.spec,
+          unit: it.unit,
+          quantity: it.quantity,
+          materialCost,
+          laborCost,
+          expenseCost,
+          total,
+          excludeKey: `${room.roomName}::${it.materialName}`,
+        });
+      }
+    }
+
+    // 공정별 그룹화
+    const groups: Record<string, ConsolidatedRow[]> = {};
+    for (const r of rows) {
+      if (!groups[r.trade]) groups[r.trade] = [];
+      groups[r.trade].push(r);
+    }
+    // TRADE_ORDER 기준 정렬
+    const sorted = Object.keys(groups).sort(
+      (a, b) => (TRADE_ORDER.indexOf(a) ?? 99) - (TRADE_ORDER.indexOf(b) ?? 99),
+    );
+    return sorted.map((trade) => ({
+      trade,
+      rows: groups[trade],
+      groupTotal: groups[trade].reduce((s, r) => s + r.total, 0),
+    }));
+  }, [filteredRooms, expenseRate]);
+
+  // 제외 항목 빼고 합계 재계산 (자재 단위 키 기준)
   const grandTotal = useMemo(() => {
     let main = 0, aux = 0, labor = 0;
     for (const room of estimates) {
-      room.items.forEach((item, idx) => {
-        if (excluded.has(itemKey(room.roomName, idx))) return;
+      // 자재별 묶기
+      const seen: Record<string, boolean> = {};
+      for (const item of room.items) {
+        const key = `${room.roomName}::${item.materialName.replace(/ 부자재 일괄| 시공/g, "").trim()}`;
+        if (excluded.has(key)) {
+          seen[key] = true;
+          continue;
+        }
+        if (seen[key]) continue; // 이미 제외됨
         if (item.category === "main") main += item.subtotalWon;
         else if (item.category === "aux") aux += item.subtotalWon;
         else if (item.category === "labor") labor += item.subtotalWon;
-      });
+      }
     }
     return { main, aux, labor, total: main + aux + labor };
   }, [estimates, excluded]);
 
   const excludedTotal = useMemo(() => {
     let sum = 0;
-    let count = 0;
+    const counted = new Set<string>();
     for (const room of estimates) {
-      room.items.forEach((item, idx) => {
-        if (excluded.has(itemKey(room.roomName, idx))) {
+      for (const item of room.items) {
+        const key = `${room.roomName}::${item.materialName.replace(/ 부자재 일괄| 시공/g, "").trim()}`;
+        if (excluded.has(key)) {
           sum += item.subtotalWon;
-          count++;
+          counted.add(key);
         }
-      });
+      }
     }
-    return { sum, count };
+    return { sum, count: counted.size };
   }, [estimates, excluded]);
 
   // 표준 견적서 형식 — 재료비 / 노무비 / 경비
@@ -551,25 +678,31 @@ export default function EstimatePage() {
                     </div>
                   )}
 
-                  {!loading && !error && filteredRooms.length > 0 && (
+                  {!loading && !error && tradeGroups.length > 0 && (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-[0.85rem]">
+                      <table className="w-full text-[0.82rem] tabular">
                         <thead>
-                          <tr className="border-b border-primary-100 text-left text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
-                            <th className="px-3 py-3 w-10 text-center">포함</th>
-                            <th className="px-3 py-3 w-14">방</th>
-                            <th className="px-3 py-3">자재 / 브랜드</th>
-                            <th className="px-3 py-3">규격</th>
-                            <th className="px-3 py-3 text-right">수량</th>
-                            <th className="px-3 py-3 text-right">단가</th>
-                            <th className="px-3 py-3 text-right pr-5">합계</th>
+                          <tr className="border-b-2 border-primary-200 text-left text-[0.7rem] font-bold tracking-tight text-primary-900/60 bg-primary-50/40">
+                            <th className="px-2 py-2.5 w-10 text-center">번호</th>
+                            <th className="px-2 py-2.5 w-20">구분</th>
+                            <th className="px-3 py-2.5">품명</th>
+                            <th className="px-2 py-2.5">규격</th>
+                            <th className="px-2 py-2.5 w-12 text-center">단위</th>
+                            <th className="px-2 py-2.5 w-16 text-right">수량</th>
+                            <th className="px-2 py-2.5 w-24 text-right">재료비</th>
+                            <th className="px-2 py-2.5 w-24 text-right">노무비</th>
+                            <th className="px-2 py-2.5 w-20 text-right">경비</th>
+                            <th className="px-2 py-2.5 w-28 text-right pr-3">합계</th>
+                            <th className="px-1 py-2.5 w-8 text-center">포함</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {filteredRooms.map((room) => (
-                            <RoomRows
-                              key={room.roomName}
-                              room={room}
+                          {tradeGroups.map((g) => (
+                            <TradeGroup
+                              key={g.trade}
+                              trade={g.trade}
+                              rows={g.rows}
+                              groupTotal={g.groupTotal}
                               excluded={excluded}
                               onToggle={toggleExcluded}
                             />
@@ -833,129 +966,173 @@ export default function EstimatePage() {
   );
 }
 
-function RoomRows({
-  room,
+function TradeGroup({
+  trade,
+  rows,
+  groupTotal,
   excluded,
   onToggle,
 }: {
-  room: EstimateRoom;
+  trade: string;
+  rows: ConsolidatedRow[];
+  groupTotal: number;
   excluded: Set<string>;
-  onToggle: (roomName: string, idx: number) => void;
+  onToggle: (key: string) => void;
 }) {
+  const [open, setOpen] = useState(true);
+  const visibleTotal = rows
+    .filter((r) => !excluded.has(r.excludeKey))
+    .reduce((s, r) => s + r.total, 0);
+
   return (
     <>
-      {room.items.map((item, i) => {
-        const isExcluded = excluded.has(`${room.roomName}::${i}`);
-        return (
-          <motion.tr
-            key={`${room.roomName}-${i}`}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className={`border-b border-primary-50 last:border-0 transition-colors ${
-              isExcluded ? "bg-zinc-50" : "hover:bg-primary-50/30"
-            }`}
+      {/* 그룹 헤더 — 어두운 네이비 */}
+      <tr className="bg-[#1B3556] text-white">
+        <td colSpan={10} className="px-3 py-2.5">
+          <button
+            onClick={() => setOpen((v) => !v)}
+            className="inline-flex items-center gap-2 text-sm font-bold tracking-tight hover:opacity-80"
           >
-            {/* 포함 체크박스 */}
-            <td className="px-3 py-3 align-middle text-center">
-              <button
-                onClick={() => onToggle(room.roomName, i)}
-                title={isExcluded ? "이 항목을 견적에 포함" : "이 항목을 견적에서 제외"}
-                className={`inline-flex h-5 w-5 items-center justify-center rounded border-2 transition-all ${
-                  isExcluded
-                    ? "border-zinc-300 bg-white hover:border-primary-300"
-                    : "border-primary-500 bg-primary-500 text-white hover:bg-primary-600"
-                }`}
-              >
-                {!isExcluded && (
-                  <svg className="h-3 w-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                  </svg>
-                )}
-              </button>
-            </td>
-            {i === 0 ? (
-              <td
-                rowSpan={room.items.length}
-                className="px-3 py-3 align-top border-r border-primary-50"
-              >
-                <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-500">
-                  {room.roomName}
+            <span className={`transition-transform ${open ? "" : "-rotate-90"}`}>▾</span>
+            {trade}
+            <span className="ml-2 text-[0.7rem] font-semibold opacity-80 tabular">
+              {rows.length}건
+            </span>
+          </button>
+        </td>
+        <td className="px-3 py-2.5 text-right text-sm font-extrabold tabular">
+          ₩ {visibleTotal.toLocaleString()}
+          {visibleTotal !== groupTotal && (
+            <span className="ml-1 text-[0.65rem] font-normal opacity-60 line-through">
+              {groupTotal.toLocaleString()}
+            </span>
+          )}
+        </td>
+      </tr>
+      {open &&
+        rows.map((r) => {
+          const isExcluded = excluded.has(r.excludeKey);
+          return (
+            <tr
+              key={r.no}
+              className={`border-b border-primary-50 transition-colors ${
+                isExcluded ? "bg-zinc-50" : "hover:bg-primary-50/30"
+              }`}
+            >
+              <td className="px-2 py-2 text-center text-[0.7rem] tabular text-primary-900/50">
+                {r.no}
+              </td>
+              <td className="px-2 py-2">
+                <span className="inline-flex items-center rounded bg-primary-100/60 px-1.5 py-0.5 text-[0.65rem] font-bold text-primary-700">
+                  {r.trade}
+                </span>
+              </td>
+              <td className="px-3 py-2">
+                <p
+                  className={`font-semibold tracking-tight ${
+                    isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                  }`}
+                >
+                  {r.materialName}
                 </p>
-                <p className="text-[0.65rem] text-primary-900/40 tabular mt-0.5">
-                  {room.totalAreaM2}㎡
+                <p className="text-[0.65rem] mt-0.5 flex items-center gap-1.5 flex-wrap text-primary-900/50">
+                  {r.brand && (
+                    <span className="inline-flex items-center rounded bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-primary-700">
+                      {r.brand}
+                    </span>
+                  )}
+                  <span>{r.roomName}</span>
                 </p>
               </td>
-            ) : null}
-            <td className="px-3 py-3 align-middle">
-              <p
-                className={`font-semibold tracking-tight ${
-                  isExcluded
-                    ? "line-through text-primary-900/40"
-                    : item.category === "main"
-                      ? "text-primary-900"
-                      : item.category === "labor"
-                        ? "text-amber-800"
-                        : "text-primary-900/60"
+              <td
+                className={`px-2 py-2 text-[0.78rem] ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/70"
                 }`}
               >
-                {item.materialName}
-              </p>
-              <p className="text-[0.65rem] mt-0.5 flex items-center gap-1.5 flex-wrap">
-                {item.brand && (
-                  <span className="inline-flex items-center rounded-full bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-primary-700">
-                    {item.brand}
-                  </span>
-                )}
-                {item.sku && (
-                  <span className="text-[0.6rem] text-primary-900/50 tabular font-mono">
-                    {item.sku}
-                  </span>
-                )}
-                <span className="text-primary-900/40">
-                  {item.surface} ·{" "}
-                  {item.category === "main"
-                    ? "주자재"
-                    : item.category === "aux"
-                      ? "부자재 (10%)"
-                      : "인건비"}
-                </span>
-              </p>
-            </td>
-            <td
-              className={`px-3 py-3 align-middle text-[0.78rem] ${
-                isExcluded ? "line-through text-primary-900/40" : "text-primary-900/70"
-              }`}
-            >
-              {item.spec}
-            </td>
-            <td
-              className={`px-3 py-3 align-middle text-right text-[0.82rem] tabular ${
-                isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
-              }`}
-            >
-              {item.quantity}{" "}
-              <span className="text-[0.7rem] text-primary-900/40">{item.unit}</span>
-            </td>
-            <td
-              className={`px-3 py-3 align-middle text-right tabular ${
-                isExcluded ? "line-through text-primary-900/40" : "text-primary-900/80"
-              }`}
-            >
-              ₩ {item.unitPriceWon.toLocaleString()}
-            </td>
-            <td
-              className={`px-3 py-3 pr-5 align-middle text-right tabular font-bold ${
-                isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
-              }`}
-            >
-              ₩ {item.subtotalWon.toLocaleString()}
-            </td>
-          </motion.tr>
-        );
-      })}
+                {r.spec || "—"}
+              </td>
+              <td
+                className={`px-2 py-2 text-center text-[0.78rem] ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/70"
+                }`}
+              >
+                {r.unit}
+              </td>
+              <td
+                className={`px-2 py-2 text-right tabular ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                }`}
+              >
+                {r.quantity}
+              </td>
+              <td
+                className={`px-2 py-2 text-right tabular ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/80"
+                }`}
+              >
+                {r.materialCost.toLocaleString()}
+              </td>
+              <td
+                className={`px-2 py-2 text-right tabular ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-amber-800/90"
+                }`}
+              >
+                {r.laborCost.toLocaleString()}
+              </td>
+              <td
+                className={`px-2 py-2 text-right tabular ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/60"
+                }`}
+              >
+                {r.expenseCost.toLocaleString()}
+              </td>
+              <td
+                className={`px-2 py-2 pr-3 text-right tabular font-bold ${
+                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                }`}
+              >
+                {r.total.toLocaleString()}
+              </td>
+              <td className="px-1 py-2 text-center">
+                <button
+                  onClick={() => onToggle(r.excludeKey)}
+                  title={isExcluded ? "견적에 포함" : "견적에서 제외"}
+                  className={`inline-flex h-4 w-4 items-center justify-center rounded border-2 transition-all ${
+                    isExcluded
+                      ? "border-zinc-300 bg-white"
+                      : "border-primary-500 bg-primary-500 text-white"
+                  }`}
+                >
+                  {!isExcluded && (
+                    <svg
+                      className="h-2.5 w-2.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth={3}
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                </button>
+              </td>
+            </tr>
+          );
+        })}
     </>
   );
 }
+
+// 구 RoomRows — TradeGroup으로 대체됨, 제거 보류 (참조 X)
+function _UnusedRoomRows(_props: {
+  room: EstimateRoom;
+  excluded: Set<string>;
+  onToggle: (key: string) => void;
+}) {
+  void _props;
+  return null;
+}
+
 
 function SumCard({ label, value }: { label: string; value: number }) {
   return (
