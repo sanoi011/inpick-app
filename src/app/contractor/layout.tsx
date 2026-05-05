@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -11,6 +11,7 @@ import {
   ChevronDown,
   Bell,
 } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * 사업자 페이지 — 정부기관(나라장터) 스타일 상단 카테고리 + 메가메뉴
@@ -112,19 +113,67 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   const [openMenu, setOpenMenu] = useState<string | null>(null);
   const [contractorName, setContractorName] = useState<string | null>(null);
 
+  const bootstrapTried = useRef(false);
+
+  // 자동 부트스트랩: supabase 로그인된 사용자면 contractor 토큰 자동 발급
   useEffect(() => {
     setContractorName(localStorage.getItem("contractor_name"));
-  }, []);
+
+    if (EXCLUDE_LAYOUT.includes(pathname)) return;
+    if (bootstrapTried.current) return;
+    bootstrapTried.current = true;
+
+    const token = localStorage.getItem("contractor_token");
+    if (token) return; // 이미 contractor 세션 있음
+
+    // supabase user 있으면 자동으로 /api/contractor/login 호출 → 토큰 발급
+    (async () => {
+      try {
+        const supabase = createClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user || !user.email) {
+          // 인증 자체 없음 → /contractor/login (OAuth)
+          router.replace("/contractor/login");
+          return;
+        }
+        // contractor 자동 등록·토큰 발급
+        const res = await fetch("/api/contractor/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: user.email }),
+        });
+        const data = await res.json();
+        if (res.ok && data.token) {
+          localStorage.setItem("contractor_token", data.token);
+          localStorage.setItem("contractor_id", data.contractor.id);
+          localStorage.setItem("contractor_name", data.contractor.company_name);
+          setContractorName(data.contractor.company_name);
+        } else {
+          router.replace("/contractor/login");
+        }
+      } catch {
+        router.replace("/contractor/login");
+      }
+    })();
+  }, [pathname, router]);
 
   if (EXCLUDE_LAYOUT.includes(pathname)) {
     return <>{children}</>;
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     localStorage.removeItem("contractor_token");
     localStorage.removeItem("contractor_id");
     localStorage.removeItem("contractor_name");
-    router.replace("/contractor/login");
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+    } catch {
+      /* ignore */
+    }
+    router.replace("/");
   };
 
   return (

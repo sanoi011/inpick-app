@@ -156,7 +156,7 @@ export default function HeaderV4() {
                 <span className="hidden sm:inline">소비자 </span>로그인
               </motion.a>
               <motion.a
-                href="/contractor/login"
+                href="/auth?type=contractor"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition-colors sm:px-4 ${
