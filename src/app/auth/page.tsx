@@ -523,52 +523,27 @@ function ContractorAuthForm() {
     <FormFrame>
       {error && <Alert kind="danger">{error}</Alert>}
 
-      {/* 사업자 등록 강조 배너 */}
-      <Link
-        href="/contractor/register"
-        className="mb-5 flex items-center justify-between rounded-2xl border border-primary-200 bg-primary-50/70 p-4 text-left transition-colors hover:border-primary-400"
-      >
-        <div>
-          <p className="text-[12px] font-bold uppercase tracking-widest text-primary-500">
-            STEP 0 · 처음이세요?
-          </p>
-          <p className="mt-1 text-[15px] font-bold tracking-tight text-ink">사업자 등록 먼저</p>
-          <p className="mt-0.5 text-[12px] text-ink-60">
-            사업자등록증 + 사업장 주소만 있으면 OK
-          </p>
-        </div>
-        <ArrowRight className="h-4 w-4 text-primary-500" />
-      </Link>
+      {/* 안내 배너 — 소셜 로그인 후 사업자 정보 등록 안내 */}
+      <div className="mb-5 rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
+        <p className="text-[12px] font-bold uppercase tracking-widest text-primary-500">
+          간편 로그인
+        </p>
+        <p className="mt-1 text-[14px] font-bold tracking-tight text-ink">
+          소셜 계정으로 즉시 시작
+        </p>
+        <p className="mt-0.5 text-[12px] text-ink-60 leading-relaxed">
+          로그인 후 첫 화면에서 사업자등록번호·대표자명 등 입찰 조건 정보를 등록하면 즉시 입찰 참여 가능합니다.
+        </p>
+      </div>
 
       <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} />
-      <Divider>또는 이메일로</Divider>
 
-      <form onSubmit={handleLogin} className="flex flex-col gap-3.5">
-        <Field label="이메일" icon={<Mail className="h-4 w-4 text-ink-40" />}>
-          <Input
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="info@company.com"
-            autoFocus
-            hasIcon
-          />
-        </Field>
-        <Field label="비밀번호" icon={<Lock className="h-4 w-4 text-ink-40" />}>
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="비밀번호 입력"
-            hasIcon
-          />
-        </Field>
-        <PrimaryButton type="submit" loading={loading} disabled={!email}>
-          {loading ? "로그인 중…" : "사업자 로그인"} <ArrowRight className="h-3.5 w-3.5" />
-        </PrimaryButton>
-      </form>
+      <p className="mt-5 text-center text-[12px] text-ink-60">
+        소셜 로그인이 가입과 로그인을 동시 처리합니다.
+      </p>
 
-      <div className="mt-3 text-center">
+      {/* 비밀번호 찾기 — 임시 hidden (이메일 로그인 비활성) */}
+      <div className="mt-3 hidden text-center">
         <button
           onClick={() => {
             setForgotMode(true);
