@@ -11,6 +11,7 @@ import { BID_STATUS_LABELS, BID_STATUS_COLORS, type BidStatus } from "@/types/bi
 import { toast } from "@/components/ui/Toast";
 import dynamic from "next/dynamic";
 import type { RoomCostSection, CostItem } from "@/components/project/CostTable";
+import DesignGalleryModal, { type DesignRender } from "@/components/contractor/DesignGalleryModal";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>,
@@ -94,6 +95,8 @@ export default function BidsPage() {
 
   // 필터
   const [showFilters, setShowFilters] = useState(false);
+  // AI 디자인 시안 갤러리 모달
+  const [galleryEstimateId, setGalleryEstimateId] = useState<string | null>(null);
   const [spaceType, setSpaceType] = useState("");
   const [budgetRange, setBudgetRange] = useState("");
 
@@ -292,7 +295,29 @@ export default function BidsPage() {
       if (res.ok) {
         setBidFormId(null);
         setBidForm({ bidAmount: "", discountRate: "", estimatedDays: "30", startAvailableDate: "", message: "", highlights: "", warrantyMonths: "12" });
-        toast({ type: "success", title: "입찰 완료", message: "입찰서가 제출되었습니다" });
+        toast({
+          type: "success",
+          title: "입찰 제출 완료",
+          message: "소비자에게 알림이 전송되었습니다. 마이페이지 → 계약 진행에서 결과를 확인합니다.",
+        });
+        // 소비자 알림 시도 (실패해도 입찰은 성공)
+        try {
+          await fetch("/api/notifications/notify-consumer", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${localStorage.getItem("contractor_token") || ""}`,
+            },
+            body: JSON.stringify({
+              estimateId,
+              type: "bid_received",
+              title: "새 입찰서 도착",
+              message: "사업자로부터 새로운 입찰서가 도착했습니다. 마이페이지에서 확인하세요.",
+            }),
+          });
+        } catch {
+          /* 알림은 실패해도 입찰 성공 */
+        }
         loadData();
       }
     } catch { toast({ type: "error", title: "오류", message: "입찰 제출에 실패했습니다" }); } finally { setSubmitting(false); }
@@ -442,8 +467,8 @@ export default function BidsPage() {
                     </div>
                   )}
 
-                  {/* 견적 상세 보기 버튼 + CostTable */}
-                  <div className="mb-4">
+                  {/* 견적 상세 + 디자인 시안 보기 */}
+                  <div className="mb-4 flex flex-wrap gap-2">
                     <button
                       onClick={() => loadEstimateItems(est.id)}
                       disabled={loadingItems === est.id}
@@ -455,6 +480,13 @@ export default function BidsPage() {
                         <Eye className="w-4 h-4" />
                       )}
                       {showEstimateDetail === est.id ? "견적 상세 접기" : "견적 상세 보기"}
+                    </button>
+                    <button
+                      onClick={() => setGalleryEstimateId(est.id)}
+                      className="flex items-center gap-1.5 px-4 py-2 bg-[#1B3556] hover:bg-[#2a4870] text-white rounded-lg text-sm font-bold transition-colors"
+                    >
+                      <Eye className="w-4 h-4" />
+                      AI 디자인 시안 보기
                     </button>
 
                     {showEstimateDetail === est.id && (estimateItems.has(est.id) || editedEstimates.has(est.id)) && (
@@ -580,8 +612,91 @@ export default function BidsPage() {
           ))}
         </div>
       )}
+
+      {/* AI 디자인 시안 갤러리 모달 */}
+      <DesignGalleryModal
+        open={!!galleryEstimateId}
+        onClose={() => setGalleryEstimateId(null)}
+        renders={extractDesignRenders(galleryEstimateId, estimates)}
+        projectTitle={estimates.find((e) => e.id === galleryEstimateId)?.title}
+      />
     </div>
   );
+}
+
+// estimate metadata · rfq_data · sessionStorage에서 시안 url 추출
+function extractDesignRenders(
+  estId: string | null,
+  estimates: Array<{ id: string; metadata?: unknown; rfq_data?: unknown }>,
+): DesignRender[] {
+  if (!estId) return [];
+  const est = estimates.find((e) => e.id === estId);
+  if (!est) return [];
+  const list: DesignRender[] = [];
+
+  type RenderLike = { url?: string; refinedUrl?: string; roomName?: string; prompt?: string };
+  // metadata.designRenders
+  const md = est.metadata as Record<string, unknown> | undefined;
+  const dr = md?.designRenders;
+  if (Array.isArray(dr)) {
+    for (const d of dr as RenderLike[]) {
+      if (d?.url) {
+        list.push({
+          url: d.url,
+          refinedUrl: d.refinedUrl,
+          roomName: d.roomName || "거실",
+          prompt: d.prompt,
+        });
+      }
+    }
+  }
+  // rfq_data.rendersByRoom
+  const rfq = est.rfq_data as Record<string, unknown> | undefined;
+  const rbr = rfq?.rendersByRoom as Record<string, RenderLike[]> | undefined;
+  if (rbr) {
+    for (const [roomKey, items] of Object.entries(rbr)) {
+      if (Array.isArray(items)) {
+        for (const it of items) {
+          if (it?.url) {
+            list.push({
+              url: it.url,
+              refinedUrl: it.refinedUrl,
+              roomName: roomKey,
+              prompt: it.prompt,
+            });
+          }
+        }
+      }
+    }
+  }
+  // sessionStorage workflow_step2 fallback (현재 사용자가 직접 만든 경우)
+  if (list.length === 0 && typeof window !== "undefined") {
+    try {
+      const s2 = sessionStorage.getItem("workflow_step2");
+      if (s2) {
+        const parsed = JSON.parse(s2) as { rendersByRoom?: Record<string, RenderLike[]> };
+        if (parsed.rendersByRoom) {
+          for (const [roomKey, items] of Object.entries(parsed.rendersByRoom)) {
+            if (Array.isArray(items)) {
+              for (const it of items) {
+                if (it?.url) {
+                  list.push({
+                    url: it.url,
+                    refinedUrl: it.refinedUrl,
+                    roomName: roomKey,
+                    prompt: it.prompt,
+                  });
+                }
+              }
+            }
+          }
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+  return list;
 }
 
 function InfoBox({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {

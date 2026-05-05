@@ -21,7 +21,7 @@ import { useTokens } from "@/hooks/useTokens";
 const NAV_ITEMS = [
   { label: "대시보드", href: "/mypage", icon: LayoutDashboard },
   { label: "내 프로젝트", href: "/mypage/projects", icon: FolderKanban },
-  { label: "내 계약", href: "/mypage/contracts", icon: FileSignature },
+  { label: "계약 진행", href: "/mypage/contracts/progress", icon: FileSignature },
   { label: "알림", href: "/mypage/notifications", icon: Bell },
   { label: "내 계정", href: "/mypage/account", icon: UserCircle },
   { label: "고객센터", href: "/mypage/support", icon: HelpCircle },
