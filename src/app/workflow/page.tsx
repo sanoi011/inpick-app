@@ -295,6 +295,7 @@ export default function WorkflowPage() {
                   rooms={step1.rooms}
                   basicInfo={step1.basicInfo}
                   normalizedFloorplan={step1.normalizedFloorplan}
+                  roomFurnishings={step1.roomFurnishings}
                   value={step2}
                   onChange={setStep2}
                   tokenBalance={balance}

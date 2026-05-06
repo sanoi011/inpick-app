@@ -59,7 +59,43 @@ export interface Step1Data {
   storeUsage?: string;
   storeUsageEtc?: string;
   normalizedFloorplan?: NormalizedFloorplan;
+  // 실별 가구·붙박이 옵션 (예: { living: ["builtIn", "systemCloset"], kitchen: ["sinkUpper", "fridgeCabinet"] })
+  roomFurnishings?: Record<string, string[]>;
 }
+
+// 실별 추가 시공 옵션 (가구·붙박이) — 실 클릭 시 펼쳐짐
+export const ROOM_FURNISHING_OPTIONS: Record<
+  string,
+  Array<{ v: string; label: string; note?: string }>
+> = {
+  living: [
+    { v: "builtIn", label: "붙박이장" },
+    { v: "systemCloset", label: "시스템 옷장" },
+  ],
+  master: [
+    { v: "builtIn", label: "붙박이장" },
+    { v: "systemCloset", label: "시스템 옷장" },
+  ],
+  bedroom: [
+    { v: "builtIn", label: "붙박이장" },
+    { v: "systemCloset", label: "시스템 옷장" },
+  ],
+  entrance: [
+    { v: "doubleDoor", label: "중문" },
+    { v: "shoeRack_keep", label: "신발장 매핑만 (기존 활용)" },
+    { v: "shoeRack_replace", label: "신발장 전체 교체" },
+  ],
+  bath: [
+    { v: "partial", label: "욕실 부분 교체" },
+  ],
+  kitchen: [
+    { v: "sinkUpper", label: "싱크대 상부장" },
+    { v: "sinkLower", label: "싱크대 하부장" },
+    { v: "sinkPartial", label: "싱크대 부분 교체" },
+    { v: "fridgeCabinet", label: "냉장고장" },
+    { v: "kimchiCabinet", label: "김치냉장고장" },
+  ],
+};
 
 interface Props {
   value: Step1Data;
@@ -220,9 +256,10 @@ export default function Step1Cards({ value, onChange, onNext }: Props) {
 
 // ─── 거주공간 (아파트·주택 공통) ───
 function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n: Step1Data) => void }) {
+  const furnishings = value.roomFurnishings || {};
+
   const toggle = (v: string) => {
     if (v === "all") {
-      // "전체" 토글 → 모두 선택/해제
       const allOn = value.rooms.includes("all");
       onChange({ ...value, rooms: allOn ? [] : ["all"] });
     } else {
@@ -231,6 +268,20 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
       onChange({ ...value, rooms: next });
     }
   };
+
+  const toggleFurnishing = (roomKey: string, opt: string) => {
+    const cur = furnishings[roomKey] || [];
+    const next = cur.includes(opt) ? cur.filter((x) => x !== opt) : [...cur, opt];
+    onChange({
+      ...value,
+      roomFurnishings: { ...furnishings, [roomKey]: next },
+    });
+  };
+
+  // "전체" 또는 개별 실 선택 시 옵션 표시 대상 결정
+  const expandedRooms = value.rooms.includes("all")
+    ? Object.keys(ROOM_FURNISHING_OPTIONS)
+    : value.rooms.filter((r) => ROOM_FURNISHING_OPTIONS[r]);
 
   return (
     <>
@@ -258,6 +309,48 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
           );
         })}
       </div>
+
+      {/* 실별 가구·붙박이 옵션 — 선택된 실에 한해 노출 */}
+      {expandedRooms.length > 0 && (
+        <div className="mt-4 space-y-2">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+            추가 시공 옵션 (가구·붙박이)
+          </p>
+          {expandedRooms.map((roomKey) => {
+            const opts = ROOM_FURNISHING_OPTIONS[roomKey];
+            const roomLabel = RESIDENTIAL_ROOMS.find((r) => r.v === roomKey)?.label || roomKey;
+            const sel = furnishings[roomKey] || [];
+            return (
+              <div
+                key={roomKey}
+                className="rounded-xl border border-primary-100 bg-primary-50/30 p-2.5"
+              >
+                <p className="text-[0.7rem] font-bold text-primary-700 mb-1.5">
+                  ▸ {roomLabel}
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {opts.map((opt) => {
+                    const isSel = sel.includes(opt.v);
+                    return (
+                      <button
+                        key={opt.v}
+                        onClick={() => toggleFurnishing(roomKey, opt.v)}
+                        className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold tracking-tight transition-all ${
+                          isSel
+                            ? "border-primary-500 bg-primary-500 text-white shadow-sm"
+                            : "border-primary-200 bg-white text-primary-900/70 hover:border-primary-400 hover:text-primary-900"
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </>
   );
 }

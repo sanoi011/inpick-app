@@ -35,7 +35,8 @@ export interface RenderRoomInput {
   windowSide?: string;       // "남측" | "북측" | "외벽" | "안쪽 (창문 없음)"
   doors?: number;            // 출입문 개수
   isInteriorRoom?: boolean;  // 내부방 (욕실/드레스룸/팬트리 등 — 창문 없는 게 일반적)
-  // ※ 가구·소품 제외는 prompt 고정값으로 무조건 적용 (옵션 X)
+  // 사용자가 Step1에서 선택한 시공 옵션 (붙박이장·중문·싱크대 등) — 가구 금지 정책의 예외로 prompt 포함
+  furnishingOptions?: string[];
 }
 
 export interface RenderRoomResult {
@@ -65,6 +66,28 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   } else if (input.windows && input.windows > 0) {
     structStr = `창문 ${input.windows}개 (${input.windowSide || "외벽측"}). `;
   }
+
+  // 사용자 선택 시공 옵션 (가구 금지 정책의 예외 — 붙박이·중문·싱크대 등은 마감재로 취급)
+  const FURNISHING_LABELS: Record<string, string> = {
+    builtIn: "붙박이장 (벽면 시공형 wardrobe, 천장까지 닿는 매립형)",
+    systemCloset: "시스템 옷장 (벽 매립형, 슬라이딩 도어)",
+    doubleDoor: "현관 중문 (3연동 슬라이딩, 슬림 프레임)",
+    shoeRack_keep: "기존 신발장 유지 (외관만 매핑)",
+    shoeRack_replace: "신발장 전체 교체 (붙박이형, 천장까지)",
+    partial: "부분 교체 (전체 X, 일부 자재만)",
+    sinkUpper: "주방 싱크대 상부장",
+    sinkLower: "주방 싱크대 하부장",
+    sinkPartial: "주방 싱크대 부분 교체",
+    fridgeCabinet: "냉장고장 (붙박이형)",
+    kimchiCabinet: "김치냉장고장 (붙박이형)",
+  };
+  let furnishingStr = "";
+  if (input.furnishingOptions && input.furnishingOptions.length > 0) {
+    const labels = input.furnishingOptions
+      .map((o) => FURNISHING_LABELS[o] || o)
+      .join(", ");
+    furnishingStr = `시공 포함 항목 (필수 표현, 가구 금지 예외): ${labels}. `;
+  }
   const lightStr = input.isInteriorRoom || input.windows === 0
     ? "조명: 천장 매입 LED만, 자연광 X."
     : "조명: 자연광 + 보조 조명.";
@@ -84,8 +107,9 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     `걸레받이: 얇고 직선형(슬림 베이스보드, 5–8mm)만 허용. ` +
     // 가구·소품 제외
     `중요 — 마감재만 표현: 바닥재(마루·타일), 벽지·페인트, 천장 마감, 슬림 걸레받이, 창호·도어, 붙박이장(주방 싱크·드레스룸 한정), 천장 매입 조명. ` +
-    `STRICT NO FURNITURE: NO sofa, NO chair, NO table, NO bed, NO mattress, NO rug, NO cushion, NO curtain (only blinds/roller-shade allowed), NO bookshelf, NO TV, NO appliance(except built-in kitchen), NO art, NO plant, NO flower, NO decoration, NO book, NO dish, NO clothing. ` +
-    `절대 금지 (한글): 소파·의자·테이블·침대·매트리스·러그·쿠션·커튼(블라인드만 가능)·책장·TV·가전(붙박이 주방 외)·그림·관엽식물·꽃·장식·책·식기·옷가지 모두 제외. ` +
+    `${furnishingStr}` +
+    `STRICT NO FURNITURE (사용자가 선택한 '시공 포함 항목'은 예외): NO sofa, NO chair, NO table, NO bed, NO mattress, NO rug, NO cushion, NO curtain (only blinds/roller-shade allowed), NO bookshelf, NO TV, NO appliance(except built-in kitchen), NO art, NO plant, NO flower, NO decoration, NO book, NO dish, NO clothing. ` +
+    `절대 금지 (한글, 단 위 시공 포함 항목은 표현 필수): 소파·의자·테이블·침대·매트리스·러그·쿠션·커튼(블라인드만 가능)·책장·TV·가전(붙박이 주방 외)·그림·관엽식물·꽃·장식·책·식기·옷가지 모두 제외. ` +
     `평면도에 명시되지 않은 창문·문 임의 추가 금지. ` +
     `Result: 2026 modern empty Korean apartment shell, ready for furniture move-in. 빈 공간 그 자체.`;
 

@@ -67,6 +67,7 @@ interface Props {
   rooms: string[];
   basicInfo: BasicInfoData;
   normalizedFloorplan?: NormalizedFloorplan;
+  roomFurnishings?: Record<string, string[]>; // 실별 가구·붙박이 옵션
   value: Step2Data;
   onChange: (next: Step2Data) => void;
   tokenBalance: number;
@@ -78,6 +79,7 @@ export default function Step2Designer({
   rooms,
   basicInfo,
   normalizedFloorplan,
+  roomFurnishings,
   value,
   onChange,
   tokenBalance,
@@ -200,6 +202,7 @@ export default function Step2Designer({
           size: "1024x1024",
           windows: struct.windows,
           isInteriorRoom: struct.isInteriorRoom,
+          furnishingOptions: roomFurnishings?.[activeRoom] || [],
         }),
       });
       const data = await res.json();
@@ -261,6 +264,7 @@ export default function Step2Designer({
               size: "1024x1024",
               windows: struct.windows,
               isInteriorRoom: struct.isInteriorRoom,
+              furnishingOptions: roomFurnishings?.[tab.v] || [],
             }),
           });
           const data = await res.json();
