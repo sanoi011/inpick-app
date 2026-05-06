@@ -14,6 +14,20 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import BidProgressTracker from "@/components/bid/BidProgressTracker";
+import type { BidStage } from "@/lib/inpick/bid-pipeline";
+
+function deriveStage(estStatus: string, bids: Array<{ status: string }>): BidStage {
+  if (estStatus === "selected" || bids.some((b) => b.status === "selected")) return "selected";
+  if (estStatus === "in_progress") return "in_progress";
+  if (estStatus === "completed") return "completed";
+  if (estStatus === "warranty") return "warranty";
+  if (estStatus === "cancelled") return "cancelled";
+  if (estStatus === "closed") return "bidding_closed";
+  if (bids.length > 0) return "bidding_open";
+  if (estStatus === "open") return "rfq_published";
+  return "draft";
+}
 
 interface BidLite {
   id: string;
@@ -163,11 +177,15 @@ export default function ContractsProgressPage() {
         estimates.map((est) => {
           const sortedBids = [...est.bids].sort((a, b) => a.bid_amount - b.bid_amount);
           const selectedBid = est.bids.find((b) => b.status === "selected");
+          const stage = deriveStage(est.status, est.bids);
           return (
-            <div
-              key={est.id}
-              className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden"
-            >
+            <div key={est.id} className="space-y-3">
+              {/* 진행 단계 추적기 */}
+              <BidProgressTracker currentStage={stage} />
+
+              <div
+                className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden"
+              >
               {/* 견적 헤더 */}
               <div className="px-6 py-4 border-b border-primary-100 bg-primary-50/30 flex items-center justify-between flex-wrap gap-2">
                 <div>
@@ -299,6 +317,7 @@ export default function ContractsProgressPage() {
                     );
                   })
                 )}
+              </div>
               </div>
             </div>
           );

@@ -141,9 +141,28 @@ export default function BiddingPage() {
           }),
         );
       }
-      // TODO: 실제 RFQ insert API 호출 (/api/rfq POST)
-      await new Promise((r) => setTimeout(r, 800));
-      router.push("/contract/consumer/demo");
+
+      // 실제 RFQ 등록 + 지역 사업자 자동 fanout
+      const estimateId = sessionStorage.getItem("workflow_estimate_id") || `temp-${Date.now()}`;
+      try {
+        await fetch("/api/rfq/publish", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            estimateId,
+            noticeNo,
+            region,
+            deadlineAt: new Date(today.getTime() + period * 86400000).toISOString(),
+            budgetWon: (step1?.basicInfo.budget ?? 0) * 10000,
+            spaceType: step1?.buildingType === "apartment" ? "주거" : step1?.buildingType === "store" ? "상업" : "주거",
+            exclusiveAreaM2: step1?.basicInfo.selectedPyeong?.exclusiveArea,
+          }),
+        });
+      } catch {
+        /* fanout 실패해도 진행 */
+      }
+      // 마이페이지 계약 진행으로 이동 (입찰 비교)
+      router.push("/mypage/contracts/progress");
     } finally {
       setPosting(false);
     }
