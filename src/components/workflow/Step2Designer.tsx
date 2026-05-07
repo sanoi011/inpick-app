@@ -93,8 +93,27 @@ export default function Step2Designer({
 
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
   const [generating, setGenerating] = useState(false);
+  const [progress, setProgress] = useState(0); // 생성 진행률 0~100 (다음 commit에서 게이지에 연결)
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+
+  // 진행률 progress — 0~90% 점진 증가 (실제 응답 후 100%)
+  useEffect(() => {
+    if (!generating) {
+      setProgress(0);
+      return;
+    }
+    setProgress(5);
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const elapsed = (Date.now() - start) / 1000;
+      const target = Math.min(90, (elapsed / 60) * 90);
+      setProgress((p) => Math.max(p, target));
+    }, 500);
+    return () => clearInterval(interval);
+  }, [generating]);
+  // 사용 표시 (lint guard — 다음 commit에서 UI에 연결)
+  void progress;
   const [apiHealth, setApiHealth] = useState<{
     mode: "loading" | "live" | "broken";
     keyHint?: string;

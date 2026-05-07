@@ -10,6 +10,7 @@ import {
   Shield,
   ChevronDown,
   Bell,
+  Home,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CalculatorPopup from "@/components/contractor/CalculatorPopup";
@@ -219,6 +220,14 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
             </Link>
           </div>
           <div className="flex items-center gap-2">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1.5 rounded border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:bg-zinc-50 hover:border-primary-400 hover:text-primary-600 transition-colors"
+              title="메인 홈으로"
+            >
+              <Home className="w-3.5 h-3.5" />
+              메인 홈
+            </Link>
             <CalculatorPopup />
             <button
               className="inline-flex h-9 w-9 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
