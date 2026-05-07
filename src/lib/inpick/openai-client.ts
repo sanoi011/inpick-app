@@ -77,7 +77,7 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     partial: "부분 교체 (전체 X, 일부 자재만)",
     sinkUpper: "주방 싱크대 상부장",
     sinkLower: "주방 싱크대 하부장",
-    sinkPartial: "주방 싱크대 부분 교체",
+    sinkFull: "주방 싱크대 전체 교체 (상부장 + 하부장 일괄)",
     fridgeCabinet: "냉장고장 (붙박이형)",
     kimchiCabinet: "김치냉장고장 (붙박이형)",
   };

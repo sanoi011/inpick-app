@@ -64,14 +64,11 @@ export interface Step1Data {
 }
 
 // 실별 추가 시공 옵션 (가구·붙박이) — 실 클릭 시 펼쳐짐
+// (거실 옵션 삭제 — 사용자 요청)
 export const ROOM_FURNISHING_OPTIONS: Record<
   string,
   Array<{ v: string; label: string; note?: string }>
 > = {
-  living: [
-    { v: "builtIn", label: "붙박이장" },
-    { v: "systemCloset", label: "시스템 옷장" },
-  ],
   master: [
     { v: "builtIn", label: "붙박이장" },
     { v: "systemCloset", label: "시스템 옷장" },
@@ -91,7 +88,7 @@ export const ROOM_FURNISHING_OPTIONS: Record<
   kitchen: [
     { v: "sinkUpper", label: "싱크대 상부장" },
     { v: "sinkLower", label: "싱크대 하부장" },
-    { v: "sinkPartial", label: "싱크대 부분 교체" },
+    { v: "sinkFull", label: "싱크대 전체 교체" },
     { v: "fridgeCabinet", label: "냉장고장" },
     { v: "kimchiCabinet", label: "김치냉장고장" },
   ],
@@ -107,26 +104,35 @@ export default function Step1Cards({ value, onChange, onNext }: Props) {
   const update = <K extends keyof Step1Data>(k: K, v: Step1Data[K]) =>
     onChange({ ...value, [k]: v });
 
-  // 기본정보 완료
+  // 기본정보 완료 — 평형 선택만 있어도 진행 가능 (grandPlanUrl 강제 X)
   const inputDone =
-    (value.basicInfo.mode === "address" && !!value.basicInfo.selectedPyeong?.grandPlanUrl) ||
+    (value.basicInfo.mode === "address" &&
+      (!!value.basicInfo.selectedPyeong || !!value.basicInfo.selectedAddress)) ||
     (value.basicInfo.mode === "upload" && !!value.basicInfo.uploadedFloorplan?.dataUrl) ||
     (value.basicInfo.mode === "lidar" && !!value.basicInfo.lidarScan?.dataUrl);
-  const budgetDone = value.basicInfo.budget > 0 && value.basicInfo.expansionType !== null;
+  // expansionType 미선택 시 'basic' 자동 기본값으로 통과
+  const budgetDone = value.basicInfo.budget > 0;
   const basicDone = inputDone && budgetDone;
 
-  // 시공범위 완료
+  // 시공범위 완료 — 건물유형 + 1개 이상 옵션 (방·층수·용도 중 하나)
   const isResidential = value.buildingType === "apartment" || value.buildingType === "house";
   const isCommercial = value.buildingType === "store" || value.buildingType === "etc";
   const scopeOk =
     value.buildingType !== null &&
     (isResidential
-      ? value.rooms.length > 0 && (value.buildingType === "apartment" || !!value.floorLevel)
+      ? value.rooms.length > 0
       : isCommercial
-        ? !!value.floorLevel && !!value.storeUsage
+        ? !!value.storeUsage
         : false);
 
   const allOk = basicDone && scopeOk;
+  // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
+  const missing: string[] = [];
+  if (!inputDone) missing.push("주소·평형 또는 도면");
+  if (!budgetDone) missing.push("예산");
+  if (!value.buildingType) missing.push("건물 유형");
+  if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
+  if (isCommercial && !value.storeUsage) missing.push("용도");
 
   return (
     <div className="grid gap-5 lg:grid-cols-2 lg:gap-7">
@@ -236,19 +242,29 @@ export default function Step1Cards({ value, onChange, onNext }: Props) {
           </>
         )}
 
-        {allOk && (
-          <motion.button
-            onClick={onNext}
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary-500 px-4 py-3 text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
-          >
-            내 공간 꾸미기
-            <ChevronDown className="h-3.5 w-3.5 animate-bounce-down" />
-          </motion.button>
-        )}
+        {/* 다음 단계 버튼 — 항상 노출 (allOk 시 활성, 아니면 비활성 + 안내) */}
+        <motion.button
+          onClick={() => allOk && onNext()}
+          disabled={!allOk}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          whileHover={allOk ? { scale: 1.02 } : undefined}
+          whileTap={allOk ? { scale: 0.98 } : undefined}
+          className={`mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold transition-all ${
+            allOk
+              ? "bg-primary-500 text-white shadow-cta hover:bg-primary-600 cursor-pointer"
+              : "bg-zinc-200 text-zinc-500 cursor-not-allowed"
+          }`}
+        >
+          {allOk ? (
+            <>
+              내 공간 꾸미기
+              <ChevronDown className="h-3.5 w-3.5 animate-bounce-down" />
+            </>
+          ) : (
+            <>다음 단계 — 입력 필요: {missing.join(" · ")}</>
+          )}
+        </motion.button>
       </Card>
     </div>
   );

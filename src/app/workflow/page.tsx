@@ -22,7 +22,7 @@ export default function WorkflowPage() {
     basicInfo: {
       mode: "address",
       budget: 3500,
-      expansionType: null,
+      expansionType: "basic", // 기본형 자동 선택 (사용자가 변경 가능)
     },
     buildingType: null,
     rooms: [],
