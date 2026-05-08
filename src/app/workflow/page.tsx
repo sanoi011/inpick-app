@@ -267,10 +267,34 @@ export default function WorkflowPage() {
                     onChange={setStep1}
                     onNext={goNext}
                     onReset={() => {
+                      // BasicInfoData / Step1Data 모든 optional 필드까지 명시적 초기화
                       setStep1({
-                        basicInfo: { mode: "address", budget: 3500, expansionType: "basic" },
+                        basicInfo: {
+                          mode: "address",
+                          budget: 3500,
+                          expansionType: "basic",
+                          selectedAddress: undefined,
+                          selectedComplex: undefined,
+                          selectedPyeong: undefined,
+                          uploadedFloorplan: undefined,
+                          lidarScan: undefined,
+                          cleanedImageUrl: undefined,
+                          dimensionOverlaySvg: undefined,
+                          totalWidthMm: undefined,
+                          totalDepthMm: undefined,
+                          normalizing: false,
+                          normalizedRooms: undefined,
+                          normalizedOpenings: undefined,
+                          normalizedNotes: undefined,
+                          normalizedPyeong: undefined,
+                        },
                         buildingType: null,
                         rooms: [],
+                        floorLevel: undefined,
+                        storeUsage: undefined,
+                        storeUsageEtc: undefined,
+                        normalizedFloorplan: undefined,
+                        roomFurnishings: undefined,
                       });
                       setStep2({
                         selectedByRoom: {},
