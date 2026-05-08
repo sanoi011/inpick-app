@@ -49,8 +49,8 @@ const METHOD_LABELS: Record<string, string> = {
   gpt4o_vision: "GPT-4o Vision (정형화)",
   normalize_floorplan: "/api/normalize-floorplan",
   extract_regions: "자재 영역 추출 (Vision)",
-  render_room: "AI 디자인 렌더 (gpt-image-1)",
-  refine_render: "고화질 재렌더 (gpt-image-1 inpaint)",
+  render_room: "AI 디자인 렌더 (gpt-image-2)",
+  refine_render: "고화질 재렌더 (gpt-image-2 inpaint)",
   // legacy
   gemini_vision: "Gemini Vision (구)",
   dxf_parser: "DXF 파서 (구)",

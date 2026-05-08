@@ -142,7 +142,7 @@ export default function AdminDashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
           <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
             <p className="font-bold text-amber-700">이미지 생성</p>
-            <p className="text-amber-900/80 mt-1">gpt-image-2 → gpt-image-1 → dall-e-3 (자동 폴백)</p>
+            <p className="text-amber-900/80 mt-1">gpt-image-2 단일 (폴백 없음 · 실패 시 토큰 차감 X)</p>
             <p className="text-amber-700/60 mt-1 tabular">/api/inpick/render-room</p>
           </div>
           <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
@@ -152,7 +152,7 @@ export default function AdminDashboardPage() {
           </div>
           <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
             <p className="font-bold text-purple-700">고화질 재렌더</p>
-            <p className="text-purple-900/80 mt-1">gpt-image-1 inpaint (마스크 기반)</p>
+            <p className="text-purple-900/80 mt-1">gpt-image-2 inpaint (마스크 기반 · 폴백 없음)</p>
             <p className="text-purple-700/60 mt-1 tabular">/api/inpick/refine-render</p>
           </div>
           <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">

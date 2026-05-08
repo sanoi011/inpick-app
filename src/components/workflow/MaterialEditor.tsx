@@ -6,7 +6,7 @@
  * 1. "자재 영역 분석 (1토큰)" → /api/inpick/extract-material-regions
  * 2. SVG 폴리곤 오버레이 → 사용자가 영역 클릭
  * 3. 자재 입력 모달 → 영역 자재 수정
- * 4. "고화질 재렌더 (2토큰)" → /api/inpick/refine-render (gpt-image-1 inpaint)
+ * 4. "고화질 재렌더 (2토큰)" → /api/inpick/refine-render (gpt-image-2 inpaint)
  *
  * 자재 수정을 안 하면 그냥 다음 단계로 — 모든 단계가 옵셔널.
  */
@@ -199,7 +199,7 @@ export default function MaterialEditor({
             고화질 재렌더 중입니다
           </p>
           <p className="mt-1 text-xs text-primary-900/60">
-            gpt-image-1로 수정 영역만 inpaint — 30~60초 소요
+            gpt-image-2로 수정 영역만 inpaint — 40~80초 소요
           </p>
         </div>
       )}
@@ -367,7 +367,7 @@ async function buildMask(
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext("2d")!;
-  // gpt-image-1 마스크 규칙: 투명/검정 = 유지, 흰색 = 재생성
+  // gpt-image-2 마스크 규칙: 투명/검정 = 유지, 흰색 = 재생성
   // 안전하게 RGBA: 검정 채우기 후 영역만 흰색
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, w, h);

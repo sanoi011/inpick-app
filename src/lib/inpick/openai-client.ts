@@ -3,7 +3,7 @@
  * 환경변수 OPENAI_API_KEY 자동 로드.
  *
  * 기능:
- *  - generateRoomRender: 실별 인테리어 렌더 (gpt-image-1 또는 dall-e-3)
+ *  - generateRoomRender: 실별 인테리어 렌더 (gpt-image-2 단일, 폴백 없음)
  *  - analyzeImageVision: 평면도/렌더 이미지 분석 (gpt-4o vision)
  *  - generateElevationSVG: 입면전개도 SVG 코드 생성 (gpt-4o)
  */

@@ -382,7 +382,7 @@ function AddressMode({ value, onChange }: Props) {
     });
     if (!p.grandPlanUrl) return;
     try {
-      // 평면도 raster cleaning은 비활성화 (gpt-image-1이 도면 구조 깨뜨림)
+      // 평면도 raster cleaning은 비활성화 (이미지 edit이 도면 구조를 깨뜨림)
       // 원본 raster + Vision 추출 치수 SVG 오버레이만 사용
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",

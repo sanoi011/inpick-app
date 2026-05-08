@@ -1,7 +1,7 @@
 /**
  * POST /api/inpick/normalize-floorplan
  *
- * 네이버/업로드 평면도 → gpt-image-1 image edit로 워터마크 제거 + 바닥 고화질화 (raster 유지)
+ * 네이버/업로드 평면도 → gpt-image-2 image edit로 워터마크 제거 + 바닥 고화질화 (raster 유지)
  *                    → GPT-4o Vision으로 실 layout 추출 (mm)
  *                    → dimension overlay SVG 생성 (raster 위에 absolute로 얹힘)
  *
@@ -85,7 +85,7 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 - 명시 치수 우선, 미표시면 표준 비율 추정
 - 욕실/침실 2개+면 "욕실1","욕실2"`;
 
-/** 평면도 raster cleaning — gpt-image-2 → gpt-image-1 fallback */
+/** 평면도 raster cleaning — gpt-image-2 단일 (사용자 정책: 폴백 없음) */
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
@@ -98,34 +98,30 @@ async function cleanFloorplanRaster(
     "깨끗한 흰 배경. 한국 인테리어 평면도 스타일. " +
     "치수 텍스트는 그리지 마세요 (별도 오버레이됨).";
 
-  const errors: string[] = [];
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
-    const form = new FormData();
-    form.append("model", modelName);
-    form.append(
-      "image",
-      new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
-      "image.png",
-    );
-    form.append("prompt", prompt);
-    form.append("size", "1024x1024");
-    form.append("quality", "high");
+  const form = new FormData();
+  form.append("model", "gpt-image-2");
+  form.append(
+    "image",
+    new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
+    "image.png",
+  );
+  form.append("prompt", prompt);
+  form.append("size", "1024x1024");
+  form.append("quality", "high");
 
-    const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const b64 = data.data?.[0]?.b64_json;
-      if (b64) return { b64, costUsd: 0.19, model: modelName };
-    } else {
-      const err = await res.text();
-      errors.push(`${modelName} ${res.status}: ${err.slice(0, 200)}`);
-    }
+  const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}` },
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`gpt-image-2 ${res.status}: ${err.slice(0, 300)}`);
   }
-  throw new Error(`cleaning 실패 — ${errors.join(" | ")}`);
+  const data = await res.json();
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) throw new Error("gpt-image-2 응답에 이미지 데이터 없음");
+  return { b64, costUsd: 0.19, model: "gpt-image-2" };
 }
 
 export async function POST(req: NextRequest) {
