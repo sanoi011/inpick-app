@@ -248,15 +248,18 @@ export default function Step2Designer({
       });
       const data = await res.json();
       if (!res.ok || !data.imageUrl) {
-        const baseMsg = data.error || "렌더링 실패";
-        const hintMsg = data.hint ? ` — ${data.hint}` : "";
-        throw new Error(baseMsg + hintMsg);
+        // gpt-image-2 단일 정책 — 실패 시 폴백 없음, 토큰 차감 없음
+        const status = data.model_status as string | undefined;
+        const baseMsg = data.error || "gpt-image-2 호출 실패";
+        const hintMsg = data.hint ? `\n→ ${data.hint}` : "";
+        const policyTag = "(gpt-image-2 단일 모델 정책 · 토큰 차감 안 됨)";
+        throw new Error(`[${status || "error"}] ${baseMsg}${hintMsg}\n${policyTag}`);
       }
       const item: RenderItem = {
         url: data.imageUrl,
         prompt: currentPrompt,
         revisedPrompt: data.revisedPrompt,
-        costUsd: data.costUsd ?? 0.08,
+        costUsd: data.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
       };
       const nextRenders = [...renders, item];
@@ -309,7 +312,11 @@ export default function Step2Designer({
           });
           const data = await res.json();
           if (!res.ok || !data.imageUrl) {
-            throw new Error(`${tab.label}: ${data.error || "렌더링 실패"}${data.hint ? ` — ${data.hint}` : ""}`);
+            const status = data.model_status as string | undefined;
+            throw new Error(
+              `${tab.label} [${status || "error"}]: ${data.error || "gpt-image-2 호출 실패"}` +
+              (data.hint ? ` → ${data.hint}` : ""),
+            );
           }
           return {
             tabKey: tab.v,
@@ -317,7 +324,7 @@ export default function Step2Designer({
               url: data.imageUrl,
               prompt: conceptPrompt,
               revisedPrompt: data.revisedPrompt,
-              costUsd: data.costUsd ?? 0.08,
+              costUsd: data.costUsd ?? 0.19,
               timestamp: new Date().toISOString(),
             } as RenderItem,
           };
@@ -659,7 +666,7 @@ export default function Step2Designer({
                   </div>
                   <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
                     <span className="tabular font-bold">{Math.round(progress)}%</span> · gpt-image-2
-                    고퀄리티 생성 중 — 40~80초 소요됩니다
+                    단일 모델 호출 — 40~80초 소요. 실패 시 토큰 차감 없음
                   </p>
                 </div>
               </div>
@@ -713,7 +720,7 @@ export default function Step2Designer({
             {errorMsg && (
               <div className="mt-2 flex items-start gap-1.5 text-[0.78rem] text-amber-700 leading-relaxed">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
-                <span>{errorMsg}</span>
+                <span className="whitespace-pre-wrap">{errorMsg}</span>
               </div>
             )}
           </div>

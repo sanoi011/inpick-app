@@ -116,78 +116,21 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // 모델 폴백 체인 (사용자 정책: gpt-image-2 우선) — Vercel maxDuration 300초 한도
-  // gpt-image-2: 40~80초, 최고 품질, 한국어 instruction-follow 우수, $0.19/image
-  // gpt-image-1: 30~60초, 차선, $0.19/image
-  // dall-e-3 standard: 15~25초, 최후 fallback, $0.04/image
-  const errors: string[] = [];
-
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 280_000);
-    try {
-      const body: Record<string, unknown> = {
-        model: modelName,
-        prompt,
-        size,
-        n: 1,
-        quality: "high",
-        output_format: "png",
-      };
-      const res = await fetch(`${OPENAI_BASE}/images/generations`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const b64 = data.data?.[0]?.b64_json;
-        const url = data.data?.[0]?.url;
-        if (b64) {
-          return {
-            imageUrl: `data:image/png;base64,${b64}`,
-            imageBase64: b64,
-            revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
-            model: modelName,
-            costUsd: 0.19,
-          };
-        }
-        if (url) {
-          return {
-            imageUrl: url,
-            revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
-            model: modelName,
-            costUsd: 0.19,
-          };
-        }
-        errors.push(`${modelName}: empty response`);
-      } else {
-        const err = await res.text();
-        errors.push(`${modelName} ${res.status}: ${err.slice(0, 200)}`);
-      }
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`${modelName} throw: ${msg.slice(0, 150)}`);
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-
-  // 최후 fallback — dall-e-3 standard
+  // ────────────────────────────────────────────────────────
+  // 사용자 정책: gpt-image-2 단일 모델만 사용. 폴백 X.
+  // 실패 시 즉시 throw → 토큰 차감 차단 + 사용자에게 명확한 hint
+  // gpt-image-2: 40~80초, $0.19/image, 한국어 instruction-follow 우수
+  // ────────────────────────────────────────────────────────
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 50_000);
+  const timeoutId = setTimeout(() => controller.abort(), 280_000);
   try {
-    const body = {
-      model: "dall-e-3",
+    const body: Record<string, unknown> = {
+      model: "gpt-image-2",
       prompt,
       size,
       n: 1,
-      quality: "standard",
-      response_format: "url",
+      quality: "high",
+      output_format: "png",
     };
     const res = await fetch(`${OPENAI_BASE}/images/generations`, {
       method: "POST",
@@ -199,18 +142,38 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
       signal: controller.signal,
     });
     if (!res.ok) {
-      const err = await res.text();
+      const errText = await res.text();
+      // 4xx는 입력/권한, 5xx는 OpenAI 측 → 그대로 throw하여 라우트가 hint 매핑
       throw new Error(
-        `모든 모델 실패 — ${errors.join(" | ")} | dall-e-3 ${res.status}: ${err.slice(0, 200)}`
+        `gpt-image-2 ${res.status}: ${errText.slice(0, 400)}`,
       );
     }
     const data = await res.json();
-    return {
-      imageUrl: data.data?.[0]?.url,
-      revisedPrompt: data.data?.[0]?.revised_prompt,
-      model: "dall-e-3",
-      costUsd: size === "1024x1024" ? 0.04 : 0.08,
-    };
+    const b64 = data.data?.[0]?.b64_json;
+    const url = data.data?.[0]?.url;
+    if (b64) {
+      return {
+        imageUrl: `data:image/png;base64,${b64}`,
+        imageBase64: b64,
+        revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
+        model: "gpt-image-2",
+        costUsd: 0.19,
+      };
+    }
+    if (url) {
+      return {
+        imageUrl: url,
+        revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
+        model: "gpt-image-2",
+        costUsd: 0.19,
+      };
+    }
+    throw new Error("gpt-image-2: 응답에 이미지 데이터 없음");
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error("gpt-image-2 요청 시간 초과 (280초). OpenAI 응답 지연.");
+    }
+    throw e;
   } finally {
     clearTimeout(timeoutId);
   }
