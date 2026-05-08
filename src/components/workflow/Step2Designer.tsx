@@ -130,7 +130,8 @@ export default function Step2Designer({
     const start = Date.now();
     const interval = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      const target = Math.min(90, (elapsed / 60) * 90);
+      // gpt-image-2 실응답 ~60s, 폴백까지 ~120s 가정
+      const target = Math.min(90, (elapsed / 90) * 90);
       setProgress((p) => Math.max(p, target));
     }, 400);
     return () => clearInterval(interval);
@@ -657,8 +658,8 @@ export default function Step2Designer({
                     />
                   </div>
                   <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
-                    <span className="tabular font-bold">{Math.round(progress)}%</span> · 고퀄리티
-                    이미지 생성으로 30~60초 소요됩니다
+                    <span className="tabular font-bold">{Math.round(progress)}%</span> · gpt-image-2
+                    고퀄리티 생성 중 — 40~80초 소요됩니다
                   </p>
                 </div>
               </div>

@@ -116,9 +116,68 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // dall-e-3 standard (15~25초 응답, Vercel 60초 한계 안전)
-  // gpt-image-1/2는 40~80초 걸려 Vercel Pro에서도 timeout — 별도 refine-render endpoint에서만 사용
-  // AbortSignal 50초로 명시 — 가능한 빠른 실패
+  // 모델 폴백 체인 (사용자 정책: gpt-image-2 우선) — Vercel maxDuration 300초 한도
+  // gpt-image-2: 40~80초, 최고 품질, 한국어 instruction-follow 우수, $0.19/image
+  // gpt-image-1: 30~60초, 차선, $0.19/image
+  // dall-e-3 standard: 15~25초, 최후 fallback, $0.04/image
+  const errors: string[] = [];
+
+  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 280_000);
+    try {
+      const body: Record<string, unknown> = {
+        model: modelName,
+        prompt,
+        size,
+        n: 1,
+        quality: "high",
+        output_format: "png",
+      };
+      const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data.data?.[0]?.b64_json;
+        const url = data.data?.[0]?.url;
+        if (b64) {
+          return {
+            imageUrl: `data:image/png;base64,${b64}`,
+            imageBase64: b64,
+            revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
+            model: modelName,
+            costUsd: 0.19,
+          };
+        }
+        if (url) {
+          return {
+            imageUrl: url,
+            revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
+            model: modelName,
+            costUsd: 0.19,
+          };
+        }
+        errors.push(`${modelName}: empty response`);
+      } else {
+        const err = await res.text();
+        errors.push(`${modelName} ${res.status}: ${err.slice(0, 200)}`);
+      }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      errors.push(`${modelName} throw: ${msg.slice(0, 150)}`);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  // 최후 fallback — dall-e-3 standard
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 50_000);
   try {
@@ -141,14 +200,16 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     });
     if (!res.ok) {
       const err = await res.text();
-      throw new Error(`OpenAI image gen failed: ${res.status} ${err.slice(0, 300)}`);
+      throw new Error(
+        `모든 모델 실패 — ${errors.join(" | ")} | dall-e-3 ${res.status}: ${err.slice(0, 200)}`
+      );
     }
     const data = await res.json();
     return {
       imageUrl: data.data?.[0]?.url,
       revisedPrompt: data.data?.[0]?.revised_prompt,
       model: "dall-e-3",
-      costUsd: size === "1024x1024" ? 0.04 : 0.08, // standard quality
+      costUsd: size === "1024x1024" ? 0.04 : 0.08,
     };
   } finally {
     clearTimeout(timeoutId);
