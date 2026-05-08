@@ -116,58 +116,8 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // 모델 폴백 — Vercel function 60초 한계로 dall-e-3 standard 우선 (15~25초 응답)
-  // gpt-image-1/2는 40~80초 걸려서 Vercel Pro에서도 timeout 발생
-  // 빠른 1차 미리보기는 dall-e-3 standard, 고화질 재렌더는 별도 endpoint(refine-render)에서 gpt-image-1 사용
-  for (const modelName of [] as string[]) {
-    try {
-      const body: Record<string, unknown> = {
-        model: modelName,
-        prompt,
-        size,
-        n: 1,
-        quality: "high",
-        output_format: "png",
-      };
-      const res = await fetch(`${OPENAI_BASE}/images/generations`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const b64 = data.data?.[0]?.b64_json;
-        const url = data.data?.[0]?.url;
-        if (b64) {
-          return {
-            imageUrl: `data:image/png;base64,${b64}`,
-            imageBase64: b64,
-            revisedPrompt: prompt,
-            model: modelName,
-            costUsd: 0.19,
-          };
-        }
-        if (url) {
-          return {
-            imageUrl: url,
-            revisedPrompt: prompt,
-            model: modelName,
-            costUsd: 0.19,
-          };
-        }
-      } else {
-        const errText = await res.text();
-        console.warn(`[render] ${modelName} ${res.status}: ${errText.slice(0, 200)}`);
-      }
-    } catch (e) {
-      console.warn(`[render] ${modelName} throw:`, e);
-    }
-  }
-
   // dall-e-3 standard (15~25초 응답, Vercel 60초 한계 안전)
+  // gpt-image-1/2는 40~80초 걸려 Vercel Pro에서도 timeout — 별도 refine-render endpoint에서만 사용
   // AbortSignal 50초로 명시 — 가능한 빠른 실패
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 50_000);

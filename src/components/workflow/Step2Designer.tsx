@@ -116,7 +116,6 @@ export default function Step2Designer({
     pingError?: string;
   }>({ mode: "loading" });
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const promptRef = useRef<HTMLTextAreaElement>(null);
 
   // Health check
   useEffect(() => {
@@ -677,7 +676,6 @@ export default function Step2Designer({
             <div className="flex items-end gap-2">
               <div className="flex-1 rounded-2xl border border-primary-200 bg-white/90 px-4 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
                 <textarea
-                  ref={promptRef}
                   value={currentPrompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   onKeyDown={(e) => {
