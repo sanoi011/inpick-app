@@ -99,8 +99,12 @@ export default function Step2Designer({
   onComplete,
 }: Props) {
   const availableTabs = useMemo(() => {
-    if (rooms.includes("all")) return ROOM_TABS.filter((t) => t.v !== "all");
-    return ROOM_TABS.filter((t) => rooms.includes(t.v));
+    // "전체" 탭은 항상 최상단에 표시 — 한 번에 모든 방 생성용
+    const allTab = ROOM_TABS.find((t) => t.v === "all")!;
+    const roomTabs = rooms.includes("all")
+      ? ROOM_TABS.filter((t) => t.v !== "all")
+      : ROOM_TABS.filter((t) => rooms.includes(t.v));
+    return [allTab, ...roomTabs];
   }, [rooms]);
 
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
@@ -110,26 +114,7 @@ export default function Step2Designer({
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
-  const [apiHealth, setApiHealth] = useState<{
-    mode: "loading" | "live" | "broken";
-    keyHint?: string;
-    pingError?: string;
-  }>({ mode: "loading" });
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  // Health check
-  useEffect(() => {
-    fetch("/api/inpick/health")
-      .then((r) => r.json())
-      .then((d) =>
-        setApiHealth({
-          mode: d.openai?.mode === "live" ? "live" : "broken",
-          keyHint: d.openai?.keyHint,
-          pingError: d.openai?.ping?.error,
-        }),
-      )
-      .catch((e) => setApiHealth({ mode: "broken", pingError: String(e) }));
-  }, []);
 
   // 진행률 게이지 — 0→90% 점진 증가, 응답 후 100%
   useEffect(() => {
@@ -187,13 +172,14 @@ export default function Step2Designer({
     return area ? classifyPyeong(area) : "30평";
   }, [basicInfo.selectedPyeong?.exclusiveArea]);
 
+  const realRoomTabs = useMemo(() => availableTabs.filter((t) => t.v !== "all"), [availableTabs]);
   const renders = value.rendersByRoom[activeRoom] || [];
   const currentPrompt = value.promptByRoom?.[activeRoom] || "";
   const selectedIdx =
     value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
   const hasGenerated = renders.length > 0;
-  const allRoomsDecided = availableTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
+  const allRoomsDecided = realRoomTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
 
   // 채팅 히스토리 자동 스크롤
   useEffect(() => {
@@ -228,6 +214,13 @@ export default function Step2Designer({
   const handleGenerate = async () => {
     if (!currentPrompt.trim()) {
       setErrorMsg("프롬프트를 입력해주세요. 예: '모던 미니멀, 화이트 + 라이트 우드'");
+      return;
+    }
+    // "전체" 탭에서는 모든 방에 일괄 생성
+    if (activeRoom === "all") {
+      const promptToUse = currentPrompt;
+      setPrompt("");
+      await handleBulkGenerate(promptToUse);
       return;
     }
     setErrorMsg(null);
@@ -364,47 +357,20 @@ export default function Step2Designer({
     });
   };
 
-  const completedCount = availableTabs.filter(
+  const completedCount = realRoomTabs.filter(
     (t) => (value.rendersByRoom[t.v] || []).length > 0,
   ).length;
-  const totalCount = availableTabs.length;
+  const totalCount = realRoomTabs.length;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[260px_1fr] items-stretch">
       {/* ─── 좌측 툴바 ─── */}
-      <aside className="space-y-3">
-        {/* AI 연결 상태 */}
-        <div
-          className={`rounded-xl border px-3 py-2 text-xs font-bold ${
-            apiHealth.mode === "live"
-              ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-              : apiHealth.mode === "broken"
-                ? "border-red-300 bg-red-50 text-red-700"
-                : "border-zinc-300 bg-white text-zinc-500"
-          }`}
-        >
-          <span>
-            {apiHealth.mode === "live"
-              ? "● AI 연결됨"
-              : apiHealth.mode === "broken"
-                ? "● 연결 끊김"
-                : "● 확인 중…"}
-          </span>
-          {apiHealth.mode === "broken" && (
-            <p className="mt-0.5 text-[0.65rem] font-normal leading-tight">
-              {apiHealth.pingError ? apiHealth.pingError.slice(0, 80) : "OpenAI API 키 확인 필요"}
-            </p>
-          )}
-        </div>
-
-        {/* 컨셉 한번에 적용 — 좌측 상단 (방 선택 위) */}
+      <aside className="flex flex-col gap-3">
+        {/* 전체 인테리어 이미지 한번에 생성 — 좌측 상단 (방 선택 위) */}
         <div className="rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-primary-700">컨셉 한번에</p>
-            <span className="rounded-full bg-emerald-100 border border-emerald-300 px-1.5 py-0.5 text-[0.6rem] font-bold text-emerald-700">
-              무료
-            </span>
-          </div>
+          <p className="text-xs font-bold text-primary-700 mb-2">
+            전체 인테리어 이미지 한번에 생성
+          </p>
           <div className="grid grid-cols-2 gap-1.5">
             {STYLE_PRESETS.map((preset) => (
               <button
@@ -412,7 +378,7 @@ export default function Step2Designer({
                 onClick={() => handleBulkGenerate(preset)}
                 disabled={
                   generating ||
-                  !availableTabs.some((t) => (value.rendersByRoom[t.v] || []).length === 0)
+                  !availableTabs.some((t) => t.v !== "all" && (value.rendersByRoom[t.v] || []).length === 0)
                 }
                 className="rounded-lg border border-primary-100 bg-primary-50/50 px-2 py-1.5 text-[0.7rem] font-semibold text-primary-900 hover:bg-primary-100 hover:border-primary-300 disabled:opacity-30 transition-all"
               >
@@ -433,9 +399,10 @@ export default function Step2Designer({
           </div>
           <div className="space-y-1">
             {availableTabs.map((t) => {
+              const isAll = t.v === "all";
               const sel = activeRoom === t.v;
               const count = (value.rendersByRoom[t.v] || []).length;
-              const decided = count > 0;
+              const decided = !isAll && count > 0;
               const Icon = t.icon;
               return (
                 <div key={t.v} className="relative">
@@ -444,12 +411,21 @@ export default function Step2Designer({
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveRoom(t.v);
-                      setOpenRoomPopup(openRoomPopup === t.v ? null : t.v);
+                      // "전체" 탭은 popup 비활성화 (전체 컨셉 입력용)
+                      if (isAll) {
+                        setOpenRoomPopup(null);
+                      } else {
+                        setOpenRoomPopup(openRoomPopup === t.v ? null : t.v);
+                      }
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all ${
                       sel
-                        ? "bg-primary-500 text-white shadow-cta"
-                        : "bg-primary-50/30 text-primary-900/70 hover:bg-primary-100 hover:text-primary-900"
+                        ? isAll
+                          ? "bg-gradient-to-r from-primary-500 to-amber-400 text-white shadow-cta"
+                          : "bg-primary-500 text-white shadow-cta"
+                        : isAll
+                          ? "bg-gradient-to-r from-primary-50 to-amber-50 text-primary-900 border border-primary-200 hover:from-primary-100 hover:to-amber-100"
+                          : "bg-primary-50/30 text-primary-900/70 hover:bg-primary-100 hover:text-primary-900"
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -467,9 +443,9 @@ export default function Step2Designer({
                       </span>
                     )}
                   </button>
-                  {/* popup — 클릭 토글만 */}
+                  {/* popup — 클릭 토글만, "전체" 제외 */}
                   <AnimatePresence>
-                    {openRoomPopup === t.v && (
+                    {!isAll && openRoomPopup === t.v && (
                       <motion.div
                         data-room-popup
                         initial={{ opacity: 0, x: -8 }}
@@ -523,8 +499,8 @@ export default function Step2Designer({
           </p>
         </div>
 
-        {/* 진행 상황 */}
-        <div className="rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
+        {/* 진행 상황 — 좌측 컬럼 하단으로 push (메인 캔버스 하단과 정렬) */}
+        <div className="mt-auto rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-xs font-bold text-primary-700">진행 상황</p>
             <span className="text-[0.65rem] tabular font-bold text-primary-900">
@@ -550,8 +526,8 @@ export default function Step2Designer({
       </aside>
 
       {/* ─── 메인: ChatGPT 스타일 채팅 + 이미지 오버랩 ─── */}
-      <section className="relative">
-        <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card min-h-[72vh] flex flex-col overflow-hidden">
+      <section className="relative flex flex-col">
+        <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] flex flex-col overflow-hidden">
           {/* 채팅 헤더 */}
           <div className="px-5 py-3 border-b border-primary-100 flex items-center justify-between bg-gradient-to-r from-primary-50/50 to-amber-50/30">
             <div className="flex items-center gap-2">
@@ -561,12 +537,18 @@ export default function Step2Designer({
               </p>
             </div>
             <p className="text-[0.7rem] text-primary-900/50 tabular">
-              치수 ·{" "}
-              {(() => {
-                const tab = ROOM_TABS.find((t) => t.v === activeRoom);
-                const d = tab ? roomDims[tab.dimKey] : null;
-                return d ? `${d.widthMm}×${d.depthMm}×${d.heightMm}mm` : "—";
-              })()}
+              {activeRoom === "all" ? (
+                <>모든 방 일괄 · {realRoomTabs.length}개 방</>
+              ) : (
+                <>
+                  치수 ·{" "}
+                  {(() => {
+                    const tab = ROOM_TABS.find((t) => t.v === activeRoom);
+                    const d = tab ? roomDims[tab.dimKey] : null;
+                    return d ? `${d.widthMm}×${d.depthMm}×${d.heightMm}mm` : "—";
+                  })()}
+                </>
+              )}
             </p>
           </div>
 
@@ -579,13 +561,27 @@ export default function Step2Designer({
                     <Sparkles className="h-8 w-8" />
                   </div>
                   <h3 className="text-2xl font-extrabold tracking-tight text-primary-900">
-                    무엇을 만들고 싶으세요?
+                    {activeRoom === "all"
+                      ? "전체 컨셉을 한 번에 만들어볼까요?"
+                      : "무엇을 만들고 싶으세요?"}
                   </h3>
                   <p className="mt-2 text-sm text-primary-900/60 leading-relaxed">
-                    스타일·자재·분위기를 자유롭게 적어주세요.
-                    <br />
-                    또는 좌측 <span className="font-bold text-primary-700">컨셉 한번에</span>{" "}
-                    프리셋을 클릭하세요.
+                    {activeRoom === "all" ? (
+                      <>
+                        하나의 컨셉으로 <span className="font-bold text-primary-700">모든 방</span>에
+                        같은 스타일로 일괄 생성됩니다.
+                        <br />
+                        프롬프트 입력 또는 좌측 프리셋 클릭.
+                      </>
+                    ) : (
+                      <>
+                        스타일·자재·분위기를 자유롭게 적어주세요.
+                        <br />
+                        또는 좌측{" "}
+                        <span className="font-bold text-primary-700">전체 인테리어 이미지 한번에 생성</span>{" "}
+                        프리셋을 클릭하세요.
+                      </>
+                    )}
                   </p>
                   <div className="mt-5 flex flex-wrap justify-center gap-1.5">
                     {STYLE_PRESETS.slice(0, 4).map((p) => (
@@ -685,9 +681,11 @@ export default function Step2Designer({
                     }
                   }}
                   placeholder={
-                    hasGenerated
-                      ? "수정 요청: 예) 소파를 회색 패브릭으로, TV 뒷벽 우드 패널..."
-                      : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
+                    activeRoom === "all"
+                      ? "전체 컨셉 입력 — 모든 방에 같은 스타일로 일괄 생성. 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
+                      : hasGenerated
+                        ? "수정 요청: 예) 소파를 회색 패브릭으로, TV 뒷벽 우드 패널..."
+                        : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
                   }
                   rows={hasGenerated ? 1 : 2}
                   className="w-full resize-none bg-transparent text-sm text-primary-900 outline-none placeholder:text-primary-900/40"
