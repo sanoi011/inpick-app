@@ -5,6 +5,7 @@ reference/
 e2e/
 test-results/
 /supabase/
+runpod_serverless/
 *.py
 *.pdf
 *.dwg
