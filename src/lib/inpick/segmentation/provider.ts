@@ -1,10 +1,10 @@
 /**
- * Segmentation provider 인터페이스 — 가이드 §3 Tech Stack과 일관.
- * 두 구현체:
- *   - gpt-4o-vision: GPT-4o가 polygon 좌표를 JSON으로 직접 출력 (인프라 없음, 정확도 낮음)
- *   - sam-2.1: Replicate.com SAM 2 API → mask → contour tracing → polygon (정확도 높음)
+ * Segmentation provider 인터페이스.
  *
- * 환경변수 SEGMENTATION_PROVIDER 로 swap. 기본값은 gpt-4o-vision.
+ * 가이드(InPick_STEP02_Workflow.md) 정책:
+ *   - SAM 2.1은 별도 GPU 서버에서 직접 운영 (Replicate / 외부 SaaS 일체 금지)
+ *   - GPU 서버 미준비 단계에서는 GPT-4o Vision provider만 사용
+ *   - 추후 별도 GPU 서버 endpoint 만들면 sam-direct-provider.ts 추가
  */
 import type { SegmentationData } from "@/types/segmentation";
 
@@ -16,18 +16,11 @@ export interface SegmentInput {
 }
 
 export interface SegmentationProvider {
-  name: "gpt-4o-vision" | "sam-2.1" | "sam-3";
+  name: "gpt-4o-vision" | "sam-2.1-direct";
   segment(input: SegmentInput): Promise<SegmentationData>;
 }
 
-export function pickProvider(): "gpt-4o-vision" | "sam-2.1" {
-  const v = (process.env.SEGMENTATION_PROVIDER || "").toLowerCase().trim();
-  if (v === "sam-2.1" || v === "sam2" || v === "sam") {
-    if (!process.env.REPLICATE_API_TOKEN) {
-      console.warn("[seg] SEGMENTATION_PROVIDER=sam-2.1 but REPLICATE_API_TOKEN missing — falling back to gpt-4o-vision");
-      return "gpt-4o-vision";
-    }
-    return "sam-2.1";
-  }
+/** 현재는 GPT-4o Vision만 사용. SAM 2.1 GPU 서버 준비되면 분기 추가. */
+export function pickProvider(): "gpt-4o-vision" {
   return "gpt-4o-vision";
 }

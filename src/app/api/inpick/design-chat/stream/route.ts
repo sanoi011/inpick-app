@@ -1,0 +1,146 @@
+/**
+ * POST /api/inpick/design-chat/stream
+ *
+ * 가이드(InPick_STEP02_Workflow.md §1) 준수:
+ * - 모델: claude-sonnet-4-6 (Anthropic 직접 호출, fallback 금지)
+ * - SSE 스트리밍
+ * - 시스템 프롬프트는 가이드 49~65 그대로
+ *
+ * 입력: { messages: [{role, content}, ...] }
+ * 출력: SSE 'data: <chunk>\n\n' ... 'data: [DONE]\n\n'
+ */
+import { NextRequest } from "next/server";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
+const SYSTEM_PROMPT = `당신은 InPick의 인테리어 상담 AI입니다.
+사용자의 거주 공간(아파트/주택), 평수, 가족 구성, 라이프스타일을 자연스럽게 파악하고,
+원하는 인테리어 스타일(미니멀/모던/클래식/내추럴 등)과 톤(우드톤/모노톤/컬러)을 끌어냅니다.
+
+대화 규칙:
+- 한국어로 친근하게 대화
+- 한 번에 한 가지 질문만
+- 4~5턴 안에 핵심 정보 수집 완료
+- 정보가 충분하면 마지막에 '이미지를 생성하시겠습니까?' 물어봄
+
+수집할 정보:
+1. 공간 종류 (거실/안방/부엌/욕실 등)
+2. 평수/면적
+3. 선호 스타일
+4. 톤/컬러
+5. 특별 요구사항 (수납, 조명, 가구 등)`;
+
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function POST(request: NextRequest) {
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return new Response(
+      JSON.stringify({ error: "AI 상담 서비스가 설정되지 않았습니다 (관리자에게 문의)" }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  try {
+    const { messages } = (await request.json()) as { messages?: ChatMessage[] };
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: "messages 필수" }),
+        { status: 400, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    const upstream = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-6",
+        max_tokens: 1024,
+        system: SYSTEM_PROMPT,
+        stream: true,
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+      }),
+    });
+
+    if (!upstream.ok) {
+      const errText = await upstream.text();
+      console.warn("[design-chat/stream] upstream error:", upstream.status, errText.slice(0, 200));
+      let hint = "AI 상담 응답 실패";
+      if (upstream.status === 401) hint = "AI 상담 서비스 인증 실패 (관리자 문의)";
+      else if (upstream.status === 429) hint = "현재 상담 요청이 많습니다 — 잠시 후 재시도";
+      else if (upstream.status === 404 || errText.includes("model_not_found")) {
+        hint = "AI 상담 모델 사용 권한 미설정 (관리자 문의)";
+      }
+      return new Response(
+        JSON.stringify({ error: "AI 상담 응답 실패", hint }),
+        { status: 502, headers: { "Content-Type": "application/json" } },
+      );
+    }
+
+    // Anthropic SSE → 클라이언트 SSE (text 만 추출)
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const reader = upstream.body?.getReader();
+        if (!reader) {
+          controller.close();
+          return;
+        }
+        const decoder = new TextDecoder();
+        let buf = "";
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split("\n");
+            buf = lines.pop() || "";
+            for (const line of lines) {
+              if (!line.startsWith("data: ")) continue;
+              const data = line.slice(6).trim();
+              if (!data) continue;
+              try {
+                const j = JSON.parse(data);
+                if (j.type === "content_block_delta" && j.delta?.type === "text_delta") {
+                  const txt: string = j.delta.text || "";
+                  if (txt) controller.enqueue(encoder.encode(`data: ${txt}\n\n`));
+                }
+                if (j.type === "message_stop") {
+                  controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+                }
+              } catch {
+                /* ping 등 비-JSON 무시 */
+              }
+            }
+          }
+        } finally {
+          controller.close();
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[design-chat/stream] error:", msg);
+    return new Response(
+      JSON.stringify({ error: "AI 상담 처리 중 오류" }),
+      { status: 500, headers: { "Content-Type": "application/json" } },
+    );
+  }
+}

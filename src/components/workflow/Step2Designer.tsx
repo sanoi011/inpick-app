@@ -72,11 +72,20 @@ export interface RenderItem {
   refinedAt?: string;
 }
 
+export interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 export interface Step2Data {
   selectedByRoom: Record<string, number | null>;
   generations: Record<string, number>;
   rendersByRoom: Record<string, RenderItem[]>;
   promptByRoom: Record<string, string>;
+  /** AI 상담 채팅 히스토리 (글로벌 — 가이드 §1: 4~5턴 안에 정보 수집) */
+  chatMessages?: ChatMessage[];
+  /** chat 모드 활성 여부 */
+  chatMode?: boolean;
 }
 
 type ConsumeFeature = "ai_render" | "drawing_option";
@@ -120,7 +129,22 @@ export default function Step2Designer({
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
+  // 채팅 모드 (AI 상담)
+  const chatMode = value.chatMode ?? false;
+  const chatMessages: ChatMessage[] = value.chatMessages ?? [];
+  const [chatStreaming, setChatStreaming] = useState(false);
+  const [extractingPrompt, setExtractingPrompt] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const setChatMode = (m: boolean) => {
+    onChange({ ...value, chatMode: m });
+  };
+  const setChatMessages = (msgs: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
+    onChange({
+      ...value,
+      chatMessages: typeof msgs === "function" ? msgs(chatMessages) : msgs,
+    });
+  };
 
   // 진행률 게이지 — 0→90% 점진 증가, 응답 후 100%
   useEffect(() => {
@@ -195,7 +219,7 @@ export default function Step2Designer({
   // 채팅 히스토리 자동 스크롤
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [renders.length, generating]);
+  }, [renders.length, generating, chatMessages.length, chatStreaming]);
 
   const setPrompt = (text: string) => {
     onChange({
@@ -220,6 +244,84 @@ export default function Step2Designer({
     }
     if (windows === 0 && isExterior) windows = 1;
     return { windows, isInteriorRoom: isInterior };
+  };
+
+  // ── 채팅 모드 핸들러 ──
+  const handleChatSend = async () => {
+    if (!currentPrompt.trim() || chatStreaming) return;
+    setErrorMsg(null);
+    const userMsg: ChatMessage = { role: "user", content: currentPrompt.trim() };
+    const next = [...chatMessages, userMsg];
+    setChatMessages([...next, { role: "assistant", content: "" }]);
+    setPrompt("");
+    setChatStreaming(true);
+    try {
+      const res = await fetch("/api/inpick/design-chat/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: next }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error + (err.hint ? ` → ${err.hint}` : ""));
+      }
+      const reader = res.body?.getReader();
+      if (!reader) throw new Error("스트리밍 응답 없음");
+      const decoder = new TextDecoder();
+      let acc = "";
+      let buf = "";
+      while (true) {
+        const { value: chunk, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(chunk, { stream: true });
+        const lines = buf.split("\n");
+        buf = lines.pop() || "";
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const data = line.slice(6);
+          if (data === "[DONE]") continue;
+          acc += data;
+          setChatMessages((prev) => {
+            const u = [...prev];
+            u[u.length - 1] = { role: "assistant", content: acc };
+            return u;
+          });
+        }
+      }
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      // 빈 placeholder 제거
+      setChatMessages((prev) => {
+        const u = [...prev];
+        if (u[u.length - 1]?.role === "assistant" && !u[u.length - 1].content) u.pop();
+        return u;
+      });
+    } finally {
+      setChatStreaming(false);
+    }
+  };
+
+  const handleChatToImage = async () => {
+    if (chatMessages.length === 0 || extractingPrompt || generating) return;
+    setErrorMsg(null);
+    setExtractingPrompt(true);
+    try {
+      const res = await fetch("/api/inpick/design-chat/extract", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: chatMessages }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.image_prompt) {
+        throw new Error(data.error || "상담 내용 정리 실패");
+      }
+      // 추출된 prompt로 비어있는 방 일괄 생성 (기존 handleBulkGenerate 재사용)
+      await handleBulkGenerate(data.image_prompt);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExtractingPrompt(false);
+    }
   };
 
   const handleGenerate = async () => {
@@ -587,44 +689,71 @@ export default function Step2Designer({
       <section className="relative flex flex-col">
         <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] flex flex-col overflow-hidden">
           {/* 채팅 헤더 */}
-          <div className="px-5 py-3 border-b border-primary-100 flex items-center justify-between bg-gradient-to-r from-primary-50/50 to-amber-50/30">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary-500" />
-              <p className="text-sm font-bold text-primary-900">
+          <div className="px-5 py-3 border-b border-primary-100 flex items-center justify-between gap-2 bg-gradient-to-r from-primary-50/50 to-amber-50/30">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="h-4 w-4 text-primary-500 shrink-0" />
+              <p className="text-sm font-bold text-primary-900 truncate">
                 {ROOM_TABS.find((t) => t.v === activeRoom)?.label} · AI 디자인 챗
               </p>
             </div>
-            <p className="text-[0.7rem] text-primary-900/50 tabular">
-              {activeRoom === "all" ? (
-                <>모든 방 일괄 · {realRoomTabs.length}개 방</>
-              ) : (
-                <>
-                  치수 ·{" "}
-                  {(() => {
+            <div className="flex items-center gap-2 shrink-0">
+              {/* 모드 토글 — Direct (즉시 이미지) / AI 상담 (Claude 대화 → 이미지) */}
+              <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-white p-0.5 text-[0.65rem] font-bold">
+                <button
+                  type="button"
+                  onClick={() => setChatMode(false)}
+                  className={`px-2 py-1 rounded-full transition-colors ${
+                    !chatMode ? "bg-primary-500 text-white" : "text-primary-900/60 hover:text-primary-900"
+                  }`}
+                >
+                  즉시 생성
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChatMode(true)}
+                  className={`px-2 py-1 rounded-full transition-colors ${
+                    chatMode ? "bg-primary-500 text-white" : "text-primary-900/60 hover:text-primary-900"
+                  }`}
+                >
+                  AI 상담
+                </button>
+              </div>
+              <p className="hidden sm:block text-[0.65rem] text-primary-900/50 tabular">
+                {activeRoom === "all" ? `${realRoomTabs.length}개 방` : (
+                  (() => {
                     const tab = ROOM_TABS.find((t) => t.v === activeRoom);
                     const d = tab ? roomDims[tab.dimKey] : null;
-                    return d ? `${d.widthMm}×${d.depthMm}×${d.heightMm}mm` : "—";
-                  })()}
-                </>
-              )}
-            </p>
+                    return d ? `${(d.widthMm/1000).toFixed(1)}×${(d.depthMm/1000).toFixed(1)}m` : "—";
+                  })()
+                )}
+              </p>
+            </div>
           </div>
 
           {/* 채팅 본문 */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
-            {!hasGenerated && !generating && (
+            {!hasGenerated && !generating && !(chatMode && chatMessages.length > 0) && (
               <div className="h-full flex items-center justify-center min-h-[40vh]">
                 <div className="text-center max-w-md">
                   <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-500 mb-4">
                     <Sparkles className="h-8 w-8" />
                   </div>
                   <h3 className="text-2xl font-extrabold tracking-tight text-primary-900">
-                    {activeRoom === "all"
-                      ? "전체 컨셉을 한 번에 만들어볼까요?"
-                      : "무엇을 만들고 싶으세요?"}
+                    {chatMode
+                      ? "어떤 공간을 꾸미고 싶으세요?"
+                      : activeRoom === "all"
+                        ? "전체 컨셉을 한 번에 만들어볼까요?"
+                        : "무엇을 만들고 싶으세요?"}
                   </h3>
                   <p className="mt-2 text-sm text-primary-900/60 leading-relaxed">
-                    {activeRoom === "all" ? (
+                    {chatMode ? (
+                      <>
+                        AI 상담사와 4~5턴 대화하면 핵심 정보를 모아
+                        <br />
+                        <span className="font-bold text-primary-700">한번에 디자인을 생성</span>해
+                        드립니다.
+                      </>
+                    ) : activeRoom === "all" ? (
                       <>
                         하나의 컨셉으로 <span className="font-bold text-primary-700">모든 방</span>에
                         같은 스타일로 일괄 생성됩니다.
@@ -652,6 +781,32 @@ export default function Step2Designer({
                       </button>
                     ))}
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* AI 상담 메시지 (chatMode 일 때, 텍스트 대화) */}
+            {chatMode && chatMessages.map((m, i) => (
+              <div
+                key={`chat-${i}`}
+                className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
+                    m.role === "user"
+                      ? "bg-primary-500 text-white rounded-tr-sm"
+                      : "bg-primary-50 text-primary-900 rounded-tl-sm border border-primary-100"
+                  }`}
+                >
+                  {m.content || (chatStreaming && i === chatMessages.length - 1 ? "…" : "")}
+                </div>
+              </div>
+            ))}
+            {chatMode && chatStreaming && chatMessages[chatMessages.length - 1]?.content === "" && (
+              <div className="flex justify-start">
+                <div className="rounded-2xl rounded-tl-sm bg-primary-50 border border-primary-100 px-4 py-2.5 text-sm text-primary-900/70 inline-flex items-center gap-2">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  AI 상담 중…
                 </div>
               </div>
             )}
@@ -725,6 +880,35 @@ export default function Step2Designer({
             <div ref={chatEndRef} />
           </div>
 
+          {/* AI 상담 모드 — '이 컨셉으로 디자인 생성' 버튼 (메시지 1턴 이상 시) */}
+          {chatMode && chatMessages.filter((m) => m.role === "user").length >= 1 && (
+            <div className="px-3 pb-2 pt-3 border-t border-primary-100 bg-gradient-to-r from-amber-50/50 to-primary-50/50">
+              <button
+                type="button"
+                onClick={handleChatToImage}
+                disabled={extractingPrompt || generating || chatStreaming}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40 transition-all"
+              >
+                {extractingPrompt ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    상담 내용 정리 중…
+                  </>
+                ) : generating ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    이미지 생성 중…
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="h-4 w-4" />
+                    이 컨셉으로 디자인 생성하기
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* 하단 sticky prompt bar (흰색 60% 투명) */}
           <div className="border-t border-primary-100 bg-white/60 backdrop-blur-md p-3">
             <div className="flex items-end gap-2">
@@ -735,26 +919,40 @@ export default function Step2Designer({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault();
-                      handleGenerate();
+                      if (chatMode) handleChatSend();
+                      else handleGenerate();
                     }
                   }}
                   placeholder={
-                    activeRoom === "all"
-                      ? "전체 컨셉 입력 — 모든 방에 같은 스타일로 일괄 생성. 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
-                      : hasGenerated
-                        ? "수정 요청: 예) 소파를 회색 패브릭으로, TV 뒷벽 우드 패널..."
-                        : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
+                    chatMode
+                      ? "어떤 공간을 꾸미고 싶으세요? 자유롭게 말씀해주세요"
+                      : activeRoom === "all"
+                        ? "전체 컨셉 입력 — 모든 방에 같은 스타일로 일괄 생성. 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
+                        : hasGenerated
+                          ? "수정 요청: 예) 소파를 회색 패브릭으로, TV 뒷벽 우드 패널..."
+                          : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
                   }
-                  rows={hasGenerated ? 1 : 2}
+                  rows={hasGenerated || chatMode ? 1 : 2}
                   className="w-full resize-none bg-transparent text-sm text-primary-900 outline-none placeholder:text-primary-900/40"
                 />
               </div>
               <button
-                onClick={handleGenerate}
-                disabled={generating || !currentPrompt.trim()}
+                onClick={chatMode ? handleChatSend : handleGenerate}
+                disabled={
+                  (chatMode ? chatStreaming : generating) || !currentPrompt.trim()
+                }
                 className="shrink-0 inline-flex h-11 items-center gap-1.5 rounded-2xl bg-primary-500 px-4 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-30"
               >
-                {generating ? (
+                {chatMode ? (
+                  chatStreaming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Send className="h-3.5 w-3.5" />
+                      <span>대화하기</span>
+                    </>
+                  )
+                ) : generating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : activeRoom === "all" ? (
                   // "전체" 탭은 항상 일괄 1차 생성 (비어있는 방만)
