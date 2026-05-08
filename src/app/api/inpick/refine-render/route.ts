@@ -15,6 +15,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIKey } from "@/lib/inpick/openai-env";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -22,12 +23,42 @@ export const dynamic = "force-dynamic";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 
+/**
+ * b64 PNG를 Supabase Storage에 업로드하고 public URL 반환.
+ * 응답 body 크기를 줄여 Cloudflare 502 회피 (data:URL 5MB+ → URL 200B).
+ */
+async function uploadBase64ToStorage(b64: string): Promise<string | null> {
+  try {
+    const supa = createAdminClient();
+    const buf = Buffer.from(b64, "base64");
+    const fileName = `refined/${Date.now()}_${Math.random().toString(36).slice(2, 10)}.png`;
+    const { error } = await supa.storage
+      .from("renders")
+      .upload(fileName, buf, { contentType: "image/png", upsert: false });
+    if (error) {
+      console.warn("[refine-render] storage upload failed:", error.message);
+      return null;
+    }
+    const { data: pub } = supa.storage.from("renders").getPublicUrl(fileName);
+    return pub.publicUrl;
+  } catch (e) {
+    console.warn("[refine-render] storage exception:", e);
+    return null;
+  }
+}
+
 interface Body {
   originalImageUrl: string;
-  maskBase64: string;
-  prompt: string;
+  maskBase64: string;          // alpha PNG: alpha=0=교체, alpha=255=보존 (가이드 §2-1)
+  prompt: string;              // 새 자재 묘사 (영문 권장 — gpt-image-2 prompt에 직접 들어감)
   roomName?: string;
-  styleHint?: string;
+  styleHint?: string;          // 전체 스타일 일관성 유지용
+  /** 가이드 §2-2 build_replacement_prompt — 카테고리 라벨 (floor/wall/...) */
+  regionCategoryEn?: "floor" | "wall" | "ceiling" | "window" | "door" | "curtain";
+  materialName?: string;       // 표시용 (예: "강마루 화이트오크")
+  materialColor?: string;
+  materialTexture?: string;
+  materialFinish?: string;
 }
 
 export async function POST(req: NextRequest) {
@@ -54,12 +85,30 @@ export async function POST(req: NextRequest) {
     // 2) 마스크 base64 → buffer
     const maskBuf = Buffer.from(body.maskBase64.replace(/^data:.*;base64,/, ""), "base64");
 
-    // 3) 고화질 프롬프트 조합
-    const refinedPrompt =
-      `한국 ${body.roomName || "실내"} 인테리어 렌더링. ` +
-      `교체된 자재: ${body.prompt}. ` +
-      `${body.styleHint ? `전체 스타일 유지: ${body.styleHint}. ` : ""}` +
-      `포토리얼리스틱 고화질, 자연광, 다른 영역과 자연스럽게 어우러지도록.`;
+    // 3) 가이드 §2-2 build_replacement_prompt — [변경] + [보존 rules] + [스타일] 3블록 패턴
+    const targetEn = body.regionCategoryEn || "target area";
+    const refinedPrompt = [
+      `Replace only the ${targetEn} with: ${body.prompt}.`,
+      "",
+      "Material details:",
+      body.materialName ? `- Name: ${body.materialName}` : null,
+      body.materialColor ? `- Color: ${body.materialColor}` : null,
+      body.materialTexture ? `- Texture: ${body.materialTexture}` : null,
+      body.materialFinish ? `- Finish: ${body.materialFinish}` : null,
+      "",
+      "Critical preservation rules:",
+      "- Keep ALL other elements unchanged: furniture, lighting fixtures, windows, ceiling, walls (except the target area), decor items, plants, artwork",
+      "- Preserve the exact camera angle, perspective, and viewpoint",
+      "- Maintain the same lighting conditions, shadows, and natural daylight",
+      "- Keep the room layout and proportions identical",
+      "- Do not move, redesign, or recolor any object outside the target area",
+      "",
+      "Style:",
+      `Photorealistic interior photography, ${body.roomName ? `Korean apartment ${body.roomName}` : "Korean apartment"}, professional architecture photography quality.`,
+      body.styleHint ? `Overall design style: ${body.styleHint}.` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     // 4) gpt-image-2 edit endpoint (사용자 정책: 단일 모델, 폴백 없음)
     const form = new FormData();
@@ -90,23 +139,25 @@ export async function POST(req: NextRequest) {
       let hint: string | undefined;
       let model_status: string = "unknown";
       if (lower.includes("model_not_found") || lower.includes("does not have access") || editRes.status === 404) {
-        hint = "gpt-image-2 사용 권한 없음 — https://platform.openai.com/settings/organization/general 에서 Verify Organization 인증 → 최대 15분 대기. tier upgrade 필요할 수 있음";
+        hint = "이미지 편집 서비스 사용 권한 미설정 (관리자에게 문의)";
         model_status = "blocked";
       } else if (editRes.status === 429) {
-        hint = "gpt-image-2 Rate limit 초과";
+        hint = "현재 요청이 많습니다 — 잠시 후 재시도";
         model_status = "rate_limited";
       } else if (lower.includes("billing") || lower.includes("quota") || lower.includes("insufficient")) {
-        hint = "OpenAI 결제 한도 초과 또는 잔액 부족";
+        hint = "이미지 편집 서비스 결제 한도 초과 (관리자에게 문의)";
         model_status = "billing";
       } else if (editRes.status === 401) {
-        hint = "API 키 인증 실패";
+        hint = "이미지 편집 서비스 인증 실패 (관리자에게 문의)";
         model_status = "auth";
+      } else {
+        hint = "이미지 편집 실패 (요금이 발생하지 않았습니다)";
       }
+      console.warn("[refine-render] edit failed:", editRes.status, errText.slice(0, 200));
       return NextResponse.json(
         {
-          error: `gpt-image-2 edit 실패: ${editRes.status} ${errText.slice(0, 400)}`,
+          error: "고화질 재렌더에 실패했습니다",
           hint,
-          model: "gpt-image-2",
           model_status,
           tokenConsumed: false,
         },
@@ -115,31 +166,34 @@ export async function POST(req: NextRequest) {
     }
     const data = await editRes.json();
 
-    // gpt-image-2는 b64_json으로 반환
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) {
       return NextResponse.json(
-        { error: "gpt-image-2 응답에 이미지 데이터 없음", raw: data, model: "gpt-image-2", tokenConsumed: false },
+        { error: "고화질 재렌더 응답이 비어있습니다", tokenConsumed: false },
         { status: 502 },
       );
     }
 
+    // Cloudflare 502 회피 — 큰 base64 대신 Storage URL로 응답
+    const publicUrl = await uploadBase64ToStorage(b64);
+    if (publicUrl) {
+      return NextResponse.json({ imageUrl: publicUrl, costUsd: 0.19 });
+    }
+    // Storage 실패 시 fallback — base64 직접 반환 (작은 응답 위해 압축)
     return NextResponse.json({
-      imageBase64: b64,
       imageUrl: `data:image/png;base64,${b64}`,
-      model: "gpt-image-2",
       costUsd: 0.19,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const isTimeout = msg.includes("Abort") || msg.includes("timeout");
+    console.warn("[refine-render] error:", msg);
     return NextResponse.json(
       {
-        error: msg,
+        error: "고화질 재렌더에 실패했습니다",
         hint: isTimeout
-          ? "gpt-image-2 응답 지연 (280초 초과). OpenAI 측 서비스 지연 — 재시도"
-          : "gpt-image-2 edit 호출 실패 — 폴백 없이 즉시 종료",
-        model: "gpt-image-2",
+          ? "응답 지연 — 잠시 후 재시도"
+          : "이미지 편집 실패 (요금이 발생하지 않았습니다)",
         model_status: isTimeout ? "timeout" : "unknown",
         tokenConsumed: false,
       },

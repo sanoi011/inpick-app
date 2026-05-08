@@ -1,36 +1,36 @@
 /* eslint-disable @next/next/no-img-element */
 /**
- * 자재 수정 에디터 — 1차 렌더 위에 SVG 폴리곤 오버레이로 클릭 가능 영역 표시.
+ * 자재 수정 에디터 — 가이드 InPick_Segmentation_Material_Replacement_Guide 기반 구현.
  *
  * 흐름:
- * 1. "자재 영역 분석 (1토큰)" → /api/inpick/extract-material-regions
- * 2. SVG 폴리곤 오버레이 → 사용자가 영역 클릭
- * 3. 자재 입력 모달 → 영역 자재 수정
- * 4. "고화질 재렌더 (2토큰)" → /api/inpick/refine-render (gpt-image-2 inpaint)
+ * 1. "자재 영역 분석 (1토큰)" → /api/inpick/extract-material-regions (SegmentationData)
+ * 2. SVG <polygon> 오버레이로 클릭 가능 영역 표시 (가이드 §3-1)
+ * 3. 영역 클릭 → 카테고리별 자재 라이브러리 모달 (/api/inpick/material-library)
+ * 4. 자재 선택 시 region.current_material_sku 업데이트
+ * 5. "고화질 재렌더 (2토큰)" → /api/inpick/refine-render (gpt-image-2 alpha-mask edit)
+ * 6. 모든 영역 자재 선택 후 "견적 보기" → /api/inpick/segmentation-estimate
  *
- * 자재 수정을 안 하면 그냥 다음 단계로 — 모든 단계가 옵셔널.
+ * 마스크 규칙 (가이드 §2-1):
+ *   - 변경할 영역 = 투명 (alpha=0)
+ *   - 보존할 영역 = 불투명 (alpha=255)
  */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Hexagon, Loader2, Wand2, Sparkles, X, Edit3 } from "lucide-react";
+import { Hexagon, Loader2, Wand2, Sparkles, X, Edit3, Check } from "lucide-react";
 import type { RenderItem } from "./Step2Designer";
-
-export interface MaterialRegion {
-  id: string;
-  surface: string;
-  detail: string;
-  material: string;
-  colorHex?: string;
-  polygon: [number, number][];
-  // 사용자 수정 사항
-  newMaterial?: string;
-  newColorHex?: string;
-}
+import type {
+  SegmentationData,
+  SegRegion,
+  CatalogMaterial,
+  InteriorCategory,
+} from "@/types/segmentation";
 
 interface Props {
   roomLabel: string;
+  /** 전용면적 m² — pixel→sqm 환산용 (가이드 §1-4) */
+  realWorldAreaSqm?: number;
   styleHint?: string;
   renderItem: RenderItem;
   tokenBalance: number;
@@ -43,22 +43,33 @@ interface Props {
 
 export default function MaterialEditor({
   roomLabel,
+  realWorldAreaSqm,
   styleHint,
   renderItem,
   tokenBalance,
   onConsumeToken,
   onUpdate,
 }: Props) {
-  const regions = renderItem.materialRegions;
+  // SegmentationData가 RenderItem.materialRegions(legacy) 또는 segmentation에 보관됨
+  // legacy 호환: RenderItem에 segmentation 필드 추가
+  const segmentation = renderItem.segmentation as SegmentationData | undefined;
   const [extracting, setExtracting] = useState(false);
   const [refining, setRefining] = useState(false);
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [estimateOpen, setEstimateOpen] = useState(false);
+  const [expensesRatio, setExpensesRatio] = useState(0.03);
 
   const hasEdits = useMemo(
-    () => !!regions?.some((r) => r.newMaterial && r.newMaterial !== r.material),
-    [regions],
+    () =>
+      !!segmentation?.regions.some(
+        (r) => r.current_material && r.current_material_sku,
+      ),
+    [segmentation],
   );
+
+  const replaceableCount = segmentation?.regions.filter((r) => r.is_replaceable).length || 0;
+  const decidedCount = segmentation?.regions.filter((r) => r.current_material_sku).length || 0;
 
   // 1) 영역 추출
   const handleExtract = async () => {
@@ -66,22 +77,30 @@ export default function MaterialEditor({
       setError("토큰 부족 — 1토큰 필요");
       return;
     }
+    // 클릭 즉시 시각 피드백 (토큰 차감 await 전에 먼저 로딩 ON)
+    setExtracting(true);
+    setError(null);
     const ok = await onConsumeToken(1, "drawing_option");
     if (!ok) {
+      setExtracting(false);
       setError("토큰 차감 실패");
       return;
     }
-    setExtracting(true);
-    setError(null);
     try {
       const res = await fetch("/api/inpick/extract-material-regions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: renderItem.url, roomName: roomLabel }),
+        body: JSON.stringify({
+          imageUrl: renderItem.url,
+          roomName: roomLabel,
+          realWorldAreaSqm,
+        }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "영역 추출 실패");
-      onUpdate({ ...renderItem, materialRegions: data.regions });
+      if (!res.ok) {
+        throw new Error(data.error + (data.hint ? `\n→ ${data.hint}` : ""));
+      }
+      onUpdate({ ...renderItem, segmentation: data as SegmentationData });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -89,35 +108,61 @@ export default function MaterialEditor({
     }
   };
 
-  // 2) 영역의 자재 변경
-  const handleRegionEdit = (regionId: string, newMaterial: string, newColorHex?: string) => {
-    if (!regions) return;
-    const next = regions.map((r) =>
-      r.id === regionId ? { ...r, newMaterial, newColorHex } : r,
-    );
-    onUpdate({ ...renderItem, materialRegions: next });
+  // 2) 자재 선택 (모달에서 호출)
+  const handleMaterialSelect = (regionId: string, material: CatalogMaterial) => {
+    if (!segmentation) return;
+    const next: SegmentationData = {
+      ...segmentation,
+      regions: segmentation.regions.map((r) =>
+        r.id === regionId
+          ? {
+              ...r,
+              current_material: material.name,
+              current_material_sku: material.sku,
+              guessed_color_hex: material.color_hex || r.guessed_color_hex,
+            }
+          : r,
+      ),
+    };
+    onUpdate({ ...renderItem, segmentation: next });
     setActiveRegionId(null);
   };
 
-  // 3) 마스크 생성 + 고화질 재렌더
+  // 3) 고화질 재렌더 — 선택된 영역만 alpha-mask edit
   const handleRefine = async () => {
-    if (!regions || !hasEdits) return;
+    if (!segmentation || !hasEdits) return;
     if (tokenBalance < 2) {
       setError("토큰 부족 — 고화질 재렌더는 2토큰 필요");
       return;
     }
+
+    // 사용자가 자재 변경한 영역들
+    const editedRegions = segmentation.regions.filter(
+      (r) => r.current_material && r.current_material_sku,
+    );
+    if (editedRegions.length === 0) return;
+
+    // 클릭 즉시 시각 피드백
+    setRefining(true);
+    setError(null);
     const ok = await onConsumeToken(2, "drawing_option");
     if (!ok) {
+      setRefining(false);
       setError("토큰 차감 실패");
       return;
     }
-    setRefining(true);
-    setError(null);
     try {
-      // 수정된 영역만 흰색으로 마스크 그리기
-      const editedRegions = regions.filter((r) => r.newMaterial && r.newMaterial !== r.material);
-      const maskBase64 = await buildMask(1024, 1024, editedRegions);
-      const promptParts = editedRegions.map((r) => `${r.detail}: ${r.newMaterial}`);
+      // 한 번에 여러 영역을 alpha 마스크로 묶음 (모든 변경 영역을 투명 처리)
+      const [w, h] = segmentation.image_size;
+      const maskBase64 = await buildAlphaMask(w, h, editedRegions);
+
+      // 카테고리 라벨 + 자재 묘사 합치기
+      const promptParts = editedRegions
+        .map((r) => `${r.label_ko}: ${r.current_material}`)
+        .join(", ");
+
+      // 대표 카테고리 (다중 영역이면 첫 영역 기준 — gpt-image-2가 prompt 자체로 다중 처리)
+      const firstCat = editedRegions[0].category;
 
       const res = await fetch("/api/inpick/refine-render", {
         method: "POST",
@@ -125,13 +170,18 @@ export default function MaterialEditor({
         body: JSON.stringify({
           originalImageUrl: renderItem.url,
           maskBase64,
-          prompt: promptParts.join("; "),
+          prompt: promptParts,
           roomName: roomLabel,
           styleHint,
+          regionCategoryEn: ["floor", "wall", "ceiling", "window", "door", "curtain"].includes(firstCat)
+            ? firstCat
+            : undefined,
+          materialName: editedRegions.map((r) => r.current_material).join(" + "),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "재렌더 실패");
+      if (!res.ok) throw new Error(data.error + (data.hint ? `\n→ ${data.hint}` : ""));
+
       onUpdate({
         ...renderItem,
         refinedUrl: data.imageUrl,
@@ -146,17 +196,17 @@ export default function MaterialEditor({
 
   return (
     <div className="mt-6 rounded-2xl border border-primary-100 bg-primary-50/30 p-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <p className="text-sm font-bold tracking-tight text-primary-900 inline-flex items-center gap-2">
             <Edit3 className="h-4 w-4 text-primary-500" />
-            자재 수정 (선택)
+            자재 수정 + 견적 산출
           </p>
           <p className="mt-0.5 text-[0.72rem] text-primary-900/50">
-            마음에 안 드는 자재만 클릭해서 교체 → 고화질 재렌더
+            영역 클릭 → 자재 라이브러리에서 선택 → 고화질 재렌더 + 면적 × 단가 견적
           </p>
         </div>
-        {!regions && (
+        {!segmentation && (
           <button
             onClick={handleExtract}
             disabled={extracting}
@@ -165,7 +215,7 @@ export default function MaterialEditor({
             {extracting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                AI 분석 중… (5–10초)
+                AI 영역 분석 중…
               </>
             ) : (
               <>
@@ -180,15 +230,14 @@ export default function MaterialEditor({
         )}
       </div>
 
-      {/* 분석 중 큰 로딩 패널 — 즉시 시각 피드백 */}
       {extracting && (
         <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/50 p-6 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
           <p className="mt-3 text-sm font-bold text-primary-900">
-            AI가 자재 영역을 분석 중입니다
+            자재 영역 분석 중 — 잠시만 기다려주세요
           </p>
           <p className="mt-1 text-xs text-primary-900/60">
-            GPT-4o Vision이 바닥·벽·가구·조명 폴리곤 추출 — 5~10초 소요
+            바닥 / 벽 / 천장 / 창호 / 가구 영역을 자동으로 인식하고 있습니다 (5~30초)
           </p>
         </div>
       )}
@@ -196,160 +245,174 @@ export default function MaterialEditor({
         <div className="mt-4 rounded-xl border border-primary-300 bg-primary-50 p-6 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
           <p className="mt-3 text-sm font-bold text-primary-900">
-            고화질 재렌더 중입니다
+            고화질 재렌더 중 — 잠시만 기다려주세요
           </p>
           <p className="mt-1 text-xs text-primary-900/60">
-            gpt-image-2로 수정 영역만 inpaint — 40~80초 소요
+            선택한 영역만 새 자재로 다시 생성 (가구·조명·창문은 그대로 유지) · 약 40~80초
           </p>
         </div>
       )}
 
       {error && (
-        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900">
+        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap">
           {error}
         </div>
       )}
 
-      {regions && (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          {/* 좌: 클릭 가능 SVG 오버레이 이미지 */}
-          <div className="relative aspect-square overflow-hidden rounded-xl border border-primary-100 bg-white">
-            <img
-              src={renderItem.refinedUrl || renderItem.url}
-              alt="design"
-              className="absolute inset-0 h-full w-full object-cover"
-            />
-            <svg
-              viewBox="0 0 1 1"
-              preserveAspectRatio="none"
-              className="absolute inset-0 h-full w-full"
-            >
-              {regions.map((r) => {
-                const points = r.polygon.map(([x, y]) => `${x},${y}`).join(" ");
-                const edited = r.newMaterial && r.newMaterial !== r.material;
-                const active = activeRegionId === r.id;
-                return (
-                  <polygon
-                    key={r.id}
-                    points={points}
-                    onClick={() => setActiveRegionId(r.id)}
-                    className="cursor-pointer transition-all"
-                    fill={
-                      active
-                        ? "rgba(247, 59, 32, 0.35)"
-                        : edited
-                          ? "rgba(245, 158, 11, 0.35)"
-                          : "rgba(255, 255, 255, 0.05)"
-                    }
-                    stroke={
-                      active
-                        ? "#F73B20"
-                        : edited
-                          ? "#F59E0B"
-                          : "rgba(247, 59, 32, 0.5)"
-                    }
-                    strokeWidth={active ? 0.005 : 0.003}
-                    vectorEffect="non-scaling-stroke"
-                  />
-                );
-              })}
-            </svg>
-            {renderItem.refinedUrl && (
-              <div className="absolute right-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.65rem] font-bold text-white">
-                ✓ 고화질
-              </div>
-            )}
+      {segmentation && (
+        <>
+          {/* 진행 상태 */}
+          <div className="mt-4 flex items-center justify-between text-[0.7rem] text-primary-900/60">
+            <span>
+              영역 {segmentation.total_regions}개 (시공 가능 {replaceableCount}개)
+            </span>
+            <span>
+              자재 선택: <strong className="text-emerald-600">{decidedCount}</strong> / {replaceableCount}
+            </span>
           </div>
 
-          {/* 우: 영역 리스트 */}
-          <div>
-            <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50 mb-2">
-              자재 영역 ({regions.length})
-            </p>
-            <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
-              {regions.map((r) => {
-                const edited = r.newMaterial && r.newMaterial !== r.material;
-                return (
-                  <li key={r.id}>
-                    <button
-                      onClick={() => setActiveRegionId(r.id)}
-                      className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-all ${
-                        edited
-                          ? "border-amber-300 bg-amber-50"
-                          : "border-primary-100 bg-white/70 hover:border-primary-300"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className="h-3 w-3 rounded-full border border-primary-200 shrink-0"
-                            style={{ background: r.newColorHex || r.colorHex || "#fff" }}
-                          />
-                          <span className="font-semibold text-primary-900 truncate">
-                            {r.detail}
-                          </span>
-                        </div>
-                        <span className="text-[0.65rem] text-primary-900/40 shrink-0">
-                          {r.surface}
-                        </span>
-                      </div>
-                      <div className="mt-1 text-primary-900/70">
-                        {edited ? (
-                          <>
-                            <span className="line-through opacity-50">{r.material}</span>
-                            <span className="ml-1 font-semibold text-amber-700">
-                              → {r.newMaterial}
-                            </span>
-                          </>
-                        ) : (
-                          r.material
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-
-            {hasEdits && (
-              <button
-                onClick={handleRefine}
-                disabled={refining}
-                className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-60"
+          <div className="mt-3 grid gap-4 lg:grid-cols-2">
+            {/* 좌: 클릭 가능 SVG 오버레이 이미지 */}
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-primary-100 bg-white">
+              <img
+                src={renderItem.refinedUrl || renderItem.url}
+                alt="design"
+                className="absolute inset-0 h-full w-full object-cover"
+              />
+              <svg
+                viewBox="0 0 1 1"
+                preserveAspectRatio="none"
+                className="absolute inset-0 h-full w-full"
               >
-                {refining ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    고화질 재렌더 중… (15–30초)
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="h-4 w-4" />
-                    고화질 재렌더 (수정 영역만)
-                    <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.7rem]">
-                      <Hexagon className="h-3 w-3 fill-white" /> 2
-                    </span>
-                  </>
-                )}
-              </button>
-            )}
+                {segmentation.regions.map((r) => {
+                  const points = r.polygon.map(([x, y]) => `${x},${y}`).join(" ");
+                  const decided = !!r.current_material_sku;
+                  const active = activeRegionId === r.id;
+                  const replaceable = r.is_replaceable;
+                  return (
+                    <polygon
+                      key={r.id}
+                      points={points}
+                      onClick={() => replaceable && setActiveRegionId(r.id)}
+                      style={{
+                        cursor: replaceable ? "pointer" : "not-allowed",
+                        pointerEvents: replaceable ? "auto" : "none",
+                        transition: "all 0.2s ease-out",
+                      }}
+                      fill={
+                        active
+                          ? "rgba(247, 59, 32, 0.30)"
+                          : decided
+                            ? "rgba(76, 175, 80, 0.18)"
+                            : replaceable
+                              ? "rgba(247, 59, 32, 0.06)"
+                              : "rgba(0, 0, 0, 0.0)"
+                      }
+                      stroke={
+                        active
+                          ? "#F73B20"
+                          : decided
+                            ? "#10B981"
+                            : replaceable
+                              ? "rgba(247, 59, 32, 0.4)"
+                              : "rgba(0, 0, 0, 0.0)"
+                      }
+                      strokeWidth={active ? 0.006 : 0.003}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  );
+                })}
+              </svg>
+              {renderItem.refinedUrl && (
+                <div className="absolute right-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.65rem] font-bold text-white">
+                  ✓ 고화질 재렌더 완료
+                </div>
+              )}
+            </div>
 
-            {!hasEdits && (
-              <p className="mt-3 text-[0.7rem] text-primary-900/50 text-center">
-                영역을 클릭하면 자재 교체 모달이 열립니다
+            {/* 우: 영역 리스트 */}
+            <div>
+              <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50 mb-2">
+                자재 영역
               </p>
-            )}
+              <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
+                {segmentation.regions
+                  .filter((r) => r.is_replaceable)
+                  .map((r) => (
+                    <RegionListItem
+                      key={r.id}
+                      region={r}
+                      active={activeRegionId === r.id}
+                      onClick={() => setActiveRegionId(r.id)}
+                    />
+                  ))}
+              </ul>
+
+              <div className="mt-3 grid grid-cols-2 gap-2">
+                {hasEdits && (
+                  <button
+                    onClick={handleRefine}
+                    disabled={refining}
+                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-60"
+                  >
+                    {refining ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        고화질 재렌더 중…
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 className="h-4 w-4" />
+                        고화질 재렌더 (수정 영역만)
+                        <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.7rem]">
+                          <Hexagon className="h-3 w-3 fill-white" /> 2
+                        </span>
+                      </>
+                    )}
+                  </button>
+                )}
+                {hasEdits && (
+                  <button
+                    onClick={() => setEstimateOpen(true)}
+                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-900 hover:bg-primary-50"
+                  >
+                    💰 견적 보기 ({decidedCount}개 영역)
+                  </button>
+                )}
+              </div>
+
+              {!hasEdits && (
+                <p className="mt-3 text-[0.7rem] text-primary-900/50 text-center">
+                  영역을 클릭하면 자재 라이브러리가 열립니다
+                </p>
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
 
-      {/* 자재 교체 모달 */}
+      {/* 자재 라이브러리 모달 */}
       <AnimatePresence>
-        {activeRegionId && regions && (
-          <RegionEditModal
-            region={regions.find((r) => r.id === activeRegionId)!}
+        {activeRegionId && segmentation && (
+          <MaterialLibraryModal
+            region={segmentation.regions.find((r) => r.id === activeRegionId)!}
+            currentSku={
+              segmentation.regions.find((r) => r.id === activeRegionId)?.current_material_sku || null
+            }
             onClose={() => setActiveRegionId(null)}
-            onSave={handleRegionEdit}
+            onSelect={(material) => handleMaterialSelect(activeRegionId, material)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* 견적 모달 */}
+      <AnimatePresence>
+        {estimateOpen && segmentation && (
+          <EstimateModal
+            segmentation={segmentation}
+            expensesRatio={expensesRatio}
+            onChangeExpensesRatio={setExpensesRatio}
+            onClose={() => setEstimateOpen(false)}
           />
         )}
       </AnimatePresence>
@@ -357,58 +420,88 @@ export default function MaterialEditor({
   );
 }
 
-// ─── 마스크 PNG 생성 (canvas → base64) ───
-async function buildMask(
-  w: number,
-  h: number,
-  regions: MaterialRegion[],
-): Promise<string> {
-  const canvas = document.createElement("canvas");
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext("2d")!;
-  // gpt-image-2 마스크 규칙: 투명/검정 = 유지, 흰색 = 재생성
-  // 안전하게 RGBA: 검정 채우기 후 영역만 흰색
-  ctx.fillStyle = "#000000";
-  ctx.fillRect(0, 0, w, h);
-  ctx.fillStyle = "#FFFFFF";
-  for (const r of regions) {
-    ctx.beginPath();
-    r.polygon.forEach(([nx, ny], i) => {
-      const x = nx * w;
-      const y = ny * h;
-      if (i === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    });
-    ctx.closePath();
-    ctx.fill();
-  }
-  return canvas.toDataURL("image/png");
+// ──────────────── 영역 리스트 아이템 ────────────────
+function RegionListItem({
+  region,
+  active,
+  onClick,
+}: {
+  region: SegRegion;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const decided = !!region.current_material_sku;
+  return (
+    <li>
+      <button
+        onClick={onClick}
+        className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-all ${
+          active
+            ? "border-primary-500 bg-white shadow-sm"
+            : decided
+              ? "border-emerald-300 bg-emerald-50"
+              : "border-primary-100 bg-white/70 hover:border-primary-300"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="h-3 w-3 rounded-full border border-primary-200 shrink-0"
+              style={{ background: region.guessed_color_hex || "#fff" }}
+            />
+            <span className="font-semibold text-primary-900 truncate">
+              {region.label_ko}
+              {region.area_sqm ? (
+                <span className="ml-1 text-[0.65rem] text-primary-900/50 tabular">
+                  · {region.area_sqm.toFixed(1)}㎡
+                </span>
+              ) : null}
+            </span>
+          </div>
+          {decided && <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />}
+        </div>
+        <div className="mt-1 text-primary-900/70">
+          {decided ? (
+            <>
+              <span className="font-semibold text-emerald-700">{region.current_material}</span>
+            </>
+          ) : (
+            <span className="text-primary-900/40">
+              {region.guessed_material || "자재 미선택 — 클릭"}
+            </span>
+          )}
+        </div>
+      </button>
+    </li>
+  );
 }
 
-// ─── 자재 교체 모달 ───
-const PRESET_MATERIALS = [
-  { label: "오크 원목마루", colorHex: "#C8A77D" },
-  { label: "월넛 원목마루", colorHex: "#5D3A1A" },
-  { label: "화이트 페인트", colorHex: "#FFFFFF" },
-  { label: "그레이 페인트", colorHex: "#A8A8A8" },
-  { label: "베이지 도배", colorHex: "#E8DCC8" },
-  { label: "대리석 타일", colorHex: "#F0EDE8" },
-  { label: "포세린 타일", colorHex: "#D8D5D0" },
-  { label: "블랙 메탈", colorHex: "#2A2A2A" },
-];
-
-function RegionEditModal({
+// ──────────────── 자재 라이브러리 모달 ────────────────
+function MaterialLibraryModal({
   region,
+  currentSku,
   onClose,
-  onSave,
+  onSelect,
 }: {
-  region: MaterialRegion;
+  region: SegRegion;
+  currentSku: string | null;
   onClose: () => void;
-  onSave: (id: string, newMaterial: string, colorHex?: string) => void;
+  onSelect: (m: CatalogMaterial) => void;
 }) {
-  const [text, setText] = useState(region.newMaterial || "");
-  const [color, setColor] = useState(region.newColorHex || region.colorHex || "");
+  const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSku, setSelectedSku] = useState<string | null>(currentSku);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/inpick/material-library?category=${region.category}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setMaterials(d.materials || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [region.category]);
 
   return (
     <>
@@ -423,52 +516,64 @@ function RegionEditModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-2xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-extrabold tracking-tight text-primary-900">
-            {region.detail} 자재 변경
-          </h3>
+          <div>
+            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+              {region.label_ko} 자재 선택
+            </h3>
+            <p className="mt-1 text-xs text-primary-900/60">
+              {region.area_sqm ? `면적: ${region.area_sqm.toFixed(2)}㎡ · ` : ""}
+              {region.guessed_material ? `현재 추정: ${region.guessed_material}` : "현재 자재 미상"}
+            </p>
+          </div>
           <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
             <X className="h-4 w-4" />
           </button>
         </div>
-        <p className="mt-1 text-xs text-primary-900/60">
-          현재: <span className="font-semibold">{region.material}</span>
-        </p>
 
-        <p className="mt-4 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
-          빠른 선택
-        </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
-          {PRESET_MATERIALS.map((p) => (
-            <button
-              key={p.label}
-              onClick={() => {
-                setText(p.label);
-                setColor(p.colorHex);
-              }}
-              className="flex items-center gap-2 rounded-lg border border-primary-100 bg-white px-2 py-1.5 text-xs hover:border-primary-300"
-            >
-              <span
-                className="h-3 w-3 rounded-full border border-primary-200"
-                style={{ background: p.colorHex }}
-              />
-              <span className="text-primary-900/80">{p.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-4 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
-          또는 직접 입력
-        </p>
-        <input
-          type="text"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="예: 헤링본 오크 원목마루, 라임스톤 벽"
-          className="mt-2 w-full rounded-xl border border-primary-100 bg-white px-3 py-2.5 text-sm outline-none focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
-        />
+        {loading ? (
+          <div className="py-12 text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
+            <p className="mt-2 text-xs text-primary-900/50">자재 카탈로그 불러오는 중…</p>
+          </div>
+        ) : materials.length === 0 ? (
+          <div className="py-12 text-center text-sm text-primary-900/60">
+            이 카테고리는 아직 자재 카탈로그가 없습니다
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {materials.map((m) => {
+              const sel = selectedSku === m.sku;
+              return (
+                <button
+                  key={m.sku}
+                  onClick={() => setSelectedSku(m.sku)}
+                  className={`text-left rounded-xl border-2 p-3 transition-all ${
+                    sel
+                      ? "border-primary-500 bg-primary-50/50 shadow-sm"
+                      : "border-primary-100 bg-white hover:border-primary-300"
+                  }`}
+                >
+                  <div
+                    className="aspect-square w-full rounded-lg border border-primary-100 mb-2"
+                    style={{ background: m.color_hex || "#eee" }}
+                  />
+                  <p className="text-xs font-bold text-primary-900 leading-tight truncate">
+                    {m.name}
+                  </p>
+                  {m.brand && (
+                    <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                  )}
+                  <p className="mt-1 text-[0.7rem] font-bold text-primary-700 tabular">
+                    ₩{m.price_per_unit.toLocaleString()}/{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="mt-5 flex gap-2">
           <button
@@ -478,14 +583,187 @@ function RegionEditModal({
             취소
           </button>
           <button
-            onClick={() => onSave(region.id, text.trim(), color || undefined)}
-            disabled={!text.trim()}
+            onClick={() => {
+              const m = materials.find((x) => x.sku === selectedSku);
+              if (m) onSelect(m);
+            }}
+            disabled={!selectedSku}
             className="flex-1 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
           >
-            적용
+            적용하기
           </button>
         </div>
       </motion.div>
     </>
   );
+}
+
+// ──────────────── 견적 모달 ────────────────
+function EstimateModal({
+  segmentation,
+  expensesRatio,
+  onChangeExpensesRatio,
+  onClose,
+}: {
+  segmentation: SegmentationData;
+  expensesRatio: number;
+  onChangeExpensesRatio: (v: number) => void;
+  onClose: () => void;
+}) {
+  const [estimate, setEstimate] = useState<{
+    items: { region_id: string; label_ko: string; material_name: string; brand?: string; unit: string; qty: number; unit_price: number; subtotal: number }[];
+    material_subtotal: number;
+    expenses: number;
+    total: number;
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch("/api/inpick/segmentation-estimate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ segmentation, expensesRatio }),
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        setEstimate(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [segmentation, expensesRatio]);
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+      >
+        <div className="flex items-center justify-between">
+          <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+            영역별 자재 견적
+          </h3>
+          <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        <div className="mt-3 flex items-center gap-2 text-xs text-primary-900/70">
+          <label>경비 비율</label>
+          <input
+            type="number"
+            value={expensesRatio * 100}
+            min={0}
+            max={20}
+            step={0.5}
+            onChange={(e) => onChangeExpensesRatio(Number(e.target.value) / 100)}
+            className="w-16 rounded-lg border border-primary-200 px-2 py-1 text-right tabular"
+          />
+          <span>%</span>
+          <span className="text-primary-900/40">· 인픽 수수료는 계약 시점 별도</span>
+        </div>
+
+        {loading ? (
+          <div className="py-12 text-center">
+            <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
+          </div>
+        ) : !estimate || estimate.items.length === 0 ? (
+          <p className="py-8 text-center text-sm text-primary-900/60">
+            자재가 선택된 영역이 없습니다
+          </p>
+        ) : (
+          <>
+            <ul className="mt-4 divide-y divide-primary-100 border-y border-primary-100">
+              {estimate.items.map((it) => (
+                <li key={it.region_id} className="py-2.5 flex items-start justify-between gap-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-bold text-primary-900 truncate">
+                      {it.label_ko} <span className="text-primary-900/40 font-normal">·</span>{" "}
+                      <span className="font-semibold">{it.material_name}</span>
+                      {it.brand && <span className="text-primary-900/40 ml-1">({it.brand})</span>}
+                    </p>
+                    <p className="text-[0.7rem] text-primary-900/60 tabular">
+                      {it.qty.toLocaleString()} {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : "EA"} ×
+                      ₩{it.unit_price.toLocaleString()}
+                    </p>
+                  </div>
+                  <p className="font-bold text-primary-900 tabular shrink-0">
+                    ₩{it.subtotal.toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-4 space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">재료비 소계</span>
+                <span className="font-bold tabular">₩{estimate.material_subtotal.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">
+                  경비 ({(expensesRatio * 100).toFixed(1)}%)
+                </span>
+                <span className="font-bold tabular">₩{estimate.expenses.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between border-t border-primary-200 pt-2 text-base">
+                <span className="font-extrabold text-primary-900">합계</span>
+                <span className="font-extrabold text-primary-900 tabular">
+                  ₩{estimate.total.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        <button
+          onClick={onClose}
+          className="mt-5 w-full rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
+        >
+          닫기
+        </button>
+      </motion.div>
+    </>
+  );
+}
+
+// ──────────────── alpha PNG 마스크 빌더 (가이드 §2-1) ────────────────
+async function buildAlphaMask(
+  w: number,
+  h: number,
+  regions: SegRegion[],
+): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+
+  // 시작: 전체 불투명 흰색 (보존)
+  ctx.fillStyle = "rgba(255, 255, 255, 1)";
+  ctx.fillRect(0, 0, w, h);
+
+  // polygon 영역만 alpha=0 으로 (변경)
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = "rgba(0, 0, 0, 1)";
+  for (const r of regions) {
+    ctx.beginPath();
+    r.polygon.forEach(([nx, ny], i) => {
+      const x = nx * w;
+      const y = ny * h;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    });
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.globalCompositeOperation = "source-over";
+
+  return canvas.toDataURL("image/png");
 }

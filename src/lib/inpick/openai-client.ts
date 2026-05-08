@@ -31,12 +31,15 @@ export interface RenderRoomInput {
   feeling?: string;
   size?: "1024x1024" | "1024x1792" | "1792x1024";
   // 평면도 신뢰성 — 창문·문·구조 context
-  windows?: number;          // 창문 개수 (0이면 명시적으로 "창문 없음")
-  windowSide?: string;       // "남측" | "북측" | "외벽" | "안쪽 (창문 없음)"
-  doors?: number;            // 출입문 개수
-  isInteriorRoom?: boolean;  // 내부방 (욕실/드레스룸/팬트리 등 — 창문 없는 게 일반적)
-  // 사용자가 Step1에서 선택한 시공 옵션 (붙박이장·중문·싱크대 등) — 가구 금지 정책의 예외로 prompt 포함
+  windows?: number;
+  windowSide?: string;
+  doors?: number;
+  isInteriorRoom?: boolean;
   furnishingOptions?: string[];
+  // 도면 기반 정확도 강화 — 같은 방 재생성 시 형태 일관성
+  aspectRatio?: number;       // widthMm/depthMm — 정사각형(1.0) vs 긴 직사각형(2.0+)
+  isFromFloorplan?: boolean;  // true면 도면에서 추출한 치수임을 prompt에 명시
+  previousReference?: string; // 직전 generation의 revisedPrompt — 형태 유지 reference
 }
 
 export interface RenderRoomResult {
@@ -92,10 +95,27 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     ? "조명: 천장 매입 LED만, 자연광 X."
     : "조명: 자연광 + 보조 조명.";
 
+  // 도면 기반 정보 (사용자 평면도에서 추출한 치수임을 모델에 명시 — 같은 방 재생성 시 형태 유지 유도)
+  const ratio = input.aspectRatio || (input.widthMm / input.depthMm);
+  const ratioDesc =
+    ratio > 1.6 ? "wide elongated rectangular floor plan"
+    : ratio > 1.15 ? "rectangular floor plan slightly wider than deep"
+    : ratio > 0.85 ? "near-square floor plan"
+    : ratio > 0.6 ? "rectangular floor plan slightly deeper than wide"
+    : "narrow elongated rectangular floor plan";
+  const floorplanTag = input.isFromFloorplan
+    ? `Layout strictly from user's actual floor plan — preserve room shape and proportions exactly. `
+    : "";
+  const previousRefTag = input.previousReference
+    ? `\nPrevious render of this same room (preserve same room shape, window/door positions, camera angle): "${input.previousReference.slice(0, 400)}"\n`
+    : "";
+
   const prompt =
     `Empty Korean apartment ${input.roomName} interior shell, just after construction completion, 2026 contemporary minimalist standard. ` +
     `한국 아파트 ${input.roomName} 빈 방 마감 사진 (시공 직후, 가구 입주 전 상태, 2026년 최신 인테리어 트렌드). ` +
-    `공간 치수: 가로 ${sizes.width}m × 깊이 ${sizes.depth}m × 천장고 ${sizes.height}m. ` +
+    `${floorplanTag}` +
+    `Space: width ${sizes.width}m × depth ${sizes.depth}m × ceiling ${sizes.height}m, ${ratioDesc}. ` +
+    `${previousRefTag}` +
     `${structStr}` +
     `스타일: ${input.style}. ${matStr} ${feelStr} ${expStr} ` +
     `${lightStr} ` +

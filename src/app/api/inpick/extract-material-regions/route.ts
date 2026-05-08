@@ -1,88 +1,64 @@
 /**
  * POST /api/inpick/extract-material-regions
  *
- * 1차 렌더 이미지(DALL-E 3) → GPT-4o Vision → 자재별 폴리곤 영역 JSON
- * 사용자가 영역 클릭 → 자재 교체 → /refine-render inpaint 호출
+ * 1차 렌더 이미지(gpt-image-2) → SAM 2.1 (또는 GPT-4o Vision) → SegmentationData JSON
+ * 가이드 §1-4 build_segmentation_data 의 동등 구현.
  *
- * 입력: { imageUrl: string, roomName: string }
- * 출력: { regions: MaterialRegion[], imageWidth: number, imageHeight: number }
+ * provider 분기:
+ *   - process.env.SEGMENTATION_PROVIDER === "sam-2.1" → Replicate SAM 2 (REPLICATE_API_TOKEN 필요)
+ *   - 그 외 → GPT-4o Vision (기본)
+ *
+ * 입력: { imageUrl, roomName?, realWorldAreaSqm? }
+ * 출력: SegmentationData
  */
 import { NextRequest, NextResponse } from "next/server";
-import { analyzeImageVision } from "@/lib/inpick/openai-client";
+import { pickProvider } from "@/lib/inpick/segmentation/provider";
+import { gpt4oProvider } from "@/lib/inpick/segmentation/gpt4o-provider";
+import { samReplicateProvider } from "@/lib/inpick/segmentation/sam-replicate-provider";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300; // SAM 2 cold start + classification 합쳐 최대 4분
+export const dynamic = "force-dynamic";
 
-export interface MaterialRegion {
-  id: string;
-  surface: string;          // "바닥" | "벽" | "천장" | "가구" | "조명" | "창호" | "도어"
-  detail: string;           // "거실 바닥", "TV 뒷벽", "소파" 등
-  material: string;         // "오크 원목마루", "월넛 가구"
-  colorHex?: string;
-  polygon: [number, number][]; // [[x, y], ...] — 0~1 정규화 좌표 (이미지 기준)
+interface Body {
+  imageUrl?: string;
+  imageBase64?: string;
+  roomName?: string;
+  realWorldAreaSqm?: number;
 }
-
-const PROMPT = `이미지는 한국 인테리어 렌더링입니다. 클릭 가능한 자재 영역을 추출하세요.
-
-JSON 응답 (반드시 valid object):
-{
-  "imageWidth": 1024,
-  "imageHeight": 1024,
-  "regions": [
-    {
-      "id": "floor",
-      "surface": "바닥|벽|천장|가구|조명|창호|도어|타일|몰딩",
-      "detail": "구체적 설명 (예: 거실 바닥, TV 뒷벽, 소파, 다이닝 테이블)",
-      "material": "추정 자재명 (예: 오크 원목마루, 화이트 페인트, 월넛 우드, 대리석)",
-      "colorHex": "#RRGGBB",
-      "polygon": [[0.12, 0.65], [0.88, 0.62], [0.92, 0.95], [0.08, 0.98]]
-    }
-  ]
-}
-
-규칙:
-- polygon 좌표는 0~1 정규화 (이미지 left-top = (0,0), right-bottom = (1,1))
-- 4~8개 꼭짓점으로 단순화. 곡면은 사각 근사 OK
-- 큰 면적 면 우선: 바닥, 주벽 3면, 천장, 주요 가구 (소파/침대/테이블/싱크대)
-- 작은 소품은 무시
-- id는 영문 소문자 + 숫자 (예: "floor", "wall1", "sofa", "ceiling")
-- 최대 10개 영역까지`;
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { imageUrl?: string; roomName?: string };
-    if (!body.imageUrl) {
-      return NextResponse.json({ error: "imageUrl 필수" }, { status: 400 });
+    const body = (await req.json()) as Body;
+    if (!body.imageUrl && !body.imageBase64) {
+      return NextResponse.json({ error: "imageUrl 또는 imageBase64 필수" }, { status: 400 });
     }
 
-    const visionRes = await analyzeImageVision({
-      imageUrl: body.imageUrl,
-      prompt: PROMPT + (body.roomName ? `\n공간: ${body.roomName}` : ""),
-      responseFormat: "json_object",
+    const choice = pickProvider();
+    const provider = choice === "sam-2.1" ? samReplicateProvider : gpt4oProvider;
+
+    const data = await provider.segment({
+      imageUrl: body.imageUrl || "",
+      imageBase64: body.imageBase64,
+      roomName: body.roomName,
+      realWorldAreaSqm: body.realWorldAreaSqm,
     });
 
-    let parsed: { regions?: MaterialRegion[]; imageWidth?: number; imageHeight?: number };
-    try {
-      parsed = JSON.parse(visionRes.content);
-    } catch {
-      return NextResponse.json(
-        { error: "Vision JSON 파싱 실패", raw: visionRes.content.slice(0, 500) },
-        { status: 502 },
-      );
-    }
-
-    const regions = (parsed.regions || []).filter(
-      (r) => r.id && r.polygon && Array.isArray(r.polygon) && r.polygon.length >= 3,
-    );
-
-    return NextResponse.json({
-      regions,
-      imageWidth: parsed.imageWidth || 1024,
-      imageHeight: parsed.imageHeight || 1024,
-      regionCount: regions.length,
-    });
+    return NextResponse.json(data);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ error: msg }, { status: 500 });
+    let hint: string | undefined;
+    if (msg.includes("REPLICATE_API_TOKEN") || msg.includes("Replicate") || msg.includes("SAM")) {
+      hint = "영역 분석 서비스 일시 장애 (관리자에게 문의)";
+    } else if (msg.includes("JSON 파싱")) {
+      hint = "이미지 분석 결과 처리 실패 — 잠시 후 재시도";
+    } else {
+      hint = "영역 분석 실패 (요금이 발생하지 않았습니다)";
+    }
+    console.warn("[extract-material-regions] failed:", msg);
+    return NextResponse.json(
+      { error: "자재 영역 분석에 실패했습니다", hint, tokenConsumed: false },
+      { status: 502 },
+    );
   }
 }

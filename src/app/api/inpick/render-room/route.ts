@@ -47,11 +47,11 @@ export async function POST(req: NextRequest) {
     let hint: string | undefined;
     let model_status: "blocked" | "rate_limited" | "billing" | "auth" | "timeout" | "unknown" = "unknown";
 
-    if (msg.includes("Incorrect API key") || msg.includes("invalid_api_key")) {
-      hint = "API 키가 잘못되었습니다. https://platform.openai.com/api-keys 에서 새 키 발급 → Vercel 환경변수 갱신";
+    if (msg.includes("Incorrect API key") || msg.includes("invalid_api_key") || msg.includes("401")) {
+      hint = "이미지 생성 서비스 인증 문제 (관리자에게 문의)";
       model_status = "auth";
     } else if (msg.includes("billing") || msg.includes("quota") || msg.includes("insufficient")) {
-      hint = "OpenAI 결제 한도 초과 또는 잔액 부족. https://platform.openai.com/account/billing 에서 충전";
+      hint = "이미지 생성 서비스 결제 한도 초과 (관리자에게 문의)";
       model_status = "billing";
     } else if (
       msg.includes("model_not_found") ||
@@ -60,25 +60,26 @@ export async function POST(req: NextRequest) {
       msg.includes("verify") ||
       msg.includes("404")
     ) {
-      hint = "gpt-image-2 사용 권한 없음 — https://platform.openai.com/settings/organization/general 에서 Verify Organization (신분증·얼굴 인증) → 인증 후 최대 15분 대기. tier upgrade 필요할 수 있음";
+      hint = "이미지 생성 서비스 사용 권한 미설정 (관리자에게 문의)";
       model_status = "blocked";
     } else if (msg.includes("rate limit") || msg.includes("429")) {
-      hint = "gpt-image-2 Rate limit 초과 — 잠시 후 재시도. 동시 호출 줄이기";
+      hint = "현재 요청이 많습니다 — 잠시 후 다시 시도해주세요";
       model_status = "rate_limited";
     } else if (msg.includes("시간 초과") || msg.includes("timeout") || msg.includes("Abort")) {
-      hint = "gpt-image-2 응답 지연 (280초 초과). OpenAI 측 서비스 지연 가능 — 잠시 후 재시도";
+      hint = "응답 지연 — 잠시 후 다시 시도해주세요";
       model_status = "timeout";
     } else {
-      hint = "gpt-image-2 호출 실패. 폴백 없이 즉시 종료됨 — 토큰 차감 안 됨";
+      hint = "이미지 생성 실패 (요금이 발생하지 않았습니다)";
     }
+
+    // 내부 에러 메시지는 server log에만 기록, 클라이언트엔 일반화된 메시지만 노출
+    console.warn("[render-room] image gen failed:", msg);
 
     return NextResponse.json(
       {
-        error: msg,
+        error: "이미지 생성에 실패했습니다",
         hint,
-        model: "gpt-image-2",
         model_status,
-        // 클라이언트가 토큰 차감 막는 신호
         tokenConsumed: false,
       },
       { status: 502 },

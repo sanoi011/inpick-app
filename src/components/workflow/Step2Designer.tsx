@@ -30,7 +30,10 @@ import {
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
 import MaterialEditor from "./MaterialEditor";
-import type { MaterialRegion } from "./MaterialEditor";
+import type { SegmentationData } from "@/types/segmentation";
+
+// legacy compat — MaterialEditor가 더이상 export하지 않음
+export type MaterialRegion = unknown;
 
 const ROOM_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
   { v: "all", label: "전체", dimKey: "거실", icon: Layers },
@@ -61,7 +64,10 @@ export interface RenderItem {
   revisedPrompt?: string;
   costUsd: number;
   timestamp: string;
+  /** legacy — 이전 GPT-4o 기반 영역 (deprecated, segmentation 사용) */
   materialRegions?: MaterialRegion[];
+  /** SAM 2.1 또는 GPT-4o Vision으로 추출한 세그멘테이션 + 자재 선택 */
+  segmentation?: SegmentationData;
   refinedUrl?: string;
   refinedAt?: string;
 }
@@ -225,11 +231,25 @@ export default function Step2Designer({
       return;
     }
     setErrorMsg(null);
+
+    // 1차는 무료, 2차+(수정)은 1토큰
+    const isFirstGen = renders.length === 0;
+    if (!isFirstGen && tokenBalance < 1) {
+      setInsufficientOpen(true);
+      return;
+    }
+
     setGenerating(true);
     try {
       const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
       const struct = inferStructure(tab.label);
+      // 2차+ 시 이전 생성의 revisedPrompt를 reference로 — 같은 방 형태 유지 유도
+      const previousRender = renders[renders.length - 1];
+      const previousReference =
+        !isFirstGen && previousRender
+          ? previousRender.revisedPrompt || previousRender.prompt
+          : undefined;
       const res = await fetch("/api/inpick/render-room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -244,16 +264,17 @@ export default function Step2Designer({
           windows: struct.windows,
           isInteriorRoom: struct.isInteriorRoom,
           furnishingOptions: roomFurnishings?.[activeRoom] || [],
+          // 도면 기반 정보 강화
+          aspectRatio: dim.widthMm / dim.depthMm,
+          isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
+          previousReference,
         }),
       });
       const data = await res.json();
       if (!res.ok || !data.imageUrl) {
-        // gpt-image-2 단일 정책 — 실패 시 폴백 없음, 토큰 차감 없음
-        const status = data.model_status as string | undefined;
-        const baseMsg = data.error || "gpt-image-2 호출 실패";
+        const baseMsg = data.error || "이미지 생성 실패";
         const hintMsg = data.hint ? `\n→ ${data.hint}` : "";
-        const policyTag = "(gpt-image-2 단일 모델 정책 · 토큰 차감 안 됨)";
-        throw new Error(`[${status || "error"}] ${baseMsg}${hintMsg}\n${policyTag}`);
+        throw new Error(`${baseMsg}${hintMsg}\n(요금이 발생하지 않았습니다)`);
       }
       const item: RenderItem = {
         url: data.imageUrl,
@@ -262,6 +283,14 @@ export default function Step2Designer({
         costUsd: data.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
       };
+      // 2차+ 시 토큰 차감 (성공 후에만 — 실패 시 차감 없음)
+      if (!isFirstGen) {
+        const ok = await onConsumeToken(1, "ai_render");
+        if (!ok) {
+          // 이미지는 생성됐지만 토큰 차감 실패 — 사용자에게 알림 (이미지는 그대로 표시)
+          setErrorMsg("이미지 생성은 완료됐지만 토큰 차감에 실패했습니다. 관리자에게 문의해주세요.");
+        }
+      }
       const nextRenders = [...renders, item];
       onChange({
         ...value,
@@ -312,9 +341,8 @@ export default function Step2Designer({
           });
           const data = await res.json();
           if (!res.ok || !data.imageUrl) {
-            const status = data.model_status as string | undefined;
             throw new Error(
-              `${tab.label} [${status || "error"}]: ${data.error || "gpt-image-2 호출 실패"}` +
+              `${tab.label}: ${data.error || "이미지 생성 실패"}` +
               (data.hint ? ` → ${data.hint}` : ""),
             );
           }
@@ -665,8 +693,8 @@ export default function Step2Designer({
                     />
                   </div>
                   <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
-                    <span className="tabular font-bold">{Math.round(progress)}%</span> · gpt-image-2
-                    단일 모델 호출 — 40~80초 소요. 실패 시 토큰 차감 없음
+                    <span className="tabular font-bold">{Math.round(progress)}%</span> · 고퀄리티 인테리어
+                    이미지 생성 중 — 약 40~80초. 실패 시 요금이 발생하지 않습니다
                   </p>
                 </div>
               </div>
@@ -706,12 +734,31 @@ export default function Step2Designer({
               >
                 {generating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
+                ) : activeRoom === "all" ? (
+                  // "전체" 탭은 항상 일괄 1차 생성 (비어있는 방만)
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    <span>전체 일괄 생성</span>
+                    <span className="rounded bg-emerald-500/30 px-1.5 py-0.5 text-[0.6rem] font-bold">
+                      무료
+                    </span>
+                  </>
+                ) : renders.length === 0 ? (
+                  // 1차 생성 — 무료
                   <>
                     <Send className="h-3.5 w-3.5" />
                     <span>1차 생성</span>
                     <span className="rounded bg-emerald-500/30 px-1.5 py-0.5 text-[0.6rem] font-bold">
                       무료
+                    </span>
+                  </>
+                ) : (
+                  // 2차+ 수정 — 1토큰
+                  <>
+                    <Send className="h-3.5 w-3.5" />
+                    <span>수정 생성</span>
+                    <span className="rounded bg-amber-400/40 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
+                      <Hexagon className="h-2.5 w-2.5 fill-amber-600" />1
                     </span>
                   </>
                 )}
@@ -783,11 +830,12 @@ export default function Step2Designer({
           )}
         </AnimatePresence>
 
-        {/* 자재 수정 (벡터화) — 선택된 시안 아래 */}
+        {/* 자재 수정 (세그멘테이션) — 선택된 시안 아래 */}
         {activeRender && selectedIdx != null && hasGenerated && (
           <div className="mt-4">
             <MaterialEditor
               roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
+              realWorldAreaSqm={basicInfo.selectedPyeong?.exclusiveArea}
               styleHint={activeRender.prompt}
               renderItem={activeRender}
               tokenBalance={tokenBalance}
