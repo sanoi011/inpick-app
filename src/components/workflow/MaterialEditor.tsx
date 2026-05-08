@@ -273,13 +273,10 @@ export default function MaterialEditor({
                   <li key={r.id}>
                     <button
                       onClick={() => setActiveRegionId(r.id)}
-                      onMouseEnter={() => setActiveRegionId(r.id)}
                       className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-all ${
-                        activeRegionId === r.id
-                          ? "border-primary-500 bg-white shadow-sm"
-                          : edited
-                            ? "border-amber-300 bg-amber-50"
-                            : "border-primary-100 bg-white/70 hover:border-primary-300"
+                        edited
+                          ? "border-amber-300 bg-amber-50"
+                          : "border-primary-100 bg-white/70 hover:border-primary-300"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
