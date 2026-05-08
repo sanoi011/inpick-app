@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Layers, Check, ChevronDown, Building2, Home, Store, Box } from "lucide-react";
+import { Layers, Check, ChevronDown, Building2, Home, Store, Box, RotateCcw } from "lucide-react";
 import BasicInfoCard, { BasicInfoData } from "./BasicInfoCard";
 
 type BuildingType = "apartment" | "house" | "store" | "etc";
@@ -98,9 +98,10 @@ interface Props {
   value: Step1Data;
   onChange: (next: Step1Data) => void;
   onNext: () => void;
+  onReset?: () => void;
 }
 
-export default function Step1Cards({ value, onChange, onNext }: Props) {
+export default function Step1Cards({ value, onChange, onNext, onReset }: Props) {
   const update = <K extends keyof Step1Data>(k: K, v: Step1Data[K]) =>
     onChange({ ...value, [k]: v });
 
@@ -135,7 +136,28 @@ export default function Step1Cards({ value, onChange, onNext }: Props) {
   if (isCommercial && !value.storeUsage) missing.push("용도");
 
   return (
-    <div className="grid gap-5 lg:grid-cols-2 lg:gap-7">
+    <div className="space-y-3">
+      {/* 상단 — 처음부터 다시 버튼 */}
+      {onReset && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => {
+              if (
+                confirm(
+                  "입력하신 모든 정보(주소·도면·예산·건물유형·공간 옵션 등)가 초기화됩니다.\n계속하시겠습니까?",
+                )
+              ) {
+                onReset();
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:border-primary-400 hover:text-primary-600 transition-colors"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+            처음부터 다시
+          </button>
+        </div>
+      )}
+      <div className="grid gap-5 lg:grid-cols-2 lg:gap-7">
       {/* Card 1: 기본정보 입력 (3 모드 + 예산) */}
       <Card title="기본정보 입력" icon={Layers} done={basicDone}>
         <BasicInfoCard
@@ -266,6 +288,7 @@ export default function Step1Cards({ value, onChange, onNext }: Props) {
           )}
         </motion.button>
       </Card>
+      </div>
     </div>
   );
 }

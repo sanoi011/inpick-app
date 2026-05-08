@@ -262,7 +262,33 @@ export default function WorkflowPage() {
                 </div>
 
                 <div className="mt-12">
-                  <Step1Cards value={step1} onChange={setStep1} onNext={goNext} />
+                  <Step1Cards
+                    value={step1}
+                    onChange={setStep1}
+                    onNext={goNext}
+                    onReset={() => {
+                      setStep1({
+                        basicInfo: { mode: "address", budget: 3500, expansionType: "basic" },
+                        buildingType: null,
+                        rooms: [],
+                      });
+                      setStep2({
+                        selectedByRoom: {},
+                        generations: {},
+                        rendersByRoom: {},
+                        promptByRoom: {},
+                      });
+                      setStep(1);
+                      try {
+                        sessionStorage.removeItem("workflow_step1");
+                        sessionStorage.removeItem("workflow_step2");
+                        sessionStorage.removeItem("workflow_step");
+                      } catch {
+                        /* private mode */
+                      }
+                      setNormalizeError(null);
+                    }}
+                  />
                 </div>
               </motion.div>
             )}

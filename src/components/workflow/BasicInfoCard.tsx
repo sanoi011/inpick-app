@@ -382,8 +382,8 @@ function AddressMode({ value, onChange }: Props) {
     });
     if (!p.grandPlanUrl) return;
     try {
-      // 평면도 raster cleaning은 비활성화 (이미지 edit이 도면 구조를 깨뜨림)
-      // 원본 raster + Vision 추출 치수 SVG 오버레이만 사용
+      // 평면도 raster cleaning 활성화 — 워터마크 제거 + 바닥 패턴 매핑
+      // 깨끗한 도면 → Vision 치수 추출 정확도 ↑ → Step2 이미지 생성 형태 일관성 ↑
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -391,7 +391,7 @@ function AddressMode({ value, onChange }: Props) {
           imageUrl: p.grandPlanUrl,
           exclusiveAreaM2: p.exclusiveArea,
           unitName: value.selectedAddress?.buildingName,
-          skipImageClean: true,
+          skipImageClean: false,
         }),
       });
       const data = await res.json();
