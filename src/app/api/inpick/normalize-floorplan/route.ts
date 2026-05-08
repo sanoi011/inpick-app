@@ -40,6 +40,8 @@ interface Body {
   isHandDrawn?: boolean;
   unitName?: string;
   skipImageClean?: boolean;  // 비용 절감 — 워터마크 제거 안 함, dimension overlay만
+  /** 확장형 — true면 발코니 확장된 평면으로 수정 (거실/방과 통합) */
+  expansion?: boolean;
 }
 
 interface VisionRoom {
@@ -89,14 +91,38 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
+  options: { expansion?: boolean } = {},
 ): Promise<{ b64: string; costUsd: number; model: string }> {
+  const expansionBlock = options.expansion
+    ? "확장형 도면으로 수정: 발코니/베란다 영역을 거실 또는 인접한 방과 하나의 공간으로 통합 (벽 제거, 바닥 통일). " +
+      "확장된 거실은 원래 거실 + 발코니 면적이 더해진 더 넓은 공간으로 표현. "
+    : "";
+
   const prompt =
-    "한국 아파트 평면도. 모든 워터마크, 로고, NAVER/네이버 텍스트, 광고 텍스트 완전 제거. " +
-    "동일한 실 레이아웃과 비율 유지. " +
-    "바닥 패턴을 고화질로 재매핑: 거실/방=헤링본 우드, 욕실=정사각 타일, 주방=가로 타일, 발코니=가로 타일. " +
-    "벽은 검은 두꺼운 외벽 + 회색 내벽. " +
-    "깨끗한 흰 배경. 한국 인테리어 평면도 스타일. " +
-    "치수 텍스트는 그리지 마세요 (별도 오버레이됨).";
+    "Korean apartment floor plan, top-down architectural view, premium magazine quality. " +
+    "한국 아파트 평면도, 위에서 본 깔끔한 건축 도면 스타일. " +
+    expansionBlock +
+    // 워터마크 교체 (AIOD)
+    "기존 NAVER, 네이버 부동산, 직방, 호갱노노, 호갱님, 다방 등 모든 외부 서비스 워터마크와 로고 완전히 지움. " +
+    "그 자리 또는 우하단 모서리에 'AIOD' 라는 얇은 회색 텍스트 워터마크만 작게 표기 (font: clean sans-serif, color: #999, size: small, opacity 0.5). " +
+    // 레이아웃 보존
+    "동일한 실 레이아웃과 비율, 벽 위치, 출입문 위치, 창문 위치 그대로 유지. 임의로 방 추가/삭제 금지. " +
+    // 매핑 강화 (이쁘게)
+    "바닥 패턴 고화질 재매핑 (사실적이고 정갈하게): " +
+    "- 거실 + 침실 + 안방: 헤링본 패턴 우드 마루 (warm oak tone, herringbone parquet) " +
+    "- 주방 + 다이닝: 라이트 그레이 가로 long-format 우드 (subtle grain) " +
+    "- 욕실 + 화장실: 화이트 정사각 600×600 타일 (clean white square tile, thin grout) " +
+    "- 발코니/베란다 (확장 X): 라이트 그레이 가로 데크 타일 " +
+    "- 현관 + 다용도실: 다크 그레이 600×600 폴리싱 타일 " +
+    "- 드레스룸: 거실과 동일 헤링본 우드 " +
+    "- 팬트리: 주방과 동일 가로 우드 " +
+    // 벽 표현
+    "벽 표현: 외벽 = 두꺼운 검정 라인 (3~4px), 내벽 = 얇은 회색 라인 (1~2px), 출입문 = 호(arc) 표시, 창문 = 두 줄 평행선. " +
+    // 배경
+    "배경: 깨끗한 화이트 (#FFFFFF), 그림자/노이즈/JPEG 아티팩트 없음. " +
+    // 금지
+    "치수 텍스트, 한글 라벨, 화살표, 가구 일러스트는 그리지 마세요 (별도 SVG 오버레이로 처리). " +
+    "어떤 외부 브랜드 로고도 추가 금지. AIOD 워터마크 외 다른 텍스트 절대 X.";
 
   const form = new FormData();
   form.append("model", "gpt-image-2");
@@ -162,7 +188,7 @@ export async function POST(req: NextRequest) {
     const [visionRes, cleaned] = await Promise.allSettled([
       visionPromise,
       imageBuf
-        ? cleanFloorplanRaster(imageBuf, apiKey)
+        ? cleanFloorplanRaster(imageBuf, apiKey, { expansion: body.expansion })
         : Promise.resolve(null),
     ]);
 

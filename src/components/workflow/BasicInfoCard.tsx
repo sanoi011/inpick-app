@@ -392,6 +392,7 @@ function AddressMode({ value, onChange }: Props) {
           exclusiveAreaM2: p.exclusiveArea,
           unitName: value.selectedAddress?.buildingName,
           skipImageClean: false,
+          expansion: value.expansionType === "extended",
         }),
       });
       const data = await res.json();
