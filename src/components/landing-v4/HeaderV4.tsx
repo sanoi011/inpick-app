@@ -1,16 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { motion } from "motion/react";
-import { User, Building2, Hexagon, LayoutDashboard, Shield } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "motion/react";
+import {
+  User, Building2, Hexagon, Shield,
+  LayoutDashboard, FolderOpen, FileSignature, Bell, CreditCard,
+  Settings, HelpCircle, LogOut, ChevronDown,
+} from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * 헤더 V4 — 좌측 로고 + 우측 로그인 버튼 (비로그인) 또는 마이페이지+토큰 (로그인)
  */
 export default function HeaderV4() {
   const [mode, setMode] = useState<"dark" | "light">("dark");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   const { authenticated, balance, loading } = useTokens();
+  const { user, signOut } = useAuth();
+
+  // 외부 클릭 시 dropdown 닫기
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
 
   useEffect(() => {
     const sections = ["hero", "walkthrough", "demo", "mob", "test", "final"];
@@ -125,20 +145,89 @@ export default function HeaderV4() {
                   토큰
                 </span>
               </motion.a>
-              {/* 마이페이지 */}
-              <motion.a
-                href="/mypage"
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 font-semibold transition-colors sm:px-4 ${
-                  isDark
-                    ? "bg-offwhite text-primary-500 hover:bg-offwhite/90"
-                    : "bg-ink text-offwhite hover:bg-ink/90"
-                }`}
-              >
-                <LayoutDashboard className="h-3.5 w-3.5" />
-                <span>마이페이지</span>
-              </motion.a>
+              {/* 마이페이지 — 사람 아이콘 + dropdown */}
+              <div ref={menuRef} className="relative">
+                <motion.button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  aria-label="마이페이지 메뉴"
+                  aria-expanded={menuOpen}
+                  className={`inline-flex h-10 items-center gap-1 rounded-full pl-1 pr-2 font-semibold transition-colors ${
+                    isDark
+                      ? "bg-offwhite text-primary-500 hover:bg-offwhite/90"
+                      : "bg-ink text-offwhite hover:bg-ink/90"
+                  }`}
+                >
+                  <span
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full ${
+                      isDark ? "bg-primary-500/15" : "bg-offwhite/15"
+                    }`}
+                  >
+                    <User className="h-4 w-4" />
+                  </span>
+                  <ChevronDown
+                    className={`h-3 w-3 transition-transform ${menuOpen ? "rotate-180" : ""}`}
+                  />
+                </motion.button>
+
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-64 rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden z-50"
+                    >
+                      {/* 사용자 정보 헤더 */}
+                      <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50">
+                        <p className="text-xs text-zinc-500">로그인 됨</p>
+                        <p className="text-sm font-bold text-zinc-900 truncate">
+                          {user?.email || "사용자"}
+                        </p>
+                      </div>
+
+                      <nav className="py-1.5">
+                        <DropdownItem href="/mypage" icon={LayoutDashboard} onClick={() => setMenuOpen(false)}>
+                          마이페이지
+                        </DropdownItem>
+                        <DropdownItem href="/mypage/projects" icon={FolderOpen} onClick={() => setMenuOpen(false)}>
+                          내 프로젝트
+                        </DropdownItem>
+                        <DropdownItem href="/mypage/contracts" icon={FileSignature} onClick={() => setMenuOpen(false)}>
+                          계약 진행
+                        </DropdownItem>
+                        <DropdownItem href="/mypage/notifications" icon={Bell} onClick={() => setMenuOpen(false)}>
+                          알림
+                        </DropdownItem>
+                        <DropdownItem href="/account/tokens" icon={CreditCard} onClick={() => setMenuOpen(false)}>
+                          토큰 / 요금제
+                        </DropdownItem>
+                        <DropdownItem href="/mypage/account" icon={Settings} onClick={() => setMenuOpen(false)}>
+                          계정 설정
+                        </DropdownItem>
+                        <DropdownItem href="/mypage/support" icon={HelpCircle} onClick={() => setMenuOpen(false)}>
+                          고객지원
+                        </DropdownItem>
+                      </nav>
+
+                      <div className="border-t border-zinc-100 py-1.5">
+                        <button
+                          onClick={async () => {
+                            setMenuOpen(false);
+                            await signOut();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <LogOut className="h-4 w-4" />
+                          로그아웃
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </>
           ) : (
             <>
@@ -188,5 +277,28 @@ export default function HeaderV4() {
         </div>
       </nav>
     </header>
+  );
+}
+
+function DropdownItem({
+  href,
+  icon: Icon,
+  children,
+  onClick,
+}: {
+  href: string;
+  icon: typeof User;
+  children: React.ReactNode;
+  onClick?: () => void;
+}) {
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      className="flex items-center gap-2.5 px-4 py-2.5 text-sm font-semibold text-zinc-700 hover:bg-zinc-50 hover:text-zinc-900 transition-colors"
+    >
+      <Icon className="h-4 w-4 text-zinc-500" />
+      {children}
+    </a>
   );
 }
