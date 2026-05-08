@@ -118,11 +118,48 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const id = request.nextUrl.searchParams.get("id");
-    if (!id) {
-      return NextResponse.json({ error: "id가 필요합니다." }, { status: 400 });
+    const idsParam = request.nextUrl.searchParams.get("ids");
+
+    // 배치 삭제: ?ids=a,b,c
+    if (idsParam) {
+      const ids = idsParam.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 200);
+      if (ids.length === 0) {
+        return NextResponse.json({ error: "삭제할 id가 없습니다." }, { status: 400 });
+      }
+      const { data, error } = await supabase
+        .from("consumer_projects")
+        .delete()
+        .in("id", ids)
+        .eq("user_id", user.id)
+        .select("id");
+
+      if (error) {
+        console.error("Batch delete error:", error);
+        return NextResponse.json({ error: "프로젝트 삭제 실패" }, { status: 500 });
+      }
+
+      const deletedIds = (data || []).map((r) => r.id as string);
+      if (deletedIds.length > 0) {
+        await supabase
+          .from("estimates")
+          .update({ consumer_project_id: null })
+          .in("consumer_project_id", deletedIds)
+          .then(() => {});
+      }
+
+      return NextResponse.json({
+        success: true,
+        deletedIds,
+        deletedCount: deletedIds.length,
+        requestedCount: ids.length,
+      });
     }
 
-    // 소유권 확인 후 삭제
+    // 단건 삭제: ?id=X (기존 호환)
+    if (!id) {
+      return NextResponse.json({ error: "id 또는 ids가 필요합니다." }, { status: 400 });
+    }
+
     const { data, error } = await supabase
       .from("consumer_projects")
       .delete()
@@ -135,7 +172,6 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "프로젝트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
     }
 
-    // 연결된 estimates의 consumer_project_id 정리 (soft link)
     await supabase
       .from("estimates")
       .update({ consumer_project_id: null })

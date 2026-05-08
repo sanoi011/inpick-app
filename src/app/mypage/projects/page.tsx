@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Plus, MapPin, Clock, FolderOpen, RefreshCw, FileSignature, ArrowRight, Trash2,
+  CheckSquare, Square, X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/Toast";
@@ -83,6 +84,9 @@ export default function MyPageProjects() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [visibleCount, setVisibleCount] = useState(10);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`"${name}" 프로젝트를 삭제하시겠습니까?\n삭제된 프로젝트는 복구할 수 없습니다.`)) return;
@@ -106,6 +110,54 @@ export default function MyPageProjects() {
       toast({ type: "error", title: "오류", message: "프로젝트 삭제 중 오류가 발생했습니다" });
     }
     setDeletingId(null);
+  };
+
+  const exitSelectMode = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const bulkDelete = async (ids: string[], confirmMsg: string) => {
+    if (ids.length === 0) return;
+    if (!confirm(confirmMsg)) return;
+    setBulkDeleting(true);
+    try {
+      // 서버 삭제 — 100개씩 chunking (URL 길이 안전)
+      if (user) {
+        for (let i = 0; i < ids.length; i += 100) {
+          const chunk = ids.slice(i, i + 100);
+          const res = await fetch(
+            `/api/consumer-projects?ids=${chunk.map(encodeURIComponent).join(",")}`,
+            { method: "DELETE" }
+          );
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            toast({ type: "error", title: "일부 삭제 실패", message: data.error || "서버 오류" });
+            // 부분 실패해도 계속 — 마지막에 다시 로드
+            break;
+          }
+        }
+      }
+      // localStorage 삭제
+      for (const id of ids) {
+        try { localStorage.removeItem(`inpick_project_${id}`); } catch { /* ignore */ }
+      }
+      setProjects((prev) => prev.filter((p) => !ids.includes(p.id)));
+      toast({ type: "success", title: "삭제 완료", message: `${ids.length}개 프로젝트가 삭제되었습니다` });
+      exitSelectMode();
+    } catch {
+      toast({ type: "error", title: "오류", message: "일괄 삭제 중 오류가 발생했습니다" });
+    }
+    setBulkDeleting(false);
   };
 
   const loadProjects = useCallback(() => {
@@ -167,7 +219,7 @@ export default function MyPageProjects() {
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       {/* 페이지 타이틀 */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 gap-2 flex-wrap">
         <div className="flex items-center gap-3">
           <h1 className="text-xl font-bold text-gray-900">내 프로젝트</h1>
           {projects.length > 0 && (
@@ -176,13 +228,83 @@ export default function MyPageProjects() {
             </span>
           )}
         </div>
-        <button
-          onClick={() => router.push("/project/new")}
-          className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          <Plus className="w-4 h-4" /> 새 프로젝트
-        </button>
+        <div className="flex items-center gap-2">
+          {projects.length > 0 && !selectMode && (
+            <button
+              onClick={() => setSelectMode(true)}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <CheckSquare className="w-4 h-4" /> 선택
+            </button>
+          )}
+          {selectMode && (
+            <button
+              onClick={exitSelectMode}
+              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <X className="w-4 h-4" /> 취소
+            </button>
+          )}
+          <button
+            onClick={() => router.push("/project/new")}
+            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <Plus className="w-4 h-4" /> 새 프로젝트
+          </button>
+        </div>
       </div>
+
+      {/* 선택 모드 툴바 */}
+      {selectMode && filtered.length > 0 && (
+        <div className="mb-4 flex items-center justify-between gap-2 flex-wrap bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                const allIds = filtered.map((p) => p.id);
+                const allSelected = allIds.every((id) => selectedIds.has(id));
+                if (allSelected) setSelectedIds(new Set());
+                else setSelectedIds(new Set(allIds));
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900"
+            >
+              {filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id)) ? (
+                <CheckSquare className="w-4 h-4" />
+              ) : (
+                <Square className="w-4 h-4" />
+              )}
+              전체 선택
+            </button>
+            <span className="text-sm text-gray-600">
+              <strong className="text-blue-700">{selectedIds.size}</strong> / {filtered.length}개 선택
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => bulkDelete(
+                Array.from(selectedIds),
+                `선택한 ${selectedIds.size}개 프로젝트를 삭제하시겠습니까?\n삭제된 프로젝트는 복구할 수 없습니다.`
+              )}
+              disabled={selectedIds.size === 0 || bulkDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+            >
+              <Trash2 className="w-4 h-4" />
+              선택 삭제 {selectedIds.size > 0 && `(${selectedIds.size})`}
+            </button>
+            <button
+              onClick={() => bulkDelete(
+                filtered.map((p) => p.id),
+                `현재 화면의 ${filtered.length}개 프로젝트를 모두 삭제하시겠습니까?\n삭제된 프로젝트는 복구할 수 없습니다.`
+              )}
+              disabled={bulkDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-red-700 text-white text-sm font-medium rounded-lg hover:bg-red-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              title="현재 필터/검색 결과 전체 삭제"
+            >
+              <Trash2 className="w-4 h-4" />
+              전체 삭제
+            </button>
+          </div>
+        </div>
+      )}
 
       {projects.length > 0 && (
         <div className="mb-4">
@@ -235,25 +357,46 @@ export default function MyPageProjects() {
               return `/project/${p.id}/design`;
             };
             const displayName = p.address?.buildingName || p.address?.roadAddress || "새 프로젝트";
+            const isSelected = selectedIds.has(p.id);
             return (
-              <div key={p.id} className={`bg-white border rounded-xl p-5 transition-all ${isContracted ? "border-green-200 hover:border-green-300 hover:shadow-sm" : "border-gray-200 hover:border-blue-300 hover:shadow-sm"}`}>
-                <button onClick={() => router.push(getTargetUrl())} className="w-full text-left">
-                  <div className="flex items-start justify-between mb-2">
-                    <h3 className="text-sm font-bold text-gray-900 truncate">
-                      {displayName}
-                    </h3>
-                    <div className="flex items-center gap-2">
+              <div key={p.id} className={`bg-white border rounded-xl p-5 transition-all ${
+                selectMode && isSelected
+                  ? "border-blue-500 ring-2 ring-blue-200"
+                  : isContracted
+                    ? "border-green-200 hover:border-green-300 hover:shadow-sm"
+                    : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+              }`}>
+                <button
+                  onClick={() => selectMode ? toggleSelect(p.id) : router.push(getTargetUrl())}
+                  className="w-full text-left"
+                >
+                  <div className="flex items-start justify-between mb-2 gap-2">
+                    <div className="flex items-start gap-2 min-w-0 flex-1">
+                      {selectMode && (
+                        <div className="mt-0.5 flex-shrink-0">
+                          {isSelected
+                            ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                            : <Square className="w-5 h-5 text-gray-300" />}
+                        </div>
+                      )}
+                      <h3 className="text-sm font-bold text-gray-900 truncate">
+                        {displayName}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
                       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap ${CONSUMER_PROJECT_STATUS_COLORS[status] || "bg-gray-100 text-gray-700"}`}>
                         {CONSUMER_PROJECT_STATUS_LABELS[status] || status}
                       </span>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDelete(p.id, String(displayName)); }}
-                        disabled={deletingId === p.id}
-                        className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
-                        title="프로젝트 삭제"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {!selectMode && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); e.preventDefault(); handleDelete(p.id, String(displayName)); }}
+                          disabled={deletingId === p.id}
+                          className="p-1 rounded-md text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                          title="프로젝트 삭제"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                   {p.address?.roadAddress && (
@@ -268,7 +411,7 @@ export default function MyPageProjects() {
                   </div>
                   <ProjectProgress status={status} compact />
                 </button>
-                {isRfqComplete && (
+                {isRfqComplete && !selectMode && (
                   <div className="mt-3 pt-3 border-t border-gray-100 flex items-center justify-between">
                     {isContracted ? (
                       <>
