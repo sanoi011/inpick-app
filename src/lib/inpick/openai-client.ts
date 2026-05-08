@@ -116,10 +116,10 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // 1차: gpt-image-2 (사용자 명시 — 가격 저렴 + 품질 우수)
-  // 2차: gpt-image-1 (gpt-image-2 access 없을 시 폴백)
-  // 3차: dall-e-3 (최후 안전망)
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+  // 모델 폴백 — Vercel function 60초 한계로 dall-e-3 standard 우선 (15~25초 응답)
+  // gpt-image-1/2는 40~80초 걸려서 Vercel Pro에서도 timeout 발생
+  // 빠른 1차 미리보기는 dall-e-3 standard, 고화질 재렌더는 별도 endpoint(refine-render)에서 gpt-image-1 사용
+  for (const modelName of [] as string[]) {
     try {
       const body: Record<string, unknown> = {
         model: modelName,
@@ -167,34 +167,42 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     }
   }
 
-  // 2차 fallback: dall-e-3 standard (조직 인증 불필요, 빠르고 저렴 — 1차 무료 미리보기에 적합)
-  const body = {
-    model: "dall-e-3",
-    prompt,
-    size,
-    n: 1,
-    quality: "standard",
-    response_format: "url",
-  };
-  const res = await fetch(`${OPENAI_BASE}/images/generations`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI image gen failed: ${res.status} ${err.slice(0, 300)}`);
+  // dall-e-3 standard (15~25초 응답, Vercel 60초 한계 안전)
+  // AbortSignal 50초로 명시 — 가능한 빠른 실패
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 50_000);
+  try {
+    const body = {
+      model: "dall-e-3",
+      prompt,
+      size,
+      n: 1,
+      quality: "standard",
+      response_format: "url",
+    };
+    const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`OpenAI image gen failed: ${res.status} ${err.slice(0, 300)}`);
+    }
+    const data = await res.json();
+    return {
+      imageUrl: data.data?.[0]?.url,
+      revisedPrompt: data.data?.[0]?.revised_prompt,
+      model: "dall-e-3",
+      costUsd: size === "1024x1024" ? 0.04 : 0.08, // standard quality
+    };
+  } finally {
+    clearTimeout(timeoutId);
   }
-  const data = await res.json();
-  return {
-    imageUrl: data.data?.[0]?.url,
-    revisedPrompt: data.data?.[0]?.revised_prompt,
-    model: "dall-e-3",
-    costUsd: size === "1024x1024" ? 0.08 : 0.12,
-  };
 }
 
 export interface VisionAnalyzeInput {

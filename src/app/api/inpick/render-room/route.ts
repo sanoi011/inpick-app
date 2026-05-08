@@ -12,7 +12,8 @@ import { generateRoomRender, type RenderRoomInput } from "@/lib/inpick/openai-cl
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+// Vercel Pro 플랜 함수 한계 60초 — gpt-image-1/2는 timeout 위험으로 dall-e-3 standard 우선
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   try {
