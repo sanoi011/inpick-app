@@ -560,12 +560,17 @@ function AddressMode({ value, onChange }: Props) {
             {value.normalizing && (
               <span className="inline-flex items-center gap-1 text-primary-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                AI 치수 추출 중 (10–15초)
+                AI 도면 정리 중 (60~120초 — 워터마크 제거 + 매핑)
               </span>
             )}
             {value.dimensionOverlaySvg && !value.normalizing && (
               <span className="text-emerald-600 text-[0.65rem] font-bold bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                ✓ {value.normalizedRooms?.length ?? 0}개 실 치수 추출
+                ✓ {value.normalizedRooms?.length ?? 0}개 실 치수
+              </span>
+            )}
+            {!value.normalizing && value.selectedPyeong && !value.cleanedImageUrl && value.dimensionOverlaySvg && (
+              <span className="text-amber-600 text-[0.65rem] font-bold bg-amber-50 px-1.5 py-0.5 rounded-full">
+                ⓘ 원본 도면 사용 (정리 스킵)
               </span>
             )}
           </div>

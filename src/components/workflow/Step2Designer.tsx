@@ -136,8 +136,8 @@ export default function Step2Designer({
     const start = Date.now();
     const interval = setInterval(() => {
       const elapsed = (Date.now() - start) / 1000;
-      // gpt-image-2 실응답 ~60s, 폴백까지 ~120s 가정
-      const target = Math.min(90, (elapsed / 90) * 90);
+      // 평균 응답 ~60s, 최악 280s 한도. 90% 도달 시점을 180s로 잡아 사용자 안심 유도
+      const target = Math.min(90, (elapsed / 180) * 90);
       setProgress((p) => Math.max(p, target));
     }, 400);
     return () => clearInterval(interval);
@@ -254,9 +254,13 @@ export default function Step2Designer({
         !isFirstGen && previousRender
           ? previousRender.revisedPrompt || previousRender.prompt
           : undefined;
+      // 클라 측 AbortController — Vercel 300초 + 여유 20초
+      const ctrl = new AbortController();
+      const timeoutId = setTimeout(() => ctrl.abort(), 320_000);
       const res = await fetch("/api/inpick/render-room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: ctrl.signal,
         body: JSON.stringify({
           roomName: tab.label,
           widthMm: dim.widthMm,
@@ -273,7 +277,7 @@ export default function Step2Designer({
           isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
           previousReference,
         }),
-      });
+      }).finally(() => clearTimeout(timeoutId));
       const data = await res.json();
       if (!res.ok || !data.imageUrl) {
         const baseMsg = data.error || "이미지 생성 실패";
@@ -561,10 +565,19 @@ export default function Step2Designer({
             />
           </div>
           <button
-            onClick={onComplete}
-            className="mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg bg-primary-500 px-3 py-2 text-xs font-bold text-white shadow-cta hover:bg-primary-600"
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onComplete();
+            }}
+            className={`relative z-10 mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-bold shadow-cta transition-all cursor-pointer ${
+              allRoomsDecided
+                ? "bg-primary-500 text-white hover:bg-primary-600 ring-2 ring-primary-200"
+                : "bg-primary-500 text-white hover:bg-primary-600"
+            }`}
           >
-            {allRoomsDecided ? "디자인 완료 (견적 요청)" : "디자인 완료 · 견적 요청"}
+            {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
             <ChevronRight className="h-3 w-3" />
           </button>
         </div>
@@ -703,7 +716,7 @@ export default function Step2Designer({
                   </div>
                   <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
                     <span className="tabular font-bold">{Math.round(progress)}%</span> · 고퀄리티 인테리어
-                    이미지 생성 중 — 약 40~80초. 실패 시 요금이 발생하지 않습니다
+                    이미지 생성 중 — 보통 40~80초, 최대 4~5분까지 걸릴 수 있습니다. 실패 시 요금 X
                   </p>
                 </div>
               </div>
