@@ -104,13 +104,13 @@ export default function Step2Designer({
   onConsumeToken,
   onComplete,
 }: Props) {
-  const availableTabs = useMemo(() => {
-    // "전체" 탭은 항상 최상단에 표시 — 한 번에 모든 방 생성용
-    const allTab = ROOM_TABS.find((t) => t.v === "all")!;
-    const roomTabs = rooms.includes("all")
-      ? ROOM_TABS.filter((t) => t.v !== "all")
-      : ROOM_TABS.filter((t) => rooms.includes(t.v));
-    return [allTab, ...roomTabs];
+  // UI에는 모든 방을 항상 표시 (Step1에서 선택 안 한 방도 클릭 가능)
+  const availableTabs = useMemo(() => ROOM_TABS, []);
+  // Step1에서 선택한 방 = 진행 카운트의 분모. 비어있거나 "all"이면 모든 방.
+  const selectedRoomKeys = useMemo(() => {
+    const all = ROOM_TABS.filter((t) => t.v !== "all").map((t) => t.v);
+    if (rooms.length === 0 || rooms.includes("all")) return all;
+    return rooms.filter((r) => r !== "all");
   }, [rooms]);
 
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
@@ -179,7 +179,11 @@ export default function Step2Designer({
     return area ? classifyPyeong(area) : "30평";
   }, [basicInfo.selectedPyeong?.exclusiveArea]);
 
-  const realRoomTabs = useMemo(() => availableTabs.filter((t) => t.v !== "all"), [availableTabs]);
+  // 진행 카운트 대상 — Step1 선택 방만 (없으면 전체)
+  const realRoomTabs = useMemo(
+    () => availableTabs.filter((t) => t.v !== "all" && selectedRoomKeys.includes(t.v)),
+    [availableTabs, selectedRoomKeys],
+  );
   const renders = value.rendersByRoom[activeRoom] || [];
   const currentPrompt = value.promptByRoom?.[activeRoom] || "";
   const selectedIdx =
@@ -311,7 +315,8 @@ export default function Step2Designer({
   };
 
   const handleBulkGenerate = async (conceptPrompt: string) => {
-    const emptyTabs = availableTabs.filter((t) => (value.rendersByRoom[t.v] || []).length === 0);
+    // Step1 선택 방 중 비어있는 것만 (없으면 전체)
+    const emptyTabs = realRoomTabs.filter((t) => (value.rendersByRoom[t.v] || []).length === 0);
     if (emptyTabs.length === 0) {
       setErrorMsg("이미 모든 방에 시안이 있습니다");
       return;
@@ -414,7 +419,7 @@ export default function Step2Designer({
                 onClick={() => handleBulkGenerate(preset)}
                 disabled={
                   generating ||
-                  !availableTabs.some((t) => t.v !== "all" && (value.rendersByRoom[t.v] || []).length === 0)
+                  !realRoomTabs.some((t) => (value.rendersByRoom[t.v] || []).length === 0)
                 }
                 className="rounded-lg border border-primary-100 bg-primary-50/50 px-2 py-1.5 text-[0.7rem] font-semibold text-primary-900 hover:bg-primary-100 hover:border-primary-300 disabled:opacity-30 transition-all"
               >
@@ -439,6 +444,8 @@ export default function Step2Designer({
               const sel = activeRoom === t.v;
               const count = (value.rendersByRoom[t.v] || []).length;
               const decided = !isAll && count > 0;
+              // Step1에서 선택한 방인지
+              const isSelectedInStep1 = isAll || selectedRoomKeys.includes(t.v);
               const Icon = t.icon;
               return (
                 <div key={t.v} className="relative">
@@ -461,7 +468,9 @@ export default function Step2Designer({
                           : "bg-primary-500 text-white shadow-cta"
                         : isAll
                           ? "bg-gradient-to-r from-primary-50 to-amber-50 text-primary-900 border border-primary-200 hover:from-primary-100 hover:to-amber-100"
-                          : "bg-primary-50/30 text-primary-900/70 hover:bg-primary-100 hover:text-primary-900"
+                          : isSelectedInStep1
+                            ? "bg-primary-50/30 text-primary-900/70 hover:bg-primary-100 hover:text-primary-900"
+                            : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
                     }`}
                   >
                     <span className="inline-flex items-center gap-2">
