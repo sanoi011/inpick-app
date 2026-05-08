@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 // 관리자 API는 RLS 바이패스를 위해 service role key 우선 사용
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

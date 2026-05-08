@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 
+export const dynamic = "force-dynamic";
+
 // service role key가 있으면 RLS 우회하여 전체 조회. 없으면 일반 client 폴백.
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

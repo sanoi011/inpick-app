@@ -8,6 +8,7 @@ import { getOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
+export const dynamic = "force-dynamic";
 
 async function pingOpenAI(key: string): Promise<{ ok: boolean; status?: number; error?: string }> {
   try {

@@ -9,6 +9,7 @@ import { getOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 
