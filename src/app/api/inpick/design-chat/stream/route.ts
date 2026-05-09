@@ -55,17 +55,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // 가이드 v2 §5-3 — prompt caching (ephemeral 5분 TTL).
+    // 시스템 프롬프트 (~600 tokens)를 캐싱 → 동일 사용자 5분 내 재호출 시 입력 90% 할인.
+    // GA 이후 anthropic-version만으로 동작하지만, 안전하게 베타 헤더도 함께 전송.
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        system: SYSTEM_PROMPT,
+        system: [
+          {
+            type: "text",
+            text: SYSTEM_PROMPT,
+            cache_control: { type: "ephemeral" },
+          },
+        ],
         stream: true,
         messages: messages.map((m) => ({ role: m.role, content: m.content })),
       }),

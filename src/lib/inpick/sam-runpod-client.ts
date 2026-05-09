@@ -36,6 +36,13 @@ export interface AutoSegmentResult {
   total_regions: number;
 }
 
+export interface ClickCandidate {
+  polygon: number[][];
+  confidence: number;
+  area_pixels: number;
+  mask_b64: string;
+}
+
 export interface ClickSegmentResult {
   task: "click_segment";
   polygon: number[][];
@@ -43,6 +50,8 @@ export interface ClickSegmentResult {
   area_pixels: number;
   mask_b64: string;
   image_size: [number, number];
+  /** 가이드 v2 §5-2 — score 내림차순 후보들 (보통 3개). top-level은 candidates[0]과 동일. */
+  candidates?: ClickCandidate[];
 }
 
 interface RunPodEnv {

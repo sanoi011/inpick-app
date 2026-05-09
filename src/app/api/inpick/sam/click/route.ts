@@ -82,6 +82,21 @@ export async function POST(req: NextRequest) {
     // mask PNG를 Storage에 업로드 → URL 반환 (응답 body 작게 유지)
     const maskUrl = await uploadMaskToStorage(result.mask_b64, "sam-masks/click");
 
+    // 가이드 v2 §5-2 — 모든 candidates도 Storage에 업로드 (mask_b64는 응답에서 제외)
+    let candidatesOut:
+      | { polygon: number[][]; confidence: number; area_pixels: number; mask_url: string | null }[]
+      | undefined;
+    if (result.candidates && result.candidates.length > 0) {
+      candidatesOut = await Promise.all(
+        result.candidates.map(async (c) => ({
+          polygon: c.polygon,
+          confidence: c.confidence,
+          area_pixels: c.area_pixels,
+          mask_url: await uploadMaskToStorage(c.mask_b64, "sam-masks/click-cand"),
+        })),
+      );
+    }
+
     return NextResponse.json({
       polygon: result.polygon,
       confidence: result.confidence,
@@ -89,6 +104,7 @@ export async function POST(req: NextRequest) {
       image_size: result.image_size,
       mask_url: maskUrl,
       // mask_b64 그대로 반환은 안 함 — 용량 큼
+      candidates: candidatesOut,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

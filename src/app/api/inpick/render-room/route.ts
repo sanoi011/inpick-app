@@ -19,6 +19,7 @@ import {
   CreditError,
   type CreditFeature,
 } from "@/lib/inpick/credit-policy";
+import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
 
 export const runtime = "nodejs";
 // gpt-image-2는 40~80초 소요 — Vercel Pro maxDuration 800초 한도 내에서 300초로 설정
@@ -77,6 +78,26 @@ export async function POST(req: NextRequest) {
             ...e.details,
           },
           { status: e.status },
+        );
+      }
+      throw e;
+    }
+
+    // ─── v2 §5-5 사용자별 rate limit (KV 미설정 시 fail-open) ──
+    try {
+      await enforceRateLimit(charge.userId, "render-room");
+    } catch (e) {
+      if (e instanceof RateLimitError) {
+        // 차감은 이미 됐으니 환불
+        await refundCredits(charge.userId, charge.charged, "rate-limited:render-room").catch(() => {});
+        return NextResponse.json(
+          {
+            error: "RATE_LIMIT_EXCEEDED",
+            hint: `요청이 너무 많습니다 — ${Math.ceil(e.retryAfterSec / 60)}분 후 다시 시도해주세요`,
+            retryAfterSec: e.retryAfterSec,
+            limit: e.limit,
+          },
+          { status: 429, headers: { "Retry-After": String(e.retryAfterSec) } },
         );
       }
       throw e;

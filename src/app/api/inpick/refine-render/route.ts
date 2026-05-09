@@ -21,6 +21,13 @@ import {
   refundCredits,
   CreditError,
 } from "@/lib/inpick/credit-policy";
+import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
+import {
+  buildRefineCacheKey,
+  getCachedRefine,
+  saveRefineCache,
+  isRefineCacheReady,
+} from "@/lib/inpick/refine-cache";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -64,6 +71,8 @@ interface Body {
   materialColor?: string;
   materialTexture?: string;
   materialFinish?: string;
+  /** 가이드 v2 §5-1 — refine은 자재 미리보기 용도라 기본 medium 권장 (high는 명시 시) */
+  quality?: "low" | "medium" | "high";
 }
 
 export async function POST(req: NextRequest) {
@@ -109,6 +118,55 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
+    // ─── v2 §5-5 사용자별 rate limit (KV 미설정 시 fail-open) ──
+    try {
+      await enforceRateLimit(charge.userId, "refine-render");
+    } catch (e) {
+      if (e instanceof RateLimitError) {
+        await refundCredits(charge.userId, charge.charged, "rate-limited:refine-render").catch(() => {});
+        return NextResponse.json(
+          {
+            error: "RATE_LIMIT_EXCEEDED",
+            hint: `요청이 너무 많습니다 — ${Math.ceil(e.retryAfterSec / 60)}분 후 다시 시도해주세요`,
+            retryAfterSec: e.retryAfterSec,
+            limit: e.limit,
+          },
+          { status: 429, headers: { "Retry-After": String(e.retryAfterSec) } },
+        );
+      }
+      throw e;
+    }
+
+    // ─── v2 §5-4 결과 캐시 hit 검사 — 적중 시 토큰 전액 환불 + gpt-image-2 skip ──
+    const cacheKey = buildRefineCacheKey({
+      imageRef: body.originalImageUrl,
+      maskRef: body.maskBase64.slice(0, 4096), // 마스크 앞부분만 hash 입력 (전체는 너무 큼)
+      materialKey: [
+        body.regionCategoryEn ?? "",
+        body.materialName ?? "",
+        body.materialColor ?? "",
+        body.materialTexture ?? "",
+        body.materialFinish ?? "",
+        body.prompt,
+      ].join("|"),
+    });
+    if (await isRefineCacheReady()) {
+      const cached = await getCachedRefine(cacheKey);
+      if (cached) {
+        // 캐시 hit — 토큰 100% 환불 (외부 호출 0)
+        await refundCredits(charge.userId, charge.charged, "refine-cache-hit").catch(() => {});
+        return NextResponse.json({
+          imageUrl: cached.result_url,
+          costUsd: 0,
+          quality: body.quality || "medium",
+          credits_charged: 0,
+          credits_remaining: charge.balance >= 0 ? charge.balance + charge.charged : undefined,
+          from_cache: true,
+          cache_hit_count: cached.hit_count,
+        });
+      }
+    }
+
     // 1) 원본 이미지 다운로드 (DALL-E 임시 URL)
     const imgRes = await fetch(body.originalImageUrl);
     if (!imgRes.ok) {
@@ -145,13 +203,16 @@ export async function POST(req: NextRequest) {
       .join("\n");
 
     // 4) gpt-image-2 edit endpoint (사용자 정책: 단일 모델, 폴백 없음)
+    // 가이드 v2 §5-1 quality tier — 미지정 시 medium (자재 미리보기는 medium으로 충분, 고화질은 명시)
+    const quality = body.quality || "medium";
+    const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
     const form = new FormData();
     form.append("model", "gpt-image-2");
     form.append("image", new Blob([new Uint8Array(imgBuf)], { type: "image/png" }), "image.png");
     form.append("mask", new Blob([new Uint8Array(maskBuf)], { type: "image/png" }), "mask.png");
     form.append("prompt", refinedPrompt);
     form.append("size", "1024x1024");
-    form.append("quality", "high");
+    form.append("quality", quality);
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 280_000);
@@ -223,17 +284,28 @@ export async function POST(req: NextRequest) {
     // Cloudflare 502 회피 — 큰 base64 대신 Storage URL로 응답
     const publicUrl = await uploadBase64ToStorage(b64);
     const successPayload = {
-      costUsd: 0.19,
+      costUsd: costMap[quality] ?? 0.04,
+      quality,
       credits_charged: charge?.charged ?? 0,
       credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
     };
     if (publicUrl) {
-      return NextResponse.json({ imageUrl: publicUrl, ...successPayload });
+      // 가이드 v2 §5-4 — Storage URL일 때만 캐싱 (base64 fallback은 캐시 부적합)
+      if (await isRefineCacheReady()) {
+        saveRefineCache(cacheKey, publicUrl, {
+          room_name: body.roomName,
+          material_name: body.materialName,
+          region_category: body.regionCategoryEn,
+          quality,
+        }).catch(() => {});
+      }
+      return NextResponse.json({ imageUrl: publicUrl, ...successPayload, from_cache: false });
     }
     // Storage 실패 시 fallback — base64 직접 반환 (작은 응답 위해 압축)
     return NextResponse.json({
       imageUrl: `data:image/png;base64,${b64}`,
       ...successPayload,
+      from_cache: false,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

@@ -52,20 +52,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "messages 필수" }, { status: 400 });
     }
 
+    // 가이드 v2 §5-3 — EXTRACTION_INSTRUCTION을 system으로 이동 + cache_control.
+    // 매 추출 호출마다 동일 instruction이 반복되므로 캐싱 효과 큼.
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "prompt-caching-2024-07-31",
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 800,
-        messages: [
-          ...messages.map((m) => ({ role: m.role, content: m.content })),
-          { role: "user", content: EXTRACTION_INSTRUCTION },
+        system: [
+          {
+            type: "text",
+            text: EXTRACTION_INSTRUCTION,
+            cache_control: { type: "ephemeral" },
+          },
         ],
+        messages: messages.map((m) => ({ role: m.role, content: m.content })),
       }),
     });
 

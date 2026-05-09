@@ -114,6 +114,11 @@ def task_auto_segment(image: np.ndarray) -> dict:
 
 
 def task_click_segment(image: np.ndarray, points: list, labels: list) -> dict:
+    """
+    가이드 v2 §5-2 — multi-mask candidates 반환 (Meta SAM 2 Paper Figure 2 패턴).
+    단일 클릭은 ambiguous하므로 score 내림차순으로 모든 후보 (보통 3개) 반환.
+    호환성: top-level polygon/mask_b64는 best (candidates[0])와 동일.
+    """
     H, W = image.shape[:2]
     predictor.set_image(image)
 
@@ -126,17 +131,29 @@ def task_click_segment(image: np.ndarray, points: list, labels: list) -> dict:
         multimask_output=True,
     )
 
-    best_idx = int(np.argmax(scores))
-    best_mask = masks[best_idx]
-    polygon = mask_to_polygon(best_mask)
+    # score 내림차순 정렬
+    sorted_idx = np.argsort(scores)[::-1]
+    candidates = []
+    for idx in sorted_idx:
+        mask = masks[idx]
+        candidates.append({
+            "polygon": mask_to_polygon(mask),
+            "confidence": float(scores[idx]),
+            "area_pixels": int(mask.sum()),
+            "mask_b64": encode_mask_b64(mask),
+        })
 
+    best = candidates[0]
     return {
         "task": "click_segment",
-        "polygon": polygon,
-        "confidence": float(scores[best_idx]),
-        "area_pixels": int(best_mask.sum()),
-        "mask_b64": encode_mask_b64(best_mask),
+        # 하위 호환 — 기존 클라이언트는 top-level 사용
+        "polygon": best["polygon"],
+        "confidence": best["confidence"],
+        "area_pixels": best["area_pixels"],
+        "mask_b64": best["mask_b64"],
         "image_size": [W, H],
+        # 신규 — UI에서 "더 넓게/좁게" 토글로 1, 2번째 후보 사용
+        "candidates": candidates,
     }
 
 

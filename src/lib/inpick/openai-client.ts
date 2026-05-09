@@ -49,6 +49,14 @@ export interface RenderRoomInput {
    * 미제공 시 generations API fallback (text-only).
    */
   floorplanImageUrl?: string;
+  /**
+   * 가이드 v2 §5-1 quality tier.
+   *  - "low": ~$0.01/이미지, 1차 미리보기 (기본)
+   *  - "medium": ~$0.04/이미지
+   *  - "high": ~$0.17/이미지, 고화질 최종
+   * 미지정 시 "low" — Phase 2 비용 절감 정책.
+   */
+  quality?: "low" | "medium" | "high";
 }
 
 export interface RenderRoomResult {
@@ -254,6 +262,9 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
       `\n\n` +
       prompt;
 
+    const quality = input.quality || "low"; // 가이드 v2 §5-1 — Phase 2부터 1차 기본 low
+    const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
+
     const form = new FormData();
     form.append("model", "gpt-image-2");
     form.append(
@@ -263,7 +274,7 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     );
     form.append("prompt", editPrompt);
     form.append("size", size);
-    form.append("quality", "high");
+    form.append("quality", quality);
 
     const res = await fetch(`${OPENAI_BASE}/images/edits`, {
       method: "POST",
@@ -283,7 +294,7 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
       imageBase64: b64,
       revisedPrompt: editPrompt,
       model: "gpt-image-2",
-      costUsd: 0.19,
+      costUsd: costMap[quality] ?? 0.17,
     };
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
