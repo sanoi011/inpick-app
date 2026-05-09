@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getContractorIdFromRequest } from "@/lib/contractor-auth";
+import { buildProgressPayments } from "@/lib/inpick/bid-pipeline";
 
 // GET: 계약 조회
 export async function GET(request: NextRequest) {
@@ -116,19 +117,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 결제 스케줄 생성 (10/30/30/30)
+    // 결제 스케줄 — `bid-pipeline.ts` DEFAULT_PAYMENT_MILESTONES 단일 진실 소스 사용 (10/30/30/30)
     const totalAmount = bid.bid_amount;
-    const deposit = Math.round(totalAmount * 0.1);
-    const mid1 = Math.round(totalAmount * 0.3);
-    const mid2 = Math.round(totalAmount * 0.3);
-    const final = totalAmount - deposit - mid1 - mid2;
-
-    const progressPayments = [
-      { phase: "착공", percentage: 10, amount: deposit, status: "PENDING" },
-      { phase: "중도 1차 (철거/기초)", percentage: 30, amount: mid1, status: "PENDING" },
-      { phase: "중도 2차 (마감)", percentage: 30, amount: mid2, status: "PENDING" },
-      { phase: "잔금 (완공/검수)", percentage: 30, amount: final, status: "PENDING" },
-    ];
+    const progressPayments = buildProgressPayments(totalAmount);
+    // DB 컬럼 deposit_amount / final_payment는 첫·끝 milestone 금액 (UI 빠른 조회용 반정규화)
+    const depositAmount = progressPayments[0]?.amount ?? 0;
+    const finalPayment = progressPayments[progressPayments.length - 1]?.amount ?? 0;
 
     // 착공일 계산
     const startDate = bid.start_available_date || new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
@@ -145,9 +139,9 @@ export async function POST(request: NextRequest) {
         project_name: estimate?.title || "인테리어 공사",
         address: estimate?.address || "",
         total_amount: totalAmount,
-        deposit_amount: deposit,
+        deposit_amount: depositAmount,
         progress_payments: progressPayments,
-        final_payment: final,
+        final_payment: finalPayment,
         start_date: startDate,
         expected_end_date: endDate,
         consult_session_id: consultSessionId || null,

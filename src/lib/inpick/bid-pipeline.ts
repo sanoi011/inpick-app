@@ -61,42 +61,94 @@ export const STAGE_ORDER: BidStage[] = [
 /** 기성지급 단계 (하도급지킴이 패턴) */
 export interface PaymentMilestone {
   id: string;
-  label: string;          // "착수금" | "기성 1차" | "준공금"
-  ratio: number;          // 0.3 (30%)
-  trigger: string;        // "계약 체결 시" | "골조 50% 완료" | "준공 검사 통과"
+  label: string;          // "착공" | "중도 1차 (철거/기초)" | "잔금 (완공/검수)"
+  ratio: number;          // 0.10 (10%) | 0.30 (30%)
+  trigger: string;        // "계약 체결 + 착공계 등록 시" | "공정률 40%" | "준공 검사 통과"
   protected: boolean;     // 하도급대금 지급보증 적용 여부
 }
 
+/**
+ * 기성지급 비율 — 한국 인테리어 시장 관행 기준 10/30/30/30 (잔금 무게형).
+ *
+ * 잔금 무게형(잔금 30%)은 사업자가 끝까지 책임 시공하도록 유인하는 소비자 보호 구조.
+ * 30/30/30/10 (착수 무게형)은 사업자 자금 부담은 적지만 잔금이 작아 마무리 책임감 약화 우려.
+ *
+ * **단일 진실 소스(SoT)** — `src/app/api/contracts/route.ts`에서 이 상수를 import하여
+ * `contracts.progress_payments` JSONB로 직렬화. 기성 검사 트리거 문구 등 메타데이터도 보존됨.
+ */
 export const DEFAULT_PAYMENT_MILESTONES: PaymentMilestone[] = [
   {
     id: "deposit",
-    label: "착수금",
-    ratio: 0.3,
+    label: "착공",
+    ratio: 0.10,
     trigger: "계약 체결 + 착공계 등록 시",
     protected: true,
   },
   {
     id: "interim_1",
-    label: "기성 1차",
-    ratio: 0.3,
+    label: "중도 1차 (철거/기초)",
+    ratio: 0.30,
     trigger: "철거·설비 완료 (공정률 40%)",
     protected: true,
   },
   {
     id: "interim_2",
-    label: "기성 2차",
-    ratio: 0.3,
+    label: "중도 2차 (마감)",
+    ratio: 0.30,
     trigger: "마감재 시공 완료 (공정률 80%)",
     protected: true,
   },
   {
     id: "final",
-    label: "준공금",
-    ratio: 0.1,
+    label: "잔금 (완공/검수)",
+    ratio: 0.30,
     trigger: "준공 검사 통과 + 사용승인",
     protected: false,
   },
 ];
+
+/**
+ * 결제 스케줄 빌더 — totalAmount → progressPayments 직렬화 형태.
+ *
+ * 마지막 항목은 (totalAmount - 누적합)으로 계산해 반올림 오차로 1원 차이 나는 것 방지.
+ */
+export interface ProgressPayment {
+  phase: string;        // PaymentMilestone.label
+  percentage: number;   // PaymentMilestone.ratio × 100
+  amount: number;       // KRW (정수)
+  status: "PENDING" | "PAID" | "OVERDUE";
+  /** 기성 트리거 문구 (검사 조건) */
+  trigger?: string;
+  /** 하도급대금 지급보증 적용 여부 */
+  protected?: boolean;
+  /** 정책 ID — milestone과 1:1 매핑 */
+  milestoneId?: string;
+}
+
+export function buildProgressPayments(
+  totalAmount: number,
+  milestones: PaymentMilestone[] = DEFAULT_PAYMENT_MILESTONES,
+): ProgressPayment[] {
+  if (totalAmount <= 0 || milestones.length === 0) return [];
+  const result: ProgressPayment[] = [];
+  let accumulated = 0;
+  for (let i = 0; i < milestones.length; i++) {
+    const m = milestones[i];
+    const isLast = i === milestones.length - 1;
+    const amount = isLast ? totalAmount - accumulated : Math.round(totalAmount * m.ratio);
+    accumulated += amount;
+    result.push({
+      phase: m.label,
+      percentage: Math.round(m.ratio * 1000) / 10, // 0.1 → 10, 0.105 → 10.5
+      amount,
+      status: "PENDING",
+      trigger: m.trigger,
+      protected: m.protected,
+      milestoneId: m.id,
+    });
+  }
+  return result;
+}
 
 /** 표준계약서 필수 조항 (실내건축 표준계약서 — 국토부 고시) */
 export interface ContractClause {
