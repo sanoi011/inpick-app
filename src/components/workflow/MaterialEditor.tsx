@@ -923,8 +923,10 @@ function EstimateModal({
   const [estimate, setEstimate] = useState<{
     items: {
       region_id: string;
+      category: string;
       label_ko: string;
       material_name: string;
+      material_sku: string;
       brand?: string;
       unit: string;
       qty: number;
@@ -949,7 +951,9 @@ function EstimateModal({
     indirect: number;
     indirect_ratio: number;
     total: number;
+    vat_rate: number;
     vat_separate: number;
+    generated_at: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   // 사용자가 수정한 가설비 항목 (id → amount 덮어쓰기)
@@ -1183,9 +1187,13 @@ function EstimateModal({
           </>
         )}
 
+        {estimate && estimate.items.length > 0 && (
+          <PdfDownloadButton estimate={estimate} segmentation={segmentation} />
+        )}
+
         <button
           onClick={onClose}
-          className="mt-5 w-full rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
+          className="mt-2 w-full rounded-full border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
         >
           닫기
         </button>
@@ -1193,6 +1201,145 @@ function EstimateModal({
     </>
   );
 }
+
+// ──────────────── PDF 다운로드 버튼 (lazy import) ────────────────
+function PdfDownloadButton({
+  estimate,
+  segmentation,
+}: {
+  estimate: NonNullable<ReturnType<typeof useState<EstimateState>>[0]>;
+  segmentation: SegmentationData;
+}) {
+  const [downloading, setDownloading] = useState(false);
+  const [meta, setMeta] = useState({
+    client_name: "",
+    client_phone: "",
+    site_address: "",
+  });
+  const [showMeta, setShowMeta] = useState(false);
+
+  const handleDownload = async () => {
+    setDownloading(true);
+    try {
+      // dynamic import — Vercel 빌드 영향 최소
+      const mod = await import("@/lib/inpick/quote-pdf");
+      const pyeong = segmentation.real_world_area_sqm
+        ? `${Math.round(segmentation.real_world_area_sqm / 3.3)}평`
+        : undefined;
+      await mod.downloadQuotePdf(estimate, {
+        quote_no: mod.generateQuoteNo(),
+        client_name: meta.client_name || "—",
+        client_phone: meta.client_phone || undefined,
+        site_address: meta.site_address || "—",
+        pyeong,
+        rooms: undefined,
+        company_name: "InPick (인픽)",
+        company_phone: "1668-0000",
+        company_biz_no: undefined,
+        validity_days: 30,
+      });
+    } catch (e) {
+      alert("PDF 생성 실패: " + (e instanceof Error ? e.message : String(e)));
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <>
+      {/* 발주자/현장 정보 입력 (선택) */}
+      {showMeta && (
+        <div className="mt-4 space-y-2 rounded-lg border border-primary-200 bg-primary-50/30 p-3">
+          <p className="text-[0.7rem] font-bold text-primary-900/70">PDF 갑지에 들어갈 정보 (선택)</p>
+          <input
+            type="text"
+            placeholder="발주자 성명 (예: 홍길동)"
+            value={meta.client_name}
+            onChange={(e) => setMeta({ ...meta, client_name: e.target.value })}
+            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+          />
+          <input
+            type="text"
+            placeholder="연락처"
+            value={meta.client_phone}
+            onChange={(e) => setMeta({ ...meta, client_phone: e.target.value })}
+            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+          />
+          <input
+            type="text"
+            placeholder="시공 장소 (예: 서울시 강남구 ...)"
+            value={meta.site_address}
+            onChange={(e) => setMeta({ ...meta, site_address: e.target.value })}
+            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+          />
+        </div>
+      )}
+
+      <div className="mt-5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setShowMeta((v) => !v)}
+          className="rounded-full border border-primary-200 bg-white px-3 py-2.5 text-xs font-semibold text-primary-900/70 hover:bg-primary-50"
+        >
+          {showMeta ? "정보 닫기" : "정보 입력"}
+        </button>
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={downloading}
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-60"
+        >
+          {downloading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              PDF 생성 중…
+            </>
+          ) : (
+            <>
+              📄 견적서 PDF 다운로드 (A4 가로 · 갑지·총괄표·내역서)
+            </>
+          )}
+        </button>
+      </div>
+    </>
+  );
+}
+
+type EstimateState = {
+  items: {
+    region_id: string;
+    category: string;
+    label_ko: string;
+    material_name: string;
+    material_sku: string;
+    brand?: string;
+    unit: string;
+    qty: number;
+    material_price: number;
+    labor_price: number;
+    unit_total: number;
+    material_subtotal: number;
+    labor_subtotal: number;
+    subtotal: number;
+  }[];
+  material_subtotal: number;
+  labor_subtotal: number;
+  direct_total: number;
+  setup_items: { id: string; name: string; description?: string; computed_amount: number }[];
+  setup_total: number;
+  expenses: number;
+  expenses_ratio: number;
+  management: number;
+  management_ratio: number;
+  safety: number;
+  safety_ratio: number;
+  indirect: number;
+  indirect_ratio: number;
+  total: number;
+  vat_rate: number;
+  vat_separate: number;
+  generated_at: string;
+};
 
 // ──────────────── alpha PNG 마스크 빌더 (가이드 §2-1) ────────────────
 async function buildAlphaMask(
