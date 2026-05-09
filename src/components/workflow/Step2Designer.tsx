@@ -697,36 +697,17 @@ export default function Step2Designer({
       <section className="relative flex flex-col">
         <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] flex flex-col overflow-hidden">
           {/* 채팅 헤더 */}
-          <div className="px-5 py-3 border-b border-primary-100 flex items-center justify-between gap-2 bg-gradient-to-r from-primary-50/50 to-amber-50/30">
+          <div className={`px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap transition-colors ${
+            chatMode
+              ? "border-amber-300 bg-gradient-to-r from-amber-50 to-primary-100"
+              : "border-primary-100 bg-gradient-to-r from-primary-50/50 to-amber-50/30"
+          }`}>
             <div className="flex items-center gap-2 min-w-0">
               <Sparkles className="h-4 w-4 text-primary-500 shrink-0" />
               <p className="text-sm font-bold text-primary-900 truncate">
                 {ROOM_TABS.find((t) => t.v === activeRoom)?.label} · AI 디자인 챗
               </p>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {/* 모드 토글 — Direct (즉시 이미지) / AI 상담 (Claude 대화 → 이미지) */}
-              <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-white p-0.5 text-[0.65rem] font-bold">
-                <button
-                  type="button"
-                  onClick={() => setChatMode(false)}
-                  className={`px-2 py-1 rounded-full transition-colors ${
-                    !chatMode ? "bg-primary-500 text-white" : "text-primary-900/60 hover:text-primary-900"
-                  }`}
-                >
-                  즉시 생성
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChatMode(true)}
-                  className={`px-2 py-1 rounded-full transition-colors ${
-                    chatMode ? "bg-primary-500 text-white" : "text-primary-900/60 hover:text-primary-900"
-                  }`}
-                >
-                  AI 상담
-                </button>
-              </div>
-              <p className="hidden sm:block text-[0.65rem] text-primary-900/50 tabular">
+              <span className="hidden sm:inline text-[0.65rem] text-primary-900/50 tabular ml-1">
                 {activeRoom === "all" ? `${realRoomTabs.length}개 방` : (
                   (() => {
                     const tab = ROOM_TABS.find((t) => t.v === activeRoom);
@@ -734,7 +715,34 @@ export default function Step2Designer({
                     return d ? `${(d.widthMm/1000).toFixed(1)}×${(d.depthMm/1000).toFixed(1)}m` : "—";
                   })()
                 )}
-              </p>
+              </span>
+            </div>
+            {/* 모드 토글 — 크게 + 시각적 강조 */}
+            <div className="inline-flex items-center gap-1 rounded-full border-2 border-primary-300 bg-white p-1 shadow-sm">
+              <button
+                type="button"
+                onClick={() => setChatMode(false)}
+                className={`px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-1.5 transition-all ${
+                  !chatMode
+                    ? "bg-primary-500 text-white shadow-cta"
+                    : "text-primary-900/60 hover:text-primary-900 hover:bg-primary-50"
+                }`}
+              >
+                <Send className="h-3.5 w-3.5" />
+                즉시 생성
+              </button>
+              <button
+                type="button"
+                onClick={() => setChatMode(true)}
+                className={`px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-1.5 transition-all ${
+                  chatMode
+                    ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white shadow-cta"
+                    : "text-primary-900/60 hover:text-primary-900 hover:bg-primary-50"
+                }`}
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                AI 상담
+              </button>
             </div>
           </div>
 
