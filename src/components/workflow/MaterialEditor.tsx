@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Hexagon, Loader2, Wand2, Sparkles, X, Edit3, Check } from "lucide-react";
+import { Hexagon, Loader2, Wand2, Sparkles, X, Edit3, Check, Crosshair, Grid3x3 } from "lucide-react";
 import type { RenderItem } from "./Step2Designer";
 import type {
   SegmentationData,
@@ -26,6 +26,8 @@ import type {
   CatalogMaterial,
   InteriorCategory,
 } from "@/types/segmentation";
+import ClickableRenderImage from "./ClickableRenderImage";
+import type { SamPolygonResult } from "@/hooks/useSamClient";
 
 interface Props {
   roomLabel: string;
@@ -58,6 +60,12 @@ export default function MaterialEditor({
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [estimateOpen, setEstimateOpen] = useState(false);
+
+  // 모드 — "auto" (전체 자동 분석) / "sam" (사용자 클릭 정밀 분할)
+  // 가이드 권장: SAM 클릭이 더 정확하지만 RunPod 환경 필요. auto는 GPT-4o Vision으로 실행 가능.
+  const [editMode, setEditMode] = useState<"auto" | "sam">("auto");
+  const [samSelection, setSamSelection] = useState<SamPolygonResult | null>(null);
+  const [samCategoryPicker, setSamCategoryPicker] = useState(false); // 카테고리 선택 모달
   const [expensesRatio, setExpensesRatio] = useState(0.03);
 
   const hasEdits = useMemo(
@@ -128,7 +136,69 @@ export default function MaterialEditor({
     setActiveRegionId(null);
   };
 
-  // 3) 고화질 재렌더 — 선택된 영역만 alpha-mask edit
+  // SAM 모드 — 클릭으로 선택한 영역 + 카테고리 선택 → 자재 라이브러리 → refine-render 직접 호출
+  const handleSamConfirm = (region: SamPolygonResult) => {
+    setSamSelection(region);
+    setSamCategoryPicker(true); // 카테고리 선택 모달
+  };
+
+  const handleSamCategoryAndMaterial = async (
+    category: InteriorCategory,
+    material: CatalogMaterial,
+  ) => {
+    if (!samSelection) return;
+    if (tokenBalance < 2) {
+      setError("토큰 부족 — 고화질 재렌더는 2토큰 필요");
+      return;
+    }
+    setSamCategoryPicker(false);
+    setRefining(true);
+    setError(null);
+    const ok = await onConsumeToken(2, "drawing_option");
+    if (!ok) {
+      setRefining(false);
+      setError("토큰 차감 실패");
+      return;
+    }
+    try {
+      // SAM polygon → alpha mask → refine-render 호출
+      const [w, h] = samSelection.image_size;
+      const maskBase64 = await buildAlphaMaskFromPolygon(w, h, samSelection.polygon);
+
+      const res = await fetch("/api/inpick/refine-render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalImageUrl: renderItem.url,
+          maskBase64,
+          prompt: `${material.description}`,
+          roomName: roomLabel,
+          styleHint,
+          regionCategoryEn: ["floor", "wall", "ceiling", "window", "door", "curtain"].includes(category)
+            ? category
+            : undefined,
+          materialName: material.name,
+          materialColor: material.color,
+          materialTexture: material.texture,
+          materialFinish: material.finish,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error + (data.hint ? `\n→ ${data.hint}` : ""));
+      onUpdate({
+        ...renderItem,
+        refinedUrl: data.imageUrl,
+        refinedAt: new Date().toISOString(),
+      });
+      setSamSelection(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRefining(false);
+    }
+  };
+
+  // 3) 고화질 재렌더 — 선택된 영역만 alpha-mask edit (자동 분석 모드용)
   const handleRefine = async () => {
     if (!segmentation || !hasEdits) return;
     if (tokenBalance < 2) {
@@ -203,10 +273,39 @@ export default function MaterialEditor({
             자재 수정 + 견적 산출
           </p>
           <p className="mt-0.5 text-[0.72rem] text-primary-900/50">
-            영역 클릭 → 자재 라이브러리에서 선택 → 고화질 재렌더 + 면적 × 단가 견적
+            {editMode === "auto"
+              ? "전체 영역 자동 분석 → 영역별 자재 선택 → 고화질 재렌더"
+              : "원하는 부위만 정확히 클릭 → 자재 즉시 교체 (가장 정밀)"}
           </p>
         </div>
-        {!segmentation && (
+
+        {/* 모드 토글 */}
+        <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-white p-0.5 text-[0.7rem] font-bold">
+          <button
+            type="button"
+            onClick={() => setEditMode("auto")}
+            className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
+              editMode === "auto"
+                ? "bg-primary-500 text-white"
+                : "text-primary-900/60 hover:text-primary-900"
+            }`}
+          >
+            <Grid3x3 className="h-3 w-3" /> 전체 분석
+          </button>
+          <button
+            type="button"
+            onClick={() => setEditMode("sam")}
+            className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
+              editMode === "sam"
+                ? "bg-primary-500 text-white"
+                : "text-primary-900/60 hover:text-primary-900"
+            }`}
+          >
+            <Crosshair className="h-3 w-3" /> 부위 선택 (정밀)
+          </button>
+        </div>
+
+        {editMode === "auto" && !segmentation && (
           <button
             onClick={handleExtract}
             disabled={extracting}
@@ -229,6 +328,18 @@ export default function MaterialEditor({
           </button>
         )}
       </div>
+
+      {/* SAM 클릭 모드 — 이미지 + 클릭 분할 */}
+      {editMode === "sam" && (
+        <div className="mt-4">
+          <ClickableRenderImage
+            imageUrl={renderItem.refinedUrl || renderItem.url}
+            onConfirm={handleSamConfirm}
+            initialMode="select"
+            hint="첫 호출은 cold start로 30~60초 소요. 이후 1~3초"
+          />
+        </div>
+      )}
 
       {extracting && (
         <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/50 p-6 text-center">
@@ -259,7 +370,7 @@ export default function MaterialEditor({
         </div>
       )}
 
-      {segmentation && (
+      {editMode === "auto" && segmentation && (
         <>
           {/* 진행 상태 */}
           <div className="mt-4 flex items-center justify-between text-[0.7rem] text-primary-900/60">
@@ -416,7 +527,190 @@ export default function MaterialEditor({
           />
         )}
       </AnimatePresence>
+
+      {/* SAM 모드 — 카테고리 + 자재 선택 모달 */}
+      <AnimatePresence>
+        {samCategoryPicker && samSelection && (
+          <SamCategoryMaterialModal
+            onClose={() => {
+              setSamCategoryPicker(false);
+              setSamSelection(null);
+            }}
+            onSelect={(cat, mat) => handleSamCategoryAndMaterial(cat, mat)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* SAM refining — 큰 로딩 패널 */}
+      {refining && editMode === "sam" && (
+        <div className="mt-4 rounded-xl border border-primary-300 bg-primary-50 p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
+          <p className="mt-3 text-sm font-bold text-primary-900">
+            선택한 영역에 새 자재 적용 중 — 약 40~80초
+          </p>
+          <p className="mt-1 text-xs text-primary-900/60">
+            마스크 영역만 새 자재로 재생성, 나머지는 그대로 유지
+          </p>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ──────────────── SAM 클릭 후 카테고리 + 자재 선택 모달 ────────────────
+function SamCategoryMaterialModal({
+  onClose,
+  onSelect,
+}: {
+  onClose: () => void;
+  onSelect: (category: InteriorCategory, material: CatalogMaterial) => void;
+}) {
+  const [category, setCategory] = useState<InteriorCategory>("floor");
+  const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedSku, setSelectedSku] = useState<string | null>(null);
+
+  const REPLACEABLE_CATS: { v: InteriorCategory; label: string }[] = [
+    { v: "floor", label: "바닥" },
+    { v: "wall", label: "벽" },
+    { v: "ceiling", label: "천장" },
+    { v: "window", label: "창문" },
+    { v: "door", label: "문" },
+    { v: "curtain", label: "커튼" },
+  ];
+
+  useEffect(() => {
+    setLoading(true);
+    setSelectedSku(null);
+    fetch(`/api/inpick/material-library?category=${category}`)
+      .then((r) => r.json())
+      .then((d) => {
+        setMaterials(d.materials || []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, [category]);
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+      />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.96, y: 12 }}
+        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-2xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+              선택한 영역의 자재 변경
+            </h3>
+            <p className="mt-1 text-xs text-primary-900/60">
+              먼저 카테고리(바닥/벽/창 등) 선택 → 자재 라이브러리에서 적용할 자재 선택
+            </p>
+          </div>
+          <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* 카테고리 선택 */}
+        <div className="mt-4">
+          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50 mb-2">
+            카테고리
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {REPLACEABLE_CATS.map((c) => (
+              <button
+                key={c.v}
+                onClick={() => setCategory(c.v)}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
+                  category === c.v
+                    ? "bg-primary-500 text-white"
+                    : "bg-primary-50 text-primary-900/70 hover:bg-primary-100"
+                }`}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 자재 그리드 */}
+        <div className="mt-4">
+          {loading ? (
+            <div className="py-8 text-center">
+              <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
+              <p className="mt-2 text-xs text-primary-900/50">자재 카탈로그 불러오는 중…</p>
+            </div>
+          ) : materials.length === 0 ? (
+            <p className="py-6 text-center text-xs text-primary-900/60">
+              이 카테고리는 자재가 없습니다
+            </p>
+          ) : (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {materials.map((m) => {
+                const sel = selectedSku === m.sku;
+                return (
+                  <button
+                    key={m.sku}
+                    onClick={() => setSelectedSku(m.sku)}
+                    className={`text-left rounded-xl border-2 p-3 transition-all ${
+                      sel
+                        ? "border-primary-500 bg-primary-50/50 shadow-sm"
+                        : "border-primary-100 bg-white hover:border-primary-300"
+                    }`}
+                  >
+                    <div
+                      className="aspect-square w-full rounded-lg border border-primary-100 mb-2"
+                      style={{ background: m.color_hex || "#eee" }}
+                    />
+                    <p className="text-xs font-bold text-primary-900 leading-tight truncate">
+                      {m.name}
+                    </p>
+                    {m.brand && (
+                      <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                    )}
+                    <p className="mt-1 text-[0.7rem] font-bold text-primary-700 tabular">
+                      ₩{m.price_per_unit.toLocaleString()}/{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-5 flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+          >
+            취소
+          </button>
+          <button
+            onClick={() => {
+              const m = materials.find((x) => x.sku === selectedSku);
+              if (m) onSelect(category, m);
+            }}
+            disabled={!selectedSku}
+            className="flex-[2] rounded-full bg-primary-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+          >
+            <Wand2 className="h-4 w-4" />
+            적용 + 고화질 재렌더
+            <span className="ml-1 inline-flex items-center gap-0.5 rounded-full bg-white/20 px-1.5 py-0.5 text-[0.65rem]">
+              <Hexagon className="h-3 w-3 fill-white" /> 2
+            </span>
+          </button>
+        </div>
+      </motion.div>
+    </>
   );
 }
 
@@ -763,6 +1057,37 @@ async function buildAlphaMask(
     ctx.closePath();
     ctx.fill();
   }
+  ctx.globalCompositeOperation = "source-over";
+
+  return canvas.toDataURL("image/png");
+}
+
+/**
+ * SAM polygon (픽셀 좌표) → alpha PNG 마스크.
+ * 정규화 polygon이 아니라 native pixel 좌표라 별도 처리.
+ */
+async function buildAlphaMaskFromPolygon(
+  w: number,
+  h: number,
+  polygon: number[][],
+): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.fillStyle = "rgba(255, 255, 255, 1)";
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = "rgba(0, 0, 0, 1)";
+  ctx.beginPath();
+  polygon.forEach(([px, py], i) => {
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  });
+  ctx.closePath();
+  ctx.fill();
   ctx.globalCompositeOperation = "source-over";
 
   return canvas.toDataURL("image/png");
