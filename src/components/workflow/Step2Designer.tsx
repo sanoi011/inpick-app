@@ -899,34 +899,55 @@ export default function Step2Designer({
             <div ref={chatEndRef} />
           </div>
 
-          {/* AI 상담 모드 — '이 컨셉으로 디자인 생성' 버튼 (메시지 1턴 이상 시) */}
-          {chatMode && chatMessages.filter((m) => m.role === "user").length >= 1 && (
-            <div className="px-3 pb-2 pt-3 border-t border-primary-100 bg-gradient-to-r from-amber-50/50 to-primary-50/50">
-              <button
-                type="button"
-                onClick={handleChatToImage}
-                disabled={extractingPrompt || generating || chatStreaming}
-                className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40 transition-all"
-              >
-                {extractingPrompt ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    상담 내용 정리 중…
-                  </>
-                ) : generating ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    이미지 생성 중…
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="h-4 w-4" />
-                    이 컨셉으로 디자인 생성하기
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          {/* AI 상담 모드 — '디자인 생성' 액션 영역 (chatMode 진입 시 항상 노출) */}
+          {chatMode && (() => {
+            const userTurns = chatMessages.filter((m) => m.role === "user").length;
+            const canGenerate = userTurns >= 1 && !extractingPrompt && !generating && !chatStreaming;
+            const helperText = userTurns === 0
+              ? "AI와 1턴 이상 대화한 뒤 활성화됩니다"
+              : userTurns < 3
+                ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
+                : "대화 충분 — 언제든 디자인 생성 가능";
+            return (
+              <div className="px-4 py-3 border-t-2 border-amber-200 bg-gradient-to-r from-amber-100 to-primary-100">
+                <button
+                  type="button"
+                  onClick={handleChatToImage}
+                  disabled={!canGenerate}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-base font-bold shadow-cta transition-all ${
+                    canGenerate
+                      ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white hover:opacity-95 ring-2 ring-amber-300"
+                      : "bg-zinc-300 text-zinc-500 cursor-not-allowed"
+                  }`}
+                >
+                  {extractingPrompt ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      상담 내용 정리 중…
+                    </>
+                  ) : generating ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      이미지 생성 중…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      이 컨셉으로 디자인 생성하기
+                      {userTurns > 0 && (
+                        <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs">
+                          {userTurns}턴
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+                <p className="mt-1.5 text-[0.7rem] text-amber-900/70 text-center">
+                  💡 {helperText}
+                </p>
+              </div>
+            );
+          })()}
 
           {/* 하단 sticky prompt bar (흰색 60% 투명) */}
           <div className="border-t border-primary-100 bg-white/60 backdrop-blur-md p-3">
