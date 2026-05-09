@@ -7,7 +7,7 @@
  * 가이드 §2 RunPodSAMClient.warmup 동등.
  */
 import { NextResponse } from "next/server";
-import { samWarmup, isSamRunPodConfigured } from "@/lib/inpick/sam-runpod-client";
+import { samAutoSegment, isSamRunPodConfigured } from "@/lib/inpick/sam-runpod-client";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -20,10 +20,42 @@ export async function POST() {
         warmed_up: false,
         hint: "영역 분할 서비스 미활성 (RUNPOD_API_KEY/RUNPOD_SAM_ENDPOINT_ID 미등록)",
       },
-      { status: 200 }, // warmup은 실패해도 사용자 차단 X
+      { status: 200 },
     );
   }
 
-  const ok = await samWarmup();
-  return NextResponse.json({ warmed_up: ok });
+  // 1x1 white PNG으로 warmup
+  const tinyPng =
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Z6inmIAAAAASUVORK5CYII=";
+  try {
+    const start = Date.now();
+    const result = await samAutoSegment(tinyPng);
+    return NextResponse.json({
+      warmed_up: true,
+      elapsed_ms: Date.now() - start,
+      total_regions: result.total_regions,
+      image_size: result.image_size,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn("[sam/warmup] failed:", msg);
+    let hint: string | undefined;
+    const lower = msg.toLowerCase();
+    if (lower.includes("401") || lower.includes("unauthor")) {
+      hint = "RUNPOD_API_KEY 인증 실패 — 키 갱신";
+    } else if (lower.includes("404") || lower.includes("endpoint not found") || lower.includes("not found")) {
+      hint = "RUNPOD_SAM_ENDPOINT_ID 잘못됨 또는 endpoint 미존재";
+    } else if (lower.includes("worker") && lower.includes("error")) {
+      hint = "RunPod 워커 내부 에러 — 콘솔에서 worker logs 확인";
+    } else if (lower.includes("timeout") || lower.includes("abort")) {
+      hint = "RunPod 응답 지연 — 첫 워커 cold start (이미지 pull 중)일 수 있음. 5분 후 재시도";
+    } else if (lower.includes("billing") || lower.includes("balance") || lower.includes("insufficient")) {
+      hint = "RunPod 잔액 부족";
+    }
+    return NextResponse.json({
+      warmed_up: false,
+      error: msg.slice(0, 500),
+      hint,
+    });
+  }
 }
