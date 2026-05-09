@@ -1,27 +1,43 @@
 /**
  * POST /api/inpick/segmentation-estimate
  *
- * SegmentationData (selected materials 포함) → KPA 기준 영역별 견적.
+ * SegmentationData (selected materials 포함) → 한국 인테리어 표준 견적.
  *
- * 견적 구조 (한국 인테리어 표준):
- *   1. 자재비 (재료) — 한국물가협회 단가 × 수량
- *   2. 노무비 (인건비) — 표준품셈 × 수량
- *   3. 경비 — (자재비 + 노무비) × 8% (운반/폐기물/잡재료)
- *   4. 간접비 — (자재 + 노무 + 경비) × 12% (관리비 + 이윤)
- *   5. 합계 + 부가세 별도
+ * 견적 구조 (한국 표준):
+ *   1. 자재비 — KPA 단가 × 수량
+ *   2. 노무비 — 표준품셈 × 수량
+ *   = 직접비 (자재 + 노무)
+ *   3. 가설비 — 정액 합 (엘리베이터 보양 / 출입구 보양 / 가설 자재 / 폐기물 등)
+ *   4. 경비 — 직접비 × 8% (운반/잡재료)
+ *   5. 현장관리비 — 직접비 × 5%
+ *   6. 안전관리비 — 직접비 × 1.5%
+ *   7. 간접비(이윤) — (직접비 + 가설비 + 경비 + 관리비 + 안전비) × 12%
+ *   = 합계 (부가세 별도)
+ *   8. 부가세 10% (총액의)
  *
- * 인픽 수수료는 계약 시점에 별도 청구 — 견적 단계 미반영.
+ * 인픽 수수료는 계약 시점 별도.
  *
- * 입력: { segmentation: SegmentationData, expensesRatio?: number, indirectRatio?: number }
- * 출력: {
- *   items: EstimateLine[],
- *   material_subtotal, labor_subtotal,
- *   expenses, indirect, total,
- *   ...
- * }
+ * 입력:
+ *   {
+ *     segmentation: SegmentationData,
+ *     setupCosts?: SetupCostItem[],     // 사용자가 가설비 항목 수정/추가
+ *     expensesRatio?: number,
+ *     managementRatio?: number,
+ *     safetyRatio?: number,
+ *     indirectRatio?: number,
+ *   }
  */
 import { NextRequest, NextResponse } from "next/server";
-import { materialBySku } from "@/lib/inpick/material-catalog";
+import {
+  materialBySku,
+  DEFAULT_SETUP_COSTS,
+  DEFAULT_EXPENSES_RATE,
+  DEFAULT_MANAGEMENT_RATE,
+  DEFAULT_SAFETY_RATE,
+  DEFAULT_INDIRECT_RATE,
+  DEFAULT_VAT_RATE,
+  type SetupCostItem,
+} from "@/lib/inpick/material-catalog";
 import {
   type SegmentationData,
   type EstimateLine,
@@ -32,9 +48,10 @@ export const dynamic = "force-dynamic";
 
 interface Body {
   segmentation: SegmentationData;
-  /** 경비 비율 (기본 0.08 = 8%) */
+  setupCosts?: SetupCostItem[];
   expensesRatio?: number;
-  /** 간접비 비율 (기본 0.12 = 12%) */
+  managementRatio?: number;
+  safetyRatio?: number;
   indirectRatio?: number;
 }
 
@@ -45,9 +62,14 @@ export async function POST(req: NextRequest) {
     if (!seg || !Array.isArray(seg.regions)) {
       return NextResponse.json({ error: "segmentation 필수" }, { status: 400 });
     }
-    const expensesRatio = typeof body.expensesRatio === "number" ? body.expensesRatio : 0.08;
-    const indirectRatio = typeof body.indirectRatio === "number" ? body.indirectRatio : 0.12;
 
+    const setupCosts = body.setupCosts || DEFAULT_SETUP_COSTS;
+    const expensesRatio = typeof body.expensesRatio === "number" ? body.expensesRatio : DEFAULT_EXPENSES_RATE;
+    const managementRatio = typeof body.managementRatio === "number" ? body.managementRatio : DEFAULT_MANAGEMENT_RATE;
+    const safetyRatio = typeof body.safetyRatio === "number" ? body.safetyRatio : DEFAULT_SAFETY_RATE;
+    const indirectRatio = typeof body.indirectRatio === "number" ? body.indirectRatio : DEFAULT_INDIRECT_RATE;
+
+    // 1) 항목별 자재비/노무비 계산
     const items: EstimateLine[] = [];
     let material_subtotal = 0;
     let labor_subtotal = 0;
@@ -57,7 +79,6 @@ export async function POST(req: NextRequest) {
       const mat = materialBySku(region.current_material_sku);
       if (!mat) continue;
 
-      // 수량 계산
       let qty: number;
       if (mat.unit === "sqm") {
         qty = region.area_sqm ?? Math.round(region.area_normalized * 100 * 100) / 100;
@@ -71,17 +92,13 @@ export async function POST(req: NextRequest) {
         qty = 1;
       }
 
-      // 자재비/노무비 단가
       const matPrice = mat.material_price ?? mat.price_per_unit ?? 0;
       const laborPrice = mat.labor_price ?? 0;
-      const unitTotal = matPrice + laborPrice;
+      const matSub = Math.round(qty * matPrice);
+      const lbrSub = Math.round(qty * laborPrice);
 
-      const matSubtotal = Math.round(qty * matPrice);
-      const lbrSubtotal = Math.round(qty * laborPrice);
-      const subtotal = matSubtotal + lbrSubtotal;
-
-      material_subtotal += matSubtotal;
-      labor_subtotal += lbrSubtotal;
+      material_subtotal += matSub;
+      labor_subtotal += lbrSub;
 
       items.push({
         region_id: region.id,
@@ -94,41 +111,74 @@ export async function POST(req: NextRequest) {
         qty,
         material_price: matPrice,
         labor_price: laborPrice,
-        unit_total: unitTotal,
-        material_subtotal: matSubtotal,
-        labor_subtotal: lbrSubtotal,
-        subtotal,
-        // 호환
-        unit_price: unitTotal,
+        unit_total: matPrice + laborPrice,
+        material_subtotal: matSub,
+        labor_subtotal: lbrSub,
+        subtotal: matSub + lbrSub,
+        unit_price: matPrice + laborPrice,
       });
     }
 
-    // 경비 = (자재 + 노무) × 8%
+    // 2) 직접비
     const direct_total = material_subtotal + labor_subtotal;
+
+    // 3) 가설비
+    const setup_items = setupCosts.map((s) => ({
+      ...s,
+      computed_amount: s.rate ? Math.round(direct_total * s.rate) : (s.amount || 0),
+    }));
+    const setup_total = setup_items.reduce((s, it) => s + it.computed_amount, 0);
+
+    // 4) 경비 (직접비 × 8%)
     const expenses = Math.round(direct_total * expensesRatio);
-    // 간접비 = (자재 + 노무 + 경비) × 12%
-    const indirect = Math.round((direct_total + expenses) * indirectRatio);
-    const total = direct_total + expenses + indirect;
-    const vat = Math.round(total * 0.1); // 부가세 10% (참고용 별도 표기)
+    // 5) 현장관리비 (직접비 × 5%)
+    const management = Math.round(direct_total * managementRatio);
+    // 6) 안전관리비 (직접비 × 1.5%)
+    const safety = Math.round(direct_total * safetyRatio);
+
+    // 7) 간접비 (직접비 + 가설비 + 경비 + 관리비 + 안전비) × 12%
+    const pre_indirect = direct_total + setup_total + expenses + management + safety;
+    const indirect = Math.round(pre_indirect * indirectRatio);
+
+    // 합계
+    const total = pre_indirect + indirect;
+    const vat_separate = Math.round(total * DEFAULT_VAT_RATE);
 
     return NextResponse.json({
       items,
+
+      // 자재/노무 분리
       material_subtotal,
       labor_subtotal,
       direct_total,
+
+      // 가설비 (사용자 수정 가능 항목)
+      setup_items,
+      setup_total,
+
+      // 경비/관리비/안전비/간접비
       expenses,
       expenses_ratio: expensesRatio,
+      management,
+      management_ratio: managementRatio,
+      safety,
+      safety_ratio: safetyRatio,
       indirect,
       indirect_ratio: indirectRatio,
+
+      // 합계
       total,
-      vat_separate: vat,
+      vat_rate: DEFAULT_VAT_RATE,
+      vat_separate,
+
       currency: "KRW",
-      // 표시용 메모
+      generated_at: new Date().toISOString(),
       note: [
-        "단가: 한국물가협회 + 대한건설협회 표준품셈 기준",
-        "경비: 운반/폐기물/잡재료 8%",
-        "간접비: 관리비 + 이윤 12%",
-        "부가세 별도 (총액의 10%)",
+        "단가: 한국물가협회(KPA) 자재 + 대한건설협회 표준품셈 노무비",
+        "가설비: 엘리베이터/출입구 보양, 가설 자재, 폐기물 처리 (현장 답사 후 조정)",
+        "경비 8% 운반/잡재료, 현장관리비 5%, 안전관리비 1.5%",
+        "간접비 12%: 관리비 + 이윤",
+        "부가세 10% 별도",
         "인픽 수수료는 계약 시점 별도 청구",
       ],
     });

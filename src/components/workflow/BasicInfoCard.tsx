@@ -63,10 +63,6 @@ export interface BasicInfoData {
   normalizedPyeong?: string;
 }
 
-const QUICK_BUDGETS = [1500, 3000, 5000, 10000, 20000];
-const BUDGET_MIN = 500;
-const BUDGET_MAX = 50000;
-
 interface Props {
   value: BasicInfoData;
   onChange: (next: BasicInfoData) => void;
@@ -126,17 +122,17 @@ export default function BasicInfoCard({ value, onChange }: Props) {
       {mode === "upload" && <UploadMode value={value} onChange={onChange} />}
       {mode === "lidar" && <LidarMode value={value} onChange={onChange} />}
 
-      {/* ── 예산 / 기본형·확장형 ── */}
+      {/* ── 시공 형태 (기본형/확장형) — 예산은 견적 단계에서 자동 산출 ── */}
       <div className="mt-5 pt-5 border-t border-primary-100">
         <div className="flex items-center gap-2 mb-3">
           <Wallet className="h-4 w-4 text-primary-500" />
-          <span className="text-sm font-bold tracking-tight text-primary-900">예산 & 시공 형태</span>
+          <span className="text-sm font-bold tracking-tight text-primary-900">시공 형태</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 mb-4">
+        <div className="grid grid-cols-2 gap-2">
           {[
-            { v: "basic", label: "기본형" },
-            { v: "extended", label: "확장형" },
+            { v: "basic", label: "기본형", desc: "발코니 미확장" },
+            { v: "extended", label: "확장형", desc: "발코니 확장 시공" },
           ].map((r) => {
             const sel = value.expansionType === r.v;
             return (
@@ -145,77 +141,26 @@ export default function BasicInfoCard({ value, onChange }: Props) {
                 onClick={() =>
                   onChange({ ...value, expansionType: r.v as "basic" | "extended" })
                 }
-                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold tracking-tight transition-all ${
+                className={`rounded-xl border px-3 py-3 text-left transition-all ${
                   sel
                     ? "border-primary-500 bg-primary-500 text-white shadow-cta"
                     : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
                 }`}
               >
-                {r.label}
+                <div className="text-sm font-bold tracking-tight">{r.label}</div>
+                <div className={`mt-0.5 text-[0.7rem] ${sel ? "text-white/85" : "text-primary-900/50"}`}>
+                  {r.desc}
+                </div>
               </button>
             );
           })}
-        </div>
-
-        <div className="flex items-end gap-3">
-          <p className="text-[2rem] font-extrabold tabular leading-none tracking-tightest">
-            <span className="text-gradient-primary">{value.budget.toLocaleString()}</span>
-            <span className="ml-1 text-sm font-bold text-primary-600">만원</span>
-          </p>
-          {/* 직접 입력 */}
-          <div className="flex-1 flex items-center gap-1.5 rounded-lg border border-primary-200 bg-white px-2 py-1.5">
-            <input
-              type="number"
-              min={BUDGET_MIN}
-              max={BUDGET_MAX}
-              step={100}
-              value={value.budget}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                if (!Number.isFinite(v)) return;
-                onChange({
-                  ...value,
-                  budget: Math.max(BUDGET_MIN, Math.min(BUDGET_MAX, Math.round(v))),
-                });
-              }}
-              className="flex-1 w-full bg-transparent text-right text-sm font-bold tabular text-primary-900 outline-none"
-            />
-            <span className="text-[0.7rem] font-semibold text-primary-900/50">만원</span>
-          </div>
-        </div>
-        <input
-          type="range"
-          min={BUDGET_MIN}
-          max={BUDGET_MAX}
-          step={100}
-          value={value.budget}
-          onChange={(e) => onChange({ ...value, budget: Number(e.target.value) })}
-          className="mt-3 w-full accent-primary-500"
-        />
-        <div className="mt-1 flex items-center justify-between text-[0.7rem] tabular text-primary-900/40">
-          <span>{BUDGET_MIN.toLocaleString()}</span>
-          <span>{BUDGET_MAX.toLocaleString()}</span>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {QUICK_BUDGETS.map((b) => (
-            <button
-              key={b}
-              onClick={() => onChange({ ...value, budget: b })}
-              className={`rounded-full border px-3 py-1 text-[0.78rem] font-semibold tabular tracking-tight transition-all ${
-                value.budget === b
-                  ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                  : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
-              }`}
-            >
-              {b.toLocaleString()}
-            </button>
-          ))}
         </div>
       </div>
 
       <p className="mt-4 text-xs text-primary-900/50 leading-relaxed">
         세 가지 입력 방법 중 하나만 선택해도 다음 단계로 진행 가능합니다.
         AI 가 자동으로 평면도를 정형화하고 실별 치수를 추출합니다.
+        견적 금액은 자재 선택 후 한국물가협회 단가 + 표준품셈으로 자동 산출됩니다.
       </p>
     </div>
   );

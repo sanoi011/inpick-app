@@ -938,19 +938,40 @@ function EstimateModal({
     material_subtotal: number;
     labor_subtotal: number;
     direct_total: number;
+    setup_items: { id: string; name: string; description?: string; computed_amount: number; editable?: boolean }[];
+    setup_total: number;
     expenses: number;
+    expenses_ratio: number;
+    management: number;
+    management_ratio: number;
+    safety: number;
+    safety_ratio: number;
     indirect: number;
+    indirect_ratio: number;
     total: number;
     vat_separate: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  // 사용자가 수정한 가설비 항목 (id → amount 덮어쓰기)
+  const [setupOverrides, setSetupOverrides] = useState<Record<string, number>>({});
+  const [showSetupEdit, setShowSetupEdit] = useState(false);
 
   useEffect(() => {
     setLoading(true);
+    // 사용자 수정한 가설비 항목 (overrides) → setupCosts 빌드
+    const setupCostsBody = Object.keys(setupOverrides).length > 0
+      ? estimate?.setup_items.map((s) => ({
+          id: s.id,
+          name: s.name,
+          description: s.description,
+          editable: s.editable,
+          amount: setupOverrides[s.id] ?? s.computed_amount,
+        }))
+      : undefined;
     fetch("/api/inpick/segmentation-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ segmentation, expensesRatio }),
+      body: JSON.stringify({ segmentation, expensesRatio, setupCosts: setupCostsBody }),
     })
       .then((r) => r.json())
       .then((d) => {
@@ -958,7 +979,8 @@ function EstimateModal({
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, [segmentation, expensesRatio]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segmentation, expensesRatio, setupOverrides]);
 
   return (
     <>
@@ -1057,14 +1079,90 @@ function EstimateModal({
                   ₩{estimate.direct_total.toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between">
+
+              {/* 가설비 (사용자 수정 가능) */}
+              <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-amber-900">
+                    가설비 (보양·자재·폐기물)
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold tabular text-amber-900">
+                      ₩{estimate.setup_total.toLocaleString()}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowSetupEdit((v) => !v)}
+                      className="text-[0.65rem] text-amber-700 underline hover:text-amber-900"
+                    >
+                      {showSetupEdit ? "닫기" : "수정"}
+                    </button>
+                  </div>
+                </div>
+                {showSetupEdit && (
+                  <ul className="mt-2 space-y-1.5">
+                    {estimate.setup_items.map((s) => (
+                      <li key={s.id} className="flex items-center gap-2 text-xs">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-amber-900 truncate">{s.name}</p>
+                          {s.description && (
+                            <p className="text-[0.65rem] text-amber-900/60 truncate">
+                              {s.description}
+                            </p>
+                          )}
+                        </div>
+                        <input
+                          type="number"
+                          value={setupOverrides[s.id] ?? s.computed_amount}
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            if (Number.isFinite(v) && v >= 0) {
+                              setSetupOverrides((prev) => ({ ...prev, [s.id]: v }));
+                            }
+                          }}
+                          className="w-28 rounded-lg border border-amber-300 bg-white px-2 py-1 text-right text-xs tabular text-amber-900 outline-none focus:border-amber-500"
+                        />
+                        <span className="text-[0.65rem] text-amber-900/60">원</span>
+                      </li>
+                    ))}
+                    {Object.keys(setupOverrides).length > 0 && (
+                      <li className="pt-1.5 text-right">
+                        <button
+                          type="button"
+                          onClick={() => setSetupOverrides({})}
+                          className="text-[0.65rem] text-amber-700 underline hover:text-amber-900"
+                        >
+                          기본값 복원
+                        </button>
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+
+              {/* 경비 / 관리비 / 안전관리비 */}
+              <div className="flex justify-between mt-2">
                 <span className="text-primary-900/70">
-                  경비 ({(expensesRatio * 100).toFixed(0)}% — 운반/폐기/잡재료)
+                  경비 ({(estimate.expenses_ratio * 100).toFixed(0)}% — 운반/잡재료)
                 </span>
                 <span className="font-semibold tabular">₩{estimate.expenses.toLocaleString()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-primary-900/70">간접비 (12% — 관리·이윤)</span>
+                <span className="text-primary-900/70">
+                  현장관리비 ({(estimate.management_ratio * 100).toFixed(1)}%)
+                </span>
+                <span className="font-semibold tabular">₩{estimate.management.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">
+                  안전관리비 ({(estimate.safety_ratio * 100).toFixed(1)}%)
+                </span>
+                <span className="font-semibold tabular">₩{estimate.safety.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">
+                  간접비 ({(estimate.indirect_ratio * 100).toFixed(0)}% — 이윤)
+                </span>
                 <span className="font-semibold tabular">₩{estimate.indirect.toLocaleString()}</span>
               </div>
               <div className="flex justify-between border-t-2 border-primary-300 pt-2 text-base">
@@ -1078,7 +1176,7 @@ function EstimateModal({
                 <span>₩{estimate.vat_separate.toLocaleString()}</span>
               </div>
               <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-[0.65rem] text-primary-900/70 leading-relaxed">
-                💡 단가는 한국물가협회 + 표준품셈 기준 평균. 현장 답사 후 ±10% 조정될 수 있습니다.
+                💡 단가는 한국물가협회 + 표준품셈 기준 평균. 가설비/관리비는 현장 답사 후 ±10% 조정 가능.
                 인픽 수수료는 계약 시점 별도 청구.
               </div>
             </div>

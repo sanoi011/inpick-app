@@ -112,8 +112,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
     (value.basicInfo.mode === "upload" && !!value.basicInfo.uploadedFloorplan?.dataUrl) ||
     (value.basicInfo.mode === "lidar" && !!value.basicInfo.lidarScan?.dataUrl);
   // expansionType 미선택 시 'basic' 자동 기본값으로 통과
-  const budgetDone = value.basicInfo.budget > 0;
-  const basicDone = inputDone && budgetDone;
+  // 예산은 견적 단계에서 자동 산출 — Step1에서 미리 받지 않음 (과장 견적 방지)
+  const basicDone = inputDone;
 
   // 시공범위 완료 — 건물유형 + 1개 이상 옵션 (방·층수·용도 중 하나)
   const isResidential = value.buildingType === "apartment" || value.buildingType === "house";
@@ -130,7 +130,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
   const missing: string[] = [];
   if (!inputDone) missing.push("주소·평형 또는 도면");
-  if (!budgetDone) missing.push("예산");
+  // 예산은 견적 단계에서 자동 산출 — missing에 포함 X
   if (!value.buildingType) missing.push("건물 유형");
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
