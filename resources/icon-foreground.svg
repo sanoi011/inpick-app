@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android Adaptive Icon — Foreground layer
+  108×108 dp 캔버스. 안전 영역 = 가운데 66×66 dp (62%).
+  Launcher가 마스킹(원형/squircle/teardrop 등)하므로 6각형은 안전 영역 안에 위치.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432">
+  <!-- 안전 영역 66x66 (좌상단 21,21 ~ 우하단 87,87) -->
+  <!-- 6각형 polygon points='25,6.7 75,6.7 100,50 75,93.3 25,93.3 0,50' (100x100 기준) -->
+  <!-- × 0.5 + offset (54-25=29, 54-50=4) → 정확히 안전영역 안 -->
+  <g transform="translate(29, 14)">
+    <polygon
+      points="12.5,3.35 37.5,3.35 50,25 37.5,46.65 12.5,46.65 0,25"
+      fill="#F73B20"
+      transform="scale(1)"
+    />
+  </g>
+</svg>

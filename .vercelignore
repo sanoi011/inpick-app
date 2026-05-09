@@ -6,6 +6,12 @@ e2e/
 test-results/
 /supabase/
 runpod_serverless/
+ios/
+android/
+.capacitor/
+mobile/
+resources/
+capacitor.config.ts
 *.py
 *.pdf
 *.dwg

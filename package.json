@@ -12,7 +12,13 @@
     "dev:ai": "cd python/floorplan-ai && python main.py serve --port 8100",
     "dev:parser": "cd services/pdf_parser && python main.py serve --port 8101",
     "dev:full": "concurrently \"npm run dev\" \"npm run dev:ai\"",
-    "dev:full-v47": "concurrently \"npm run dev\" \"npm run dev:parser\""
+    "dev:full-v47": "concurrently \"npm run dev\" \"npm run dev:parser\"",
+    "mobile:init": "npx cap init InPick kr.inpick.app --web-dir=public",
+    "mobile:add:ios": "npx cap add ios",
+    "mobile:add:android": "npx cap add android",
+    "mobile:sync": "npx cap sync",
+    "mobile:open:ios": "npx cap open ios",
+    "mobile:open:android": "npx cap open android"
   },
   "dependencies": {
     "@google/genai": "^1.41.0",
@@ -38,6 +44,17 @@
     "undici": "^7.22.0"
   },
   "devDependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0",
+    "@capacitor/ios": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/browser": "^7.0.0",
+    "@capacitor/camera": "^7.0.0",
+    "@capacitor/push-notifications": "^7.0.0",
+    "@capacitor/share": "^7.0.0",
+    "@capacitor/status-bar": "^7.0.0",
+    "@capacitor/splash-screen": "^7.0.0",
     "@next/bundle-analyzer": "^16.1.6",
     "@playwright/test": "^1.58.2",
     "@types/node": "^20",

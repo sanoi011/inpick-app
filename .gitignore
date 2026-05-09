@@ -80,3 +80,9 @@ services/pdf_parser/**/__pycache__/
 
 # Local brainstorming screenshots
 /skill/
+
+# Capacitor native projects (개발자 PC에서 init 후 생성됨, 머신마다 다름)
+/ios/
+/android/
+.capacitor/
+

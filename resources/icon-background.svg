@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Android Adaptive Icon — Background layer (단색 화이트)
+  다홍색 6각형이 흰 배경 위에 있는 형태.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="432" height="432">
+  <rect width="108" height="108" fill="#FFFFFF"/>
+</svg>
