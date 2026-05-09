@@ -10,7 +10,7 @@
  */
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "motion/react";
 import {
   Search,
@@ -704,53 +704,123 @@ function UploadMode({ value, onChange }: Props) {
   );
 }
 
-// ─── Mode 3: LIDAR 스캔 ───
-function LidarMode({ value, onChange: _ }: Props) {
-  const [isMobile, setIsMobile] = useState(false);
+// ─── Mode 3: LIDAR 스캔 — 외부 앱(RoomPlan/PolyCam) 결과 파일 업로드 ───
+function LidarMode({ value, onChange }: Props) {
+  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [bbox, setBbox] = useState<{ width: number; depth: number; height: number } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    setIsMobile(/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent));
-  }, []);
-
-  if (!isMobile) {
-    return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-        <div className="flex items-center gap-2 text-amber-800 font-semibold text-sm">
-          <ScanLine className="h-4 w-4" />
-          모바일 전용 기능
-        </div>
-        <p className="mt-2 text-xs text-amber-900/80 leading-relaxed">
-          LIDAR 스캔은 iPhone Pro / iPad Pro 또는 LIDAR 지원 안드로이드에서 가능합니다.
-          모바일로 InPick 사이트 접속 후 동일 단계에서 이용해주세요.
-        </p>
-      </div>
-    );
-  }
-
-  const handleScan = () => {
-    alert("LIDAR 스캔 기능 베타 — 실제 스캔 SDK 연동 후 활성화. 우선 도면 업로드를 이용해주세요.");
+  const handleFile = async (file: File) => {
+    setError(null);
+    setProcessing(true);
+    setProgress(0);
+    setBbox(null);
+    try {
+      // 클라 측 lazy import — Three.js 번들 크기 (Step1 진입 전엔 로드 X)
+      const mod = await import("@/lib/inpick/lidar-to-floorplan");
+      const result = await mod.lidarFileToFloorplan(file, {
+        size: 1024,
+        onProgress: (_stage, percent) => setProgress(percent),
+      });
+      setBbox(result.bboxMm);
+      onChange({
+        ...value,
+        lidarScan: { dataUrl: result.dataUrl },
+      });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setProcessing(false);
+    }
   };
 
+  const accept = ".usdz,.obj,.glb,.gltf,.ply";
+
   return (
-    <div>
+    <div className="space-y-3">
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept={accept}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+        className="hidden"
+      />
+
+      {/* 안내 */}
+      <div className="rounded-xl border border-primary-200 bg-primary-50/30 p-3 text-xs leading-relaxed text-primary-900/80">
+        <p className="font-semibold text-primary-900 mb-1.5 inline-flex items-center gap-1.5">
+          <ScanLine className="h-3.5 w-3.5" />
+          LIDAR 스캔 파일 업로드
+        </p>
+        <ol className="list-decimal list-inside space-y-1 text-primary-900/70">
+          <li>iPhone Pro / iPad Pro의 <b>RoomPlan</b>(iOS 16+ 기본 앱) 또는 <b>PolyCam</b> · <b>Scaniverse</b>로 방 스캔</li>
+          <li>스캔 완료 → Export → <b>USDZ</b> · OBJ · GLB · PLY 형식 저장</li>
+          <li>파일을 PC로 옮기거나 모바일에서 직접 업로드</li>
+        </ol>
+      </div>
+
+      {/* 업로드 버튼 */}
       <button
-        onClick={handleScan}
-        className="w-full flex flex-col items-center justify-center h-40 rounded-xl border-2 border-dashed border-primary-200 bg-primary-50/30 hover:bg-primary-50/50 transition-colors"
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        disabled={processing}
+        className="w-full flex flex-col items-center justify-center h-32 rounded-xl border-2 border-dashed border-primary-300 bg-white hover:bg-primary-50/40 transition-colors disabled:opacity-60"
       >
-        <Camera className="h-8 w-8 text-primary-400 mb-2" />
-        <span className="text-sm font-semibold text-primary-900">실내 LIDAR 스캔 시작</span>
-        <span className="text-xs text-primary-900/60 mt-1">방마다 1분 — iPhone Pro / iPad Pro 권장</span>
+        {processing ? (
+          <>
+            <Loader2 className="h-6 w-6 animate-spin text-primary-500 mb-2" />
+            <span className="text-sm font-semibold text-primary-900">처리 중… {progress}%</span>
+            <span className="text-xs text-primary-900/60 mt-1">평면도 변환 중 (3D mesh → top-down)</span>
+          </>
+        ) : value.lidarScan ? (
+          <>
+            <Camera className="h-6 w-6 text-emerald-500 mb-1.5" />
+            <span className="text-sm font-semibold text-emerald-700">변환 완료 · 다른 파일 선택</span>
+          </>
+        ) : (
+          <>
+            <Camera className="h-7 w-7 text-primary-400 mb-1.5" />
+            <span className="text-sm font-semibold text-primary-900">LIDAR 파일 선택</span>
+            <span className="text-xs text-primary-900/60 mt-1">USDZ · OBJ · GLB · PLY</span>
+          </>
+        )}
       </button>
 
-      {value.lidarScan && (
-        <div className="mt-3">
-          <img src={value.lidarScan.dataUrl} alt="LIDAR 스캔 결과" className="w-full rounded-xl border" />
+      {/* 에러 */}
+      {error && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap">
+          {error}
         </div>
       )}
 
-      <p className="mt-3 text-xs text-primary-900/50 leading-relaxed">
-        스캔된 3D 데이터에서 실별 치수와 벽·창 위치를 자동 추출합니다.
-        <span className="block mt-1 font-medium text-amber-700">베타 버전 — 곧 출시</span>
+      {/* 변환 결과 미리보기 */}
+      {value.lidarScan && !processing && (
+        <div className="rounded-xl border border-primary-200 bg-white overflow-hidden">
+          <img
+            src={value.lidarScan.dataUrl}
+            alt="LIDAR top-down 평면도"
+            className="w-full"
+          />
+          {bbox && (
+            <div className="px-3 py-2 border-t border-primary-100 text-[0.7rem] text-primary-900/70 tabular flex items-center justify-between flex-wrap gap-1">
+              <span>
+                추정 크기 · <strong>{(bbox.width / 1000).toFixed(2)}m</strong> ×{" "}
+                <strong>{(bbox.depth / 1000).toFixed(2)}m</strong> × 천장{" "}
+                <strong>{(bbox.height / 1000).toFixed(2)}m</strong>
+              </span>
+              <span className="text-emerald-600 font-bold">✓ 자동 평면도 생성됨</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <p className="text-[0.7rem] text-primary-900/50 leading-relaxed">
+        업로드한 3D 데이터를 위에서 본 평면도(top-down)로 변환합니다. 다음 단계에서 AI가 실별 치수와 벽·창 위치를 자동 추출합니다.
       </p>
     </div>
   );
