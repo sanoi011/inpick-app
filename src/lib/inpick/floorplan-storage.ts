@@ -53,13 +53,24 @@ export interface FloorplanMetadata {
 // ═══════════════════════════════════════════════════
 // property_id — 캐싱 키
 // ═══════════════════════════════════════════════════
+/**
+ * 알고리즘 버전 — 변경 시 모든 기존 캐시 자동 무효화.
+ * v2 (2026-05-09): 워터마크 제거 + 확장/비확장 분기 + 매핑 강화 prompt 적용.
+ *                  v1 캐시는 옛 prompt 결과라 모두 폐기.
+ */
+const PROPERTY_ID_ALGO_VERSION = "v2";
+
 export function getPropertyId(
   address: string,
   aptName: string,
   areaSqm: number,
 ): string {
-  const key = `${address}|${aptName}|${areaSqm.toFixed(2)}`;
+  const key = `${PROPERTY_ID_ALGO_VERSION}:${address}|${aptName}|${areaSqm.toFixed(2)}`;
   return crypto.createHash("md5").update(key).digest("hex").slice(0, 16);
+}
+
+export function getCurrentAlgoVersion(): string {
+  return PROPERTY_ID_ALGO_VERSION;
 }
 
 // ═══════════════════════════════════════════════════
