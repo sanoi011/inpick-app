@@ -129,21 +129,24 @@ export default function Step2Designer({
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
-  // 채팅 모드 (AI 상담)
-  const chatMode = value.chatMode ?? false;
-  const chatMessages: ChatMessage[] = value.chatMessages ?? [];
+  // 채팅 모드 + 메시지는 local useState로 — 스트리밍 빈번 갱신 시 closure stale 회피
+  const [chatMode, setChatModeLocal] = useState<boolean>(value.chatMode ?? false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(value.chatMessages ?? []);
   const [chatStreaming, setChatStreaming] = useState(false);
   const [extractingPrompt, setExtractingPrompt] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  // 부모(value)와 sync — 페이지 이탈 후 복원용. 단, 매 chunk마다 X (debounce).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      onChange({ ...value, chatMessages, chatMode });
+    }, 500);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chatMessages, chatMode]);
+
   const setChatMode = (m: boolean) => {
-    onChange({ ...value, chatMode: m });
-  };
-  const setChatMessages = (msgs: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => {
-    onChange({
-      ...value,
-      chatMessages: typeof msgs === "function" ? msgs(chatMessages) : msgs,
-    });
+    setChatModeLocal(m);
   };
 
   // SAM warmup — Step2 마운트 시 1회 백그라운드 호출 (cold start 회피)
@@ -953,20 +956,21 @@ export default function Step2Designer({
                 />
               </div>
               <button
+                type="button"
                 onClick={chatMode ? handleChatSend : handleGenerate}
                 disabled={
                   (chatMode ? chatStreaming : generating) || !currentPrompt.trim()
                 }
-                className="shrink-0 inline-flex h-11 items-center gap-1.5 rounded-2xl bg-primary-500 px-4 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-30"
+                aria-label={chatMode ? "메시지 전송" : "이미지 생성"}
+                className={`shrink-0 inline-flex items-center justify-center rounded-2xl text-white shadow-cta hover:bg-primary-600 disabled:opacity-30 transition-all ${
+                  chatMode ? "h-11 w-11 bg-primary-500" : "h-11 gap-1.5 bg-primary-500 px-4 text-sm font-bold"
+                }`}
               >
                 {chatMode ? (
                   chatStreaming ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <>
-                      <Send className="h-3.5 w-3.5" />
-                      <span>대화하기</span>
-                    </>
+                    <Send className="h-5 w-5" />
                   )
                 ) : generating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
