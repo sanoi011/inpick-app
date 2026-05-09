@@ -146,6 +146,14 @@ export default function Step2Designer({
     });
   };
 
+  // SAM warmup — Step2 마운트 시 1회 백그라운드 호출 (cold start 회피)
+  // 자재 수정 모달 열 때 워커가 이미 warm 상태로 있게 — fire-and-forget, 실패해도 무시
+  useEffect(() => {
+    fetch("/api/inpick/sam/warmup", { method: "POST" }).catch(() => {
+      /* warmup은 사용자 차단 X */
+    });
+  }, []);
+
   // 진행률 게이지 — 0→90% 점진 증가, 응답 후 100%
   useEffect(() => {
     if (!generating) {
