@@ -24,9 +24,9 @@ export async function POST() {
     );
   }
 
-  // 1x1 white PNG으로 warmup
+  // 64x64 white PNG으로 warmup (1x1은 SAM/PIL이 거부)
   const tinyPng =
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Z6inmIAAAAASUVORK5CYII=";
+    "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAfElEQVR4nNXOQREAIADDsFL/nocIHlyjIGcbZRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncf4OvLpyqgN9ZSiDcwAAAABJRU5ErkJggg==";
   try {
     const start = Date.now();
     const result = await samAutoSegment(tinyPng);

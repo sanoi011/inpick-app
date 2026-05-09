@@ -220,9 +220,9 @@ export async function samRefineSegment(
  */
 export async function samWarmup(): Promise<boolean> {
   try {
-    // 1x1 white PNG (base64 encoded)
+    // 64×64 white PNG (1x1은 SAM/PIL에서 "broken data stream" 거부)
     const tinyPng =
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Z6inmIAAAAASUVORK5CYII=";
+      "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAfElEQVR4nNXOQREAIADDsFL/nocIHlyjIGcbZRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncf4OvLpyqgN9ZSiDcwAAAABJRU5ErkJggg==";
     await callRunPod({
       task: "auto_segment",
       image_b64: tinyPng,
