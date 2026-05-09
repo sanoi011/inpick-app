@@ -66,7 +66,8 @@ export default function MaterialEditor({
   const [editMode, setEditMode] = useState<"auto" | "sam">("auto");
   const [samSelection, setSamSelection] = useState<SamPolygonResult | null>(null);
   const [samCategoryPicker, setSamCategoryPicker] = useState(false); // 카테고리 선택 모달
-  const [expensesRatio, setExpensesRatio] = useState(0.03);
+  // expensesRatio knob 제거 — spec §C는 고정 요율 (산안비 3.11% / 일반관리비 5% / 이윤 10%) 사용.
+  // 사업자별 요율 수정은 Phase 2 `/business/bids/[bidId]/edit-rates`에서 처리.
 
   const hasEdits = useMemo(
     () =>
@@ -521,8 +522,6 @@ export default function MaterialEditor({
         {estimateOpen && segmentation && (
           <EstimateModal
             segmentation={segmentation}
-            expensesRatio={expensesRatio}
-            onChangeExpensesRatio={setExpensesRatio}
             onClose={() => setEstimateOpen(false)}
           />
         )}
@@ -908,74 +907,24 @@ function MaterialLibraryModal({
   );
 }
 
-// ──────────────── 견적 모달 ────────────────
+// ──────────────── 견적 모달 (spec §A-3 — 12 공종 그룹핑 + 단가 컬럼 제거) ────────────────
 function EstimateModal({
   segmentation,
-  expensesRatio,
-  onChangeExpensesRatio,
   onClose,
 }: {
   segmentation: SegmentationData;
-  expensesRatio: number;
-  onChangeExpensesRatio: (v: number) => void;
   onClose: () => void;
 }) {
-  const [estimate, setEstimate] = useState<{
-    items: {
-      region_id: string;
-      category: string;
-      label_ko: string;
-      material_name: string;
-      material_sku: string;
-      brand?: string;
-      unit: string;
-      qty: number;
-      material_price: number;
-      labor_price: number;
-      unit_total: number;
-      material_subtotal: number;
-      labor_subtotal: number;
-      subtotal: number;
-    }[];
-    material_subtotal: number;
-    labor_subtotal: number;
-    direct_total: number;
-    setup_items: { id: string; name: string; description?: string; computed_amount: number; editable?: boolean }[];
-    setup_total: number;
-    expenses: number;
-    expenses_ratio: number;
-    management: number;
-    management_ratio: number;
-    safety: number;
-    safety_ratio: number;
-    indirect: number;
-    indirect_ratio: number;
-    total: number;
-    vat_rate: number;
-    vat_separate: number;
-    generated_at: string;
-  } | null>(null);
+  const [estimate, setEstimate] = useState<EstimateState | null>(null);
   const [loading, setLoading] = useState(true);
-  // 사용자가 수정한 가설비 항목 (id → amount 덮어쓰기)
-  const [setupOverrides, setSetupOverrides] = useState<Record<string, number>>({});
-  const [showSetupEdit, setShowSetupEdit] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    // 사용자 수정한 가설비 항목 (overrides) → setupCosts 빌드
-    const setupCostsBody = Object.keys(setupOverrides).length > 0
-      ? estimate?.setup_items.map((s) => ({
-          id: s.id,
-          name: s.name,
-          description: s.description,
-          editable: s.editable,
-          amount: setupOverrides[s.id] ?? s.computed_amount,
-        }))
-      : undefined;
     fetch("/api/inpick/segmentation-estimate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ segmentation, expensesRatio, setupCosts: setupCostsBody }),
+      body: JSON.stringify({ segmentation }),
     })
       .then((r) => r.json())
       .then((d) => {
@@ -983,8 +932,12 @@ function EstimateModal({
         setLoading(false);
       })
       .catch(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [segmentation, expensesRatio, setupOverrides]);
+  }, [segmentation]);
+
+  const sections = estimate?.sections ?? [];
+  const indirect = estimate?.indirectCosts;
+  const totalAmount = estimate?.totalAmount ?? estimate?.total ?? 0;
+  const directCost = estimate?.directCostSubtotal ?? estimate?.direct_total ?? 0;
 
   return (
     <>
@@ -1002,192 +955,193 @@ function EstimateModal({
         className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-base font-extrabold tracking-tight text-primary-900">
-            영역별 자재 견적
-          </h3>
+          <div>
+            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+              견적서 (총괄표 + 내역서)
+            </h3>
+            <p className="mt-0.5 text-[0.65rem] text-primary-900/50">
+              spec §A — 12 공종 그룹 · 2026 KICT 표준품셈 + KPI 원가계산
+            </p>
+          </div>
           <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
             <X className="h-4 w-4" />
           </button>
-        </div>
-
-        <div className="mt-3 flex items-center gap-2 text-xs text-primary-900/70">
-          <label>경비 비율</label>
-          <input
-            type="number"
-            value={expensesRatio * 100}
-            min={0}
-            max={20}
-            step={0.5}
-            onChange={(e) => onChangeExpensesRatio(Number(e.target.value) / 100)}
-            className="w-16 rounded-lg border border-primary-200 px-2 py-1 text-right tabular"
-          />
-          <span>%</span>
-          <span className="text-primary-900/40">· 인픽 수수료는 계약 시점 별도</span>
         </div>
 
         {loading ? (
           <div className="py-12 text-center">
             <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
           </div>
-        ) : !estimate || estimate.items.length === 0 ? (
+        ) : !estimate || sections.length === 0 ? (
           <p className="py-8 text-center text-sm text-primary-900/60">
             자재가 선택된 영역이 없습니다
           </p>
         ) : (
           <>
-            <ul className="mt-4 divide-y divide-primary-100 border-y border-primary-100">
-              {estimate.items.map((it) => (
-                <li key={it.region_id} className="py-3 text-sm">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="font-bold text-primary-900 truncate flex-1">
-                      {it.label_ko} <span className="text-primary-900/40 font-normal">·</span>{" "}
-                      <span className="font-semibold">{it.material_name}</span>
-                      {it.brand && <span className="text-primary-900/40 ml-1">({it.brand})</span>}
-                    </p>
-                    <p className="font-extrabold text-primary-900 tabular shrink-0">
-                      ₩{it.subtotal.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[0.7rem] text-primary-900/60 tabular">
-                    <span>
-                      수량 · {it.qty.toLocaleString()}{" "}
-                      {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : "EA"}
-                    </span>
-                    <span>단가 · ₩{it.unit_total.toLocaleString()}</span>
-                    <span>
-                      자재 ₩{it.material_price.toLocaleString()} = ₩{it.material_subtotal.toLocaleString()}
-                    </span>
-                    <span>
-                      인건 ₩{it.labor_price.toLocaleString()} = ₩{it.labor_subtotal.toLocaleString()}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-4 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-primary-900/70">자재비 소계</span>
-                <span className="font-semibold tabular">
-                  ₩{estimate.material_subtotal.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-primary-900/70">노무비(인건비) 소계</span>
-                <span className="font-semibold tabular">
-                  ₩{estimate.labor_subtotal.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-primary-900/80 border-t border-primary-100 pt-1">
-                <span>직접비 합 (자재 + 노무)</span>
-                <span className="font-bold tabular">
-                  ₩{estimate.direct_total.toLocaleString()}
-                </span>
-              </div>
+            {/* ─── 총 견적 금액 (큰 박스, spec §A-1) ─── */}
+            <div className="mt-4 rounded-2xl border-2 border-primary-900 bg-gradient-to-br from-primary-50/40 to-amber-50/40 p-4">
+              <p className="text-[0.65rem] font-bold text-primary-900/60 tracking-widest">
+                총 견적 금액 (VAT 포함)
+              </p>
+              <p className="mt-1 text-2xl font-extrabold text-primary-500 tabular">
+                ₩{totalAmount.toLocaleString()}
+              </p>
+              {estimate.indirectCosts?.modified && (
+                <p className="mt-1 text-[0.65rem] text-amber-700">
+                  사업자 입찰 요율 적용됨
+                </p>
+              )}
+            </div>
 
-              {/* 가설비 (사용자 수정 가능) */}
-              <div className="mt-2 rounded-lg bg-amber-50 border border-amber-200 p-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-amber-900">
-                    가설비 (보양·자재·폐기물)
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold tabular text-amber-900">
-                      ₩{estimate.setup_total.toLocaleString()}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setShowSetupEdit((v) => !v)}
-                      className="text-[0.65rem] text-amber-700 underline hover:text-amber-900"
-                    >
-                      {showSetupEdit ? "닫기" : "수정"}
-                    </button>
-                  </div>
-                </div>
-                {showSetupEdit && (
-                  <ul className="mt-2 space-y-1.5">
-                    {estimate.setup_items.map((s) => (
-                      <li key={s.id} className="flex items-center gap-2 text-xs">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-amber-900 truncate">{s.name}</p>
-                          {s.description && (
-                            <p className="text-[0.65rem] text-amber-900/60 truncate">
-                              {s.description}
-                            </p>
-                          )}
+            {/* ─── 총괄표 (12 공종 + 간접비 5종, spec §A-2) ─── */}
+            <div className="mt-4">
+              <p className="text-[0.7rem] font-bold text-primary-900/70 mb-2">
+                공종별 소계
+              </p>
+              <ul className="rounded-xl border border-primary-200 divide-y divide-primary-100 overflow-hidden">
+                {sections.map((sec) => {
+                  const isOpen = expandedSection === sec.sectionId;
+                  return (
+                    <li key={sec.sectionId} className="bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setExpandedSection(isOpen ? null : sec.sectionId)}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-primary-50/50 text-left"
+                      >
+                        <span className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="text-[0.65rem] font-bold text-primary-900/40 tabular shrink-0">
+                            {sec.sectionNumber}
+                          </span>
+                          <span className="text-sm font-bold text-primary-900 truncate">
+                            {sec.sectionName}
+                          </span>
+                          <span className="text-[0.65rem] text-primary-900/40 shrink-0">
+                            ({sec.items.length}건)
+                          </span>
+                        </span>
+                        <span className="text-sm font-extrabold text-primary-900 tabular shrink-0">
+                          ₩{sec.subtotal.total.toLocaleString()}
+                        </span>
+                      </button>
+                      {/* 내역서 (spec §A-3 — 품명 / 단위 / 수량 / 자재비 / 노무비 / 경비 / 합계) */}
+                      {isOpen && (
+                        <div className="bg-primary-50/30 px-3 py-2 border-t border-primary-100">
+                          <ul className="space-y-1.5">
+                            {sec.items.map((it) => (
+                              <li key={it.itemId} className="text-[0.7rem] tabular">
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="font-semibold text-primary-900 truncate flex-1">
+                                    {it.name}
+                                    {it.spec && (
+                                      <span className="ml-1 text-primary-900/50 font-normal">
+                                        · {it.spec}
+                                      </span>
+                                    )}
+                                  </span>
+                                  <span className="font-bold text-primary-900 shrink-0">
+                                    ₩{it.totalCost.toLocaleString()}
+                                  </span>
+                                </div>
+                                <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.62rem] text-primary-900/55">
+                                  <span>
+                                    {it.quantity.toLocaleString()}{" "}
+                                    {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : it.unit}
+                                  </span>
+                                  {it.materialCost > 0 && (
+                                    <span>자재 ₩{it.materialCost.toLocaleString()}</span>
+                                  )}
+                                  {it.laborCost > 0 && (
+                                    <span>노무 ₩{it.laborCost.toLocaleString()}</span>
+                                  )}
+                                  {it.expenseCost > 0 && (
+                                    <span>경비 ₩{it.expenseCost.toLocaleString()}</span>
+                                  )}
+                                  {it.source === "standard" && (
+                                    <span className="text-primary-500/70">표준</span>
+                                  )}
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                          {/* 공종 소계 (3분할: 자재 / 노무 / 경비) */}
+                          <div className="mt-2 pt-2 border-t border-primary-200 flex justify-between text-[0.62rem] text-primary-900/60 tabular">
+                            <span>자재 ₩{sec.subtotal.materialCost.toLocaleString()}</span>
+                            <span>노무 ₩{sec.subtotal.laborCost.toLocaleString()}</span>
+                            <span>경비 ₩{sec.subtotal.expenseCost.toLocaleString()}</span>
+                          </div>
                         </div>
-                        <input
-                          type="number"
-                          value={setupOverrides[s.id] ?? s.computed_amount}
-                          onChange={(e) => {
-                            const v = Number(e.target.value);
-                            if (Number.isFinite(v) && v >= 0) {
-                              setSetupOverrides((prev) => ({ ...prev, [s.id]: v }));
-                            }
-                          }}
-                          className="w-28 rounded-lg border border-amber-300 bg-white px-2 py-1 text-right text-xs tabular text-amber-900 outline-none focus:border-amber-500"
-                        />
-                        <span className="text-[0.65rem] text-amber-900/60">원</span>
-                      </li>
-                    ))}
-                    {Object.keys(setupOverrides).length > 0 && (
-                      <li className="pt-1.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => setSetupOverrides({})}
-                          className="text-[0.65rem] text-amber-700 underline hover:text-amber-900"
-                        >
-                          기본값 복원
-                        </button>
-                      </li>
-                    )}
-                  </ul>
-                )}
-              </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
 
-              {/* 경비 / 관리비 / 안전관리비 */}
-              <div className="flex justify-between mt-2">
-                <span className="text-primary-900/70">
-                  경비 ({(estimate.expenses_ratio * 100).toFixed(0)}% — 운반/잡재료)
+            {/* ─── 직접공사비 합 + 간접비 5종 (spec §C — 총괄표 하단) ─── */}
+            <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/30 p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between font-bold text-primary-900">
+                <span>직접공사비 합</span>
+                <span className="tabular">₩{Math.round(directCost).toLocaleString()}</span>
+              </div>
+              {indirect && (
+                <>
+                  <div className="flex justify-between text-primary-900/75 border-t border-primary-200 pt-1.5">
+                    <span>가설공사비 (보양·자재·폐기물)</span>
+                    <span className="tabular">₩{Math.round(indirect.setupCost).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-primary-900/75">
+                    <span>
+                      산업안전보건관리비
+                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                        ({(indirect.appliedRates?.safety_rate ?? 0.0311) * 100}%)
+                      </span>
+                    </span>
+                    <span className="tabular">₩{Math.round(indirect.safetyCost).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-primary-900/75">
+                    <span>
+                      일반관리비
+                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                        ({((indirect.appliedRates?.general_management_rate ?? 0.05) * 100).toFixed(1)}%)
+                      </span>
+                    </span>
+                    <span className="tabular">₩{Math.round(indirect.generalManagementCost).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-primary-900/75">
+                    <span>
+                      기업이윤
+                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                        ({((indirect.appliedRates?.profit_rate ?? 0.10) * 100).toFixed(1)}%)
+                      </span>
+                    </span>
+                    <span className="tabular">₩{Math.round(indirect.profit).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-primary-900 border-t border-primary-200 pt-1.5">
+                    <span>공급가액</span>
+                    <span className="tabular">₩{Math.round(indirect.supplyAmount).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-primary-900/75">
+                    <span>부가가치세 (10%)</span>
+                    <span className="tabular">₩{Math.round(indirect.vat).toLocaleString()}</span>
+                  </div>
+                </>
+              )}
+              <div className="flex justify-between border-t-2 border-primary-900 pt-2 mt-1 text-base">
+                <span className="font-extrabold text-primary-900">총 견적 금액 (VAT 포함)</span>
+                <span className="font-extrabold text-primary-500 tabular">
+                  ₩{totalAmount.toLocaleString()}
                 </span>
-                <span className="font-semibold tabular">₩{estimate.expenses.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-primary-900/70">
-                  현장관리비 ({(estimate.management_ratio * 100).toFixed(1)}%)
-                </span>
-                <span className="font-semibold tabular">₩{estimate.management.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-primary-900/70">
-                  안전관리비 ({(estimate.safety_ratio * 100).toFixed(1)}%)
-                </span>
-                <span className="font-semibold tabular">₩{estimate.safety.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-primary-900/70">
-                  간접비 ({(estimate.indirect_ratio * 100).toFixed(0)}% — 이윤)
-                </span>
-                <span className="font-semibold tabular">₩{estimate.indirect.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between border-t-2 border-primary-300 pt-2 text-base">
-                <span className="font-extrabold text-primary-900">합계 (부가세 별도)</span>
-                <span className="font-extrabold text-primary-900 tabular">
-                  ₩{estimate.total.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex justify-between text-[0.7rem] text-primary-900/50 tabular">
-                <span>부가세 (10%, 참고)</span>
-                <span>₩{estimate.vat_separate.toLocaleString()}</span>
-              </div>
-              <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-[0.65rem] text-primary-900/70 leading-relaxed">
-                💡 단가는 한국물가협회 + 표준품셈 기준 평균. 가설비/관리비는 현장 답사 후 ±10% 조정 가능.
-                인픽 수수료는 계약 시점 별도 청구.
-              </div>
+            </div>
+
+            <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[0.65rem] text-amber-900/80 leading-relaxed">
+              💡 단가는 KPA 자재 + 대한건설협회 표준품셈 기준. 간접비 요율은 2026 KICT + KPI 표준값 (산안비
+              3.11% 법정 최저). 사업자 입찰 시 요율 수정 가능 (산안비 하향 제외).
             </div>
           </>
         )}
 
-        {estimate && estimate.items.length > 0 && (
+        {estimate && sections.length > 0 && (
           <PdfDownloadButton estimate={estimate} segmentation={segmentation} />
         )}
 
@@ -1314,8 +1268,62 @@ function PdfDownloadButton({
   );
 }
 
+// segmentation-estimate API 응답 — spec §B-2 신규 + 호환 평면 필드 모두 포함.
+// PdfDownloadButton + quote-pdf.tsx는 sections/indirectCosts 우선, 없으면 ensureSections/ensureIndirect 폴백.
+type QuoteItemUI = {
+  itemId: string;
+  name: string;
+  spec?: string;
+  unit: string;
+  quantity: number;
+  materialCost: number;
+  laborCost: number;
+  expenseCost: number;
+  totalCost: number;
+  source: "catalog" | "standard";
+  catalogSku?: string;
+};
+
+type QuoteSectionUI = {
+  sectionId: string;
+  sectionNumber: string;
+  sectionName: string;
+  items: QuoteItemUI[];
+  subtotal: {
+    materialCost: number;
+    laborCost: number;
+    expenseCost: number;
+    total: number;
+  };
+};
+
+type IndirectCostsUI = {
+  directCost: number;
+  setupCost: number;
+  safetyCost: number;
+  generalManagementCost: number;
+  profit: number;
+  supplyAmount: number;
+  vat: number;
+  totalAmount: number;
+  modified?: boolean;
+  appliedRates?: {
+    safety_rate: number;
+    general_management_rate: number;
+    profit_rate: number;
+  };
+};
+
 type EstimateState = {
-  items: {
+  // 신규 (spec §B-2 — UI는 이 필드 사용)
+  sections?: QuoteSectionUI[];
+  directCostSubtotal?: number;
+  indirectCosts?: IndirectCostsUI;
+  totalAmount?: number;
+  unmappedCategories?: string[];
+
+  // 호환 (PdfDownloadButton/quote-pdf.tsx의 ensureSections 폴백 + 옛 통합)
+  items?: {
     region_id: string;
     category: string;
     label_ko: string;
@@ -1331,22 +1339,23 @@ type EstimateState = {
     labor_subtotal: number;
     subtotal: number;
   }[];
-  material_subtotal: number;
-  labor_subtotal: number;
-  direct_total: number;
-  setup_items: { id: string; name: string; description?: string; computed_amount: number }[];
-  setup_total: number;
-  expenses: number;
-  expenses_ratio: number;
-  management: number;
-  management_ratio: number;
-  safety: number;
-  safety_ratio: number;
-  indirect: number;
-  indirect_ratio: number;
-  total: number;
-  vat_rate: number;
-  vat_separate: number;
+  material_subtotal?: number;
+  labor_subtotal?: number;
+  direct_total?: number;
+  setup_items?: { id: string; name: string; description?: string; computed_amount: number }[];
+  setup_total?: number;
+  expenses?: number;
+  expenses_ratio?: number;
+  management?: number;
+  management_ratio?: number;
+  safety?: number;
+  safety_ratio?: number;
+  indirect?: number;
+  indirect_ratio?: number;
+  total?: number;
+  vat_rate?: number;
+  vat_separate?: number;
+
   generated_at: string;
 };
 
