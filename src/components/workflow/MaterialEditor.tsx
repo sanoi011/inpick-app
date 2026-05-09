@@ -604,7 +604,7 @@ function SamCategoryMaterialModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-2xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-2xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -677,9 +677,17 @@ function SamCategoryMaterialModal({
                     {m.brand && (
                       <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
                     )}
-                    <p className="mt-1 text-[0.7rem] font-bold text-primary-700 tabular">
-                      ₩{m.price_per_unit.toLocaleString()}/{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
-                    </p>
+                    <div className="mt-1 space-y-0.5">
+                      <p className="text-[0.7rem] font-bold text-primary-700 tabular">
+                        ₩{(m.material_price + m.labor_price).toLocaleString()}
+                        <span className="font-medium text-primary-900/50">
+                          /{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
+                        </span>
+                      </p>
+                      <p className="text-[0.55rem] text-primary-900/50 tabular">
+                        자재 ₩{m.material_price.toLocaleString()} + 인건 ₩{m.labor_price.toLocaleString()}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
@@ -810,7 +818,7 @@ function MaterialLibraryModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-2xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-2xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -860,9 +868,17 @@ function MaterialLibraryModal({
                   {m.brand && (
                     <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
                   )}
-                  <p className="mt-1 text-[0.7rem] font-bold text-primary-700 tabular">
-                    ₩{m.price_per_unit.toLocaleString()}/{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
-                  </p>
+                  <div className="mt-1 space-y-0.5">
+                    <p className="text-[0.7rem] font-bold text-primary-700 tabular">
+                      ₩{(m.material_price + m.labor_price).toLocaleString()}
+                      <span className="font-medium text-primary-900/50">
+                        /{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
+                      </span>
+                    </p>
+                    <p className="text-[0.55rem] text-primary-900/50 tabular">
+                      자재 ₩{m.material_price.toLocaleString()} + 인건 ₩{m.labor_price.toLocaleString()}
+                    </p>
+                  </div>
                 </button>
               );
             })}
@@ -905,10 +921,27 @@ function EstimateModal({
   onClose: () => void;
 }) {
   const [estimate, setEstimate] = useState<{
-    items: { region_id: string; label_ko: string; material_name: string; brand?: string; unit: string; qty: number; unit_price: number; subtotal: number }[];
+    items: {
+      region_id: string;
+      label_ko: string;
+      material_name: string;
+      brand?: string;
+      unit: string;
+      qty: number;
+      material_price: number;
+      labor_price: number;
+      unit_total: number;
+      material_subtotal: number;
+      labor_subtotal: number;
+      subtotal: number;
+    }[];
     material_subtotal: number;
+    labor_subtotal: number;
+    direct_total: number;
     expenses: number;
+    indirect: number;
     total: number;
+    vat_separate: number;
   } | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -940,7 +973,7 @@ function EstimateModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-xl max-h-[85vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-6 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
       >
         <div className="flex items-center justify-between">
           <h3 className="text-base font-extrabold tracking-tight text-primary-900">
@@ -978,40 +1011,75 @@ function EstimateModal({
           <>
             <ul className="mt-4 divide-y divide-primary-100 border-y border-primary-100">
               {estimate.items.map((it) => (
-                <li key={it.region_id} className="py-2.5 flex items-start justify-between gap-2 text-sm">
-                  <div className="min-w-0">
-                    <p className="font-bold text-primary-900 truncate">
+                <li key={it.region_id} className="py-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="font-bold text-primary-900 truncate flex-1">
                       {it.label_ko} <span className="text-primary-900/40 font-normal">·</span>{" "}
                       <span className="font-semibold">{it.material_name}</span>
                       {it.brand && <span className="text-primary-900/40 ml-1">({it.brand})</span>}
                     </p>
-                    <p className="text-[0.7rem] text-primary-900/60 tabular">
-                      {it.qty.toLocaleString()} {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : "EA"} ×
-                      ₩{it.unit_price.toLocaleString()}
+                    <p className="font-extrabold text-primary-900 tabular shrink-0">
+                      ₩{it.subtotal.toLocaleString()}
                     </p>
                   </div>
-                  <p className="font-bold text-primary-900 tabular shrink-0">
-                    ₩{it.subtotal.toLocaleString()}
-                  </p>
+                  <div className="mt-1 grid grid-cols-2 gap-x-3 gap-y-0.5 text-[0.7rem] text-primary-900/60 tabular">
+                    <span>
+                      수량 · {it.qty.toLocaleString()}{" "}
+                      {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : "EA"}
+                    </span>
+                    <span>단가 · ₩{it.unit_total.toLocaleString()}</span>
+                    <span>
+                      자재 ₩{it.material_price.toLocaleString()} = ₩{it.material_subtotal.toLocaleString()}
+                    </span>
+                    <span>
+                      인건 ₩{it.labor_price.toLocaleString()} = ₩{it.labor_subtotal.toLocaleString()}
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>
-            <div className="mt-4 space-y-1.5 text-sm">
+            <div className="mt-4 space-y-1 text-sm">
               <div className="flex justify-between">
-                <span className="text-primary-900/70">재료비 소계</span>
-                <span className="font-bold tabular">₩{estimate.material_subtotal.toLocaleString()}</span>
+                <span className="text-primary-900/70">자재비 소계</span>
+                <span className="font-semibold tabular">
+                  ₩{estimate.material_subtotal.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">노무비(인건비) 소계</span>
+                <span className="font-semibold tabular">
+                  ₩{estimate.labor_subtotal.toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-primary-900/80 border-t border-primary-100 pt-1">
+                <span>직접비 합 (자재 + 노무)</span>
+                <span className="font-bold tabular">
+                  ₩{estimate.direct_total.toLocaleString()}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-primary-900/70">
-                  경비 ({(expensesRatio * 100).toFixed(1)}%)
+                  경비 ({(expensesRatio * 100).toFixed(0)}% — 운반/폐기/잡재료)
                 </span>
-                <span className="font-bold tabular">₩{estimate.expenses.toLocaleString()}</span>
+                <span className="font-semibold tabular">₩{estimate.expenses.toLocaleString()}</span>
               </div>
-              <div className="flex justify-between border-t border-primary-200 pt-2 text-base">
-                <span className="font-extrabold text-primary-900">합계</span>
+              <div className="flex justify-between">
+                <span className="text-primary-900/70">간접비 (12% — 관리·이윤)</span>
+                <span className="font-semibold tabular">₩{estimate.indirect.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between border-t-2 border-primary-300 pt-2 text-base">
+                <span className="font-extrabold text-primary-900">합계 (부가세 별도)</span>
                 <span className="font-extrabold text-primary-900 tabular">
                   ₩{estimate.total.toLocaleString()}
                 </span>
+              </div>
+              <div className="flex justify-between text-[0.7rem] text-primary-900/50 tabular">
+                <span>부가세 (10%, 참고)</span>
+                <span>₩{estimate.vat_separate.toLocaleString()}</span>
+              </div>
+              <div className="mt-3 rounded-lg bg-primary-50 px-3 py-2 text-[0.65rem] text-primary-900/70 leading-relaxed">
+                💡 단가는 한국물가협회 + 표준품셈 기준 평균. 현장 답사 후 ±10% 조정될 수 있습니다.
+                인픽 수수료는 계약 시점 별도 청구.
               </div>
             </div>
           </>

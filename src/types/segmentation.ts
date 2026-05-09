@@ -95,7 +95,7 @@ export interface SegmentationData {
   created_at: string;
 }
 
-/** 자재 라이브러리 entry */
+/** 자재 라이브러리 entry — KPA(한국물가협회) 기준 시공 단가 */
 export interface CatalogMaterial {
   sku: string;
   name: string;
@@ -103,16 +103,28 @@ export interface CatalogMaterial {
   category: InteriorCategory;
   /** 단위 — 면적 자재면 sqm, 개수 자재면 each */
   unit: "sqm" | "m" | "each";
-  price_per_unit: number; // KRW
+  /**
+   * 자재비 단가 (KRW). 한국물가협회(KPA) / 대한건설협회 기준 평균.
+   * 부자재(접착제/실리콘/플랜지 등)는 별도 5% 추가.
+   */
+  material_price: number;
+  /**
+   * 노무비(인건비) 단가 (KRW). 표준품셈 기준.
+   * 도배공/도장공/타일공/바닥공 등 직종별 노무비 + 보조원 + 잡일.
+   */
+  labor_price: number;
   description: string;     // gpt-image-2 prompt에 들어갈 영문 묘사
   color?: string;
   texture?: string;
   finish?: string;
   thumbnail_url?: string;
   color_hex?: string;
+
+  /** @deprecated material_price + labor_price로 대체 — 호환 위해 유지 */
+  price_per_unit?: number;
 }
 
-/** 견적 1줄 */
+/** 견적 1줄 — KPA 기준 자재/인건/소계 분리 */
 export interface EstimateLine {
   region_id: string;
   category: InteriorCategory;
@@ -121,7 +133,13 @@ export interface EstimateLine {
   material_sku: string;
   brand?: string;
   unit: "sqm" | "m" | "each";
-  qty: number;       // 면적 또는 개수
-  unit_price: number;
-  subtotal: number;
+  qty: number;            // 면적 또는 개수
+  material_price: number; // 자재비 단가
+  labor_price: number;    // 노무비(인건비) 단가
+  unit_total: number;     // material + labor (₩/단위)
+  material_subtotal: number; // qty × material_price
+  labor_subtotal: number;    // qty × labor_price
+  subtotal: number;          // material_subtotal + labor_subtotal
+  // 호환
+  unit_price?: number;
 }
