@@ -426,6 +426,11 @@ export default function Step2Designer({
           // 도면 기반 정보 강화
           aspectRatio: dim.widthMm / dim.depthMm,
           isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
+          // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
+          propertyId: basicInfo.floorplanPropertyId,
+          floorplanImageUrl: basicInfo.normalizedImageUrl
+            || basicInfo.cleanedImageUrl
+            || basicInfo.selectedPyeong?.grandPlanUrl,
           previousReference,
         }),
       }).finally(() => clearTimeout(timeoutId));

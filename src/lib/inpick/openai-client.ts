@@ -43,6 +43,12 @@ export interface RenderRoomInput {
   aspectRatio?: number;
   isFromFloorplan?: boolean;
   previousReference?: string;
+  /**
+   * 평면도 이미지 URL (Supabase Storage 또는 외부 URL).
+   * 제공되면 gpt-image-2 EDITS API로 호출 → 평면도 형태 100% 보존하며 인테리어 마감 적용.
+   * 미제공 시 generations API fallback (text-only).
+   */
+  floorplanImageUrl?: string;
 }
 
 export interface RenderRoomResult {
@@ -212,58 +218,73 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const apiKey = getKey();
 
   // ────────────────────────────────────────────────────────
-  // 사용자 정책: gpt-image-2 단일 모델만 사용. 폴백 X.
-  // 실패 시 즉시 throw → 토큰 차감 차단 + 사용자에게 명확한 hint
-  // gpt-image-2: 40~80초, $0.19/image, 한국어 instruction-follow 우수
+  // 가이드(InPick_Floorplan_Pipeline_Refactor.md §3) 정책:
+  //   - gpt-image-2 EDITS API 만 사용 (평면도 입력으로 형태 100% 보존)
+  //   - text-only generations API fallback 절대 금지
+  //   - 평면도 이미지 없으면 즉시 throw "Floorplan not found. Crawl first."
   // ────────────────────────────────────────────────────────
+  if (!input.floorplanImageUrl) {
+    throw new Error(
+      "Floorplan not found. Crawl first. " +
+        "(평면도 이미지가 없으면 generateRoomRender 호출 불가 — Step1에서 주소+평형 선택 → normalize-floorplan 호출 후 propertyId 확보 후 호출)",
+    );
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 280_000);
+
   try {
-    const body: Record<string, unknown> = {
-      model: "gpt-image-2",
-      prompt,
-      size,
-      n: 1,
-      quality: "high",
-      output_format: "png",
-    };
-    const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+    // ─── EDITS API 경로 (평면도 input — 가이드 강제) ───
+    const fpRes = await fetch(input.floorplanImageUrl, {
+      signal: controller.signal,
+    });
+    if (!fpRes.ok) {
+      throw new Error(
+        `평면도 이미지 다운로드 실패: ${fpRes.status} (${input.floorplanImageUrl.slice(0, 80)})`,
+      );
+    }
+    const fpBuf = Buffer.from(await fpRes.arrayBuffer());
+
+    // edits API 프롬프트 — 가이드 §3-2 buildRoomRenderPrompt 패턴
+    const editPrompt =
+      `Use the attached 2D Korean apartment floor plan as the strict structural reference. ` +
+      `Transform it into a photorealistic 3D interior view of the **${input.roomName}** room only. ` +
+      `STRICTLY PRESERVE: room shape, walls, window positions, door positions, proportions exactly as shown in the floor plan. ` +
+      `Camera: eye-level interior view from inside the ${input.roomName}, looking towards the most prominent feature wall. ` +
+      `\n\n` +
+      prompt;
+
+    const form = new FormData();
+    form.append("model", "gpt-image-2");
+    form.append(
+      "image",
+      new Blob([new Uint8Array(fpBuf)], { type: "image/png" }),
+      "floorplan.png",
+    );
+    form.append("prompt", editPrompt);
+    form.append("size", size);
+    form.append("quality", "high");
+
+    const res = await fetch(`${OPENAI_BASE}/images/edits`, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
       signal: controller.signal,
     });
     if (!res.ok) {
       const errText = await res.text();
-      // 4xx는 입력/권한, 5xx는 OpenAI 측 → 그대로 throw하여 라우트가 hint 매핑
-      throw new Error(
-        `gpt-image-2 ${res.status}: ${errText.slice(0, 400)}`,
-      );
+      throw new Error(`gpt-image-2 edits ${res.status}: ${errText.slice(0, 400)}`);
     }
     const data = await res.json();
     const b64 = data.data?.[0]?.b64_json;
-    const url = data.data?.[0]?.url;
-    if (b64) {
-      return {
-        imageUrl: `data:image/png;base64,${b64}`,
-        imageBase64: b64,
-        revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
-        model: "gpt-image-2",
-        costUsd: 0.19,
-      };
-    }
-    if (url) {
-      return {
-        imageUrl: url,
-        revisedPrompt: data.data?.[0]?.revised_prompt || prompt,
-        model: "gpt-image-2",
-        costUsd: 0.19,
-      };
-    }
-    throw new Error("gpt-image-2: 응답에 이미지 데이터 없음");
+    if (!b64) throw new Error("gpt-image-2 edits: 응답에 이미지 데이터 없음");
+    return {
+      imageUrl: `data:image/png;base64,${b64}`,
+      imageBase64: b64,
+      revisedPrompt: editPrompt,
+      model: "gpt-image-2",
+      costUsd: 0.19,
+    };
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
       throw new Error("gpt-image-2 요청 시간 초과 (280초). OpenAI 응답 지연.");

@@ -1,24 +1,32 @@
 /**
  * POST /api/inpick/render-room
  *
- * 실제 OpenAI DALL-E 3 호출. mock 사용 안 함 — 실패 시 명확한 에러 반환.
+ * gpt-image-2 EDITS API 호출 (가이드 §3 정책).
+ * 평면도 이미지를 input으로 보내 도면 형태 100% 보존.
  *
- * 입력: { roomName, widthMm, depthMm, heightMm, style, materialHints?, expansion?, feeling?, size? }
+ * 입력: RenderRoomInput + propertyId? (있으면 Storage에서 normalized.png 자동 로드)
+ *      또는 floorplanImageUrl 직접 제공
  * 출력 (성공): { imageUrl, revisedPrompt, model, costUsd }
- * 출력 (실패): { error: string, hint?: string } 4xx/5xx
+ * 출력 (실패): { error: string, hint?: string }
  */
 import { NextRequest, NextResponse } from "next/server";
 import { generateRoomRender, type RenderRoomInput } from "@/lib/inpick/openai-client";
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
+import { getFloorplanUrl, hasFloorplan } from "@/lib/inpick/floorplan-storage";
 
 export const runtime = "nodejs";
 // gpt-image-2는 40~80초 소요 — Vercel Pro maxDuration 800초 한도 내에서 300초로 설정
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
+interface RenderBody extends RenderRoomInput {
+  /** 가이드 §3 — propertyId로 Storage에서 normalized.png 자동 로드 */
+  propertyId?: string;
+}
+
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as RenderRoomInput;
+    const body = (await req.json()) as RenderBody;
     if (!body.roomName || !body.widthMm || !body.depthMm) {
       return NextResponse.json(
         { error: "roomName, widthMm, depthMm 필수" },
@@ -35,10 +43,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 가이드 §3 정책: 평면도 이미지 강제. propertyId 또는 floorplanImageUrl 둘 중 하나 필수.
+    let floorplanImageUrl = body.floorplanImageUrl;
+    if (!floorplanImageUrl && body.propertyId) {
+      // Storage에서 normalized 또는 original URL 조회
+      if (await hasFloorplan(body.propertyId, "normalized")) {
+        floorplanImageUrl = getFloorplanUrl(body.propertyId, "normalized") || undefined;
+      } else if (await hasFloorplan(body.propertyId, "original")) {
+        floorplanImageUrl = getFloorplanUrl(body.propertyId, "original") || undefined;
+      }
+    }
+    if (!floorplanImageUrl) {
+      return NextResponse.json(
+        {
+          error: "Floorplan not found. Crawl first.",
+          hint: "Step1에서 주소+평형 선택 → /api/inpick/normalize-floorplan 호출 → propertyId 확보 후 다시 시도",
+        },
+        { status: 400 },
+      );
+    }
+
     const result = await generateRoomRender({
       ...body,
       heightMm: body.heightMm || 2400,
       style: body.style || "modern minimal",
+      floorplanImageUrl,
     });
     return NextResponse.json(result);
   } catch (e) {

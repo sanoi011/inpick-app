@@ -26,6 +26,13 @@ import {
   buildDimensionOverlaySvg,
   type FloorRoomLayout,
 } from "@/lib/inpick/floorplan-svg";
+import {
+  getPropertyId,
+  saveFloorplan,
+  saveMetadata,
+  getFloorplanUrl,
+  hasFloorplan,
+} from "@/lib/inpick/floorplan-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -39,9 +46,13 @@ interface Body {
   exclusiveAreaM2?: number;
   isHandDrawn?: boolean;
   unitName?: string;
-  skipImageClean?: boolean;  // 비용 절감 — 워터마크 제거 안 함, dimension overlay만
-  /** 확장형 — true면 발코니 확장된 평면으로 수정 (거실/방과 통합) */
+  skipImageClean?: boolean;
   expansion?: boolean;
+  /** 가이드 §1-2 — propertyId 시스템: address+aptName+areaSqm 해시로 영구 저장 */
+  address?: string;
+  aptName?: string;
+  /** 호출자가 propertyId 직접 제공 시 그대로 사용 (재현성) */
+  propertyId?: string;
 }
 
 interface VisionRoom {
@@ -164,6 +175,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
     }
 
+    // ─── propertyId 결정 (가이드 §1-2) ───
+    const exclusiveAreaM2 = body.exclusiveAreaM2 ?? 0;
+    const propertyId = body.propertyId
+      || getPropertyId(body.address || "unknown", body.aptName || body.unitName || "unknown", exclusiveAreaM2);
+
+    // ─── 캐시 확인 — 동일 propertyId의 normalized.png 있으면 재크롤링/처리 X ───
+    if (await hasFloorplan(propertyId, "normalized")) {
+      console.log(`[FLOORPLAN] cache HIT property=${propertyId}`);
+      const normalizedUrl = getFloorplanUrl(propertyId, "normalized");
+      const originalUrl = getFloorplanUrl(propertyId, "original");
+      // metadata에 정형화 결과 저장돼 있으면 그대로 응답
+      const { loadMetadata } = await import("@/lib/inpick/floorplan-storage");
+      const meta = await loadMetadata(propertyId);
+      if (meta) {
+        return NextResponse.json({
+          property_id: propertyId,
+          cached: true,
+          normalizedImageUrl: normalizedUrl,
+          originalImageUrl: originalUrl,
+          cleanedImageUrl: normalizedUrl,
+          rooms: meta.rooms || [],
+          totalWidthMm: meta.total_width_mm || 0,
+          totalDepthMm: meta.total_depth_mm || 0,
+          pyeong: meta.pyeong || classifyPyeong(exclusiveAreaM2 || 84.9),
+          openings: [],
+          notes: "cache hit",
+        });
+      }
+    }
+
     // 1) Vision으로 layout 추출 (병렬로 시작)
     const visionPromise = analyzeImageVision({
       imageUrl: body.imageUrl,
@@ -173,24 +214,27 @@ export async function POST(req: NextRequest) {
       responseFormat: "json_object",
     });
 
-    // 2) 원본 이미지 buffer 준비 (raster cleaning용)
+    // 2) 원본 이미지 buffer 준비 (raster cleaning + 영구 저장용)
     let imageBuf: Buffer | null = null;
-    if (!body.skipImageClean) {
-      if (body.imageUrl) {
-        const r = await fetch(body.imageUrl);
-        if (r.ok) imageBuf = Buffer.from(await r.arrayBuffer());
-      } else if (body.imageBase64) {
-        imageBuf = Buffer.from(body.imageBase64, "base64");
+    if (body.imageUrl) {
+      const r = await fetch(body.imageUrl);
+      if (r.ok) imageBuf = Buffer.from(await r.arrayBuffer());
+    } else if (body.imageBase64) {
+      imageBuf = Buffer.from(body.imageBase64, "base64");
+    }
+    // 원본은 항상 저장 (skipImageClean과 무관)
+    if (imageBuf) {
+      try {
+        await saveFloorplan(propertyId, "original", { buffer: imageBuf, contentType: "image/png" });
+      } catch (e) {
+        console.warn("[FLOORPLAN] save original failed:", e);
       }
     }
-
     // 3) Vision 결과 + 옵셔널 cleaning 병렬
-    const [visionRes, cleaned] = await Promise.allSettled([
-      visionPromise,
-      imageBuf
-        ? cleanFloorplanRaster(imageBuf, apiKey, { expansion: body.expansion })
-        : Promise.resolve(null),
-    ]);
+    const cleanPromise = imageBuf && !body.skipImageClean
+      ? cleanFloorplanRaster(imageBuf, apiKey, { expansion: body.expansion })
+      : Promise.resolve(null);
+    const [visionRes, cleaned] = await Promise.allSettled([visionPromise, cleanPromise]);
 
     if (visionRes.status === "rejected") {
       return NextResponse.json(
@@ -296,15 +340,52 @@ export async function POST(req: NextRequest) {
       showOuterDimensions: true,
     });
 
-    // cleaned image (옵셔널)
+    // cleaned image (옵셔널) — 가이드 §1-2 'normalized.png' 영구 저장
     let cleanedImageUrl: string | undefined;
     let cleanCostUsd = 0;
+    let normalizedImageUrl: string | undefined;
     if (cleaned.status === "fulfilled" && cleaned.value) {
-      cleanedImageUrl = `data:image/png;base64,${cleaned.value.b64}`;
+      const normBuf = Buffer.from(cleaned.value.b64, "base64");
+      try {
+        await saveFloorplan(propertyId, "normalized", { buffer: normBuf, contentType: "image/png" });
+        normalizedImageUrl = getFloorplanUrl(propertyId, "normalized") || undefined;
+      } catch (e) {
+        console.warn("[FLOORPLAN] save normalized failed:", e);
+      }
+      // 호환 — 클라가 dataURL 받던 케이스 유지 (storage URL이 우선)
+      cleanedImageUrl = normalizedImageUrl || `data:image/png;base64,${cleaned.value.b64}`;
       cleanCostUsd = cleaned.value.costUsd;
+    } else if (imageBuf && body.skipImageClean) {
+      // cleaning 스킵 시 원본을 normalized로 복사 (edits API용 stable URL 확보)
+      try {
+        await saveFloorplan(propertyId, "normalized", { buffer: imageBuf, contentType: "image/png" });
+        normalizedImageUrl = getFloorplanUrl(propertyId, "normalized") || undefined;
+      } catch (e) {
+        console.warn("[FLOORPLAN] save normalized (from original) failed:", e);
+      }
+      cleanedImageUrl = normalizedImageUrl;
+    }
+
+    // metadata 저장
+    try {
+      await saveMetadata(propertyId, {
+        property_id: propertyId,
+        address: body.address || "unknown",
+        apt_name: body.aptName || body.unitName || "unknown",
+        area_sqm: areaM2,
+        source_url: body.imageUrl || "(base64)",
+        cached_at: new Date().toISOString(),
+        rooms: merged.map((r) => ({ name: r.name, widthMm: r.widthMm, depthMm: r.depthMm })),
+        total_width_mm: totalWidthMm,
+        total_depth_mm: totalDepthMm,
+        pyeong,
+      });
+    } catch (e) {
+      console.warn("[FLOORPLAN] save metadata failed:", e);
     }
 
     return NextResponse.json({
+      property_id: propertyId,
       pyeong,
       detectedAreaM2: parsed.detectedAreaM2,
       providedAreaM2: body.exclusiveAreaM2,
@@ -317,6 +398,8 @@ export async function POST(req: NextRequest) {
         (cleaned.status === "rejected" ? ` · cleaning 스킵 (${String(cleaned.reason).slice(0, 100)})` : ""),
       visionRoomCount: visionRooms.length,
       cleanedImageUrl,
+      normalizedImageUrl,
+      originalImageUrl: getFloorplanUrl(propertyId, "original"),
       cleanCostUsd,
       dimensionOverlaySvg,
       totalWidthMm,

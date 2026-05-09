@@ -47,6 +47,8 @@ export interface BasicInfoData {
   expansionType: "basic" | "extended" | null;
   // 정형화 평면도 (워터마크 제거된 raster + 치수 SVG 오버레이)
   cleanedImageUrl?: string;
+  normalizedImageUrl?: string;       // 가이드 §1 — Storage에 저장된 normalized.png URL
+  floorplanPropertyId?: string;      // 가이드 §3 — render-room 호출 시 사용
   dimensionOverlaySvg?: string;
   totalWidthMm?: number;
   totalDepthMm?: number;
@@ -347,14 +349,20 @@ function AddressMode({ value, onChange }: Props) {
         console.warn("[floorplan-cache] failed (계속 네이버 URL 사용):", e);
       }
 
-      // STEP 2: 평면도 정형화 (Vision 치수 추출 + 선택적 cleaning)
+      // STEP 2: 평면도 정형화 (Vision 치수 추출 + 영구 저장 — 가이드 §1)
+      const aptName = value.selectedAddress?.buildingName || "";
+      const address = value.selectedAddress?.roadAddress
+        || value.selectedAddress?.jibunAddress
+        || aptName;
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageUrl: stableUrl,
           exclusiveAreaM2: p.exclusiveArea,
-          unitName: value.selectedAddress?.buildingName,
+          unitName: aptName,
+          address,
+          aptName,
           skipImageClean: false,
           expansion: value.expansionType === "extended",
         }),
@@ -364,7 +372,10 @@ function AddressMode({ value, onChange }: Props) {
         onChange({
           ...value,
           selectedPyeong: p,
+          // 가이드 §3 — propertyId를 step1에 보관 → Step2에서 render-room 호출 시 사용
+          floorplanPropertyId: data.property_id,
           cleanedImageUrl: data.cleanedImageUrl,
+          normalizedImageUrl: data.normalizedImageUrl,
           dimensionOverlaySvg: data.dimensionOverlaySvg,
           totalWidthMm: data.totalWidthMm,
           totalDepthMm: data.totalDepthMm,
