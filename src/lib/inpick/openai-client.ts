@@ -32,14 +32,17 @@ export interface RenderRoomInput {
   size?: "1024x1024" | "1024x1792" | "1792x1024";
   // 평면도 신뢰성 — 창문·문·구조 context
   windows?: number;
-  windowSide?: string;
+  windowSide?: string;       // legacy
+  windowWalls?: string[];    // 도면 openings에서 추출한 창문 wall 텍스트
   doors?: number;
+  doorWalls?: string[];      // 도면 openings에서 추출한 문 wall 텍스트
+  adjacentRooms?: string[];  // 인접 방 (sharedDoor 기반)
   isInteriorRoom?: boolean;
   furnishingOptions?: string[];
   // 도면 기반 정확도 강화 — 같은 방 재생성 시 형태 일관성
-  aspectRatio?: number;       // widthMm/depthMm — 정사각형(1.0) vs 긴 직사각형(2.0+)
-  isFromFloorplan?: boolean;  // true면 도면에서 추출한 치수임을 prompt에 명시
-  previousReference?: string; // 직전 generation의 revisedPrompt — 형태 유지 reference
+  aspectRatio?: number;
+  isFromFloorplan?: boolean;
+  previousReference?: string;
 }
 
 export interface RenderRoomResult {
@@ -50,6 +53,62 @@ export interface RenderRoomResult {
   costUsd: number;
 }
 
+/**
+ * 방별 특수 prompt — gpt-image-2가 한국식 공간 정확히 인식하게 영문 동치 + 핵심 특성.
+ *
+ * 진단: 베란다/드레스룸/현관이 일반 generic prompt에서는 잘못 인식됨.
+ *  - 베란다 → "balcony"가 더 정확 (한국식: 외부 노출 + 한쪽 면 통창 + 세탁기 자리)
+ *  - 드레스룸 → "walk-in closet" (좁고 양벽 옷장 빼곡)
+ *  - 현관 → "Korean apartment entryway" (좁고 신발장 + 중문)
+ */
+function getRoomSpecificDescription(roomName: string, expansion?: boolean): string {
+  const map: Record<string, string> = {
+    거실: "Living room (거실): main social space, largest room in apartment, " +
+          "TV wall + wide wall + balcony-side full-window wall. " +
+          "Modern Korean apartment living room, open feel.",
+    안방: "Master bedroom (안방): largest bedroom, dedicated dressing closet wall " +
+          "(built-in only), one full window on outer wall.",
+    침실: "Bedroom (침실): standard size, one outer-wall window, " +
+          "simple finish for furniture move-in.",
+    부엌: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
+          "upper + lower cabinets, range hood, refrigerator alcove. " +
+          "Modern Korean apartment kitchen.",
+    주방: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
+          "upper + lower cabinets, range hood, refrigerator alcove.",
+    욕실: "Bathroom (욕실): compact wet space, full tile walls + floor, " +
+          "vanity/toilet/shower built-in. Korean apartment bathroom.",
+    현관: "Korean apartment entryway / foyer (현관): " +
+          "narrow rectangular space, raised floor at door level (signature 신발 벗는 곳), " +
+          "shoe cabinet built-in (신발장) along one wall (full height to ceiling), " +
+          "white interior door at end leading to interior, " +
+          "no windows, ceiling LED downlight only.",
+    베란다: (expansion
+      ? "Korean apartment veranda (베란다) — EXPANDED layout (확장형): " +
+        "balcony merged with adjacent room (no dividing wall), " +
+        "treated as living room extension, full ceiling-to-floor windows on outer wall, " +
+        "continuous flooring with main room."
+      : "Korean apartment veranda / balcony (베란다): " +
+        "narrow elongated outdoor-facing space along outer wall, " +
+        "FULL HEIGHT GLASS sliding window covering entire outer wall (시스템창호), " +
+        "tile floor (small square 300x300), drainage at corner, " +
+        "washing machine / dryer corner allowed (built-in), " +
+        "no ceiling light or simple LED, narrow strip ~1.5m deep."),
+    드레스룸: "Walk-in closet / dressing room (드레스룸): " +
+             "narrow rectangular space, " +
+             "BOTH long walls covered with FULL-HEIGHT built-in wardrobes (양벽 옷장 빼곡), " +
+             "system closet doors (sliding or hinged), " +
+             "central walking aisle ~1.0m, dressing mirror on end wall optional, " +
+             "no exterior window, ceiling track lighting or LED downlight, " +
+             "vinyl or laminate floor matching master bedroom.",
+    발코니: "Korean apartment veranda / balcony (베란다 / 발코니): " +
+           "narrow outdoor-facing strip with full-height windows, tile floor.",
+    다용도실: "Utility room (다용도실): small back-of-house space, " +
+             "tile floor, washing machine + storage shelves, no window or one small window.",
+    팬트리: "Pantry (팬트리): kitchen storage closet, full-height shelving on both walls, no window.",
+  };
+  return map[roomName] || "";
+}
+
 export async function generateRoomRender(input: RenderRoomInput): Promise<RenderRoomResult> {
   const sizes = {
     width: (input.widthMm / 1000).toFixed(2),
@@ -57,17 +116,33 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     height: (input.heightMm / 1000).toFixed(2),
   };
   const matStr = input.materialHints?.length
-    ? `자재: ${input.materialHints.join(", ")}.`
+    ? `Materials: ${input.materialHints.join(", ")}.`
     : "";
-  const expStr = input.expansion ? "평면 확장 시공된 모습." : "";
-  const feelStr = input.feeling ? `분위기: ${input.feeling}.` : "";
+  const expStr = input.expansion ? "Expanded layout (확장형) — balcony merged. " : "";
+  const feelStr = input.feeling ? `Mood: ${input.feeling}.` : "";
 
   // 창문·구조 명시 (도면 신뢰성)
   let structStr = "";
   if (input.isInteriorRoom || input.windows === 0) {
-    structStr = "창문 없는 내부 공간 (외벽 없음, 자연광 들어오지 않음, 인공 조명만). ";
+    structStr = "Interior windowless room (no exterior wall, no daylight, LED only). ";
   } else if (input.windows && input.windows > 0) {
-    structStr = `창문 ${input.windows}개 (${input.windowSide || "외벽측"}). `;
+    const wallInfo = input.windowWalls && input.windowWalls.length > 0
+      ? input.windowWalls.join(", ")
+      : input.windowSide || "outer wall";
+    structStr = `${input.windows} window(s) located on: ${wallInfo}. `;
+  }
+  // 문 위치
+  if (input.doors && input.doors > 0 && input.doorWalls && input.doorWalls.length > 0) {
+    structStr += `Door(s) on: ${input.doorWalls.join(", ")}. `;
+  }
+  // 인접 방 (도면 기반 spatial context)
+  if (input.adjacentRooms && input.adjacentRooms.length > 0) {
+    structStr += `Adjacent rooms (사용자 도면 기반): ${input.adjacentRooms.join(", ")}. `;
+  }
+  // 방별 특수 묘사 (한국식 공간 정확 인식)
+  const roomSpec = getRoomSpecificDescription(input.roomName, input.expansion);
+  if (roomSpec) {
+    structStr += `\n${roomSpec}\n`;
   }
 
   // 사용자 선택 시공 옵션 (가구 금지 정책의 예외 — 붙박이·중문·싱크대 등은 마감재로 취급)

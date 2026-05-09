@@ -242,19 +242,53 @@ export default function Step2Designer({
   // 평면도 정보 → 방별 창문/구조
   const inferStructure = (roomLabel: string) => {
     const interiorRooms = ["욕실", "드레스룸", "팬트리", "현관", "다용도실", "보일러실"];
-    const exteriorRooms = ["거실", "안방", "침실", "주방", "발코니", "다이닝"];
+    const exteriorRooms = ["거실", "안방", "침실", "주방", "발코니", "베란다", "다이닝"];
     const isInterior = interiorRooms.some((k) => roomLabel.includes(k));
     const isExterior = exteriorRooms.some((k) => roomLabel.includes(k));
+
+    // 창문 + 문 통계 + wall 위치 정보
     let windows = 0;
+    let doors = 0;
+    const windowWalls: string[] = [];
+    const doorWalls: string[] = [];
     if (normalizedFloorplan?.openings) {
       for (const op of normalizedFloorplan.openings) {
-        if ((op.type === "window" || op.type === "sliding") && op.wall?.includes(roomLabel)) {
+        if (!op.wall || !op.wall.includes(roomLabel)) continue;
+        if (op.type === "window" || op.type === "sliding") {
           windows++;
+          if (op.wall) windowWalls.push(op.wall);
+        } else if (op.type === "door") {
+          doors++;
+          if (op.wall) doorWalls.push(op.wall);
         }
       }
     }
     if (windows === 0 && isExterior) windows = 1;
-    return { windows, isInteriorRoom: isInterior };
+
+    // 인접 방 추출 — Vision 좌표 기반 단순 매칭
+    const adjacentRooms: string[] = [];
+    if (normalizedFloorplan?.rooms) {
+      const me = normalizedFloorplan.rooms.find((r) => r.name === roomLabel);
+      if (me) {
+        for (const other of normalizedFloorplan.rooms) {
+          if (other.name === me.name) continue;
+          // openings.wall 텍스트에 두 방 이름이 같이 있으면 인접
+          const sharedDoor = (normalizedFloorplan.openings || []).some(
+            (op) => op.wall?.includes(me.name) && op.wall?.includes(other.name),
+          );
+          if (sharedDoor) adjacentRooms.push(other.name);
+        }
+      }
+    }
+
+    return {
+      windows,
+      doors,
+      isInteriorRoom: isInterior,
+      windowWalls,
+      doorWalls,
+      adjacentRooms,
+    };
   };
 
   // ── 채팅 모드 핸들러 ──
@@ -383,7 +417,11 @@ export default function Step2Designer({
           expansion: basicInfo.expansionType === "extended",
           size: "1024x1024",
           windows: struct.windows,
+          doors: struct.doors,
           isInteriorRoom: struct.isInteriorRoom,
+          windowWalls: struct.windowWalls,
+          doorWalls: struct.doorWalls,
+          adjacentRooms: struct.adjacentRooms,
           furnishingOptions: roomFurnishings?.[activeRoom] || [],
           // 도면 기반 정보 강화
           aspectRatio: dim.widthMm / dim.depthMm,
@@ -457,7 +495,13 @@ export default function Step2Designer({
               expansion: basicInfo.expansionType === "extended",
               size: "1024x1024",
               windows: struct.windows,
+              doors: struct.doors,
               isInteriorRoom: struct.isInteriorRoom,
+              windowWalls: struct.windowWalls,
+              doorWalls: struct.doorWalls,
+              adjacentRooms: struct.adjacentRooms,
+              aspectRatio: dim.widthMm / dim.depthMm,
+              isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
               furnishingOptions: roomFurnishings?.[tab.v] || [],
             }),
           });
@@ -677,12 +721,26 @@ export default function Step2Designer({
               className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
             />
           </div>
-          <button
-            type="button"
+          <a
+            href="/workflow/estimate"
             onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
+              // sessionStorage에 step1/step2 저장 후 navigation 진행
+              try {
+                sessionStorage.setItem("workflow_step1", JSON.stringify({
+                  basicInfo,
+                  buildingType: rooms.includes("all") ? null : null, // 부모 state는 onComplete가 더 정확
+                  rooms,
+                  roomFurnishings,
+                  normalizedFloorplan,
+                }));
+                sessionStorage.setItem("workflow_step2", JSON.stringify(value));
+              } catch {
+                /* private mode */
+              }
+              // onComplete (workflow page의 goBranch)도 호출 — sessionStorage 갱신 + router.push 백업
               onComplete();
+              // a href 자체로도 navigation 발생 — JS 실패해도 보장
+              if (e.defaultPrevented) return;
             }}
             className={`relative z-10 mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-bold shadow-cta transition-all cursor-pointer ${
               allRoomsDecided
@@ -692,7 +750,7 @@ export default function Step2Designer({
           >
             {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
             <ChevronRight className="h-3 w-3" />
-          </button>
+          </a>
         </div>
       </aside>
 
