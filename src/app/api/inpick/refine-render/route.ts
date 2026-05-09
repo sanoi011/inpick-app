@@ -16,6 +16,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOpenAIKey } from "@/lib/inpick/openai-env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  enforceConsume,
+  refundCredits,
+  CreditError,
+} from "@/lib/inpick/credit-policy";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -62,6 +67,9 @@ interface Body {
 }
 
 export async function POST(req: NextRequest) {
+  // 차감 정보 — 외부 API 실패 시 환불에 사용
+  let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
+
   try {
     const body = (await req.json()) as Body;
     if (!body.originalImageUrl || !body.maskBase64 || !body.prompt) {
@@ -73,6 +81,32 @@ export async function POST(req: NextRequest) {
     const key = getOpenAIKey();
     if (!key) {
       return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
+    }
+
+    // ─── v2 §4-2 토큰 차감 (인증 + 잔액 검증) ──
+    try {
+      charge = await enforceConsume("refine-render", {
+        roomName: body.roomName,
+        materialName: body.materialName,
+        regionCategoryEn: body.regionCategoryEn,
+      });
+    } catch (e) {
+      if (e instanceof CreditError) {
+        return NextResponse.json(
+          {
+            error: e.code,
+            hint:
+              e.code === "UNAUTHENTICATED"
+                ? "로그인이 필요합니다"
+                : e.code === "INSUFFICIENT_CREDITS"
+                  ? "토큰이 부족합니다 — 충전 후 다시 시도해주세요"
+                  : "요청을 처리할 수 없습니다",
+            ...e.details,
+          },
+          { status: e.status },
+        );
+      }
+      throw e;
     }
 
     // 1) 원본 이미지 다운로드 (DALL-E 임시 URL)
@@ -154,12 +188,19 @@ export async function POST(req: NextRequest) {
         hint = "이미지 편집 실패 (요금이 발생하지 않았습니다)";
       }
       console.warn("[refine-render] edit failed:", editRes.status, errText.slice(0, 200));
+      // ─── v2 §4-2 실패 시 자동 환불 ──
+      let refunded = false;
+      if (charge && charge.charged > 0) {
+        const r = await refundCredits(charge.userId, charge.charged, `refine-render-failed:${model_status}`);
+        refunded = r.refunded;
+      }
       return NextResponse.json(
         {
           error: "고화질 재렌더에 실패했습니다",
           hint,
           model_status,
-          tokenConsumed: false,
+          tokenConsumed: !refunded && (charge?.charged ?? 0) > 0,
+          refunded,
         },
         { status: 502 },
       );
@@ -168,26 +209,42 @@ export async function POST(req: NextRequest) {
 
     const b64 = data.data?.[0]?.b64_json;
     if (!b64) {
+      let refunded = false;
+      if (charge && charge.charged > 0) {
+        const r = await refundCredits(charge.userId, charge.charged, "refine-render-empty-response");
+        refunded = r.refunded;
+      }
       return NextResponse.json(
-        { error: "고화질 재렌더 응답이 비어있습니다", tokenConsumed: false },
+        { error: "고화질 재렌더 응답이 비어있습니다", tokenConsumed: !refunded, refunded },
         { status: 502 },
       );
     }
 
     // Cloudflare 502 회피 — 큰 base64 대신 Storage URL로 응답
     const publicUrl = await uploadBase64ToStorage(b64);
+    const successPayload = {
+      costUsd: 0.19,
+      credits_charged: charge?.charged ?? 0,
+      credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
+    };
     if (publicUrl) {
-      return NextResponse.json({ imageUrl: publicUrl, costUsd: 0.19 });
+      return NextResponse.json({ imageUrl: publicUrl, ...successPayload });
     }
     // Storage 실패 시 fallback — base64 직접 반환 (작은 응답 위해 압축)
     return NextResponse.json({
       imageUrl: `data:image/png;base64,${b64}`,
-      costUsd: 0.19,
+      ...successPayload,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     const isTimeout = msg.includes("Abort") || msg.includes("timeout");
     console.warn("[refine-render] error:", msg);
+    // ─── v2 §4-2 실패 시 자동 환불 ──
+    let refunded = false;
+    if (charge && charge.charged > 0) {
+      const r = await refundCredits(charge.userId, charge.charged, `refine-render-error:${isTimeout ? "timeout" : "unknown"}`);
+      refunded = r.refunded;
+    }
     return NextResponse.json(
       {
         error: "고화질 재렌더에 실패했습니다",
@@ -195,7 +252,8 @@ export async function POST(req: NextRequest) {
           ? "응답 지연 — 잠시 후 재시도"
           : "이미지 편집 실패 (요금이 발생하지 않았습니다)",
         model_status: isTimeout ? "timeout" : "unknown",
-        tokenConsumed: false,
+        tokenConsumed: !refunded && (charge?.charged ?? 0) > 0,
+        refunded,
       },
       { status: 500 },
     );
