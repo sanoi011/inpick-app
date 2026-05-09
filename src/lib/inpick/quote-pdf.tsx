@@ -8,7 +8,8 @@
  *   2. 총괄표 (Summary) — 카테고리별 소계 + 가설비/경비/관리비/간접비
  *   3. 내역서 (Detail) — 항목별 수량 × 단가 (자재 + 노무 분리)
  *
- * 폰트: NotoSansKR (Google Fonts CDN)
+ * 폰트: NanumGothic (public/fonts 로컬 번들 — CDN 의존성 0).
+ *       가이드 v2 §6 Phase 3-3 / 4-3-4 PDF 폰트 번들 정책.
  *
  * 호출:
  *   import { generateQuotePdf } from '@/lib/inpick/quote-pdf';
@@ -27,19 +28,21 @@ import {
 } from "@react-pdf/renderer";
 
 // ═══════════════════════════════════════════════════
-// 폰트 등록 — NotoSansKR (Google Fonts CDN)
+// 폰트 등록 — NanumGothic (public/fonts 로컬 번들)
+// 가이드 v2 §6 Phase 3-3 — Google Fonts CDN 다운 시 PDF 생성 실패 위험 제거.
+// public/fonts/NanumGothic-{Regular,Bold}.ttf 가 Vercel 정적 자산으로 서빙됨.
+// 클라이언트 fetch 시 same-origin이므로 절대 URL 변환은 런타임에 origin 부착.
 // ═══════════════════════════════════════════════════
+const FONT_BASE =
+  typeof window !== "undefined" && window.location?.origin
+    ? window.location.origin
+    : "";
+
 Font.register({
-  family: "NotoSansKR",
+  family: "NanumGothic",
   fonts: [
-    {
-      src: "https://fonts.gstatic.com/s/notosanskr/v36/PbyxFmXiEBPT4ITbgNA5Cgm20HTs4JM4tw.ttf",
-      fontWeight: 400,
-    },
-    {
-      src: "https://fonts.gstatic.com/s/notosanskr/v36/PbymFmXiEBPT4ITbgNA5CgmOI_lL98R6PFkbAg.ttf",
-      fontWeight: 700,
-    },
+    { src: `${FONT_BASE}/fonts/NanumGothic-Regular.ttf`, fontWeight: 400 },
+    { src: `${FONT_BASE}/fonts/NanumGothic-Bold.ttf`, fontWeight: 700 },
   ],
 });
 
@@ -106,7 +109,7 @@ export interface QuoteMeta {
 // ═══════════════════════════════════════════════════
 const styles = StyleSheet.create({
   page: {
-    fontFamily: "NotoSansKR",
+    fontFamily: "NanumGothic",
     paddingHorizontal: 30,
     paddingVertical: 25,
     fontSize: 9,
