@@ -54,13 +54,7 @@ export const QUOTE_SECTIONS: QuoteSection[] = [
         expenseCost: 31300,
         formula: "area_sqm * 0.04",
       },
-      {
-        itemName: "엘리베이터 보양",
-        unit: "식",
-        defaultQuantity: 1,
-        laborCost: 0,
-        expenseCost: 350000,
-      },
+      // 엘리베이터 보양은 indirect-rates.ts setupCosts.elevatorProtection에서 처리 (가설공사비, 총괄표 영역)
     ],
   },
 
