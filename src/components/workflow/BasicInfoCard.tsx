@@ -327,13 +327,32 @@ function AddressMode({ value, onChange }: Props) {
     });
     if (!p.grandPlanUrl) return;
     try {
-      // 평면도 raster cleaning 활성화 — 워터마크 제거 + 바닥 패턴 매핑
-      // 깨끗한 도면 → Vision 치수 추출 정확도 ↑ → Step2 이미지 생성 형태 일관성 ↑
+      // STEP 1: 네이버 CDN URL → Supabase Storage 캐시 (재사용 + edits API용 안정 URL 확보)
+      let stableUrl = p.grandPlanUrl;
+      try {
+        const cacheRes = await fetch("/api/inpick/floorplan-cache", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ sourceUrl: p.grandPlanUrl }),
+        });
+        if (cacheRes.ok) {
+          const cacheData = await cacheRes.json();
+          if (cacheData.url) {
+            stableUrl = cacheData.url;
+            // selectedPyeong.grandPlanUrl을 Supabase URL로 교체 (이후 흐름 모두 안정 URL 사용)
+            p = { ...p, grandPlanUrl: stableUrl };
+          }
+        }
+      } catch (e) {
+        console.warn("[floorplan-cache] failed (계속 네이버 URL 사용):", e);
+      }
+
+      // STEP 2: 평면도 정형화 (Vision 치수 추출 + 선택적 cleaning)
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: p.grandPlanUrl,
+          imageUrl: stableUrl,
           exclusiveAreaM2: p.exclusiveArea,
           unitName: value.selectedAddress?.buildingName,
           skipImageClean: false,
