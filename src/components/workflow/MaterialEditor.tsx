@@ -1214,6 +1214,7 @@ function PdfDownloadButton({
   const [meta, setMeta] = useState({
     client_name: "",
     client_phone: "",
+    client_email: "",
     site_address: "",
   });
   const [showMeta, setShowMeta] = useState(false);
@@ -1226,17 +1227,18 @@ function PdfDownloadButton({
       const pyeong = segmentation.real_world_area_sqm
         ? `${Math.round(segmentation.real_world_area_sqm / 3.3)}평`
         : undefined;
+      // spec §A-1: 시공자 칸은 입찰 선정 후 자동 주입 — 견적 단계에선 contractor 미전송 (placeholder 표시)
       await mod.downloadQuotePdf(estimate, {
         quote_no: mod.generateQuoteNo(),
         client_name: meta.client_name || "—",
         client_phone: meta.client_phone || undefined,
+        client_email: meta.client_email || undefined,
         site_address: meta.site_address || "—",
+        site_area_sqm: segmentation.real_world_area_sqm,
         pyeong,
         rooms: undefined,
-        company_name: "InPick (인픽)",
-        company_phone: "1668-0000",
-        company_biz_no: undefined,
         validity_days: 30,
+        // contractor 미설정 → quote-pdf의 placeholder 박스 자동 표시
       });
     } catch (e) {
       alert("PDF 생성 실패: " + (e instanceof Error ? e.message : String(e)));
@@ -1263,6 +1265,13 @@ function PdfDownloadButton({
             placeholder="연락처"
             value={meta.client_phone}
             onChange={(e) => setMeta({ ...meta, client_phone: e.target.value })}
+            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+          />
+          <input
+            type="email"
+            placeholder="이메일 (선택)"
+            value={meta.client_email}
+            onChange={(e) => setMeta({ ...meta, client_email: e.target.value })}
             className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
           />
           <input

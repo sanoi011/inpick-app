@@ -1,19 +1,16 @@
 // @ts-nocheck — @react-pdf/renderer는 npm install 후에만 type 인식. 빌드 시 정상 동작.
 /* eslint-disable jsx-a11y/alt-text */
 /**
- * InPick 견적서 PDF — 한국 인테리어 업계 표준 양식.
+ * InPick 견적서 PDF — spec §A 표준 양식 (12 공종 + 5 간접비 + 시공자 placeholder).
+ *
+ * 가이드: InPick_Quote_System_Spec.md §A-1, A-2, A-3
  *
  * A4 가로 3장:
- *   1. 갑지 (Cover) — 발주자/시공장소/총액/견적일자/유효기간
- *   2. 총괄표 (Summary) — 카테고리별 소계 + 가설비/경비/관리비/간접비
- *   3. 내역서 (Detail) — 항목별 수량 × 단가 (자재 + 노무 분리)
+ *   1. 갑지 (Cover) — 발주자/시공자(placeholder)/공사개요/총액(VAT 포함, 한글)
+ *   2. 총괄표 (Summary) — 12 공종 + 간접비 5종
+ *   3. 내역서 (Detail) — 공종별 Section Header + 7 컬럼 (자재단가/노무단가 제거)
  *
- * 폰트: NanumGothic (public/fonts 로컬 번들 — CDN 의존성 0).
- *       가이드 v2 §6 Phase 3-3 / 4-3-4 PDF 폰트 번들 정책.
- *
- * 호출:
- *   import { generateQuotePdf } from '@/lib/inpick/quote-pdf';
- *   await generateQuotePdf(estimate, { quoteNo, clientName, siteAddress });
+ * 폰트: NanumGothic (public/fonts 로컬 번들)
  */
 "use client";
 
@@ -28,10 +25,7 @@ import {
 } from "@react-pdf/renderer";
 
 // ═══════════════════════════════════════════════════
-// 폰트 등록 — NanumGothic (public/fonts 로컬 번들)
-// 가이드 v2 §6 Phase 3-3 — Google Fonts CDN 다운 시 PDF 생성 실패 위험 제거.
-// public/fonts/NanumGothic-{Regular,Bold}.ttf 가 Vercel 정적 자산으로 서빙됨.
-// 클라이언트 fetch 시 same-origin이므로 절대 URL 변환은 런타임에 origin 부착.
+// 폰트 등록
 // ═══════════════════════════════════════════════════
 const FONT_BASE =
   typeof window !== "undefined" && window.location?.origin
@@ -46,371 +40,308 @@ Font.register({
   ],
 });
 
-// 줄바꿈 hyphenation 한글에서 이상하게 작동 — 비활성
 Font.registerHyphenationCallback((word) => [word]);
 
 // ═══════════════════════════════════════════════════
-// 타입 (segmentation-estimate 응답과 동일)
+// 타입 — segmentation-estimate 응답 + spec 신규 필드
 // ═══════════════════════════════════════════════════
+export interface QuoteItemPdf {
+  itemId: string;
+  name: string;
+  spec?: string;
+  unit: string;
+  quantity: number;
+  materialCost: number;
+  laborCost: number;
+  expenseCost: number;
+  totalCost: number;
+  source: "catalog" | "standard";
+  catalogSku?: string;
+}
+
+export interface QuoteSectionPdf {
+  sectionId: string;
+  sectionNumber: string;
+  sectionName: string;
+  items: QuoteItemPdf[];
+  subtotal: {
+    materialCost: number;
+    laborCost: number;
+    expenseCost: number;
+    total: number;
+  };
+}
+
+export interface IndirectCostsPdf {
+  directCost: number;
+  setupCost: number;
+  safetyCost: number;
+  generalManagementCost: number;
+  profit: number;
+  supplyAmount: number;
+  vat: number;
+  totalAmount: number;
+  setupBreakdown?: {
+    elevatorProtection: number;
+    entranceProtection: number;
+    scaffolding: number;
+    wasteDisposal: number;
+  };
+  appliedRates?: {
+    safety_rate: number;
+    general_management_rate: number;
+    profit_rate: number;
+  };
+}
+
 export interface QuoteEstimate {
-  items: {
-    region_id: string;
-    category: string;
-    label_ko: string;
-    material_name: string;
-    material_sku: string;
-    brand?: string;
-    unit: string;
-    qty: number;
-    material_price: number;
-    labor_price: number;
-    unit_total: number;
-    material_subtotal: number;
-    labor_subtotal: number;
-    subtotal: number;
-  }[];
-  material_subtotal: number;
-  labor_subtotal: number;
-  direct_total: number;
-  setup_items: { id: string; name: string; description?: string; computed_amount: number }[];
-  setup_total: number;
-  expenses: number;
-  expenses_ratio: number;
-  management: number;
-  management_ratio: number;
-  safety: number;
-  safety_ratio: number;
-  indirect: number;
-  indirect_ratio: number;
-  total: number;
-  vat_rate: number;
-  vat_separate: number;
+  // 신규 (spec)
+  sections?: QuoteSectionPdf[];
+  directCostSubtotal?: number;
+  indirectCosts?: IndirectCostsPdf;
+  totalAmount?: number;
+  total_area_sqm?: number;
+  // 호환 (옛 응답)
+  items?: any[];
+  material_subtotal?: number;
+  labor_subtotal?: number;
+  direct_total?: number;
+  setup_items?: { id: string; name: string; description?: string; computed_amount: number }[];
+  setup_total?: number;
+  expenses?: number;
+  expenses_ratio?: number;
+  management?: number;
+  management_ratio?: number;
+  safety?: number;
+  safety_ratio?: number;
+  indirect?: number;
+  indirect_ratio?: number;
+  total?: number;
+  vat_rate?: number;
+  vat_separate?: number;
   generated_at: string;
 }
 
 export interface QuoteMeta {
-  quote_no: string;             // 견적번호 (예: INP-2026-0509-001)
-  client_name: string;          // 발주자
+  quote_no: string;             // spec — IP-YYYY-MMDD-NNN
+  client_name: string;
   client_phone?: string;
-  site_address: string;         // 시공 장소
-  pyeong?: string;              // 평형 (예: "30평")
+  client_email?: string;
+  site_address: string;
+  site_area_sqm?: number;       // 시공면적
+  pyeong?: string;
   expansion?: "basic" | "extended";
-  rooms?: string[];             // 시공 범위 (방 이름들)
-  validity_days?: number;       // 견적 유효기간 (기본 30일)
-  company_name?: string;        // 시공사 (기본: 인픽 InPick)
-  company_address?: string;
-  company_phone?: string;
-  company_biz_no?: string;      // 사업자번호
-  representative?: string;       // 대표자
+  rooms?: string[];
+  validity_days?: number;
+  expected_period_days?: number; // 공사기간
+  // 시공자 정보 (입찰 선정 + 계약 체결 후 주입. 미입력 시 placeholder 표시)
+  contractor?: {
+    company_name?: string;
+    representative?: string;
+    biz_no?: string;
+    address?: string;
+    phone?: string;
+    email?: string;
+  };
 }
 
 // ═══════════════════════════════════════════════════
-// Stylesheet (A4 가로, 한국 인테리어 견적서 표준)
+// Helpers
 // ═══════════════════════════════════════════════════
-const styles = StyleSheet.create({
-  page: {
-    fontFamily: "NanumGothic",
-    paddingHorizontal: 30,
-    paddingVertical: 25,
-    fontSize: 9,
-    color: "#1A1A1A",
-  },
-  // 헤더
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    borderBottom: "2px solid #1A1A1A",
-    paddingBottom: 8,
-    marginBottom: 12,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 700,
-    letterSpacing: 4,
-    color: "#1A1A1A",
-  },
-  subtitle: {
-    fontSize: 11,
-    color: "#666",
-    marginTop: 2,
-  },
-  brandBox: {
-    fontSize: 8,
-    textAlign: "right",
-    color: "#666",
-    lineHeight: 1.4,
-  },
-  brandName: {
-    fontSize: 16,
-    fontWeight: 700,
-    color: "#F73B20",
-    letterSpacing: 1,
-  },
-  // 갑지 큰 박스
-  coverGrid: {
-    marginTop: 15,
-    flexDirection: "row",
-    gap: 10,
-  },
-  coverLeft: {
-    flex: 1,
-    border: "1px solid #999",
-  },
-  coverRight: {
-    flex: 1,
-    border: "1px solid #999",
-  },
-  coverHeader: {
-    backgroundColor: "#F5F0EE",
-    padding: "6 8",
-    fontSize: 10,
-    fontWeight: 700,
-    borderBottom: "1px solid #999",
-  },
-  coverRow: {
-    flexDirection: "row",
-    borderBottom: "1px solid #DDD",
-    minHeight: 28,
-    alignItems: "center",
-  },
-  coverLabel: {
-    width: 90,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 9,
-    color: "#666",
-    fontWeight: 700,
-    borderRight: "1px solid #DDD",
-  },
-  coverValue: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 10,
-  },
-  // 합계 큰 박스 (갑지)
-  totalBigBox: {
-    marginTop: 18,
-    border: "2px solid #1A1A1A",
-    backgroundColor: "#FFF6F5",
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  totalLabel: {
-    fontSize: 12,
-    fontWeight: 700,
-    color: "#666",
-  },
-  totalValue: {
-    fontSize: 28,
-    fontWeight: 700,
-    color: "#F73B20",
-    letterSpacing: 1,
-  },
-  totalSub: {
-    fontSize: 9,
-    color: "#888",
-    marginTop: 2,
-  },
-  // 표 (table)
-  table: {
-    border: "1px solid #999",
-    marginTop: 8,
-  },
-  tableHeader: {
-    flexDirection: "row",
-    backgroundColor: "#1A1A1A",
-    color: "#FFFFFF",
-    fontWeight: 700,
-    fontSize: 8.5,
-    minHeight: 24,
-    alignItems: "center",
-  },
-  tableRow: {
-    flexDirection: "row",
-    borderBottom: "0.5px solid #DDD",
-    minHeight: 22,
-    alignItems: "center",
-    fontSize: 8.5,
-  },
-  tableRowAlt: {
-    backgroundColor: "#FAFAFA",
-  },
-  td: {
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  tdHeader: {
-    paddingHorizontal: 6,
-    paddingVertical: 5,
-    color: "#FFFFFF",
-  },
-  // 카테고리별 소계 행
-  catRow: {
-    flexDirection: "row",
-    backgroundColor: "#F5F0EE",
-    fontWeight: 700,
-    minHeight: 24,
-    alignItems: "center",
-    borderBottom: "1px solid #999",
-  },
-  // 합계 영역 (총괄표 하단)
-  summaryTable: {
-    marginTop: 12,
-    border: "1px solid #999",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    minHeight: 26,
-    borderBottom: "0.5px solid #DDD",
-    alignItems: "center",
-  },
-  summaryLabelCell: {
-    flex: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    fontSize: 9,
-  },
-  summaryValueCell: {
-    flex: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    textAlign: "right",
-    fontSize: 9,
-  },
-  summaryTotalRow: {
-    flexDirection: "row",
-    minHeight: 36,
-    borderTop: "2px solid #1A1A1A",
-    backgroundColor: "#FFF6F5",
-    alignItems: "center",
-  },
-  summaryTotalLabel: {
-    flex: 3,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    fontSize: 12,
-    fontWeight: 700,
-  },
-  summaryTotalValue: {
-    flex: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 10,
-    textAlign: "right",
-    fontSize: 14,
-    fontWeight: 700,
-    color: "#F73B20",
-  },
-  // 푸터
-  footer: {
-    position: "absolute",
-    bottom: 15,
-    left: 30,
-    right: 30,
-    paddingTop: 6,
-    borderTop: "1px solid #DDD",
-    fontSize: 7,
-    color: "#999",
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  pageNo: {
-    fontSize: 7,
-    color: "#999",
-  },
-  noteBox: {
-    marginTop: 10,
-    padding: 8,
-    backgroundColor: "#FAFAFA",
-    border: "0.5px solid #DDD",
-    fontSize: 7.5,
-    color: "#666",
-    lineHeight: 1.5,
-  },
-});
-
-// ═══════════════════════════════════════════════════
-// Helper — 통화 포맷
-// ═══════════════════════════════════════════════════
-const won = (n: number) => `₩${n.toLocaleString()}`;
+const won = (n: number) => `₩${Math.round(n).toLocaleString()}`;
 const ymd = (iso: string) => {
   const d = new Date(iso);
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, "0")}.${String(d.getDate()).padStart(2, "0")}`;
 };
 
-// 카테고리 라벨
-const CAT_LABEL: Record<string, string> = {
-  floor: "바닥",
-  wall: "벽",
-  ceiling: "천장",
-  window: "창호",
-  door: "문/도어",
-  curtain: "커튼/블라인드",
-  unknown: "기타",
-};
-
-// 카테고리별 그룹핑
-function groupByCategory(items: QuoteEstimate["items"]) {
-  const map = new Map<string, { items: typeof items; subtotal: number; material: number; labor: number }>();
-  for (const it of items) {
-    const key = it.category;
-    if (!map.has(key)) map.set(key, { items: [], subtotal: 0, material: 0, labor: 0 });
-    const g = map.get(key)!;
-    g.items.push(it);
-    g.subtotal += it.subtotal;
-    g.material += it.material_subtotal;
-    g.labor += it.labor_subtotal;
+/** 한글 금액 표기 (예: 12345678 → "일천이백삼십사만오천육백칠십팔원") */
+function numToKorean(n: number): string {
+  n = Math.round(n);
+  if (n === 0) return "영원정";
+  const digits = ["", "일", "이", "삼", "사", "오", "육", "칠", "팔", "구"];
+  const small = ["", "십", "백", "천"];
+  const big = ["", "만", "억", "조", "경"];
+  let str = "";
+  let unit = 0;
+  while (n > 0) {
+    const part = n % 10000;
+    if (part > 0) {
+      let pStr = "";
+      let p = part;
+      let s = 0;
+      while (p > 0) {
+        const d = p % 10;
+        if (d > 0) pStr = digits[d] + small[s] + pStr;
+        p = Math.floor(p / 10);
+        s++;
+      }
+      str = pStr + big[unit] + str;
+    }
+    n = Math.floor(n / 10000);
+    unit++;
   }
-  return map;
+  return str + "원정";
+}
+
+/** sections이 없는 옛 응답을 sections 형태로 자동 변환 (호환) */
+function ensureSections(estimate: QuoteEstimate): QuoteSectionPdf[] {
+  if (estimate.sections && estimate.sections.length > 0) return estimate.sections;
+  // fallback: items[] → 단일 'unmapped' 섹션
+  if (!estimate.items || estimate.items.length === 0) return [];
+  const items: QuoteItemPdf[] = estimate.items.map((it: any) => ({
+    itemId: it.region_id || it.id || "x",
+    name: it.material_name || it.name || "—",
+    unit: it.unit || "EA",
+    quantity: it.qty ?? it.quantity ?? 1,
+    materialCost: it.material_subtotal || 0,
+    laborCost: it.labor_subtotal || 0,
+    expenseCost: 0,
+    totalCost: it.subtotal || 0,
+    source: "catalog",
+    catalogSku: it.material_sku,
+  }));
+  const sub = items.reduce(
+    (a, it) => ({
+      materialCost: a.materialCost + it.materialCost,
+      laborCost: a.laborCost + it.laborCost,
+      expenseCost: a.expenseCost + it.expenseCost,
+      total: a.total + it.totalCost,
+    }),
+    { materialCost: 0, laborCost: 0, expenseCost: 0, total: 0 },
+  );
+  return [
+    {
+      sectionId: "unmapped",
+      sectionNumber: "00",
+      sectionName: "전체 항목",
+      items,
+      subtotal: sub,
+    },
+  ];
+}
+
+/** indirectCosts가 없는 옛 응답을 추정 (호환) */
+function ensureIndirect(estimate: QuoteEstimate): IndirectCostsPdf {
+  if (estimate.indirectCosts) return estimate.indirectCosts;
+  // fallback — 평면 필드로부터 재구성
+  const directCost = estimate.direct_total || 0;
+  const setupCost = estimate.setup_total || 0;
+  const safetyCost = estimate.safety || 0;
+  const generalManagementCost = estimate.management || 0;
+  const profit = estimate.indirect || 0;
+  const supplyAmount = estimate.total || directCost + setupCost + safetyCost + generalManagementCost + profit;
+  const vat = estimate.vat_separate || Math.round(supplyAmount * 0.10);
+  const totalAmount = supplyAmount + vat;
+  return { directCost, setupCost, safetyCost, generalManagementCost, profit, supplyAmount, vat, totalAmount };
 }
 
 // ═══════════════════════════════════════════════════
-// Footer (모든 페이지 공통)
+// Stylesheet
 // ═══════════════════════════════════════════════════
-const FooterRow: React.FC<{ meta: QuoteMeta; page: string }> = ({ meta, page }) => (
+const styles = StyleSheet.create({
+  page: { fontFamily: "NanumGothic", paddingHorizontal: 30, paddingVertical: 25, fontSize: 9, color: "#1A1A1A" },
+  header: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", borderBottom: "2px solid #1A1A1A", paddingBottom: 8, marginBottom: 12 },
+  title: { fontSize: 22, fontWeight: 700, letterSpacing: 4, color: "#1A1A1A" },
+  subtitle: { fontSize: 11, color: "#666", marginTop: 2 },
+  brandBox: { fontSize: 8, textAlign: "right", color: "#666", lineHeight: 1.4 },
+  brandName: { fontSize: 16, fontWeight: 700, color: "#F73B20", letterSpacing: 1 },
+
+  coverGrid: { marginTop: 12, flexDirection: "row", gap: 10 },
+  coverLeft: { flex: 1, border: "1px solid #999" },
+  coverRight: { flex: 1, border: "1px solid #999" },
+  // spec — 시공자 placeholder 박스 (점선 + 사선 배경 톤)
+  contractorPlaceholderBox: { flex: 1, border: "1px dashed #B79575", backgroundColor: "#FBF7F2", position: "relative" },
+  contractorBadge: { position: "absolute", top: -1, right: -1, backgroundColor: "#F73B20", color: "#FFFFFF", fontSize: 7.5, padding: "3 7", fontWeight: 700, letterSpacing: 0.5 },
+  coverHeader: { backgroundColor: "#F5F0EE", padding: "6 8", fontSize: 10, fontWeight: 700, borderBottom: "1px solid #999" },
+  coverHeaderPlaceholder: { backgroundColor: "#F5EBDD", padding: "6 8", fontSize: 10, fontWeight: 700, borderBottom: "1px dashed #B79575", color: "#8C6A4A" },
+  coverRow: { flexDirection: "row", borderBottom: "1px solid #DDD", minHeight: 26, alignItems: "center" },
+  coverRowDashed: { flexDirection: "row", borderBottom: "1px dashed #D9C9B3", minHeight: 26, alignItems: "center" },
+  coverLabel: { width: 95, backgroundColor: "#FAFAFA", paddingHorizontal: 8, paddingVertical: 6, fontSize: 9, color: "#666", fontWeight: 700, borderRight: "1px solid #DDD" },
+  coverLabelPlaceholder: { width: 95, backgroundColor: "#F5EBDD", paddingHorizontal: 8, paddingVertical: 6, fontSize: 9, color: "#8C6A4A", fontWeight: 700, borderRight: "1px dashed #D9C9B3" },
+  coverValue: { flex: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 10 },
+  coverValuePlaceholder: { flex: 1, paddingHorizontal: 8, paddingVertical: 6, fontSize: 9, color: "#B79575", fontStyle: "italic" },
+
+  totalBigBox: { marginTop: 14, border: "2px solid #1A1A1A", backgroundColor: "#FFF6F5", padding: 14, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  totalLabel: { fontSize: 11, fontWeight: 700, color: "#666" },
+  totalValue: { fontSize: 26, fontWeight: 700, color: "#F73B20", letterSpacing: 1 },
+  totalSub: { fontSize: 9, color: "#888", marginTop: 2 },
+  totalKorean: { fontSize: 10, color: "#1A1A1A", marginTop: 4, fontWeight: 700 },
+
+  table: { border: "1px solid #999", marginTop: 8 },
+  tableHeader: { flexDirection: "row", backgroundColor: "#1A1A1A", color: "#FFFFFF", fontWeight: 700, fontSize: 8.5, minHeight: 24, alignItems: "center" },
+  tableRow: { flexDirection: "row", borderBottom: "0.5px solid #DDD", minHeight: 22, alignItems: "center", fontSize: 8.5 },
+  tableRowAlt: { backgroundColor: "#FAFAFA" },
+  td: { paddingHorizontal: 6, paddingVertical: 4 },
+  tdHeader: { paddingHorizontal: 6, paddingVertical: 5, color: "#FFFFFF" },
+
+  // spec — 공종 Section Header (검정)
+  sectionHeader: { flexDirection: "row", backgroundColor: "#2A2A2A", color: "#FFFFFF", fontWeight: 700, minHeight: 26, alignItems: "center", borderBottom: "1px solid #1A1A1A" },
+  sectionHeaderTd: { paddingHorizontal: 8, paddingVertical: 6, color: "#FFFFFF", fontSize: 9.5 },
+
+  // 총괄표 — 간접비 행
+  summaryTable: { marginTop: 12, border: "1px solid #999" },
+  summaryRow: { flexDirection: "row", minHeight: 26, borderBottom: "0.5px solid #DDD", alignItems: "center" },
+  summaryLabelCell: { flex: 3, paddingHorizontal: 8, paddingVertical: 6, fontSize: 9 },
+  summaryValueCell: { flex: 1, paddingHorizontal: 8, paddingVertical: 6, textAlign: "right", fontSize: 9 },
+  summaryTotalRow: { flexDirection: "row", minHeight: 36, borderTop: "2px solid #1A1A1A", backgroundColor: "#FFF6F5", alignItems: "center" },
+  summaryTotalLabel: { flex: 3, paddingHorizontal: 10, paddingVertical: 10, fontSize: 12, fontWeight: 700 },
+  summaryTotalValue: { flex: 1, paddingHorizontal: 10, paddingVertical: 10, textAlign: "right", fontSize: 14, fontWeight: 700, color: "#F73B20" },
+
+  footer: { position: "absolute", bottom: 15, left: 30, right: 30, paddingTop: 6, borderTop: "1px solid #DDD", fontSize: 7, color: "#999", flexDirection: "row", justifyContent: "space-between" },
+  pageNo: { fontSize: 7, color: "#999" },
+  noteBox: { marginTop: 10, padding: 8, backgroundColor: "#FAFAFA", border: "0.5px solid #DDD", fontSize: 7.5, color: "#666", lineHeight: 1.5 },
+  contractorNotice: { marginTop: 6, fontSize: 7.5, color: "#8C6A4A", textAlign: "center", fontStyle: "italic" },
+});
+
+// ═══════════════════════════════════════════════════
+// Footer 공통
+// ═══════════════════════════════════════════════════
+const FooterRow = ({ meta, page }: { meta: QuoteMeta; page: string }) => (
   <View style={styles.footer}>
     <Text>
-      {meta.company_name || "InPick (인픽)"} · {meta.company_phone || "-"} ·
-      {meta.company_biz_no ? ` 사업자 ${meta.company_biz_no} ·` : ""}
-      견적번호 {meta.quote_no}
+      {meta.contractor?.company_name || "InPick (인픽)"}
+      {meta.contractor?.phone ? ` · ${meta.contractor.phone}` : ""}
+      {meta.contractor?.biz_no ? ` · 사업자 ${meta.contractor.biz_no}` : ""}
+      {` · 견적번호 ${meta.quote_no}`}
     </Text>
     <Text style={styles.pageNo}>{page}</Text>
   </View>
 );
 
 // ═══════════════════════════════════════════════════
-// 1. 갑지 (Cover Sheet)
+// 1. 갑지 (Cover Sheet) — spec §A-1
 // ═══════════════════════════════════════════════════
-const CoverSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ estimate, meta }) => {
+const CoverSheet = ({ estimate, meta }: { estimate: QuoteEstimate; meta: QuoteMeta }) => {
   const validityDays = meta.validity_days || 30;
   const validUntil = new Date(estimate.generated_at);
   validUntil.setDate(validUntil.getDate() + validityDays);
 
+  const indirect = ensureIndirect(estimate);
+  const totalIncludingVat = indirect.totalAmount; // VAT 포함 (spec — "총 견적금액 (VAT 포함)")
+  const hasContractor = meta.contractor && (
+    meta.contractor.company_name || meta.contractor.representative || meta.contractor.biz_no
+  );
+
   return (
     <Page size="A4" orientation="landscape" style={styles.page}>
-      {/* 헤더 */}
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>견 적 서</Text>
-          <Text style={styles.subtitle}>QUOTATION</Text>
+          <Text style={styles.subtitle}>QUOTATION · 견적번호 {meta.quote_no}</Text>
         </View>
         <View style={styles.brandBox}>
           <Text style={styles.brandName}>InPick</Text>
           <Text>AI 인테리어 견적 플랫폼</Text>
-          <Text>{meta.company_address || "대전광역시"}</Text>
-          <Text>Tel. {meta.company_phone || "-"}</Text>
-          {meta.company_biz_no && <Text>사업자등록번호 {meta.company_biz_no}</Text>}
+          <Text>발급일 {ymd(estimate.generated_at)}</Text>
+          <Text>유효기간 {ymd(validUntil.toISOString())} ({validityDays}일)</Text>
         </View>
       </View>
 
-      {/* 발주자 / 시공자 정보 박스 */}
+      {/* 발주자 / 시공자 박스 */}
       <View style={styles.coverGrid}>
+        {/* 발주자 (좌) */}
         <View style={styles.coverLeft}>
-          <Text style={styles.coverHeader}>발 주 자</Text>
+          <Text style={styles.coverHeader}>발 주 자 (수신처)</Text>
           <View style={styles.coverRow}>
             <Text style={styles.coverLabel}>성명</Text>
             <Text style={styles.coverValue}>{meta.client_name || "—"}</Text>
@@ -420,84 +351,116 @@ const CoverSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ es
             <Text style={styles.coverValue}>{meta.client_phone || "—"}</Text>
           </View>
           <View style={styles.coverRow}>
+            <Text style={styles.coverLabel}>이메일</Text>
+            <Text style={styles.coverValue}>{meta.client_email || "—"}</Text>
+          </View>
+          <View style={styles.coverRow}>
             <Text style={styles.coverLabel}>시공장소</Text>
             <Text style={styles.coverValue}>{meta.site_address || "—"}</Text>
           </View>
-          <View style={styles.coverRow}>
-            <Text style={styles.coverLabel}>평형 / 시공형태</Text>
+          <View style={[styles.coverRow, { borderBottom: "none" }]}>
+            <Text style={styles.coverLabel}>시공면적</Text>
             <Text style={styles.coverValue}>
               {meta.pyeong || "—"}
-              {meta.expansion === "extended" ? " (확장형)" : meta.expansion === "basic" ? " (기본형)" : ""}
-            </Text>
-          </View>
-          <View style={[styles.coverRow, { borderBottom: "none" }]}>
-            <Text style={styles.coverLabel}>시공범위</Text>
-            <Text style={styles.coverValue}>
-              {meta.rooms && meta.rooms.length > 0 ? meta.rooms.join(", ") : "전체"}
+              {meta.site_area_sqm ? ` (${meta.site_area_sqm.toFixed(1)}㎡)` : ""}
+              {meta.expansion === "extended" ? " · 확장형" : meta.expansion === "basic" ? " · 기본형" : ""}
             </Text>
           </View>
         </View>
 
-        <View style={styles.coverRight}>
-          <Text style={styles.coverHeader}>시 공 자 (당사)</Text>
-          <View style={styles.coverRow}>
-            <Text style={styles.coverLabel}>상호</Text>
-            <Text style={styles.coverValue}>{meta.company_name || "InPick (인픽)"}</Text>
+        {/* 시공자 (우) — 채워졌으면 normal, 비었으면 placeholder */}
+        {hasContractor ? (
+          <View style={styles.coverRight}>
+            <Text style={styles.coverHeader}>시 공 자</Text>
+            <View style={styles.coverRow}>
+              <Text style={styles.coverLabel}>상호</Text>
+              <Text style={styles.coverValue}>{meta.contractor!.company_name || "—"}</Text>
+            </View>
+            <View style={styles.coverRow}>
+              <Text style={styles.coverLabel}>대표자</Text>
+              <Text style={styles.coverValue}>{meta.contractor!.representative || "—"}</Text>
+            </View>
+            <View style={styles.coverRow}>
+              <Text style={styles.coverLabel}>사업자번호</Text>
+              <Text style={styles.coverValue}>{meta.contractor!.biz_no || "—"}</Text>
+            </View>
+            <View style={styles.coverRow}>
+              <Text style={styles.coverLabel}>사업장 주소</Text>
+              <Text style={styles.coverValue}>{meta.contractor!.address || "—"}</Text>
+            </View>
+            <View style={[styles.coverRow, { borderBottom: "none" }]}>
+              <Text style={styles.coverLabel}>연락처·이메일</Text>
+              <Text style={styles.coverValue}>
+                {meta.contractor!.phone || "—"}
+                {meta.contractor!.email ? ` · ${meta.contractor!.email}` : ""}
+              </Text>
+            </View>
           </View>
-          <View style={styles.coverRow}>
-            <Text style={styles.coverLabel}>대표자</Text>
-            <Text style={styles.coverValue}>{meta.representative || "—"}</Text>
+        ) : (
+          <View style={styles.contractorPlaceholderBox}>
+            <Text style={styles.contractorBadge}>계약 후 자동 입력</Text>
+            <Text style={styles.coverHeaderPlaceholder}>시 공 자 (입찰 선정 시 채워짐)</Text>
+            <View style={styles.coverRowDashed}>
+              <Text style={styles.coverLabelPlaceholder}>상호</Text>
+              <Text style={styles.coverValuePlaceholder}>입찰 선정 시 자동 입력</Text>
+            </View>
+            <View style={styles.coverRowDashed}>
+              <Text style={styles.coverLabelPlaceholder}>대표자</Text>
+              <Text style={styles.coverValuePlaceholder}>—</Text>
+            </View>
+            <View style={styles.coverRowDashed}>
+              <Text style={styles.coverLabelPlaceholder}>사업자번호</Text>
+              <Text style={styles.coverValuePlaceholder}>—</Text>
+            </View>
+            <View style={styles.coverRowDashed}>
+              <Text style={styles.coverLabelPlaceholder}>사업장 주소</Text>
+              <Text style={styles.coverValuePlaceholder}>—</Text>
+            </View>
+            <View style={[styles.coverRowDashed, { borderBottom: "none" }]}>
+              <Text style={styles.coverLabelPlaceholder}>연락처·이메일</Text>
+              <Text style={styles.coverValuePlaceholder}>—</Text>
+            </View>
+            <Text style={styles.contractorNotice}>InPick 표준계약서 시행 동의 업체만 노출</Text>
           </View>
-          <View style={styles.coverRow}>
-            <Text style={styles.coverLabel}>사업자번호</Text>
-            <Text style={styles.coverValue}>{meta.company_biz_no || "—"}</Text>
-          </View>
-          <View style={styles.coverRow}>
-            <Text style={styles.coverLabel}>주소</Text>
-            <Text style={styles.coverValue}>{meta.company_address || "—"}</Text>
-          </View>
-          <View style={[styles.coverRow, { borderBottom: "none" }]}>
-            <Text style={styles.coverLabel}>연락처</Text>
-            <Text style={styles.coverValue}>{meta.company_phone || "—"}</Text>
-          </View>
-        </View>
+        )}
       </View>
 
-      {/* 합계 큰 박스 */}
+      {/* 총 금액 박스 — VAT 포함 + 한글 금액 */}
       <View style={styles.totalBigBox}>
         <View>
-          <Text style={styles.totalLabel}>총 견적 금액 (부가세 별도)</Text>
+          <Text style={styles.totalLabel}>총 견적 금액 (VAT 포함)</Text>
           <Text style={styles.totalSub}>
-            견적일 {ymd(estimate.generated_at)} · 유효기간 {ymd(validUntil.toISOString())} ({validityDays}일)
+            공급가액 {won(indirect.supplyAmount)} + 부가세 {won(indirect.vat)}
+            {meta.expected_period_days ? ` · 공사기간 약 ${meta.expected_period_days}일` : ""}
           </Text>
+          <Text style={styles.totalKorean}>金 {numToKorean(totalIncludingVat)}</Text>
         </View>
         <View style={{ alignItems: "flex-end" }}>
-          <Text style={styles.totalValue}>{won(estimate.total)}</Text>
-          <Text style={styles.totalSub}>VAT 별도 {won(estimate.vat_separate)}</Text>
+          <Text style={styles.totalValue}>{won(totalIncludingVat)}</Text>
+          <Text style={styles.totalSub}>
+            견적일 {ymd(estimate.generated_at)}
+          </Text>
         </View>
       </View>
 
-      {/* 견적 요약 (간단 break-down) */}
-      <View style={[styles.coverGrid, { marginTop: 14 }]}>
+      {/* 공사 개요 + 견적 조건 */}
+      <View style={[styles.coverGrid, { marginTop: 12 }]}>
         <View style={[styles.coverLeft, { padding: 10 }]}>
           <Text style={[styles.coverHeader, { backgroundColor: "transparent", borderBottom: "1px solid #DDD", paddingHorizontal: 0, marginBottom: 6 }]}>
-            견적 구성 (요약)
+            공사 개요
           </Text>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-            <Text>· 자재비</Text><Text>{won(estimate.material_subtotal)}</Text>
+            <Text>· 공사명</Text><Text>{meta.client_name || "—"}님 인테리어</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-            <Text>· 노무비</Text><Text>{won(estimate.labor_subtotal)}</Text>
+            <Text>· 위치</Text><Text>{meta.site_address || "—"}</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-            <Text>· 가설비</Text><Text>{won(estimate.setup_total)}</Text>
-          </View>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-            <Text>· 경비 / 관리비 / 안전비</Text>
-            <Text>{won(estimate.expenses + estimate.management + estimate.safety)}</Text>
+            <Text>· 시공범위</Text>
+            <Text>{meta.rooms && meta.rooms.length > 0 ? meta.rooms.join(", ") : "전체"}</Text>
           </View>
           <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-            <Text>· 간접비 (이윤)</Text><Text>{won(estimate.indirect)}</Text>
+            <Text>· 공사기간</Text><Text>약 {meta.expected_period_days || 35}일</Text>
           </View>
         </View>
 
@@ -506,12 +469,12 @@ const CoverSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ es
             견적 조건
           </Text>
           <Text style={{ fontSize: 8.5, lineHeight: 1.7, color: "#444" }}>
-            · 단가: 한국물가협회(KPA) + 대한건설협회 표준품셈 기준{"\n"}
-            · 시공기간: 약 30~45일 (평형/시공범위에 따라 변동){"\n"}
-            · 결제: 착수금 30% / 기성 30% / 기성 30% / 준공 10%{"\n"}
+            · 단가: 한국물가협회(KPA) + KICT 2026 표준품셈{"\n"}
+            · 결제: 착공 10% / 중도 1차 30% / 중도 2차 30% / 잔금 30%{"\n"}
+            · 산업안전보건관리비: 고용노동부 고시 2025-11호 적용{"\n"}
             · 견적 유효기간 {validityDays}일 (자재 단가 변동 가능){"\n"}
-            · 부가세 10% 별도{"\n"}
-            · 인픽 수수료는 계약 시점 별도
+            · 부가세 10% 포함{"\n"}
+            · 입찰 사업자별 요율 조정 가능 (산안비 하향 제외)
           </Text>
         </View>
       </View>
@@ -522,13 +485,15 @@ const CoverSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ es
 };
 
 // ═══════════════════════════════════════════════════
-// 2. 총괄표 (Summary)
+// 2. 총괄표 (Summary) — spec §A-2
 // ═══════════════════════════════════════════════════
-const SummarySheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ estimate, meta }) => {
-  const groups = groupByCategory(estimate.items);
+const SummarySheet = ({ estimate, meta }: { estimate: QuoteEstimate; meta: QuoteMeta }) => {
+  const sections = ensureSections(estimate);
+  const indirect = ensureIndirect(estimate);
+  const directCost = estimate.directCostSubtotal ?? indirect.directCost;
+
   return (
     <Page size="A4" orientation="landscape" style={styles.page}>
-      {/* 헤더 */}
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { fontSize: 18 }]}>공 사 비 총 괄 표</Text>
@@ -540,85 +505,85 @@ const SummarySheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ 
         </View>
       </View>
 
-      {/* 카테고리별 소계 표 */}
+      {/* 12 공종 표 */}
       <View style={styles.table}>
         <View style={styles.tableHeader}>
-          <Text style={[styles.tdHeader, { width: 40, textAlign: "center" }]}>NO.</Text>
-          <Text style={[styles.tdHeader, { flex: 2 }]}>구 분</Text>
+          <Text style={[styles.tdHeader, { width: 35, textAlign: "center" }]}>NO.</Text>
+          <Text style={[styles.tdHeader, { flex: 2 }]}>공 종</Text>
           <Text style={[styles.tdHeader, { flex: 1.2, textAlign: "right" }]}>자재비</Text>
           <Text style={[styles.tdHeader, { flex: 1.2, textAlign: "right" }]}>노무비</Text>
           <Text style={[styles.tdHeader, { flex: 1.5, textAlign: "right" }]}>소계</Text>
           <Text style={[styles.tdHeader, { flex: 0.8, textAlign: "right" }]}>비율</Text>
         </View>
-        {Array.from(groups.entries()).map(([cat, g], i) => {
-          const ratio = estimate.direct_total > 0 ? (g.subtotal / estimate.direct_total) * 100 : 0;
+        {sections.map((sec, i) => {
+          const ratio = directCost > 0 ? (sec.subtotal.total / directCost) * 100 : 0;
           return (
-            <View key={cat} style={[styles.tableRow, i % 2 ? styles.tableRowAlt : {}]}>
-              <Text style={[styles.td, { width: 40, textAlign: "center" }]}>{i + 1}</Text>
-              <Text style={[styles.td, { flex: 2, fontWeight: 700 }]}>{CAT_LABEL[cat] || cat}</Text>
-              <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>{won(g.material)}</Text>
-              <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>{won(g.labor)}</Text>
-              <Text style={[styles.td, { flex: 1.5, textAlign: "right", fontWeight: 700 }]}>{won(g.subtotal)}</Text>
+            <View key={sec.sectionId} style={[styles.tableRow, i % 2 ? styles.tableRowAlt : {}]}>
+              <Text style={[styles.td, { width: 35, textAlign: "center" }]}>{sec.sectionNumber}</Text>
+              <Text style={[styles.td, { flex: 2, fontWeight: 700 }]}>{sec.sectionName}</Text>
+              <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>{won(sec.subtotal.materialCost)}</Text>
+              <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>
+                {won(sec.subtotal.laborCost + sec.subtotal.expenseCost)}
+              </Text>
+              <Text style={[styles.td, { flex: 1.5, textAlign: "right", fontWeight: 700 }]}>{won(sec.subtotal.total)}</Text>
               <Text style={[styles.td, { flex: 0.8, textAlign: "right", color: "#888" }]}>{ratio.toFixed(1)}%</Text>
             </View>
           );
         })}
-        {/* 직접비 합 */}
+        {/* 직접공사비 합계 */}
         <View style={[styles.tableRow, { backgroundColor: "#F5F0EE", fontWeight: 700, borderTop: "1.5px solid #999" }]}>
-          <Text style={[styles.td, { width: 40 }]}></Text>
-          <Text style={[styles.td, { flex: 2, fontWeight: 700 }]}>직 접 비 합 계</Text>
-          <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>{won(estimate.material_subtotal)}</Text>
-          <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}>{won(estimate.labor_subtotal)}</Text>
-          <Text style={[styles.td, { flex: 1.5, textAlign: "right", fontWeight: 700 }]}>{won(estimate.direct_total)}</Text>
+          <Text style={[styles.td, { width: 35 }]}></Text>
+          <Text style={[styles.td, { flex: 2, fontWeight: 700 }]}>직 접 공 사 비 합 계</Text>
+          <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}></Text>
+          <Text style={[styles.td, { flex: 1.2, textAlign: "right" }]}></Text>
+          <Text style={[styles.td, { flex: 1.5, textAlign: "right", fontWeight: 700, fontSize: 10 }]}>{won(directCost)}</Text>
           <Text style={[styles.td, { flex: 0.8, textAlign: "right" }]}>100%</Text>
         </View>
       </View>
 
-      {/* 가설비 + 경비 + 관리비 + 간접비 + 합계 */}
+      {/* 간접비 5종 + 총액 */}
       <View style={styles.summaryTable}>
-        {/* 가설비 항목별 */}
-        {estimate.setup_items.map((s) => (
-          <View key={s.id} style={styles.summaryRow}>
-            <Text style={styles.summaryLabelCell}>· 가설비 — {s.name}</Text>
-            <Text style={styles.summaryValueCell}>{won(s.computed_amount)}</Text>
-          </View>
-        ))}
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabelCell}>· 가설공사비 (엘리베이터/출입구/가설자재/폐기물 보양)</Text>
+          <Text style={styles.summaryValueCell}>{won(indirect.setupCost)}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabelCell}>
+            · 산업안전보건관리비 ({((indirect.appliedRates?.safety_rate ?? 0.0311) * 100).toFixed(2)}% — 고용노동부 고시 2025-11호)
+          </Text>
+          <Text style={styles.summaryValueCell}>{won(indirect.safetyCost)}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabelCell}>
+            · 일반관리비 ({((indirect.appliedRates?.general_management_rate ?? 0.05) * 100).toFixed(1)}% — KPI 원가계산 기준)
+          </Text>
+          <Text style={styles.summaryValueCell}>{won(indirect.generalManagementCost)}</Text>
+        </View>
+        <View style={styles.summaryRow}>
+          <Text style={styles.summaryLabelCell}>
+            · 기업이윤 ({((indirect.appliedRates?.profit_rate ?? 0.10) * 100).toFixed(1)}% — KPI 한도 25%)
+          </Text>
+          <Text style={styles.summaryValueCell}>{won(indirect.profit)}</Text>
+        </View>
+        {/* 공급가액 */}
         <View style={[styles.summaryRow, { backgroundColor: "#FAFAFA" }]}>
-          <Text style={[styles.summaryLabelCell, { fontWeight: 700 }]}>가설비 소계</Text>
-          <Text style={[styles.summaryValueCell, { fontWeight: 700 }]}>{won(estimate.setup_total)}</Text>
-        </View>
-
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabelCell}>경비 ({(estimate.expenses_ratio * 100).toFixed(0)}% — 운반·잡재료)</Text>
-          <Text style={styles.summaryValueCell}>{won(estimate.expenses)}</Text>
+          <Text style={[styles.summaryLabelCell, { fontWeight: 700 }]}>공 급 가 액 (소계)</Text>
+          <Text style={[styles.summaryValueCell, { fontWeight: 700 }]}>{won(indirect.supplyAmount)}</Text>
         </View>
         <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabelCell}>현장관리비 ({(estimate.management_ratio * 100).toFixed(1)}%)</Text>
-          <Text style={styles.summaryValueCell}>{won(estimate.management)}</Text>
+          <Text style={styles.summaryLabelCell}>· 부가가치세 (10% — 부가가치세법)</Text>
+          <Text style={styles.summaryValueCell}>{won(indirect.vat)}</Text>
         </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabelCell}>안전관리비 ({(estimate.safety_ratio * 100).toFixed(1)}%)</Text>
-          <Text style={styles.summaryValueCell}>{won(estimate.safety)}</Text>
-        </View>
-        <View style={styles.summaryRow}>
-          <Text style={styles.summaryLabelCell}>간접비 (이윤 {(estimate.indirect_ratio * 100).toFixed(0)}%)</Text>
-          <Text style={styles.summaryValueCell}>{won(estimate.indirect)}</Text>
-        </View>
-
-        {/* 합계 */}
+        {/* 총 견적금액 */}
         <View style={styles.summaryTotalRow}>
-          <Text style={styles.summaryTotalLabel}>합 계 (부가세 별도)</Text>
-          <Text style={styles.summaryTotalValue}>{won(estimate.total)}</Text>
-        </View>
-        <View style={[styles.summaryRow, { borderBottom: "none" }]}>
-          <Text style={[styles.summaryLabelCell, { color: "#666", fontSize: 8 }]}>참고: 부가세 ({(estimate.vat_rate * 100).toFixed(0)}%)</Text>
-          <Text style={[styles.summaryValueCell, { color: "#666", fontSize: 8 }]}>{won(estimate.vat_separate)}</Text>
+          <Text style={styles.summaryTotalLabel}>총 견 적 금 액 (VAT 포함)</Text>
+          <Text style={styles.summaryTotalValue}>{won(indirect.totalAmount)}</Text>
         </View>
       </View>
 
       <View style={styles.noteBox}>
-        본 견적은 한국물가협회(KPA) 자재 단가 + 대한건설협회 표준품셈 기준 평균값으로 산정되었습니다.
-        실제 시공 시 자재 변동 / 현장 여건에 따라 ±10% 조정될 수 있으며, 인픽 수수료는 계약 체결 시 별도 청구됩니다.
+        2026 KICT 표준품셈 + 한국물가정보(KPI) 원가계산 제비율 + 고용노동부 고시 2025-11호 기준.
+        사업자 입찰 시 가설공사비/일반관리비/이윤은 한도 내 조정 가능. 산업안전보건관리비는 법정 최저값(3.11%) 이상으로만 조정.
       </View>
 
       <FooterRow meta={meta} page="총괄표 2/3" />
@@ -627,17 +592,20 @@ const SummarySheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ 
 };
 
 // ═══════════════════════════════════════════════════
-// 3. 내역서 (Detail)
+// 3. 내역서 (Detail) — spec §A-3
+// 컬럼: 품명/규격 → 단위 → 수량 → 자재비 → 노무비 → 경비 → 합계
 // ═══════════════════════════════════════════════════
-const DetailSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ estimate, meta }) => {
-  const groups = groupByCategory(estimate.items);
+const DetailSheet = ({ estimate, meta }: { estimate: QuoteEstimate; meta: QuoteMeta }) => {
+  const sections = ensureSections(estimate);
+  const indirect = ensureIndirect(estimate);
+  const directCost = estimate.directCostSubtotal ?? indirect.directCost;
 
   return (
     <Page size="A4" orientation="landscape" style={styles.page}>
       <View style={styles.header}>
         <View>
           <Text style={[styles.title, { fontSize: 18 }]}>공 사 내 역 서</Text>
-          <Text style={styles.subtitle}>견적번호 {meta.quote_no} · 항목별 상세 내역</Text>
+          <Text style={styles.subtitle}>견적번호 {meta.quote_no} · 공종별 상세 내역</Text>
         </View>
         <View style={styles.brandBox}>
           <Text style={styles.brandName}>InPick</Text>
@@ -646,72 +614,74 @@ const DetailSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ e
       </View>
 
       <View style={styles.table}>
-        {/* 헤더 */}
+        {/* 헤더 — spec 7 컬럼 */}
         <View style={styles.tableHeader}>
           <Text style={[styles.tdHeader, { width: 30, textAlign: "center" }]}>No.</Text>
-          <Text style={[styles.tdHeader, { flex: 2.4 }]}>품 명 / 규 격</Text>
-          <Text style={[styles.tdHeader, { flex: 1 }]}>제조사</Text>
+          <Text style={[styles.tdHeader, { flex: 3 }]}>품 명 / 규 격</Text>
           <Text style={[styles.tdHeader, { width: 60, textAlign: "center" }]}>단위</Text>
-          <Text style={[styles.tdHeader, { width: 65, textAlign: "right" }]}>수 량</Text>
-          <Text style={[styles.tdHeader, { width: 75, textAlign: "right" }]}>자재단가</Text>
-          <Text style={[styles.tdHeader, { width: 75, textAlign: "right" }]}>노무단가</Text>
-          <Text style={[styles.tdHeader, { width: 85, textAlign: "right" }]}>자재금액</Text>
-          <Text style={[styles.tdHeader, { width: 85, textAlign: "right" }]}>노무금액</Text>
-          <Text style={[styles.tdHeader, { width: 95, textAlign: "right" }]}>합 계</Text>
+          <Text style={[styles.tdHeader, { width: 70, textAlign: "right" }]}>수 량</Text>
+          <Text style={[styles.tdHeader, { width: 95, textAlign: "right" }]}>자재비</Text>
+          <Text style={[styles.tdHeader, { width: 95, textAlign: "right" }]}>노무비</Text>
+          <Text style={[styles.tdHeader, { width: 80, textAlign: "right" }]}>경비</Text>
+          <Text style={[styles.tdHeader, { width: 100, textAlign: "right" }]}>합 계</Text>
         </View>
 
-        {/* 카테고리별 그룹 + 항목 */}
-        {Array.from(groups.entries()).map(([cat, g]) => (
-          <View key={cat}>
-            {/* 카테고리 헤더 */}
-            <View style={styles.catRow}>
-              <Text style={[styles.td, { width: 30 }]}></Text>
-              <Text style={[styles.td, { flex: 5, fontWeight: 700, color: "#1A1A1A" }]}>
-                ▶ {CAT_LABEL[cat] || cat}
-              </Text>
-              <Text style={[styles.td, { width: 85, textAlign: "right", fontWeight: 700, color: "#666" }]}>
-                자재 {won(g.material)}
-              </Text>
-              <Text style={[styles.td, { width: 85, textAlign: "right", fontWeight: 700, color: "#666" }]}>
-                노무 {won(g.labor)}
-              </Text>
-              <Text style={[styles.td, { width: 95, textAlign: "right", fontWeight: 700 }]}>
-                {won(g.subtotal)}
+        {/* 공종별 — Section Header + 항목들 */}
+        {sections.map((sec) => (
+          <View key={sec.sectionId} wrap={false}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionHeaderTd, { width: 30 }]}>{sec.sectionNumber}</Text>
+              <Text style={[styles.sectionHeaderTd, { flex: 4.5 }]}>{sec.sectionName}</Text>
+              <Text style={[styles.sectionHeaderTd, { width: 100, textAlign: "right" }]}>
+                {won(sec.subtotal.total)}
               </Text>
             </View>
-            {/* 항목들 */}
-            {g.items.map((it, i) => (
-              <View key={it.region_id} style={[styles.tableRow, i % 2 ? styles.tableRowAlt : {}]}>
+            {sec.items.map((it, i) => (
+              <View key={it.itemId} style={[styles.tableRow, i % 2 ? styles.tableRowAlt : {}]}>
                 <Text style={[styles.td, { width: 30, textAlign: "center", color: "#888" }]}>{i + 1}</Text>
-                <Text style={[styles.td, { flex: 2.4 }]}>{it.material_name}</Text>
-                <Text style={[styles.td, { flex: 1, color: "#666" }]}>{it.brand || "—"}</Text>
-                <Text style={[styles.td, { width: 60, textAlign: "center" }]}>
-                  {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : "EA"}
+                <Text style={[styles.td, { flex: 3 }]}>
+                  {it.name}
+                  {it.spec ? `\n${it.spec}` : ""}
                 </Text>
-                <Text style={[styles.td, { width: 65, textAlign: "right" }]}>{it.qty.toLocaleString()}</Text>
-                <Text style={[styles.td, { width: 75, textAlign: "right" }]}>{won(it.material_price)}</Text>
-                <Text style={[styles.td, { width: 75, textAlign: "right" }]}>{won(it.labor_price)}</Text>
-                <Text style={[styles.td, { width: 85, textAlign: "right" }]}>{won(it.material_subtotal)}</Text>
-                <Text style={[styles.td, { width: 85, textAlign: "right" }]}>{won(it.labor_subtotal)}</Text>
-                <Text style={[styles.td, { width: 95, textAlign: "right", fontWeight: 700 }]}>{won(it.subtotal)}</Text>
+                <Text style={[styles.td, { width: 60, textAlign: "center" }]}>
+                  {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : it.unit}
+                </Text>
+                <Text style={[styles.td, { width: 70, textAlign: "right" }]}>
+                  {it.quantity.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                </Text>
+                <Text style={[styles.td, { width: 95, textAlign: "right" }]}>
+                  {it.materialCost > 0 ? won(it.materialCost) : "—"}
+                </Text>
+                <Text style={[styles.td, { width: 95, textAlign: "right" }]}>
+                  {it.laborCost > 0 ? won(it.laborCost) : "—"}
+                </Text>
+                <Text style={[styles.td, { width: 80, textAlign: "right" }]}>
+                  {it.expenseCost > 0 ? won(it.expenseCost) : "—"}
+                </Text>
+                <Text style={[styles.td, { width: 100, textAlign: "right", fontWeight: 700 }]}>
+                  {won(it.totalCost)}
+                </Text>
               </View>
             ))}
           </View>
         ))}
 
-        {/* 직접비 합계 */}
+        {/* 직접공사비 합계 */}
         <View style={[styles.tableRow, { backgroundColor: "#F5F0EE", borderTop: "1.5px solid #999", minHeight: 30 }]}>
           <Text style={[styles.td, { width: 30 }]}></Text>
-          <Text style={[styles.td, { flex: 5, fontWeight: 700, fontSize: 10 }]}>직 접 비 합 계</Text>
-          <Text style={[styles.td, { width: 85, textAlign: "right", fontWeight: 700 }]}>{won(estimate.material_subtotal)}</Text>
-          <Text style={[styles.td, { width: 85, textAlign: "right", fontWeight: 700 }]}>{won(estimate.labor_subtotal)}</Text>
-          <Text style={[styles.td, { width: 95, textAlign: "right", fontWeight: 700, fontSize: 10 }]}>{won(estimate.direct_total)}</Text>
+          <Text style={[styles.td, { flex: 3, fontWeight: 700, fontSize: 10 }]}>직 접 공 사 비 합 계</Text>
+          <Text style={[styles.td, { width: 60 }]}></Text>
+          <Text style={[styles.td, { width: 70 }]}></Text>
+          <Text style={[styles.td, { width: 95 }]}></Text>
+          <Text style={[styles.td, { width: 95 }]}></Text>
+          <Text style={[styles.td, { width: 80 }]}></Text>
+          <Text style={[styles.td, { width: 100, textAlign: "right", fontWeight: 700, fontSize: 10 }]}>{won(directCost)}</Text>
         </View>
       </View>
 
       <View style={styles.noteBox}>
         품명/규격은 제조사 카탈로그 기준 표시. 실 시공 시 동급 자재로 대체 가능 (사전 협의).
-        수량은 도면 + AI 영역 분석 결과 기준 추정값 — 현장 답사 후 확정.
+        수량은 도면 + AI 영역 분석 기준 추정값 — 현장 답사 후 확정. 간접비(가설공사비/산안비/관리비/이윤/VAT)는 총괄표 참조.
       </View>
 
       <FooterRow meta={meta} page="내역서 3/3" />
@@ -722,7 +692,7 @@ const DetailSheet: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ e
 // ═══════════════════════════════════════════════════
 // Document
 // ═══════════════════════════════════════════════════
-export const QuoteDocument: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta }> = ({ estimate, meta }) => (
+export const QuoteDocument = ({ estimate, meta }: { estimate: QuoteEstimate; meta: QuoteMeta }) => (
   <Document
     title={`InPick 견적서 ${meta.quote_no}`}
     author="InPick"
@@ -738,18 +708,11 @@ export const QuoteDocument: React.FC<{ estimate: QuoteEstimate; meta: QuoteMeta 
 // ═══════════════════════════════════════════════════
 // 다운로드 헬퍼
 // ═══════════════════════════════════════════════════
-export async function generateQuotePdf(
-  estimate: QuoteEstimate,
-  meta: QuoteMeta,
-): Promise<Blob> {
-  const blob = await pdf(<QuoteDocument estimate={estimate} meta={meta} />).toBlob();
-  return blob;
+export async function generateQuotePdf(estimate: QuoteEstimate, meta: QuoteMeta): Promise<Blob> {
+  return await pdf(<QuoteDocument estimate={estimate} meta={meta} />).toBlob();
 }
 
-export async function downloadQuotePdf(
-  estimate: QuoteEstimate,
-  meta: QuoteMeta,
-): Promise<void> {
+export async function downloadQuotePdf(estimate: QuoteEstimate, meta: QuoteMeta): Promise<void> {
   const blob = await generateQuotePdf(estimate, meta);
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -763,12 +726,12 @@ export async function downloadQuotePdf(
   }, 100);
 }
 
-/** 견적번호 자동 생성 (yyyyMMdd-NNN 형식) */
+/** spec §A-1 — IP-YYYY-MMDD-NNN 형식 */
 export function generateQuoteNo(): string {
   const now = new Date();
-  const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
-  const seq = Math.floor(Math.random() * 1000)
-    .toString()
-    .padStart(3, "0");
-  return `INP-${ymd}-${seq}`;
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const seq = Math.floor(Math.random() * 1000).toString().padStart(3, "0");
+  return `IP-${yyyy}-${mm}${dd}-${seq}`;
 }
