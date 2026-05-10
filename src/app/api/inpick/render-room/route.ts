@@ -1,17 +1,24 @@
 /**
  * POST /api/inpick/render-room
  *
- * gpt-image-2 EDITS API 호출 (가이드 §3 정책).
- * 평면도 이미지를 input으로 보내 도면 형태 100% 보존.
+ * 이미지 생성 backend adapter 호출 (Phase 1 — Prompt 1).
+ * IMAGE_GEN_BACKEND 환경변수로 OpenAI / RunPod / auto 분기.
+ *
+ * 가이드: c:\Users\user\Downloads\inpick-claude-code-dev-direction-20260510.md §3 (제품 아키텍처)
  *
  * 입력: RenderRoomInput + propertyId? (있으면 Storage에서 normalized.png 자동 로드)
  *      또는 floorplanImageUrl 직접 제공
- * 출력 (성공): { imageUrl, revisedPrompt, model, costUsd }
- * 출력 (실패): { error: string, hint?: string }
+ * 출력 (성공): { imageUrl, revisedPrompt, model, backend, costUsd }
+ * 출력 (실패): { error: string, hint?: string, model_status: ... }
+ *
+ * 변경 이력:
+ *   - Phase 1: backend adapter 구조 추가 (이전: 직접 generateRoomRender 호출)
+ *   - 기존 OpenAI path는 backend="openai"로 100% 보존
  */
 import { NextRequest, NextResponse } from "next/server";
-import { generateRoomRender, type RenderRoomInput } from "@/lib/inpick/openai-client";
+import { type RenderRoomInput } from "@/lib/inpick/openai-client";
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
+import { renderRoomViaBackend } from "@/lib/inpick/image-backends/select-backend";
 import { getFloorplanUrl, hasFloorplan } from "@/lib/inpick/floorplan-storage";
 import {
   enforceConsume,
@@ -123,67 +130,85 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const result = await generateRoomRender({
-      ...body,
+    // ─── Backend adapter 호출 (Phase 1) ───
+    // IMAGE_GEN_BACKEND 환경변수로 분기 (default: "openai" — 기존 path 100% 보존)
+    const result = await renderRoomViaBackend({
+      ...(body as RenderRoomInput & { roomName: string }),
+      prompt: body.style || "modern minimal",
       heightMm: body.heightMm || 2400,
-      style: body.style || "modern minimal",
       floorplanImageUrl,
     });
+
+    // ─── 실패 처리 ───
+    if (result.status !== "completed" || !result.imageUrl) {
+      const model_status = result.modelStatus || "unknown";
+      console.warn(
+        "[render-room] image gen failed:",
+        `backend=${result.backend} model=${result.model} error=${result.error}`,
+      );
+
+      // ─── v2 §4-2 실패 시 자동 환불 ──
+      let refunded = false;
+      if (charge && charge.charged > 0) {
+        const r = await refundCredits(
+          charge.userId,
+          charge.charged,
+          `render-room-failed:${model_status}`,
+        );
+        refunded = r.refunded;
+      }
+
+      return NextResponse.json(
+        {
+          error: result.error || "이미지 생성에 실패했습니다",
+          hint: result.hint,
+          model_status,
+          backend: result.backend,
+          model: result.model,
+          tokenConsumed: !refunded && (charge?.charged ?? 0) > 0,
+          refunded,
+          // async job 응답 (Phase 2 이후)
+          jobId: result.jobId,
+        },
+        { status: 502 },
+      );
+    }
+
+    // ─── 성공 응답 (기존 shape 보존 + backend/jobId 추가) ───
     return NextResponse.json({
-      ...result,
+      imageUrl: result.imageUrl,
+      revisedPrompt: result.revisedPrompt,
+      model: result.model,
+      backend: result.backend,
+      costUsd: result.costUsd,
+      jobId: result.jobId,
       credits_charged: charge?.charged ?? 0,
       credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
     });
   } catch (e) {
+    // backend adapter 외부 에러 (예상 외) — 환불 + 일반 에러
     const msg = e instanceof Error ? e.message : String(e);
-    // 사용자 정책: gpt-image-2 only. 폴백 없음 — 실패 시 명확한 hint로 즉시 보고
-    let hint: string | undefined;
-    let model_status: "blocked" | "rate_limited" | "billing" | "auth" | "timeout" | "unknown" = "unknown";
+    console.warn("[render-room] unexpected error:", msg);
 
-    if (msg.includes("Incorrect API key") || msg.includes("invalid_api_key") || msg.includes("401")) {
-      hint = "이미지 생성 서비스 인증 문제 (관리자에게 문의)";
-      model_status = "auth";
-    } else if (msg.includes("billing") || msg.includes("quota") || msg.includes("insufficient")) {
-      hint = "이미지 생성 서비스 결제 한도 초과 (관리자에게 문의)";
-      model_status = "billing";
-    } else if (
-      msg.includes("model_not_found") ||
-      msg.includes("does not have access") ||
-      msg.includes("organization") ||
-      msg.includes("verify") ||
-      msg.includes("404")
-    ) {
-      hint = "이미지 생성 서비스 사용 권한 미설정 (관리자에게 문의)";
-      model_status = "blocked";
-    } else if (msg.includes("rate limit") || msg.includes("429")) {
-      hint = "현재 요청이 많습니다 — 잠시 후 다시 시도해주세요";
-      model_status = "rate_limited";
-    } else if (msg.includes("시간 초과") || msg.includes("timeout") || msg.includes("Abort")) {
-      hint = "응답 지연 — 잠시 후 다시 시도해주세요";
-      model_status = "timeout";
-    } else {
-      hint = "이미지 생성 실패 (요금이 발생하지 않았습니다)";
-    }
-
-    // 내부 에러 메시지는 server log에만 기록, 클라이언트엔 일반화된 메시지만 노출
-    console.warn("[render-room] image gen failed:", msg);
-
-    // ─── v2 §4-2 실패 시 자동 환불 ──
     let refunded = false;
     if (charge && charge.charged > 0) {
-      const r = await refundCredits(charge.userId, charge.charged, `render-room-failed:${model_status}`);
+      const r = await refundCredits(
+        charge.userId,
+        charge.charged,
+        `render-room-unexpected-error`,
+      );
       refunded = r.refunded;
     }
 
     return NextResponse.json(
       {
-        error: "이미지 생성에 실패했습니다",
-        hint,
-        model_status,
+        error: "이미지 생성 중 예상하지 못한 오류",
+        hint: "잠시 후 다시 시도해주세요",
+        model_status: "unknown",
         tokenConsumed: !refunded && (charge?.charged ?? 0) > 0,
         refunded,
       },
-      { status: 502 },
+      { status: 500 },
     );
   }
 }
