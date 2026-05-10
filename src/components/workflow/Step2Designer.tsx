@@ -159,7 +159,33 @@ export default function Step2Designer({
 
   const setChatMode = (m: boolean) => {
     setChatModeLocal(m);
+    // 정책: AI 상담 토글 ON + 메시지 0건이면 정적 인사 1회 추가 (API 호출 X — UX 즉시 반응 + 비용 절약)
+    // 이후 AI는 시스템 프롬프트에 따라 인사 생략하고 바로 답변.
+    if (m && chatMessages.length === 0) {
+      setChatMessages([
+        {
+          role: "assistant",
+          content:
+            "안녕하세요! InPick 인테리어 상담 AI입니다 😊\n어떤 공간을 어떻게 꾸미고 싶으신가요? 자유롭게 말씀해 주세요.",
+        },
+      ]);
+    }
   };
+
+  // chatMode가 default true(value.chatMode 미설정 시)로 시작될 때도 동일하게 인사
+  // — 마운트 직후 1회 (chatMessages 비어있으면)
+  useEffect(() => {
+    if (chatMode && chatMessages.length === 0) {
+      setChatMessages([
+        {
+          role: "assistant",
+          content:
+            "안녕하세요! InPick 인테리어 상담 AI입니다 😊\n어떤 공간을 어떻게 꾸미고 싶으신가요? 자유롭게 말씀해 주세요.",
+        },
+      ]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // SAM warmup — Step2 마운트 시 1회 백그라운드 호출 (cold start 회피)
   // 자재 수정 모달 열 때 워커가 이미 warm 상태로 있게 — fire-and-forget, 실패해도 무시
