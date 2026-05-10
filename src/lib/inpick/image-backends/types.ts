@@ -24,12 +24,24 @@ export type ImageBackendName = "openai" | "runpod" | "auto";
  */
 export type RenderQuality = "draft" | "standard" | "high" | "low" | "medium";
 
-// ─── Geometry types (간소 버전, 본격은 floorplan/geometry-types.ts에서) ───
-export interface Point2D {
-  x: number;
-  y: number;
-}
+// ─── Geometry types ───
+// 본격 정의: src/lib/inpick/floorplan/geometry-types.ts (Phase 4)
+// 호환을 위해 simplified hint는 유지하면서 full type도 re-export.
+import type {
+  Point2D as GPoint2D,
+  RoomGeometry as GRoomGeometry,
+  RoomCamera as GRoomCamera,
+} from "@/lib/inpick/floorplan/geometry-types";
 
+export type Point2D = GPoint2D;
+
+/** 본격 RoomGeometry (Phase 4+) — RunPod 2.5D proxy 입력 */
+export type RoomGeometry = GRoomGeometry;
+
+/** 본격 RoomCamera (Phase 4+) */
+export type RoomCamera = GRoomCamera;
+
+/** Phase 1~3 호환용 simplified hint — RoomGeometry로 점진 마이그레이션 */
 export interface RoomGeometryHint {
   roomId: string;
   roomName: string;
@@ -37,6 +49,7 @@ export interface RoomGeometryHint {
   estimatedAreaM2?: number;
 }
 
+/** Phase 1~3 호환용 simplified camera hint */
 export interface RoomCameraHint {
   position: Point2D;
   target: Point2D;
@@ -84,8 +97,9 @@ export interface RenderRoomRequest {
   seed?: number;
 
   // Geometry-first pipeline (Phase 4+)
-  roomGeometry?: RoomGeometryHint;
-  camera?: RoomCameraHint;
+  // Phase 4부터는 본격 RoomGeometry/RoomCamera를 권장. Hint는 호환용 폴백.
+  roomGeometry?: RoomGeometry | RoomGeometryHint;
+  camera?: RoomCamera | RoomCameraHint;
 
   // 콜러 컨텍스트 (env, request id 등)
   requestId?: string;
