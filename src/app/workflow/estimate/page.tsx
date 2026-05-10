@@ -202,11 +202,11 @@ export default function EstimatePage() {
         selectedRoomKeys = s1.rooms.filter((r) => r in ROOM_NAME_MAP);
       }
 
-      // 2) 이미지 있는 방만 견적 산정 (정밀성 — 이미지 없으면 견적 X)
+      // 2) 정책 변경 — 이미지 없는 방도 표준 자재로 견적 산정 (자재 컨택 선택사항)
       const requestRooms: Array<{
         roomName: string;
         dim: { widthMm: number; depthMm: number; heightMm: number };
-        renderImageUrl: string;
+        renderImageUrl?: string;
       }> = [];
 
       for (const key of selectedRoomKeys) {
@@ -214,12 +214,11 @@ export default function EstimatePage() {
         if (!koreanName) continue;
 
         const renders = s2.rendersByRoom?.[key] || [];
-        if (renders.length === 0) continue; // 이미지 없으면 skip
-
         const idx = s2.selectedByRoom?.[key];
-        const selectedRender = idx != null ? renders[idx] : renders[renders.length - 1];
+        const selectedRender =
+          renders.length > 0 ? (idx != null ? renders[idx] : renders[renders.length - 1]) : null;
         const imageUrl = selectedRender?.refinedUrl || selectedRender?.url;
-        if (!imageUrl) continue;
+        // 이미지 있으면 vision 추출, 없으면 build-estimate에서 표준 자재 fallback
 
         // 치수: 정형화 → 평형 표준 → 일반 표준
         let dim = normalizedRooms.find(
@@ -250,13 +249,14 @@ export default function EstimatePage() {
         requestRooms.push({
           roomName: koreanName,
           dim: { widthMm: dim.widthMm, depthMm: dim.depthMm, heightMm: dim.heightMm },
-          renderImageUrl: imageUrl,
+          // 이미지 있으면 전달 (vision 자재 추출), 없으면 omitted → 표준 자재 fallback
+          ...(imageUrl ? { renderImageUrl: imageUrl } : {}),
         });
       }
 
       if (requestRooms.length === 0) {
         setError(
-          "생성된 디자인 이미지가 없습니다. Step2에서 AI 디자인을 먼저 생성해주세요. (Vision 분석 기반 정밀 견적)",
+          "Step1에서 방을 선택해주세요. (선택한 방이 견적 산출 대상)",
         );
         setLoading(false);
         return;
@@ -270,8 +270,14 @@ export default function EstimatePage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "견적 생성 실패");
       const list: EstimateRoom[] = data.estimates || [];
-      if (list.length === 0) {
-        setError("Vision 분석이 자재를 추출하지 못했습니다. 더 명확한 디자인 이미지로 재시도해주세요.");
+      // 이제 빈 결과 거의 없음 — 표준 자재 fallback이 항상 동작
+      // (이미지 있으면 vision 추출, 없으면 표준)
+      if (data.fallbackRooms?.length > 0) {
+        // 정보 로그 — 사용자에게 강제 안내는 안 함 (선택사항이라)
+        console.info(
+          "[estimate] 표준 자재 적용된 방:",
+          data.fallbackRooms.map((r: { roomName: string }) => r.roomName).join(", "),
+        );
       }
       setEstimates(list);
     } catch (e) {

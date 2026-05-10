@@ -140,9 +140,15 @@ export default function BasicInfoCard({ value, onChange }: Props) {
             return (
               <button
                 key={r.v}
-                onClick={() =>
-                  onChange({ ...value, expansionType: r.v as "basic" | "extended" })
-                }
+                onClick={() => {
+                  // 가이드: 기본/확장 변경 시 cleanedImageUrl 리셋 → AddressMode useEffect가 도면 재호출
+                  onChange({
+                    ...value,
+                    expansionType: r.v as "basic" | "extended",
+                    cleanedImageUrl: undefined,
+                    dimensionOverlaySvg: undefined,
+                  });
+                }}
                 className={`rounded-xl border px-3 py-3 text-left transition-all ${
                   sel
                     ? "border-primary-500 bg-primary-500 text-white shadow-cta"
@@ -252,6 +258,30 @@ function AddressMode({ value, onChange }: Props) {
   >([]);
   const [loadingBuilding, setLoadingBuilding] = useState(false);
 
+  // ─── 가이드: 평형 + expansion 둘 다 결정되면 자동 호출 ───
+  // 흐름: 주소 → 평형 클릭 (저장만) → 기본/확장형 클릭 → 도면 정리 시작
+  // expansion 변경 시 cleanedImageUrl 리셋되어 useEffect가 재호출
+  useEffect(() => {
+    if (
+      value.selectedPyeong?.grandPlanUrl &&
+      value.expansionType &&
+      !value.cleanedImageUrl &&
+      !value.normalizing
+    ) {
+      // 자동 트리거 — runNormalize는 아래 정의됨
+      void runNormalizeRef.current?.(value.selectedPyeong, value.expansionType);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    value.selectedPyeong?.pyeongNo,
+    value.expansionType,
+    value.cleanedImageUrl,
+    value.normalizing,
+  ]);
+
+  // runNormalize ref — useEffect 안에서 최신 함수 참조 (closure 회피)
+  const runNormalizeRef = useRef<typeof runNormalize | null>(null);
+
   // 마운트 시 최근 검색 로드
   useEffect(() => {
     setRecent(loadRecent());
@@ -313,24 +343,33 @@ function AddressMode({ value, onChange }: Props) {
     setRecent(loadRecent());
   };
 
-  const handleSelectPyeong = async (p: {
-    pyeongNo: number;
-    pyeongName: string;
-    exclusiveArea: number;
-    grandPlanUrl?: string;
-    roomCnt?: number;
-  }) => {
+  /**
+   * 평면도 정형화 호출 — 평형 + expansion 둘 다 결정된 시점에만 실행.
+   * useEffect (위)에서 자동 trigger.
+   */
+  const runNormalize = async (
+    pyeong: {
+      pyeongNo: number;
+      pyeongName: string;
+      exclusiveArea: number;
+      grandPlanUrl?: string;
+      roomCnt?: number;
+    },
+    expansion: "basic" | "extended",
+  ) => {
+    if (!pyeong.grandPlanUrl) return;
     onChange({
       ...value,
-      selectedPyeong: p,
+      selectedPyeong: pyeong,
+      expansionType: expansion,
       cleanedImageUrl: undefined,
       dimensionOverlaySvg: undefined,
-      normalizing: !!p.grandPlanUrl,
+      normalizing: true,
     });
-    if (!p.grandPlanUrl) return;
     try {
-      // STEP 1: 네이버 CDN URL → Supabase Storage 캐시 (재사용 + edits API용 안정 URL 확보)
-      let stableUrl = p.grandPlanUrl;
+      // STEP 1: 네이버 CDN → Supabase Storage 캐시
+      let stableUrl = pyeong.grandPlanUrl;
+      let p = pyeong;
       try {
         const cacheRes = await fetch("/api/inpick/floorplan-cache", {
           method: "POST",
@@ -341,19 +380,19 @@ function AddressMode({ value, onChange }: Props) {
           const cacheData = await cacheRes.json();
           if (cacheData.url) {
             stableUrl = cacheData.url;
-            // selectedPyeong.grandPlanUrl을 Supabase URL로 교체 (이후 흐름 모두 안정 URL 사용)
             p = { ...p, grandPlanUrl: stableUrl };
           }
         }
       } catch (e) {
-        console.warn("[floorplan-cache] failed (계속 네이버 URL 사용):", e);
+        console.warn("[floorplan-cache] failed:", e);
       }
 
-      // STEP 2: 평면도 정형화 (Vision 치수 추출 + 영구 저장 — 가이드 §1)
+      // STEP 2: 평면도 정형화 (expansion 적용)
       const aptName = value.selectedAddress?.buildingName || "";
-      const address = value.selectedAddress?.roadAddress
-        || value.selectedAddress?.jibunAddress
-        || aptName;
+      const address =
+        value.selectedAddress?.roadAddress ||
+        value.selectedAddress?.jibunAddress ||
+        aptName;
       const res = await fetch("/api/inpick/normalize-floorplan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -364,7 +403,7 @@ function AddressMode({ value, onChange }: Props) {
           address,
           aptName,
           skipImageClean: false,
-          expansion: value.expansionType === "extended",
+          expansion: expansion === "extended",
         }),
       });
       const data = await res.json();
@@ -372,7 +411,7 @@ function AddressMode({ value, onChange }: Props) {
         onChange({
           ...value,
           selectedPyeong: p,
-          // 가이드 §3 — propertyId를 step1에 보관 → Step2에서 render-room 호출 시 사용
+          expansionType: expansion,
           floorplanPropertyId: data.property_id,
           cleanedImageUrl: data.cleanedImageUrl,
           normalizedImageUrl: data.normalizedImageUrl,
@@ -386,12 +425,36 @@ function AddressMode({ value, onChange }: Props) {
           normalizing: false,
         });
       } else {
-        onChange({ ...value, selectedPyeong: p, normalizing: false });
+        onChange({ ...value, selectedPyeong: p, expansionType: expansion, normalizing: false });
       }
     } catch (e) {
       console.error("normalize fail", e);
-      onChange({ ...value, selectedPyeong: p, normalizing: false });
+      onChange({ ...value, selectedPyeong: pyeong, expansionType: expansion, normalizing: false });
     }
+  };
+
+  // useEffect가 평형+expansion 둘 다 결정될 때 자동 trigger하므로 최신 함수를 ref에 저장
+  runNormalizeRef.current = runNormalize;
+
+  /**
+   * 평형 클릭 → 저장만. useEffect가 expansion까지 셋되면 자동 호출.
+   * 새 흐름: 주소 → 평형 → 기본/확장 클릭 → 도면 호출
+   */
+  const handleSelectPyeong = async (p: {
+    pyeongNo: number;
+    pyeongName: string;
+    exclusiveArea: number;
+    grandPlanUrl?: string;
+    roomCnt?: number;
+  }) => {
+    onChange({
+      ...value,
+      selectedPyeong: p,
+      cleanedImageUrl: undefined,
+      dimensionOverlaySvg: undefined,
+      normalizing: false,
+    });
+    // expansion 이미 셋된 상태에서 평형 클릭 → useEffect가 자동 호출
   };
 
   return (

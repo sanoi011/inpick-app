@@ -113,14 +113,21 @@ export default function Step2Designer({
   onConsumeToken,
   onComplete,
 }: Props) {
-  // UI에는 모든 방을 항상 표시 (Step1에서 선택 안 한 방도 클릭 가능)
-  const availableTabs = useMemo(() => ROOM_TABS, []);
-  // Step1에서 선택한 방 = 진행 카운트의 분모. 비어있거나 "all"이면 모든 방.
+  // 가이드: Step2 방 목록에서 베란다/드레스룸 제외 (이미지 생성 X). 단 견적 면적엔 포함.
+  // 이유: 베란다/드레스룸은 일반적으로 Step2 인테리어 디자인 생성 대상이 아님.
+  const RENDER_EXCLUDED = ["balcony", "dress"];
+  const availableTabs = useMemo(
+    () => ROOM_TABS.filter((t) => !RENDER_EXCLUDED.includes(t.v)),
+    [],
+  );
+  // Step1에서 선택한 방 = 진행 카운트의 분모 (베란다/드레스룸 제외). 비어있거나 "all"이면 모든 렌더 대상.
   const selectedRoomKeys = useMemo(() => {
-    const all = ROOM_TABS.filter((t) => t.v !== "all").map((t) => t.v);
-    if (rooms.length === 0 || rooms.includes("all")) return all;
-    return rooms.filter((r) => r !== "all");
-  }, [rooms]);
+    const allRenderable = availableTabs
+      .filter((t) => t.v !== "all")
+      .map((t) => t.v);
+    if (rooms.length === 0 || rooms.includes("all")) return allRenderable;
+    return rooms.filter((r) => r !== "all" && !RENDER_EXCLUDED.includes(r));
+  }, [rooms, availableTabs]);
 
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
   const [generating, setGenerating] = useState(false);
@@ -681,11 +688,13 @@ export default function Step2Designer({
             {STYLE_PRESETS.map((preset) => (
               <button
                 key={preset}
-                onClick={() => handleBulkGenerate(preset)}
-                disabled={
-                  generating ||
-                  !realRoomTabs.some((t) => (value.rendersByRoom[t.v] || []).length === 0)
-                }
+                onClick={() => {
+                  // 가이드: 자동 생성 X — 프리셋 클릭 시 프롬프트에만 추가, 사용자가 직접 생성 클릭
+                  setPrompt(
+                    currentPrompt ? `${currentPrompt}, ${preset}` : preset,
+                  );
+                }}
+                disabled={generating}
                 className="rounded-lg border border-primary-100 bg-primary-50/50 px-2 py-1.5 text-[0.7rem] font-semibold text-primary-900 hover:bg-primary-100 hover:border-primary-300 disabled:opacity-30 transition-all"
               >
                 {preset}
@@ -693,7 +702,7 @@ export default function Step2Designer({
             ))}
           </div>
           <p className="mt-1.5 text-[0.65rem] text-primary-900/50 leading-snug">
-            클릭 시 비어있는 방 자동 생성
+            클릭 시 프롬프트에 추가 → 입력 완료 후 [전체 일괄 생성] 클릭
           </p>
         </div>
 

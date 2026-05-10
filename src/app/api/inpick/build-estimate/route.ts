@@ -1,12 +1,14 @@
 /**
  * POST /api/inpick/build-estimate
  *
- * 입력: { rooms: [{ roomName, dim, renderImageUrl }] }
+ * 입력: { rooms: [{ roomName, dim, renderImageUrl? }] }
  *
- * 정밀성 원칙: 생성된 디자인 이미지에서 GPT-4o Vision으로 자재를 직접 추출.
- * 이미지 없으면 그 방은 견적에서 제외 (mock 자재 자동 채움 X).
+ * 정책 변경 (2026-05-10): 자재 컨택은 선택사항.
+ *   - 이미지 + vision 추출 성공 → 추출된 자재로 견적
+ *   - 이미지 없거나 vision 실패 → 방 타입별 표준 자재 (KPA 단가 기반)로 fallback
+ *   - 절대 방을 skip하지 않음 (사용자가 "전체 일괄 생성" 안 했어도 견적 가능)
  *
- * 출력: { estimates: RoomEstimate[], grandTotal, skippedRooms }
+ * 출력: { estimates: RoomEstimate[], grandTotal, fallbackRooms }
  */
 import { NextRequest, NextResponse } from "next/server";
 import {
@@ -20,6 +22,74 @@ import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
+/**
+ * 방 타입별 표준 자재 (KPA 단가 매핑 자동 — 이미지/vision 실패 시 fallback).
+ * 사용자가 "부위별 자재 컨택"을 안 했어도 표준 견적 산출 가능.
+ */
+function defaultSurfacesForRoom(roomName: string): MaterialItem[] {
+  const r = roomName.toLowerCase();
+  const isBath = r.includes("욕실") || r.includes("화장실") || r.includes("bath");
+  const isKitchen = r.includes("부엌") || r.includes("주방") || r.includes("kitchen");
+  const isEntry = r.includes("현관") || r.includes("entrance");
+  const isBalcony = r.includes("베란다") || r.includes("발코니") || r.includes("balcony");
+  const isUtility = r.includes("다용도실") || r.includes("팬트리");
+  const isDressroom = r.includes("드레스룸") || r.includes("walk");
+
+  if (isBath) {
+    return [
+      { surface: "바닥", materialName: "포세린 타일 600x600", unit: "m²", unitPriceWon: 78000, priceSource: "standard" },
+      { surface: "벽", materialName: "벽 타일 (실크)", unit: "m²", unitPriceWon: 55000, priceSource: "standard" },
+      { surface: "천장", materialName: "방수 도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+      { surface: "fixture", materialName: "욕실세트 (변기+세면대+샤워)", unit: "set", unitPriceWon: 1900000, priceSource: "standard" },
+    ];
+  }
+  if (isKitchen) {
+    return [
+      { surface: "바닥", materialName: "강마루", unit: "m²", unitPriceWon: 64000, priceSource: "standard" },
+      { surface: "벽", materialName: "실크벽지", unit: "m²", unitPriceWon: 12000, priceSource: "standard" },
+      { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+      { surface: "fixture", materialName: "싱크대 (상·하부장)", unit: "set", unitPriceWon: 8900000, priceSource: "standard" },
+    ];
+  }
+  if (isEntry) {
+    return [
+      { surface: "바닥", materialName: "포세린 타일", unit: "m²", unitPriceWon: 78000, priceSource: "standard" },
+      { surface: "벽", materialName: "도배", unit: "m²", unitPriceWon: 9500, priceSource: "standard" },
+      { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+      { surface: "도어", materialName: "현관문 (방화)", unit: "EA", unitPriceWon: 320000, priceSource: "standard" },
+    ];
+  }
+  if (isBalcony) {
+    return [
+      { surface: "바닥", materialName: "데크 타일", unit: "m²", unitPriceWon: 75000, priceSource: "standard" },
+      { surface: "벽", materialName: "도배", unit: "m²", unitPriceWon: 9500, priceSource: "standard" },
+      { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+    ];
+  }
+  if (isUtility) {
+    return [
+      { surface: "바닥", materialName: "타일", unit: "m²", unitPriceWon: 75000, priceSource: "standard" },
+      { surface: "벽", materialName: "도배", unit: "m²", unitPriceWon: 9500, priceSource: "standard" },
+      { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+    ];
+  }
+  if (isDressroom) {
+    return [
+      { surface: "바닥", materialName: "강마루", unit: "m²", unitPriceWon: 64000, priceSource: "standard" },
+      { surface: "벽", materialName: "도배", unit: "m²", unitPriceWon: 9500, priceSource: "standard" },
+      { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+      { surface: "fixture", materialName: "붙박이장 (양벽)", unit: "set", unitPriceWon: 1800000, priceSource: "standard" },
+    ];
+  }
+  // 거실/안방/침실 등 일반 거주 공간
+  return [
+    { surface: "바닥", materialName: "강마루", unit: "m²", unitPriceWon: 64000, priceSource: "standard" },
+    { surface: "벽", materialName: "실크벽지", unit: "m²", unitPriceWon: 12000, priceSource: "standard" },
+    { surface: "천장", materialName: "도배", unit: "m²", unitPriceWon: 7500, priceSource: "standard" },
+    { surface: "도어", materialName: "방문", unit: "EA", unitPriceWon: 180000, priceSource: "standard" },
+  ];
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -27,34 +97,19 @@ export async function POST(req: NextRequest) {
     if (!Array.isArray(rooms) || rooms.length === 0) {
       return NextResponse.json({ error: "rooms 배열 필수" }, { status: 400 });
     }
-    if (!hasOpenAIKey()) {
-      return NextResponse.json(
-        {
-          error: "OpenAI 키 미설정 — GPT-4o Vision 자재 추출 불가",
-          hint: "Vercel에 OPENAI_API_KEY (또는 openai_api_key) 등록 필요",
-        },
-        { status: 500 },
-      );
-    }
+    // 정책 변경: OpenAI 키 없어도 표준 자재로 견적 생성 가능 (vision 자재 추출만 실패)
+    const visionAvailable = hasOpenAIKey();
 
     const estimates: RoomEstimate[] = [];
-    const skippedRooms: Array<{ roomName: string; reason: string }> = [];
+    const fallbackRooms: Array<{ roomName: string; reason: string }> = [];
     const errors: Array<{ roomName: string; error: string }> = [];
 
     for (const r of rooms) {
       let surfaces: MaterialItem[] = r.surfaces || [];
+      let usedFallback = false;
 
-      // 이미지 필수 (정밀성)
-      if ((!surfaces || surfaces.length === 0) && !r.renderImageUrl) {
-        skippedRooms.push({
-          roomName: r.roomName,
-          reason: "디자인 이미지 없음 — Step2에서 생성 필요",
-        });
-        continue;
-      }
-
-      // Vision으로 자재 추출
-      if ((!surfaces || surfaces.length === 0) && r.renderImageUrl) {
+      // 이미지 + vision 가능 → 자재 추출 시도
+      if ((!surfaces || surfaces.length === 0) && r.renderImageUrl && visionAvailable) {
         try {
           surfaces = await extractMaterialsFromRender({
             renderImageUrl: r.renderImageUrl,
@@ -66,16 +121,22 @@ export async function POST(req: NextRequest) {
             roomName: r.roomName,
             error: e instanceof Error ? e.message.slice(0, 200) : String(e).slice(0, 200),
           });
-          continue;
+          // 에러 발생 → 표준 자재로 fallback (방 skip 안 함)
         }
       }
 
+      // ─── Fallback: 표준 자재 (사용자 자재 컨택 X / vision 실패 / 이미지 없음) ───
       if (!surfaces || surfaces.length === 0) {
-        errors.push({
+        surfaces = defaultSurfacesForRoom(r.roomName);
+        usedFallback = true;
+        fallbackRooms.push({
           roomName: r.roomName,
-          error: "Vision이 자재를 추출하지 못했습니다. 더 명확한 이미지 필요",
+          reason: !r.renderImageUrl
+            ? "이미지 없음 — 표준 자재로 산출"
+            : !visionAvailable
+              ? "Vision 미사용 — 표준 자재로 산출"
+              : "Vision 실패 — 표준 자재로 산출",
         });
-        continue;
       }
 
       estimates.push(
@@ -100,7 +161,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       estimates,
       grandTotal: grand,
-      skippedRooms,
+      fallbackRooms,            // 표준 자재 적용된 방 (사용자 안내용)
+      skippedRooms: [],         // 호환 — 더 이상 skip 안 함
       errors,
     });
   } catch (e) {
