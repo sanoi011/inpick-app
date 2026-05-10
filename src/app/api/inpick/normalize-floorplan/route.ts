@@ -98,7 +98,7 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 - 명시 치수 우선, 미표시면 표준 비율 추정
 - 욕실/침실 2개+면 "욕실1","욕실2"`;
 
-/** 평면도 raster cleaning — gpt-image-2 단일 (사용자 정책: 폴백 없음) */
+/** 평면도 raster cleaning — 모델 폴백 체인 (gpt-image-2 우선, 5/8 워킹 상태 복원) */
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
@@ -135,30 +135,48 @@ async function cleanFloorplanRaster(
     "치수 텍스트, 한글 라벨, 화살표, 가구 일러스트는 그리지 마세요 (별도 SVG 오버레이로 처리). " +
     "어떤 외부 브랜드 로고도 추가 금지. AIOD 워터마크 외 다른 텍스트 절대 X.";
 
-  const form = new FormData();
-  form.append("model", "gpt-image-2");
-  form.append(
-    "image",
-    new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
-    "image.png",
-  );
-  form.append("prompt", prompt);
-  form.append("size", "1024x1024");
-  form.append("quality", "high");
+  // ─── 모델 폴백 체인: gpt-image-2 (우선) → gpt-image-1 (차선) ───
+  // dall-e-3는 edits API 미지원 → 폴백 제외
+  const errors: string[] = [];
+  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+    const form = new FormData();
+    form.append("model", modelName);
+    form.append(
+      "image",
+      new Blob([new Uint8Array(imageBuf)], { type: "image/png" }),
+      "image.png",
+    );
+    form.append("prompt", prompt);
+    form.append("size", "1024x1024");
+    form.append("quality", "high");
 
-  const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`gpt-image-2 ${res.status}: ${err.slice(0, 300)}`);
+    const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      body: form,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) {
+        errors.push(`${modelName}: 응답에 이미지 데이터 없음`);
+        continue;
+      }
+      return { b64, costUsd: 0.19, model: modelName };
+    }
+
+    const errText = await res.text();
+    const lower = errText.toLowerCase();
+    const recoverable =
+      res.status === 404 ||
+      lower.includes("model_not_found") ||
+      lower.includes("does not have access") ||
+      lower.includes("invalid_value");
+    errors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
+    if (!recoverable) break; // billing/auth/rate-limit → 다른 모델도 동일
   }
-  const data = await res.json();
-  const b64 = data.data?.[0]?.b64_json;
-  if (!b64) throw new Error("gpt-image-2 응답에 이미지 데이터 없음");
-  return { b64, costUsd: 0.19, model: "gpt-image-2" };
+  throw new Error(`평면도 클리닝 모든 모델 실패 — ${errors.join(" | ")}`);
 }
 
 export async function POST(req: NextRequest) {

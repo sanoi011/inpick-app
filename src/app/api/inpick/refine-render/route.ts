@@ -202,53 +202,79 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    // 4) gpt-image-2 edit endpoint (사용자 정책: 단일 모델, 폴백 없음)
+    // 4) edits API — 모델 폴백 체인 (사용자 정책: gpt-image-2 우선, 5/8 워킹 상태 복원)
+    // gpt-image-2 (40~80s, 우선) → gpt-image-1 (30~60s, 차선)
     // 가이드 v2 §5-1 quality tier — 미지정 시 medium (자재 미리보기는 medium으로 충분, 고화질은 명시)
     const quality = body.quality || "medium";
     const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
-    const form = new FormData();
-    form.append("model", "gpt-image-2");
-    form.append("image", new Blob([new Uint8Array(imgBuf)], { type: "image/png" }), "image.png");
-    form.append("mask", new Blob([new Uint8Array(maskBuf)], { type: "image/png" }), "mask.png");
-    form.append("prompt", refinedPrompt);
-    form.append("size", "1024x1024");
-    form.append("quality", quality);
 
+    let editRes: Response | null = null;
+    let usedModel = "";
+    const editErrors: string[] = [];
+    let lastErrText = "";
+    let lastStatus = 0;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 280_000);
-    let editRes: Response;
     try {
-      editRes = await fetch(`${OPENAI_BASE}/images/edits`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}` },
-        body: form,
-        signal: controller.signal,
-      });
+      for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+        const form = new FormData();
+        form.append("model", modelName);
+        form.append("image", new Blob([new Uint8Array(imgBuf)], { type: "image/png" }), "image.png");
+        form.append("mask", new Blob([new Uint8Array(maskBuf)], { type: "image/png" }), "mask.png");
+        form.append("prompt", refinedPrompt);
+        form.append("size", "1024x1024");
+        form.append("quality", quality);
+
+        const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${key}` },
+          body: form,
+          signal: controller.signal,
+        });
+
+        if (res.ok) {
+          editRes = res;
+          usedModel = modelName;
+          break;
+        }
+
+        const errText = await res.text();
+        const lower = errText.toLowerCase();
+        const recoverable =
+          res.status === 404 ||
+          lower.includes("model_not_found") ||
+          lower.includes("does not have access") ||
+          lower.includes("invalid_value");
+        editErrors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
+        lastErrText = errText;
+        lastStatus = res.status;
+        if (!recoverable) break; // billing/auth/rate-limit 등은 다른 모델도 동일 → 폴백 중단
+      }
     } finally {
       clearTimeout(timeoutId);
     }
 
-    if (!editRes.ok) {
-      const errText = await editRes.text();
+    if (!editRes || !editRes.ok) {
+      const errText = lastErrText || editErrors.join(" | ");
       const lower = errText.toLowerCase();
       let hint: string | undefined;
       let model_status: string = "unknown";
-      if (lower.includes("model_not_found") || lower.includes("does not have access") || editRes.status === 404) {
+      if (lower.includes("model_not_found") || lower.includes("does not have access") || lastStatus === 404) {
         hint = "이미지 편집 서비스 사용 권한 미설정 (관리자에게 문의)";
         model_status = "blocked";
-      } else if (editRes.status === 429) {
+      } else if (lastStatus === 429) {
         hint = "현재 요청이 많습니다 — 잠시 후 재시도";
         model_status = "rate_limited";
       } else if (lower.includes("billing") || lower.includes("quota") || lower.includes("insufficient")) {
         hint = "이미지 편집 서비스 결제 한도 초과 (관리자에게 문의)";
         model_status = "billing";
-      } else if (editRes.status === 401) {
+      } else if (lastStatus === 401) {
         hint = "이미지 편집 서비스 인증 실패 (관리자에게 문의)";
         model_status = "auth";
       } else {
         hint = "이미지 편집 실패 (요금이 발생하지 않았습니다)";
       }
-      console.warn("[refine-render] edit failed:", editRes.status, errText.slice(0, 200));
+      console.warn("[refine-render] edit failed (all fallback exhausted):", lastStatus, errText.slice(0, 300));
       // ─── v2 §4-2 실패 시 자동 환불 ──
       let refunded = false;
       if (charge && charge.charged > 0) {
@@ -286,6 +312,7 @@ export async function POST(req: NextRequest) {
     const successPayload = {
       costUsd: costMap[quality] ?? 0.04,
       quality,
+      model: usedModel,
       credits_charged: charge?.charged ?? 0,
       credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
     };

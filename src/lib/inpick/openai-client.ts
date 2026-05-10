@@ -265,40 +265,65 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     const quality = input.quality || "low"; // 가이드 v2 §5-1 — Phase 2부터 1차 기본 low
     const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
 
-    const form = new FormData();
-    form.append("model", "gpt-image-2");
-    form.append(
-      "image",
-      new Blob([new Uint8Array(fpBuf)], { type: "image/png" }),
-      "floorplan.png",
-    );
-    form.append("prompt", editPrompt);
-    form.append("size", size);
-    form.append("quality", quality);
+    // ─── 모델 폴백 체인 (사용자 정책: gpt-image-2 우선, 5/8 워킹 상태 복원) ───
+    // edits API 지원 모델: gpt-image-2 (40~80s, 우선) → gpt-image-1 (30~60s, 차선)
+    // dall-e-3는 edits API 미지원 → fallback 제외
+    const errors: string[] = [];
+    for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+      const form = new FormData();
+      form.append("model", modelName);
+      form.append(
+        "image",
+        new Blob([new Uint8Array(fpBuf)], { type: "image/png" }),
+        "floorplan.png",
+      );
+      form.append("prompt", editPrompt);
+      form.append("size", size);
+      form.append("quality", quality);
 
-    const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}` },
-      body: form,
-      signal: controller.signal,
-    });
-    if (!res.ok) {
+      const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}` },
+        body: form,
+        signal: controller.signal,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data.data?.[0]?.b64_json;
+        if (!b64) {
+          errors.push(`${modelName}: 응답에 이미지 데이터 없음`);
+          continue;
+        }
+        return {
+          imageUrl: `data:image/png;base64,${b64}`,
+          imageBase64: b64,
+          revisedPrompt: editPrompt,
+          model: modelName,
+          costUsd: costMap[quality] ?? 0.17,
+        };
+      }
+
       const errText = await res.text();
-      throw new Error(`gpt-image-2 edits ${res.status}: ${errText.slice(0, 400)}`);
+      const lower = errText.toLowerCase();
+      const recoverable =
+        res.status === 404 ||
+        lower.includes("model_not_found") ||
+        lower.includes("does not have access") ||
+        lower.includes("invalid_value");
+      errors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
+      if (!recoverable) {
+        // 401/billing/rate-limit 등은 다른 모델도 같은 결과 — 더 시도하지 않고 에러
+        throw new Error(
+          `OpenAI edits 실패 (recoverable=false) — ${errors.join(" | ")}`,
+        );
+      }
+      // recoverable 에러 → 다음 모델로 폴백
     }
-    const data = await res.json();
-    const b64 = data.data?.[0]?.b64_json;
-    if (!b64) throw new Error("gpt-image-2 edits: 응답에 이미지 데이터 없음");
-    return {
-      imageUrl: `data:image/png;base64,${b64}`,
-      imageBase64: b64,
-      revisedPrompt: editPrompt,
-      model: "gpt-image-2",
-      costUsd: costMap[quality] ?? 0.17,
-    };
+    throw new Error(`모든 image edit 모델 실패 — ${errors.join(" | ")}`);
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new Error("gpt-image-2 요청 시간 초과 (280초). OpenAI 응답 지연.");
+      throw new Error("OpenAI 이미지 요청 시간 초과 (280초). 응답 지연.");
     }
     throw e;
   } finally {
