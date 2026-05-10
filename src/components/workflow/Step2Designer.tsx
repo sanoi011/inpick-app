@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
+import { renderRoomViaClient, type RenderRoomBody } from "@/lib/inpick/render-room-client";
 import {
   classifyPyeong,
   estimateRoomDimsFromPyeong,
@@ -475,49 +476,49 @@ export default function Step2Designer({
       // 클라 측 AbortController — Vercel 300초 + 여유 20초
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 320_000);
-      const res = await fetch("/api/inpick/render-room", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const renderBody: RenderRoomBody = {
+        roomName: tab.label,
+        widthMm: dim.widthMm,
+        depthMm: dim.depthMm,
+        heightMm: dim.heightMm,
+        style: currentPrompt,
+        expansion: basicInfo.expansionType === "extended",
+        size: "1024x1024",
+        quality,                                          // Q2 — 1차 low / 재생성 high
+        windows: struct.windows,
+        doors: struct.doors,
+        isInteriorRoom: struct.isInteriorRoom,
+        windowWalls: struct.windowWalls,
+        doorWalls: struct.doorWalls,
+        adjacentRooms: struct.adjacentRooms,
+        wallLayout,                                       // Q1 — 자연어 도면 묘사
+        furnishingOptions: roomFurnishings?.[activeRoom] || [],
+        // 도면 기반 정보 강화
+        aspectRatio: dim.widthMm / dim.depthMm,
+        isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
+        // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
+        propertyId: basicInfo.floorplanPropertyId,
+        floorplanImageUrl: basicInfo.normalizedImageUrl
+          || basicInfo.cleanedImageUrl
+          || basicInfo.selectedPyeong?.grandPlanUrl,
+        previousReference,
+      };
+      // Phase 9 — sync/async 자동 처리 (jobId 응답 시 polling)
+      const result = await renderRoomViaClient(renderBody, {
         signal: ctrl.signal,
-        body: JSON.stringify({
-          roomName: tab.label,
-          widthMm: dim.widthMm,
-          depthMm: dim.depthMm,
-          heightMm: dim.heightMm,
-          style: currentPrompt,
-          expansion: basicInfo.expansionType === "extended",
-          size: "1024x1024",
-          quality,                                          // Q2 — 1차 low / 재생성 high
-          windows: struct.windows,
-          doors: struct.doors,
-          isInteriorRoom: struct.isInteriorRoom,
-          windowWalls: struct.windowWalls,
-          doorWalls: struct.doorWalls,
-          adjacentRooms: struct.adjacentRooms,
-          wallLayout,                                       // Q1 — 자연어 도면 묘사
-          furnishingOptions: roomFurnishings?.[activeRoom] || [],
-          // 도면 기반 정보 강화
-          aspectRatio: dim.widthMm / dim.depthMm,
-          isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
-          // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
-          propertyId: basicInfo.floorplanPropertyId,
-          floorplanImageUrl: basicInfo.normalizedImageUrl
-            || basicInfo.cleanedImageUrl
-            || basicInfo.selectedPyeong?.grandPlanUrl,
-          previousReference,
-        }),
-      }).finally(() => clearTimeout(timeoutId));
-      const data = await res.json();
-      if (!res.ok || !data.imageUrl) {
-        const baseMsg = data.error || "이미지 생성 실패";
-        const hintMsg = data.hint ? `\n→ ${data.hint}` : "";
+        postTimeoutMs: 320_000,
+      });
+      clearTimeout(timeoutId);
+      if ("error" in result) {
+        const baseMsg = result.error || "이미지 생성 실패";
+        const hintMsg = result.hint ? `\n→ ${result.hint}` : "";
         throw new Error(`${baseMsg}${hintMsg}\n(요금이 발생하지 않았습니다)`);
       }
       const item: RenderItem = {
-        url: data.imageUrl,
+        url: result.imageUrl,
         prompt: currentPrompt,
-        revisedPrompt: data.revisedPrompt,
-        costUsd: data.costUsd ?? 0.19,
+        revisedPrompt: result.revisedPrompt,
+        costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
       };
       // 2차+ 시 토큰 차감 (성공 후에만 — 실패 시 차감 없음)
@@ -574,41 +575,41 @@ export default function Step2Designer({
           const wallLayout = buildWallLayout(tab.label);  // Q1
           const ctrl = new AbortController();
           const timeoutId = setTimeout(() => ctrl.abort(), 320_000);
-          const res = await fetch("/api/inpick/render-room", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+          const bulkBody: RenderRoomBody = {
+            roomName: tab.label,
+            widthMm: dim.widthMm,
+            depthMm: dim.depthMm,
+            heightMm: dim.heightMm,
+            style: conceptPrompt,
+            expansion: basicInfo.expansionType === "extended",
+            size: "1024x1024",
+            quality: "low",                              // Q2 — 1차 low
+            windows: struct.windows,
+            doors: struct.doors,
+            isInteriorRoom: struct.isInteriorRoom,
+            windowWalls: struct.windowWalls,
+            doorWalls: struct.doorWalls,
+            adjacentRooms: struct.adjacentRooms,
+            wallLayout,                                  // Q1
+            aspectRatio: dim.widthMm / dim.depthMm,
+            isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
+            furnishingOptions: roomFurnishings?.[tab.v] || [],
+            propertyId: basicInfo.floorplanPropertyId,
+            floorplanImageUrl: basicInfo.normalizedImageUrl
+              || basicInfo.cleanedImageUrl
+              || basicInfo.selectedPyeong?.grandPlanUrl,
+          };
+          // Phase 9 — sync/async 자동 처리 (jobId 응답 시 polling)
+          const result = await renderRoomViaClient(bulkBody, {
             signal: ctrl.signal,
-            body: JSON.stringify({
-              roomName: tab.label,
-              widthMm: dim.widthMm,
-              depthMm: dim.depthMm,
-              heightMm: dim.heightMm,
-              style: conceptPrompt,
-              expansion: basicInfo.expansionType === "extended",
-              size: "1024x1024",
-              quality: "low",                              // Q2 — 1차 low
-              windows: struct.windows,
-              doors: struct.doors,
-              isInteriorRoom: struct.isInteriorRoom,
-              windowWalls: struct.windowWalls,
-              doorWalls: struct.doorWalls,
-              adjacentRooms: struct.adjacentRooms,
-              wallLayout,                                  // Q1
-              aspectRatio: dim.widthMm / dim.depthMm,
-              isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
-              furnishingOptions: roomFurnishings?.[tab.v] || [],
-              propertyId: basicInfo.floorplanPropertyId,
-              floorplanImageUrl: basicInfo.normalizedImageUrl
-                || basicInfo.cleanedImageUrl
-                || basicInfo.selectedPyeong?.grandPlanUrl,
-            }),
-          }).finally(() => clearTimeout(timeoutId));
-          const data = await res.json();
-          if (!res.ok || !data.imageUrl) {
+            postTimeoutMs: 320_000,
+          });
+          clearTimeout(timeoutId);
+          if ("error" in result) {
             results.push({
               tabKey: tab.v,
               ok: false,
-              error: `${data.error || "이미지 생성 실패"}${data.hint ? ` → ${data.hint}` : ""}`,
+              error: `${result.error || "이미지 생성 실패"}${result.hint ? ` → ${result.hint}` : ""}`,
               label: tab.label,
             });
           } else {
@@ -616,10 +617,10 @@ export default function Step2Designer({
               tabKey: tab.v,
               ok: true,
               item: {
-                url: data.imageUrl,
+                url: result.imageUrl,
                 prompt: conceptPrompt,
-                revisedPrompt: data.revisedPrompt,
-                costUsd: data.costUsd ?? 0.01,            // low quality 기본 $0.01
+                revisedPrompt: result.revisedPrompt,
+                costUsd: result.costUsd ?? 0.01,            // low quality 기본 $0.01
                 timestamp: new Date().toISOString(),
               } as RenderItem,
             });

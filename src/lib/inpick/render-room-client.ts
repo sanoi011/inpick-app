@@ -1,0 +1,232 @@
+/**
+ * Client-side render-room helper — Phase 9.
+ *
+ * 가이드: c:\Users\user\Downloads\inpick-claude-code-dev-direction-20260510.md
+ *        Prompt 9 (Step2 polling 최소 반영)
+ *
+ * 책임:
+ *   - /api/inpick/render-room POST 호출
+ *   - 응답이 sync (imageUrl 즉시) 또는 async (jobId 반환) 둘 다 처리
+ *   - async일 때 GET /api/inpick/render-room/jobs/[jobId] polling
+ *   - 동일한 결과 shape 반환 → 호출자(Step2Designer) 변경 최소화
+ *
+ * 호환:
+ *   - 기존 sync 응답: { imageUrl, revisedPrompt, model, costUsd, ... }
+ *   - 신규 async 응답: { jobId, status: "queued" | "processing", imageUrl: undefined }
+ *   - 두 케이스 모두 RenderRoomResult shape으로 통일.
+ *
+ * 정책:
+ *   - polling 간격: 3초 (RunPod 통상 12~60초 ETA)
+ *   - polling 최대 시간: 5분 (Vercel maxDuration 300초와 정렬)
+ *   - 실패 시 에러 throw (호출자가 catch + 사용자 안내)
+ *   - AbortSignal 지원 (호출자가 timeout/취소 가능)
+ */
+
+export interface RenderRoomBody {
+  roomName: string;
+  widthMm: number;
+  depthMm: number;
+  heightMm?: number;
+  style?: string;
+  expansion?: boolean;
+  size?: "1024x1024" | "1024x1792" | "1792x1024";
+  quality?: "low" | "medium" | "high";
+  windows?: number;
+  doors?: number;
+  isInteriorRoom?: boolean;
+  windowWalls?: string[];
+  doorWalls?: string[];
+  adjacentRooms?: string[];
+  wallLayout?: string;
+  furnishingOptions?: string[];
+  aspectRatio?: number;
+  isFromFloorplan?: boolean;
+  propertyId?: string;
+  floorplanImageUrl?: string;
+  previousReference?: string;
+  // geometry-first (Phase 4+ optional)
+  roomGeometry?: Record<string, unknown>;
+  camera?: Record<string, unknown>;
+}
+
+export interface RenderRoomClientResult {
+  /** 최종 imageUrl (sync 또는 async 완료 후) */
+  imageUrl: string;
+  revisedPrompt?: string;
+  model?: string;
+  backend?: string;
+  costUsd?: number;
+  jobId?: string;
+  /** sync 응답이면 false. async polling 후 완료면 true. */
+  wasAsync: boolean;
+  /** debug — 총 polling 시간 ms */
+  pollingMs?: number;
+}
+
+export interface RenderRoomClientError {
+  error: string;
+  hint?: string;
+  modelStatus?: string;
+  jobId?: string;
+  backend?: string;
+}
+
+export interface RenderRoomClientOptions {
+  /** 진행 콜백 (async polling 시 호출) */
+  onProgress?: (state: {
+    status: string;
+    jobId: string;
+    elapsedMs: number;
+  }) => void;
+  /** AbortSignal — 호출자가 취소 가능 */
+  signal?: AbortSignal;
+  /** polling 간격 ms (default 3000) */
+  pollIntervalMs?: number;
+  /** polling 최대 시간 ms (default 300000 = 5분) */
+  pollTimeoutMs?: number;
+  /** POST 직접 timeout (default 320000 = 5분 20초) */
+  postTimeoutMs?: number;
+}
+
+/**
+ * /api/inpick/render-room 호출 + 필요 시 polling.
+ *
+ * 사용:
+ *   const result = await renderRoomViaClient(body, { signal: abortCtrl.signal });
+ *   if ("error" in result) throw new Error(result.error);
+ *   setImageUrl(result.imageUrl);
+ */
+export async function renderRoomViaClient(
+  body: RenderRoomBody,
+  opts: RenderRoomClientOptions = {},
+): Promise<RenderRoomClientResult | RenderRoomClientError> {
+  const pollIntervalMs = opts.pollIntervalMs ?? 3000;
+  const pollTimeoutMs = opts.pollTimeoutMs ?? 300_000;
+  const postTimeoutMs = opts.postTimeoutMs ?? 320_000;
+
+  // ─── 1. POST /api/inpick/render-room ───
+  const postCtrl = new AbortController();
+  const onAbort = () => postCtrl.abort();
+  if (opts.signal) {
+    if (opts.signal.aborted) postCtrl.abort();
+    else opts.signal.addEventListener("abort", onAbort, { once: true });
+  }
+  const postTimeoutId = setTimeout(() => postCtrl.abort(), postTimeoutMs);
+
+  let postRes: Response;
+  let postData: Record<string, unknown>;
+  try {
+    postRes = await fetch("/api/inpick/render-room", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: postCtrl.signal,
+      body: JSON.stringify(body),
+    });
+    postData = (await postRes.json()) as Record<string, unknown>;
+  } catch (e) {
+    return {
+      error: e instanceof Error ? e.message : String(e),
+    };
+  } finally {
+    clearTimeout(postTimeoutId);
+    if (opts.signal) opts.signal.removeEventListener("abort", onAbort);
+  }
+
+  // 명시적 에러 응답
+  if (!postRes.ok) {
+    return {
+      error: (postData.error as string) || `HTTP ${postRes.status}`,
+      hint: postData.hint as string | undefined,
+      modelStatus: postData.model_status as string | undefined,
+      jobId: postData.jobId as string | undefined,
+      backend: postData.backend as string | undefined,
+    };
+  }
+
+  // ─── 2a. Sync 응답 (imageUrl 즉시) ───
+  if (postData.imageUrl && typeof postData.imageUrl === "string") {
+    return {
+      imageUrl: postData.imageUrl,
+      revisedPrompt: postData.revisedPrompt as string | undefined,
+      model: postData.model as string | undefined,
+      backend: postData.backend as string | undefined,
+      costUsd: postData.costUsd as number | undefined,
+      jobId: postData.jobId as string | undefined,
+      wasAsync: false,
+    };
+  }
+
+  // ─── 2b. Async 응답 (jobId만) — polling ───
+  const jobId = postData.jobId as string | undefined;
+  if (!jobId) {
+    return {
+      error: "이미지 URL 없음 (응답에 imageUrl도 jobId도 없음)",
+    };
+  }
+
+  const t0 = Date.now();
+  while (true) {
+    if (opts.signal?.aborted) {
+      return { error: "사용자 취소", jobId };
+    }
+    const elapsedMs = Date.now() - t0;
+    if (elapsedMs > pollTimeoutMs) {
+      return {
+        error: `Polling timeout (${Math.round(elapsedMs / 1000)}초)`,
+        jobId,
+        hint: "RunPod cold start 가능 — 잠시 후 다시 시도",
+      };
+    }
+
+    // wait
+    await new Promise((r) => setTimeout(r, pollIntervalMs));
+
+    let pollRes: Response;
+    let pollData: Record<string, unknown>;
+    try {
+      pollRes = await fetch(`/api/inpick/render-room/jobs/${jobId}`, {
+        signal: opts.signal,
+      });
+      pollData = (await pollRes.json()) as Record<string, unknown>;
+    } catch (e) {
+      // network 에러 — 한번 더 재시도 가능, 일단 polling 종료
+      return {
+        error: e instanceof Error ? e.message : String(e),
+        jobId,
+      };
+    }
+    if (!pollRes.ok) {
+      return {
+        error: (pollData.error as string) || `Job poll HTTP ${pollRes.status}`,
+        hint: pollData.hint as string | undefined,
+        jobId,
+      };
+    }
+
+    const status = pollData.status as string | undefined;
+    opts.onProgress?.({ status: status || "unknown", jobId, elapsedMs });
+
+    if (status === "completed" && pollData.imageUrl) {
+      return {
+        imageUrl: pollData.imageUrl as string,
+        revisedPrompt: pollData.revisedPrompt as string | undefined,
+        model: pollData.model as string | undefined,
+        backend: pollData.backend as string | undefined,
+        costUsd: pollData.costUsd as number | undefined,
+        jobId,
+        wasAsync: true,
+        pollingMs: Date.now() - t0,
+      };
+    }
+    if (status === "failed") {
+      return {
+        error: (pollData.error as string) || "Job failed",
+        hint: pollData.hint as string | undefined,
+        modelStatus: pollData.modelStatus as string | undefined,
+        jobId,
+        backend: pollData.backend as string | undefined,
+      };
+    }
+    // 그 외 (queued, processing) — 계속 polling
+  }
+}
