@@ -140,7 +140,9 @@ export default function Step2Designer({
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
   // 채팅 모드 + 메시지는 local useState로 — 스트리밍 빈번 갱신 시 closure stale 회피
-  const [chatMode, setChatModeLocal] = useState<boolean>(value.chatMode ?? false);
+  // 정책 (대표 지시): default = chat 모드. 사용자는 AI와 대화 후 명시적으로
+  // "이 컨셉으로 디자인 생성하기" 버튼을 눌러야 이미지 생성. 즉시생성은 토글로 옵션.
+  const [chatMode, setChatModeLocal] = useState<boolean>(value.chatMode ?? true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(value.chatMessages ?? []);
   const [chatStreaming, setChatStreaming] = useState(false);
   const [extractingPrompt, setExtractingPrompt] = useState(false);
