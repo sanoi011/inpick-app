@@ -1,7 +1,21 @@
+/**
+ * POST /api/project/design-ai
+ *
+ * AI 디자인 상담 (SSE 스트리밍).
+ * 변경 (2026-05-10): Gemini → Anthropic Claude Sonnet 4.6 교체.
+ * 가이드: docs/ops/GEMINI_REMOVAL_AUDIT.md Phase C
+ *
+ * 입력: { messages, floorPlanContext?, annotations? }
+ * 출력: SSE — data: {"text":"..."} ... data: [DONE]
+ */
 import { NextRequest } from "next/server";
-import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
 import { searchKnowledgeSemantic } from "@/lib/knowledge-search";
 import { searchRegulations, formatRegulations } from "@/lib/regulations-search";
+import { streamAnthropicChat, type ChatMessage } from "@/lib/ai/anthropic-stream";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
 
 const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전문가입니다.
 
@@ -13,7 +27,7 @@ const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전�
 
 규칙:
 - 한국어로 답변하세요.
-- 사용자가 이미지를 공유하면 이미지 내용을 상세히 분석하세요.
+- **인사말 금지**: 이미 사용자가 화면에서 인사를 받았습니다. "안녕하세요" 등으로 시작하지 말고 사용자 질문에 곧바로 답변하세요.
 - 사용자가 표시한 주석 영역에 집중하여 답변하세요.
 - 비용 언급 시 "대략적인 참고 금액"임을 명시하세요.
 - 답변은 전문적이면서도 이해하기 쉽게, 구조화하여 작성하세요.
@@ -21,178 +35,99 @@ const DESIGN_SYSTEM_PROMPT = `당신은 INPICK의 AI 인테리어 디자인 전�
 - 공간의 넓이, 채광, 동선을 고려하여 실용적인 제안을 하세요.
 - 이전 대화 내용을 기억하고, 사용자가 이전에 언급한 선호도나 결정사항을 반영하세요.`;
 
-
-export async function POST(request: NextRequest) {
-  try {
-    const { messages, floorPlanContext, annotations } = await request.json();
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(
-        JSON.stringify({ error: "메시지가 필요합니다." }),
-        { status: 400, headers: { "Content-Type": "application/json" } }
-      );
-    }
-
-    // Gemini 클라이언트 확인
-    const client = getGeminiClient();
-
-    if (!client || !isGeminiConfigured()) {
-      return createMockResponse(messages);
-    }
-
-    // 지식베이스 + 법규 병렬 검색 (마지막 메시지 기반)
-    const lastUserMsg = messages[messages.length - 1]?.content || "";
-    const [knowledgeContext, regulations] = await Promise.all([
-      searchKnowledgeSemantic(lastUserMsg),
-      searchRegulations(lastUserMsg),
-    ]);
-    const regulationContext = formatRegulations(regulations);
-
-    try {
-      // Gemini 멀티턴 대화 구성
-      const systemInstruction = [
-        DESIGN_SYSTEM_PROMPT,
-        knowledgeContext ? `\n\n[참고 지식]\n${knowledgeContext}` : "",
-        regulationContext,
-        floorPlanContext ? `\n\n[도면 정보]\n공간 구성: ${floorPlanContext}` : "",
-      ].filter(Boolean).join("");
-
-      // 대화 이력을 Gemini 형식으로 변환
-      const geminiContents: Array<{ role: "user" | "model"; parts: Array<{ text: string }> }> = [];
-
-      for (const msg of messages) {
-        const role = msg.role === "assistant" ? "model" as const : "user" as const;
-        const parts: Array<{ text: string }> = [{ text: msg.content }];
-
-        // 마지막 user 메시지에 이미지/주석 컨텍스트 추가
-        if (msg === messages[messages.length - 1] && role === "user") {
-          if (annotations && annotations.length > 0) {
-            const annotationDesc = annotations
-              .map((a: { type: string; label?: string }, idx: number) =>
-                `주석 ${idx + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`)
-              .join("\n");
-            parts.push({ text: `\n[사용자 주석]\n${annotationDesc}` });
-          }
-        }
-
-        geminiContents.push({ role, parts });
-      }
-
-      // Gemini 스트리밍 호출
-      const response = await client.models.generateContentStream({
-        model: "gemini-3-pro-preview",
-        contents: geminiContents,
-        config: {
-          systemInstruction,
-          maxOutputTokens: 2048,
-          temperature: 0.7,
-        },
-      });
-
-      // Gemini 스트림 → SSE 변환
-      const encoder = new TextEncoder();
-      const readableStream = new ReadableStream({
-        async start(controller) {
-          try {
-            for await (const chunk of response) {
-              const text = chunk.text;
-              if (text) {
-                controller.enqueue(
-                  encoder.encode(`data: ${JSON.stringify({ text })}\n\n`)
-                );
-              }
-            }
-          } catch (err: unknown) {
-            const error = err as { message?: string };
-            console.error("Gemini stream error:", error.message);
-          } finally {
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            controller.close();
-          }
-        },
-      });
-
-      return new Response(readableStream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          Connection: "keep-alive",
-        },
-      });
-    } catch (err: unknown) {
-      const error = err as { status?: number; message?: string };
-      console.error("Gemini API error:", error.status, error.message);
-      return createMockResponse(messages);
-    }
-  } catch (err) {
-    console.error("Design AI error:", err);
-    return new Response(
-      JSON.stringify({ error: "AI 서비스 오류가 발생했습니다." }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
-    );
-  }
+interface DesignAiBody {
+  messages?: ChatMessage[];
+  floorPlanContext?: string;
+  annotations?: { type: string; label?: string }[];
 }
 
-// Mock 응답 생성
-function createMockResponse(messages: { role: string; content: string }[]) {
-  const lastMsg = messages[messages.length - 1]?.content || "";
-  let mockText = "";
+export async function POST(request: NextRequest) {
+  let body: DesignAiBody;
+  try {
+    body = (await request.json()) as DesignAiBody;
+  } catch {
+    return new Response(
+      JSON.stringify({ error: "잘못된 요청 형식입니다." }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
+  const { messages, floorPlanContext, annotations } = body;
+  if (!messages || !Array.isArray(messages) || messages.length === 0) {
+    return new Response(
+      JSON.stringify({ error: "메시지가 필요합니다." }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
+  // 지식베이스 + 법규 병렬 검색 (마지막 메시지 기반)
+  const lastUserMsg = messages[messages.length - 1]?.content || "";
+  const [knowledgeContext, regulations] = await Promise.all([
+    searchKnowledgeSemantic(lastUserMsg).catch(() => ""),
+    searchRegulations(lastUserMsg).catch(() => []),
+  ]);
+  const regulationContext = formatRegulations(regulations);
+
+  // 시스템 프롬프트 구성
+  const systemInstruction = [
+    DESIGN_SYSTEM_PROMPT,
+    knowledgeContext ? `\n\n[참고 지식]\n${knowledgeContext}` : "",
+    regulationContext,
+    floorPlanContext ? `\n\n[도면 정보]\n공간 구성: ${floorPlanContext}` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  // annotations를 마지막 user 메시지에 추가 (Anthropic은 별도 parts 없음 — content에 합침)
+  const enrichedMessages: ChatMessage[] = messages.map((m, i) => ({ ...m }));
+  if (annotations && annotations.length > 0 && enrichedMessages.length > 0) {
+    const last = enrichedMessages[enrichedMessages.length - 1];
+    if (last.role === "user") {
+      const annotationDesc = annotations
+        .map(
+          (a, idx) =>
+            `주석 ${idx + 1}: ${a.type}${a.label ? ` - "${a.label}"` : ""}`,
+        )
+        .join("\n");
+      last.content = `${last.content}\n\n[사용자 주석]\n${annotationDesc}`;
+    }
+  }
+
+  return streamAnthropicChat({
+    system: systemInstruction,
+    messages: enrichedMessages,
+    maxTokens: 2048,
+    temperature: 0.7,
+    mockFallback: createDesignMockResponse,
+  });
+}
+
+function createDesignMockResponse(messages: ChatMessage[]): string {
+  const lastMsg = messages[messages.length - 1]?.content || "";
   if (lastMsg.includes("바닥") || lastMsg.includes("마루")) {
-    mockText = `해당 공간의 바닥재를 분석해 보겠습니다.
+    return `해당 공간의 바닥재를 분석해 보겠습니다.
 
 **추천 바닥재:**
-1. **LX 하우시스 디아망 오크** - 내구성 우수, 평당 약 45,000원
-   - 규격: 1,210×192×8mm / 친환경 E0 등급
-2. **한화 아쿠아텍 자작나무** - 방수 기능, 평당 약 38,000원
-   - 규격: 1,200×190×8mm / 욕실 인접 공간에 적합
-3. **KCC 숲 에코 월넛** - 프리미엄 질감, 평당 약 52,000원
-   - 규격: 1,220×195×12mm / 고급 인테리어에 적합
+1. **LX 하우시스 디아망 오크** - 평당 약 45,000원
+2. **한화 아쿠아텍 자작나무** - 평당 약 38,000원
+3. **KCC 숲 에코 월넛** - 평당 약 52,000원
 
-선택하신 공간의 면적과 용도를 고려하면 **1번 디아망 오크**를 추천드립니다.
-시공비 포함 시 평당 약 65,000원~75,000원 수준입니다.
-
-추가 궁금한 점이 있으시면 말씀해 주세요!`;
-  } else if (lastMsg.includes("벽") || lastMsg.includes("색상") || lastMsg.includes("도배")) {
-    mockText = `벽면 디자인을 분석했습니다.
+선택하신 공간의 면적과 용도를 고려하면 1번 디아망 오크를 추천드립니다.
+시공비 포함 시 평당 약 65,000원~75,000원 수준입니다.`;
+  }
+  if (lastMsg.includes("벽") || lastMsg.includes("색상") || lastMsg.includes("도배")) {
+    return `벽면 디자인을 분석했습니다.
 
 **벽 색상 제안:**
-1. **베이지 톤 (NCS S 1005-Y20R)** - 따뜻하고 넓어 보이는 효과
-2. **라이트 그레이 (NCS S 1502-B)** - 모던하고 깔끔한 느낌
-3. **소프트 민트 (NCS S 1010-G10Y)** - 밝고 산뜻한 분위기
+1. 베이지 톤 (NCS S 1005-Y20R)
+2. 라이트 그레이 (NCS S 1502-B)
+3. 소프트 민트 (NCS S 1010-G10Y)
 
 **도배 비용 참고:**
 - 실크 벽지: 평당 약 12,000원~15,000원
-- 합지 벽지: 평당 약 8,000원~10,000원
-- 포인트 벽지(수입): 평당 약 25,000원~40,000원
-
-현재 공간의 채광과 크기를 고려하면 **1번 베이지 톤**을 추천드립니다.`;
-  } else if (lastMsg.includes("수납") || lastMsg.includes("정리") || lastMsg.includes("붙박이")) {
-    mockText = `수납 공간 활용도를 높이는 솔루션을 제안드립니다.
-
-**수납 확장 방안:**
-- **붙박이장 설치** (벽면 활용) - 약 120만원~200만원
-- **시스템 행거** (드레스룸 구성) - 약 80만원~150만원
-- **키큰수납장** (주방/거실 벽면) - 약 60만원~100만원
-
-표시하신 영역에 맞춤형 붙박이장을 설치하면 수납량을 약 3배 늘릴 수 있습니다.`;
-  } else {
-    // 대화 이력이 있으면 이전 대화 참조 응답
-    const prevMessages = messages.filter((m: { role: string }) => m.role === "assistant");
-    if (prevMessages.length > 0) {
-      mockText = `네, 이전 대화를 참고하여 답변드리겠습니다.
-
-**${lastMsg}**에 대해 분석해 보겠습니다.
-
-이전에 논의했던 내용을 바탕으로:
-- 선택하신 스타일과 예산에 맞는 옵션을 제안드립니다
-- 공간 특성을 고려한 맞춤 추천을 드립니다
-
-더 구체적인 부분이 궁금하시면 말씀해 주세요!
-
-더 궁금한 점이 있으시면 편하게 물어봐 주세요!`;
-    } else {
-      mockText = `안녕하세요! 해당 공간을 분석해 보겠습니다.
+- 합지 벽지: 평당 약 8,000원~10,000원`;
+  }
+  return `해당 공간을 분석해 보겠습니다.
 
 도면이나 사진을 보면서 궁금한 부분을 표시해주시면 더 정확한 답변을 드릴 수 있습니다.
 
@@ -204,34 +139,5 @@ function createMockResponse(messages: { role: string; content: string }[]) {
 - 수납 솔루션 및 공간 활용
 - 공종별 예상 비용 안내
 
-궁금한 점을 자유롭게 물어봐 주세요!
-
-더 궁금한 점이 있으시면 편하게 물어봐 주세요!`;
-    }
-  }
-
-  // Mock 스트리밍 응답
-  const encoder = new TextEncoder();
-  const stream = new ReadableStream({
-    async start(controller) {
-      const words = mockText.split("");
-      for (let i = 0; i < words.length; i += 5) {
-        const chunk = words.slice(i, i + 5).join("");
-        controller.enqueue(
-          encoder.encode(`data: ${JSON.stringify({ text: chunk })}\n\n`)
-        );
-        await new Promise((r) => setTimeout(r, 10));
-      }
-      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-      controller.close();
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  });
+궁금한 점을 자유롭게 물어봐 주세요.`;
 }

@@ -155,17 +155,8 @@ export async function POST(request: NextRequest) {
       callPdfParserV47(fileBuffer, file.name),
     ]);
 
-    // Gemini 결과 추출
-    const result = geminiSettled.status === "fulfilled"
-      ? geminiSettled.value
-      : null;
-
-    if (!result) {
-      return NextResponse.json(
-        { error: "도면 분석에 실패했습니다. 다시 시도해주세요." },
-        { status: 500 }
-      );
-    }
+    // Gemini 결과 추출 (정책 차단 또는 키 미설정 시 null)
+    let result = geminiSettled.status === "fulfilled" ? geminiSettled.value : null;
 
     // floorplan-ai 결과 변환 (legacy 또는 v4.7)
     const aiRawResult = aiSettled.status === "fulfilled" ? aiSettled.value : null;
@@ -181,13 +172,46 @@ export async function POST(request: NextRequest) {
       console.log(`[parse-drawing] floorplan-ai: ${aiParsedPlan.rooms.length} rooms, ${aiParsedPlan.walls.length} walls, ${aiParsedPlan.doors.length} doors`);
     }
 
+    // Phase E (graceful degrade — 2026-05-10): Gemini 정책 차단 시
+    // Python 결과(floorplan-ai 또는 v47)만으로 응답 구성
+    // TODO: OpenAI Vision으로 마이그레이션 (docs/ops/GEMINI_REMOVAL_AUDIT.md Phase E)
+    if (!result) {
+      if (aiParsedPlan) {
+        console.warn("[parse-drawing] Gemini unavailable — using Python-only fallback");
+        // method 필드는 gemini-floorplan-parser의 union literal — 임시 cast로 graceful 응답
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        result = {
+          floorPlan: aiParsedPlan,
+          confidence: 0.6,
+          warnings: ["Gemini 시맨틱 분석 비활성화 — 정확도 일부 저하"],
+          processingTimeMs: 0,
+          method: "python_only_fallback",
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } as any;
+      } else {
+        return NextResponse.json(
+          {
+            error: "도면 분석 미설정",
+            hint:
+              "Gemini가 비활성화되어 있고 floorplan-ai/pdf-parser-v47도 응답 없음. " +
+              "Python 서비스를 켜거나 OpenAI Vision 마이그레이션이 필요합니다.",
+          },
+          { status: 503 },
+        );
+      }
+    }
+
     // 3단계: Enhanced Fusion (Gemini + floorplan-ai + PyMuPDF)
-    // 템플릿 매칭 결과는 이미 정확하므로 fusion 스킵
-    const isTemplateMatch = result.confidence >= 1.0 && result.repairMetrics?.sizeCV === 1.0;
+    // 위 fallback 분기로 result는 항상 non-null. TS narrowing용 명시.
+    const finalResult: NonNullable<typeof result> = result as NonNullable<typeof result>;
+    const isTemplateMatch =
+      finalResult.confidence >= 1.0 && finalResult.repairMetrics?.sizeCV === 1.0;
     const fusionResult = isTemplateMatch
-      ? { floorPlan: result.floorPlan, stats: {}, sources: {} }
-      : enhancedFuse(result.floorPlan, aiParsedPlan, vectorHints);
-    result.floorPlan = fusionResult.floorPlan;
+      ? { floorPlan: finalResult.floorPlan, stats: {}, sources: {} }
+      : enhancedFuse(finalResult.floorPlan, aiParsedPlan, vectorHints);
+    finalResult.floorPlan = fusionResult.floorPlan;
+    // 이후 코드 호환을 위해 result에도 같은 참조 유지
+    result = finalResult;
 
     // 도면 파싱 로그 기록 (fire-and-forget)
     if (supabase) {

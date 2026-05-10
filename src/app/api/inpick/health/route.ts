@@ -5,6 +5,7 @@
  */
 import { NextResponse } from "next/server";
 import { getOpenAIKey } from "@/lib/inpick/openai-env";
+import { getAIEnvStatus, getActivePolicy } from "@/lib/ai/model-registry";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -45,7 +46,15 @@ export async function GET() {
     openaiPing = await pingOpenAI(openaiKey);
   }
 
+  const aiEnv = getAIEnvStatus();
+
   return NextResponse.json({
+    aiPolicy: {
+      active: getActivePolicy(),
+      required: aiEnv.required,
+      optional: aiEnv.optional,
+      deprecated: aiEnv.deprecated, // GOOGLE_GEMINI_API_KEY 표시
+    },
     openai: {
       configured: !!openaiKey,
       keySource,
@@ -54,6 +63,20 @@ export async function GET() {
       forceMock,
       ping: openaiPing,
       mode: openaiKey && openaiPing.ok && !forceMock ? "live" : "broken",
+    },
+    anthropic: {
+      configured: !!process.env.ANTHROPIC_API_KEY,
+      keyHint: process.env.ANTHROPIC_API_KEY
+        ? `sk-ant-...${process.env.ANTHROPIC_API_KEY.slice(-4)}`
+        : null,
+    },
+    runpod: {
+      configured: !!process.env.RUNPOD_API_KEY,
+      endpoints: {
+        flux: !!process.env.RUNPOD_FLUX_ENDPOINT,
+        sync: !!process.env.RUNPOD_SYNC_ENDPOINT,
+        async: !!process.env.RUNPOD_ASYNC_ENDPOINT,
+      },
     },
     supabase: {
       url: !!process.env.NEXT_PUBLIC_SUPABASE_URL,

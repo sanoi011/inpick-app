@@ -6,6 +6,7 @@ import sharp from "sharp";
 import { buildSegmentationPrompt } from "@/lib/prompts/segmentation-prompt";
 import { ROOM_TYPE_COLORS } from "@/lib/constants/room-segmentation";
 import type { SegmentedRoom, RoomColorMap } from "@/lib/constants/room-segmentation";
+import { isGeminiConfigured } from "@/lib/gemini-client";
 
 // Storage 업로드용 service role client (anon key로는 업로드 불가)
 function createAdminClient() {
@@ -197,8 +198,39 @@ export async function POST(request: NextRequest) {
   }
 
   const apiKey = process.env.GOOGLE_GEMINI_API_KEY;
-  if (!apiKey) {
-    return NextResponse.json({ error: "Gemini API 키가 설정되지 않았습니다" }, { status: 500 });
+  // Phase E (graceful degrade — 2026-05-10): Gemini 정책 차단 또는 키 미설정 시
+  // 원본 네이버 도면 URL을 그대로 반환. 워터마크 포함된 raw 이미지지만 동작은 유지.
+  // TODO: OpenAI gpt-image-2 EDITS API로 마이그레이션 (docs/ops/GEMINI_REMOVAL_AUDIT.md Phase E)
+  if (!apiKey || !isGeminiConfigured()) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      start(controller) {
+        controller.enqueue(
+          encoder.encode(
+            `data: ${JSON.stringify({
+              event: "fallback",
+              status: "disabled",
+              notice: "AI 도면 가공 비활성화 — 원본 도면 그대로 사용 (워터마크 포함)",
+              finalUrl: grandPlanUrl,
+              finalMirrorUrl: grandPlanUrl,
+              maskUrl: null,
+              maskMirrorUrl: null,
+              roomColorMap: null,
+              deprecated: true,
+            })}\n\n`,
+          ),
+        );
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      },
+    });
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
+    });
   }
 
   const supabase = createAdminClient();
