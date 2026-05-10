@@ -978,6 +978,11 @@ function ContractDetailContent() {
               <span className="flex items-center gap-1"><Building2 className="w-3 h-3" />{contractor.company_name}</span>
             )}
           </div>
+
+          {/* Phase 3 — 확정 견적서 PDF 다운로드 (사업자 정보 + 적용 요율 자동 주입) */}
+          <div className="mt-4 pt-3 border-t border-gray-100">
+            <QuotePdfDownloadButton contractId={contract.id} isContractor={isContractor} />
+          </div>
         </div>
 
         {/* 활성 섹션 */}
@@ -1126,5 +1131,111 @@ export default function ContractDetailPage() {
     >
       <ContractDetailContent />
     </Suspense>
+  );
+}
+
+// ─── Phase 3: 확정 견적서 PDF 다운로드 ───
+function QuotePdfDownloadButton({
+  contractId,
+  isContractor,
+}: {
+  contractId: string;
+  isContractor: boolean;
+}) {
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (downloading) return;
+    setDownloading(true);
+    try {
+      // ─── 1. 견적 데이터 조회 ───
+      const headers: Record<string, string> = {};
+      if (isContractor && typeof window !== "undefined") {
+        const token = localStorage.getItem("contractor_token");
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+      }
+      const res = await fetch(`/api/contracts/${contractId}/quote-data`, { headers });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        toast({ type: "error", title: err.error || "견적 데이터 조회 실패" });
+        return;
+      }
+      const data = await res.json();
+
+      // ─── 2. quote-pdf 동적 import + meta/estimate 빌드 ───
+      const mod = await import("@/lib/inpick/quote-pdf");
+
+      const pyeong = data.estimate?.totalAreaM2
+        ? `${Math.round(data.estimate.totalAreaM2 / 3.3)}평`
+        : undefined;
+
+      // QuoteEstimate (호환 평면 + 신규 sections 둘 다 채움)
+      const generatedAt = new Date().toISOString();
+      const estimate = {
+        // 신규 (spec) — sections 없으면 ensureSections가 items[]로 폴백
+        items: data.items || [],
+        directCostSubtotal: data.directCost,
+        indirectCosts: data.indirectCosts,
+        totalAmount: data.totalAmount,
+        total_area_m2: data.estimate?.totalAreaM2,
+
+        // 호환 평면 필드
+        material_subtotal: data.estimate?.totalMaterial ?? 0,
+        labor_subtotal: data.estimate?.totalLabor ?? 0,
+        direct_total: data.directCost,
+        total: data.totalAmount,
+        vat_separate: data.indirectCosts?.vat ?? 0,
+
+        generated_at: generatedAt,
+      };
+
+      // QuoteMeta — contractor 채워서 갑지 자동 주입
+      const meta = {
+        quote_no: mod.generateQuoteNo(),
+        client_name: "—", // TODO: contract 페이지에 consumer 정보 노출되면 채움
+        site_address: data.address || data.estimate?.address || "—",
+        site_area_sqm: data.estimate?.totalAreaM2,
+        pyeong,
+        validity_days: 30,
+        contractor: data.contractor
+          ? {
+              company_name: data.contractor.company_name,
+              representative: data.contractor.representative,
+              biz_no: data.contractor.biz_no,
+              address: data.contractor.address,
+              phone: data.contractor.phone,
+              email: data.contractor.email,
+            }
+          : undefined,
+      };
+
+      await mod.downloadQuotePdf(estimate, meta);
+      toast({ type: "success", title: "견적서 PDF가 다운로드되었습니다" });
+    } catch (e) {
+      console.error("[contract] quote PDF generation failed:", e);
+      toast({
+        type: "error",
+        title: "PDF 생성 실패",
+        message: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleDownload}
+      disabled={downloading}
+      className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow hover:opacity-95 disabled:opacity-50"
+    >
+      {downloading ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      ) : (
+        <Download className="w-3.5 h-3.5" />
+      )}
+      {downloading ? "PDF 생성 중..." : "확정 견적서 PDF (사업자 정보 자동 주입)"}
+    </button>
   );
 }

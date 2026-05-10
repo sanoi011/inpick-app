@@ -91,10 +91,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "bidId가 필요합니다." }, { status: 400 });
     }
 
-    // 입찰 정보 조회
+    // 입찰 정보 조회 (사업자 + 요율 LEFT JOIN — Phase 3 snapshot용)
     const { data: bid, error: bidErr } = await supabase
       .from("bids")
-      .select("*, estimates(*)")
+      .select(`
+        *,
+        estimates(*),
+        specialty_contractors (id, company_name, contact_name, business_number, address, phone, email),
+        bid_indirect_rates (*)
+      `)
       .eq("id", bidId)
       .single();
 
@@ -103,6 +108,39 @@ export async function POST(request: NextRequest) {
     }
 
     const estimate = bid.estimates;
+
+    // ─── Phase 3 spec §A-1: 계약 시점 사업자 정보 snapshot (갑지 시공자 칸 5필드) ───
+    const contractorRow = Array.isArray(bid.specialty_contractors)
+      ? (bid.specialty_contractors[0] as Record<string, unknown> | undefined)
+      : (bid.specialty_contractors as Record<string, unknown> | null);
+    const contractorSnapshot = contractorRow
+      ? {
+          company_name: (contractorRow.company_name as string) || "",
+          representative: (contractorRow.contact_name as string) || "",
+          biz_no: (contractorRow.business_number as string) || "",
+          address: (contractorRow.address as string) || "",
+          phone: (contractorRow.phone as string) || "",
+          email: (contractorRow.email as string) || "",
+        }
+      : null;
+
+    // ─── Phase 3: 적용 요율 snapshot (선정 시점의 bid_indirect_rates) ───
+    const ratesRow = Array.isArray(bid.bid_indirect_rates)
+      ? (bid.bid_indirect_rates[0] as Record<string, unknown> | undefined)
+      : (bid.bid_indirect_rates as Record<string, unknown> | null);
+    const appliedIndirectRates = ratesRow
+      ? {
+          elevator_protection: Number(ratesRow.elevator_protection ?? 350000),
+          entrance_protection: Number(ratesRow.entrance_protection ?? 180000),
+          scaffolding: Number(ratesRow.scaffolding ?? 250000),
+          waste_disposal: Number(ratesRow.waste_disposal ?? 480000),
+          safety_rate: Number(ratesRow.safety_rate ?? 0.0311),
+          general_management_rate: Number(ratesRow.general_management_rate ?? 0.05),
+          profit_rate: Number(ratesRow.profit_rate ?? 0.10),
+          is_modified_from_default: Boolean(ratesRow.is_modified_from_default ?? false),
+          modification_reason: (ratesRow.modification_reason as string | null) ?? null,
+        }
+      : null;
 
     // AI 상담 로그 조회
     let consultSnapshot: unknown[] = [];
@@ -146,6 +184,8 @@ export async function POST(request: NextRequest) {
         expected_end_date: endDate,
         consult_session_id: consultSessionId || null,
         consult_log_snapshot: consultSnapshot,
+        contractor_snapshot: contractorSnapshot,
+        applied_indirect_rates: appliedIndirectRates,
         status: "pending_signature",
       })
       .select(`
