@@ -1,0 +1,77 @@
+# SAM 2.1 fine-tune 하이퍼파라미터
+# 가이드: README_FINETUNE.md
+#
+# H100 80GB 기준 12시간 학습 = ₩4~5만원 (RunPod 시간당 ~₩4,000)
+# A100 80GB 기준 18시간 학습 = ₩4~5만원 (시간당 ~₩2,500)
+
+# ─── 모델 ───
+model:
+  # SAM 2.1 base checkpoint — RunPod 컨테이너 안 /app/checkpoints에 미리 다운로드 필요
+  # large: 224M params (느리지만 정확) / base_plus: 80M / small: 46M / tiny: 38M
+  variant: hiera_large           # hiera_large | hiera_base_plus | hiera_small | hiera_tiny
+  checkpoint: /app/checkpoints/sam2.1_hiera_large.pt
+  config: configs/sam2.1/sam2.1_hiera_l.yaml
+
+# ─── LoRA ───
+lora:
+  rank: 16                       # 8/16/32 — 높을수록 capacity↑ but VRAM↑
+  alpha: 32                      # 보통 rank × 2
+  dropout: 0.05
+  # 학습할 모듈 — image encoder 대부분 frozen, mask decoder + cross attention만
+  target_modules:
+    - "mask_decoder.transformer.layers.*.cross_attn_token_to_image.q_proj"
+    - "mask_decoder.transformer.layers.*.cross_attn_token_to_image.v_proj"
+    - "mask_decoder.transformer.layers.*.cross_attn_image_to_token.q_proj"
+    - "mask_decoder.transformer.layers.*.cross_attn_image_to_token.v_proj"
+    - "mask_decoder.transformer.layers.*.self_attn.q_proj"
+    - "mask_decoder.transformer.layers.*.self_attn.v_proj"
+  # image encoder는 frozen — LoRA 미적용 (메모리/시간 절약)
+  freeze_image_encoder: true
+  freeze_prompt_encoder: true
+
+# ─── 학습 ───
+train:
+  data_root: ./prepared          # prepare_dataset.py 출력 폴더
+  ade_root: /app/datasets/ade20k/ADEChallengeData2016  # 컨테이너 내부 마운트 경로
+  batch_size: 4
+  grad_accum_steps: 4            # effective batch 16
+  epochs: 3
+  lr: 1.0e-4
+  weight_decay: 0.0
+  warmup_steps: 200
+  max_grad_norm: 1.0
+  num_workers: 4
+
+  # mixed precision
+  precision: bf16                # bf16 | fp16 | fp32 — H100/A100은 bf16 권장
+  gradient_checkpointing: true
+
+  # 손실
+  loss:
+    bce_weight: 1.0
+    dice_weight: 1.0
+
+  # 클래스 균형 — prepare_dataset.py max_samples_per_class와 함께 사용
+  oversample_minority: true
+
+# ─── 평가 ───
+eval:
+  batch_size: 8
+  iou_threshold: 0.5
+  every_n_steps: 500             # 매 N 스텝마다 val 평가
+  save_best: true                # val IoU 최고일 때 체크포인트 저장
+
+# ─── 출력 ───
+output:
+  dir: ./outputs
+  adapter_name: inpick-sam21-lora-v1
+  save_every_n_steps: 1000
+  push_to_hub: false              # HuggingFace Hub 업로드 (선택)
+  hub_repo_id: ""
+
+# ─── 로깅 ───
+log:
+  use_wandb: false               # CLI --wandb 플래그로 override
+  wandb_project: inpick-sam21
+  wandb_run_name: lora-v1
+  print_every: 50

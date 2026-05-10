@@ -1,0 +1,29 @@
+# SAM 2.1 fine-tune (LoRA) 의존성
+# 가이드: README_FINETUNE.md
+# 베이스: PyTorch 2.5 + CUDA 12.1 (RunPod H100/A100 호환)
+
+# 코어 ML
+torch==2.5.1
+torchvision==0.20.1
+numpy>=1.24,<2.0
+Pillow>=10.0
+opencv-python-headless>=4.9
+scipy>=1.11
+
+# SAM 2 (Meta 공식)
+git+https://github.com/facebookresearch/sam2.git@main
+
+# LoRA / PEFT
+peft>=0.13.0
+transformers>=4.45.0
+
+# 학습 유틸
+tqdm>=4.66
+pyyaml>=6.0
+wandb>=0.18.0     # 옵션 — 학습 메트릭 추적 (없어도 OK, --no-wandb 플래그)
+
+# 데이터셋
+datasets>=2.20.0
+
+# 모델 export
+safetensors>=0.4.5

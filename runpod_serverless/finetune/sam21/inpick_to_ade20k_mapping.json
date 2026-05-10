@@ -1,0 +1,29 @@
+{
+  "_comment": "ADE20K 150 카테고리 (objectInfo150.txt) → 인픽 16 카테고리 매핑. 인픽 카테고리에 해당하지 않는 ADE20K 클래스는 학습 대상에서 제외.",
+  "_inpick_categories": [
+    "floor", "wall", "ceiling", "window", "door", "curtain",
+    "sink", "counter", "tile", "cabinet", "wardrobe", "bathtub",
+    "toilet", "table", "lamp", "fireplace"
+  ],
+  "ade20k_to_inpick": {
+    "1": "wall",
+    "4": "floor",
+    "6": "ceiling",
+    "9": "window",
+    "15": "door",
+    "19": "curtain",
+    "11": "cabinet",
+    "36": "wardrobe",
+    "38": "bathtub",
+    "48": "sink",
+    "46": "counter",
+    "37": "lamp",
+    "65": "toilet",
+    "16": "table",
+    "50": "fireplace"
+  },
+  "_excluded_categories_note": "person/sky/tree/grass/road 등 옥외/사람 카테고리는 인테리어 학습에 무관하므로 제외. furniture (sofa/bed/chair/seat/armchair 등)는 자재가 아니므로 제외.",
+  "_priority_classes_for_inpick": [
+    "floor", "wall", "ceiling", "window", "door", "curtain"
+  ]
+}

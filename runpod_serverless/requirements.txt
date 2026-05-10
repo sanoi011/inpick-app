@@ -4,3 +4,7 @@ torchvision==0.19.0
 numpy==1.26.4
 pillow==11.0.0
 opencv-python-headless==4.10.0.84
+# Phase 3+: handler.py LoRA 어댑터 자동 로드 (INPICK_LORA_ADAPTER_PATH 환경변수)
+# fine-tune/sam21/README_FINETUNE.md §4 참조. peft 미설치 시 base SAM 2.1로 fallback.
+peft>=0.13.0
+safetensors>=0.4.5

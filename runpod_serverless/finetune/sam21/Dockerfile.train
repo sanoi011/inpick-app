@@ -1,0 +1,45 @@
+# RunPod 학습 컨테이너 — SAM 2.1 + LoRA fine-tune
+# 빌드:
+#   docker build -f Dockerfile.train -t inpick-sam21-train:latest .
+# 실행 (RunPod):
+#   - GPU: H100 80GB (권장) 또는 A100 80GB
+#   - 마운트:
+#       /app/checkpoints/sam2.1_hiera_large.pt  (SAM 2.1 base)
+#       /app/datasets/ade20k/                   (ADE20K 데이터셋)
+#       /app/prepared/                          (prepare_dataset.py 출력 — 사전 변환)
+#       /app/outputs/                           (학습 결과 — Volume 마운트로 영속)
+#   - 명령:
+#       cd /app && python train_sam_lora.py --config config.yaml --wandb
+
+FROM nvidia/cuda:12.1.0-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# 시스템 패키지
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.11 python3.11-dev python3-pip git wget \
+    libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python \
+    && ln -sf /usr/bin/python3.11 /usr/bin/python3
+
+WORKDIR /app
+
+# Python 의존성 (캐시 효율화 — requirements 변경 시만 재빌드)
+COPY requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip && pip install -r /app/requirements.txt
+
+# 학습 스크립트 + 설정 + 매핑
+COPY train_sam_lora.py /app/train_sam_lora.py
+COPY prepare_dataset.py /app/prepare_dataset.py
+COPY config.yaml /app/config.yaml
+COPY inpick_to_ade20k_mapping.json /app/inpick_to_ade20k_mapping.json
+
+# 체크포인트 폴더 (Volume 마운트 포인트)
+RUN mkdir -p /app/checkpoints /app/datasets /app/prepared /app/outputs
+
+# 기본 명령 — RunPod에서 override 가능
+CMD ["python", "train_sam_lora.py", "--config", "config.yaml"]

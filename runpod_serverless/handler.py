@@ -13,6 +13,7 @@ RunPod Serverless Worker for SAM 2.1
 }
 """
 
+import os
 import runpod
 import torch
 import numpy as np
@@ -37,6 +38,30 @@ MODEL_CONFIG = "configs/sam2.1/sam2.1_hiera_l.yaml"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 sam2_model = build_sam2(MODEL_CONFIG, SAM2_CHECKPOINT, device=device)
+
+# ─── 옵션: LoRA 어댑터 자동 로드 (finetune/sam21/outputs/best/adapter_model.safetensors) ───
+# 환경변수 INPICK_LORA_ADAPTER_PATH 설정 시 mask_decoder에 LoRA 주입.
+# 미설정 시 base SAM 2.1 그대로 사용 (호환성 보장).
+# 가이드: runpod_serverless/finetune/sam21/README_FINETUNE.md §4
+LORA_ADAPTER_PATH = os.environ.get("INPICK_LORA_ADAPTER_PATH")
+if LORA_ADAPTER_PATH and os.path.isdir(LORA_ADAPTER_PATH):
+    try:
+        from peft import PeftModel
+        print(f"[InPick SAM Worker] LoRA adapter detected: {LORA_ADAPTER_PATH}")
+        sam2_model.sam_mask_decoder = PeftModel.from_pretrained(
+            sam2_model.sam_mask_decoder,
+            LORA_ADAPTER_PATH,
+        )
+        # merge_and_unload로 추론 속도 최적화 (LoRA를 base weight로 fold)
+        if hasattr(sam2_model.sam_mask_decoder, "merge_and_unload"):
+            sam2_model.sam_mask_decoder = sam2_model.sam_mask_decoder.merge_and_unload()
+            print("[InPick SAM Worker] LoRA merged into base weights — inference optimized.")
+        sam2_model.to(device)
+        sam2_model.eval()
+    except Exception as e:
+        print(f"[InPick SAM Worker] LoRA load failed (using base model): {e}")
+elif LORA_ADAPTER_PATH:
+    print(f"[InPick SAM Worker] LoRA path set but not a directory — using base model: {LORA_ADAPTER_PATH}")
 
 auto_generator = SAM2AutomaticMaskGenerator(
     model=sam2_model,
