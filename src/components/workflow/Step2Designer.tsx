@@ -1062,12 +1062,10 @@ export default function Step2Designer({
                     {bulkProgress ? (
                       <>
                         <span className="tabular font-bold">{bulkProgress.current}/{bulkProgress.total}</span> 방 완료
-                        — 안전 직렬 호출 (방 1개당 10~30초). 1차 미리보기는 low quality, 만족 시 고화질 재렌더 가능.
                       </>
                     ) : (
                       <>
-                        <span className="tabular font-bold">{Math.round(progress)}%</span> · 1차 미리보기 생성 중
-                        — 보통 10~30초 (low quality). 형태 보존을 위해 평면도 정확 명세 사용.
+                        <span className="tabular font-bold">{Math.round(progress)}%</span> · 인테리어 이미지 생성 중
                       </>
                     )}
                   </p>

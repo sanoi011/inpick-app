@@ -14,9 +14,13 @@ export function createClient() {
         },
         setAll(cookiesToSet) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            // 보안: 세션 쿠키 강제 (maxAge/expires 제거 → 브라우저 닫으면 자동 삭제)
+            cookiesToSet.forEach(({ name, value, options }) => {
+              const sessionOptions = { ...options };
+              delete sessionOptions.maxAge;
+              delete sessionOptions.expires;
+              cookieStore.set(name, value, sessionOptions);
+            });
           } catch {
             // The `setAll` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing user sessions.

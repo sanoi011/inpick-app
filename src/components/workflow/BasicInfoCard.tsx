@@ -535,7 +535,7 @@ function AddressMode({ value, onChange }: Props) {
             {value.normalizing && (
               <span className="inline-flex items-center gap-1 text-primary-500">
                 <Loader2 className="h-3 w-3 animate-spin" />
-                AI 도면 정리 중 (60~120초 — 워터마크 제거 + 매핑)
+                도면 정리 중
               </span>
             )}
             {value.dimensionOverlaySvg && !value.normalizing && (
