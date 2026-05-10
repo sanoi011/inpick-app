@@ -148,7 +148,9 @@ async function cleanFloorplanRaster(
     );
     form.append("prompt", prompt);
     form.append("size", "1024x1024");
-    form.append("quality", "high");
+    // 가이드 v2 §5-1 quality tier — 평면도 클리닝은 medium 충분 (워터마크 제거 + 바닥 매핑)
+    // high 대비 시간 50% 단축 (40-80s → 20-40s), 비용 76% 절감 ($0.17 → $0.04)
+    form.append("quality", "medium");
 
     const res = await fetch(`${OPENAI_BASE}/images/edits`, {
       method: "POST",
@@ -163,7 +165,8 @@ async function cleanFloorplanRaster(
         errors.push(`${modelName}: 응답에 이미지 데이터 없음`);
         continue;
       }
-      return { b64, costUsd: 0.19, model: modelName };
+      // medium quality: $0.04/image (high $0.17 대비 76% 절감)
+      return { b64, costUsd: 0.04, model: modelName };
     }
 
     const errText = await res.text();
