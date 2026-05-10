@@ -529,10 +529,18 @@ export default function BidsPage() {
                         {est.my_bid.start_available_date && <div><span className="text-blue-600 text-xs">착공 가능일</span><p className="font-medium text-blue-900">{est.my_bid.start_available_date}</p></div>}
                       </div>
                       {est.my_bid.message && <p className="text-xs text-blue-700 mt-2">{est.my_bid.message}</p>}
-                      <div className="flex items-center gap-2 mt-2">
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
                         {est.my_bid.status === "selected" && <span className="flex items-center gap-1 text-green-700 text-xs font-medium"><CheckCircle2 className="w-3.5 h-3.5" />선정됨</span>}
                         {est.my_bid.status === "rejected" && <span className="flex items-center gap-1 text-gray-500 text-xs font-medium"><XCircle className="w-3.5 h-3.5" />미선정</span>}
                         {est.my_bid.status === "pending" && <span className="flex items-center gap-1 text-amber-600 text-xs font-medium"><Clock className="w-3.5 h-3.5" />검토중</span>}
+                        {est.my_bid.status === "pending" && (
+                          <a
+                            href={`/contractor/bids/${est.my_bid.id}/edit-rates`}
+                            className="ml-auto inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-2.5 py-1 text-[0.65rem] font-semibold text-blue-700 hover:bg-blue-50"
+                          >
+                            요율 조정
+                          </a>
+                        )}
                       </div>
                     </div>
                   )}
