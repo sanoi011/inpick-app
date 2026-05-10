@@ -24,6 +24,9 @@ import {
   Loader2,
   Inbox,
   RefreshCw,
+  BarChart3,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { useProjectState } from "@/hooks/useProjectState";
 import { isStatusAtLeast } from "@/types/consumer-project";
@@ -58,6 +61,45 @@ function assignAiTag(bid: BidData, allBids: BidData[]): { tag: string; reason: s
     return { tag: "빠른 시공", reason: `최단 공기 ${minDays}일` };
   }
   return { tag: "", reason: "" };
+}
+
+// ─── Phase 2.2 비교 응답 ───
+interface ComparisonData {
+  estimateId: string;
+  directCost: number;
+  laborPlusExpense: number;
+  bids: ComparisonBid[];
+}
+
+interface ComparisonBid {
+  bidId: string;
+  bidAmount: number;
+  estimatedDays?: number;
+  ratesModified: boolean;
+  appliedRates: {
+    elevator_protection: number;
+    entrance_protection: number;
+    scaffolding: number;
+    waste_disposal: number;
+    safety_rate: number;
+    general_management_rate: number;
+    profit_rate: number;
+  } | null;
+  contractor: {
+    id: string;
+    companyName: string;
+    rating: number | null;
+    isVerified: boolean;
+  } | null;
+  indirectCosts: {
+    setupCost: number;
+    safetyCost: number;
+    generalManagementCost: number;
+    profit: number;
+    supplyAmount: number;
+    vat: number;
+    totalAmount: number;
+  };
 }
 
 interface BidData {
@@ -116,6 +158,11 @@ export default function RfqPage() {
   const [bidLoading, setBidLoading] = useState(false);
   const [contracting, setContracting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+
+  // ─── Phase 2.2: 사업자별 적용 요율 비교 ───
+  const [comparison, setComparison] = useState<ComparisonData | null>(null);
+  const [comparisonOpen, setComparisonOpen] = useState(false);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
 
   // Supabase 폴백: localStorage에 estimateId가 없으면 서버에서 조회
   useEffect(() => {
@@ -311,6 +358,30 @@ export default function RfqPage() {
       setBidLoading(false);
     }
   };
+
+  const loadComparison = useCallback(async () => {
+    const estimateId = project?.estimateId;
+    if (!estimateId) return;
+    setComparisonLoading(true);
+    try {
+      const res = await fetch(`/api/bids/comparison?estimateId=${estimateId}`);
+      if (res.ok) {
+        const data = (await res.json()) as ComparisonData;
+        setComparison(data);
+      }
+    } catch (err) {
+      console.error("[rfq] Failed to load comparison:", err);
+    } finally {
+      setComparisonLoading(false);
+    }
+  }, [project?.estimateId]);
+
+  // 비교 패널 토글 시 또는 입찰 갱신 시 자동 재조회
+  useEffect(() => {
+    if (comparisonOpen && bids.length > 0) {
+      loadComparison();
+    }
+  }, [comparisonOpen, bids.length, loadComparison]);
 
   const estimate = project?.estimate;
 
@@ -675,6 +746,150 @@ export default function RfqPage() {
                     );
                   })}
                 </div>
+
+                {/* ─── Phase 2.2: 사업자별 적용 요율 비교 ─── */}
+                {bids.length > 1 && (
+                  <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50/40 overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setComparisonOpen((v) => !v)}
+                      className="w-full flex items-center justify-between gap-2 px-4 py-3 hover:bg-blue-50 transition-colors"
+                    >
+                      <span className="flex items-center gap-2 text-sm font-bold text-blue-900">
+                        <BarChart3 className="w-4 h-4" />
+                        사업자별 적용 요율 비교 ({bids.length}개 업체)
+                      </span>
+                      {comparisonOpen ? (
+                        <ChevronUp className="w-4 h-4 text-blue-700" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-blue-700" />
+                      )}
+                    </button>
+
+                    {comparisonOpen && (
+                      <div className="border-t border-blue-200 bg-white">
+                        {comparisonLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                          </div>
+                        ) : comparison && comparison.bids.length > 0 ? (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs tabular border-collapse">
+                              <thead>
+                                <tr className="bg-blue-50 border-b border-blue-200">
+                                  <th className="text-left px-3 py-2 font-bold text-blue-900 sticky left-0 bg-blue-50 z-10">
+                                    항목
+                                  </th>
+                                  {comparison.bids.map((b) => (
+                                    <th
+                                      key={b.bidId}
+                                      className="text-right px-3 py-2 font-bold text-blue-900 min-w-[120px]"
+                                    >
+                                      <div className="flex flex-col items-end gap-0.5">
+                                        <span className="text-[0.7rem]">
+                                          {b.contractor?.companyName || "—"}
+                                        </span>
+                                        {b.ratesModified && (
+                                          <span className="text-[0.6rem] text-amber-600 font-normal">
+                                            요율 수정
+                                          </span>
+                                        )}
+                                      </div>
+                                    </th>
+                                  ))}
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <ComparisonRow
+                                  label="직접공사비"
+                                  cells={comparison.bids.map(
+                                    () => comparison.directCost,
+                                  )}
+                                  muted
+                                />
+                                <ComparisonRow
+                                  label="가설공사비"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.setupCost,
+                                  )}
+                                />
+                                <ComparisonRow
+                                  label="산업안전보건관리비"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.safetyCost,
+                                  )}
+                                  subtext={comparison.bids.map((b) =>
+                                    b.appliedRates
+                                      ? `${(b.appliedRates.safety_rate * 100).toFixed(2)}%`
+                                      : "",
+                                  )}
+                                />
+                                <ComparisonRow
+                                  label="일반관리비"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.generalManagementCost,
+                                  )}
+                                  subtext={comparison.bids.map((b) =>
+                                    b.appliedRates
+                                      ? `${(b.appliedRates.general_management_rate * 100).toFixed(1)}%`
+                                      : "",
+                                  )}
+                                />
+                                <ComparisonRow
+                                  label="기업이윤"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.profit,
+                                  )}
+                                  subtext={comparison.bids.map((b) =>
+                                    b.appliedRates
+                                      ? `${(b.appliedRates.profit_rate * 100).toFixed(1)}%`
+                                      : "",
+                                  )}
+                                />
+                                <ComparisonRow
+                                  label="공급가액"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.supplyAmount,
+                                  )}
+                                  bold
+                                />
+                                <ComparisonRow
+                                  label="부가세 (10%)"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.vat,
+                                  )}
+                                  muted
+                                />
+                                <ComparisonRow
+                                  label="총액"
+                                  cells={comparison.bids.map(
+                                    (b) => b.indirectCosts.totalAmount,
+                                  )}
+                                  bold
+                                  highlight
+                                />
+                                <ComparisonRow
+                                  label="제출 입찰가"
+                                  cells={comparison.bids.map((b) => b.bidAmount)}
+                                  muted
+                                />
+                              </tbody>
+                            </table>
+                            <p className="px-4 py-2 text-[0.65rem] text-blue-700/80 bg-blue-50/30 border-t border-blue-100">
+                              ⓘ 직접공사비 = 견적의 자재비 + 노무비. 사업자별 가설비/요율 차이가
+                              총액 차이의 주요 원인입니다. 산업안전보건관리비는 법정 최저값 3.11%
+                              (하향 불가).
+                            </p>
+                          </div>
+                        ) : (
+                          <p className="text-center py-6 text-sm text-gray-500">
+                            비교 데이터를 불러올 수 없습니다
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </>
             ) : (
               /* 입찰 대기 중 UI */
@@ -720,5 +935,57 @@ export default function RfqPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// ─── Phase 2.2 비교 테이블 행 ───
+function ComparisonRow({
+  label,
+  cells,
+  subtext,
+  muted,
+  bold,
+  highlight,
+}: {
+  label: string;
+  cells: number[];
+  subtext?: string[];
+  muted?: boolean;
+  bold?: boolean;
+  highlight?: boolean;
+}) {
+  // 최소값 강조 (하이라이트 행에서만)
+  const minValue = highlight ? Math.min(...cells) : null;
+  return (
+    <tr className={`border-b border-blue-100 ${highlight ? "bg-amber-50/40" : ""}`}>
+      <td
+        className={`px-3 py-2 sticky left-0 z-10 ${highlight ? "bg-amber-50/40" : "bg-white"} ${
+          bold ? "font-bold text-gray-900" : muted ? "text-gray-500" : "text-gray-700"
+        }`}
+      >
+        {label}
+      </td>
+      {cells.map((val, i) => {
+        const isMin = highlight && minValue !== null && val === minValue && cells.length > 1;
+        return (
+          <td
+            key={i}
+            className={`text-right px-3 py-2 ${
+              bold ? "font-bold" : ""
+            } ${muted ? "text-gray-500" : "text-gray-900"} ${
+              isMin ? "text-green-700 font-extrabold" : ""
+            }`}
+          >
+            <div className="flex flex-col items-end gap-0">
+              <span>₩{Math.round(val).toLocaleString()}</span>
+              {subtext?.[i] && (
+                <span className="text-[0.6rem] text-gray-400 font-normal">{subtext[i]}</span>
+              )}
+              {isMin && <span className="text-[0.55rem] text-green-600 font-normal">최저</span>}
+            </div>
+          </td>
+        );
+      })}
+    </tr>
   );
 }
