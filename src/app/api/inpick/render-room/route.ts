@@ -25,6 +25,7 @@ import {
   updateJob,
   isJobsRepoReady,
 } from "@/lib/inpick/generation-jobs/repository";
+import { ensureStorageUrl } from "@/lib/inpick/storage/image-storage";
 import {
   enforceConsume,
   refundCredits,
@@ -229,9 +230,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ─── Phase 3: base64 → storage URL 자동 변환 ───
+    // production 모드에서 data: URL 그대로 응답 X (storage URL로 변환)
+    // PoC 모드에서는 base64 fallback 허용 (ensureStorageUrl이 처리)
+    let finalImageUrl = result.imageUrl || "";
+    if (finalImageUrl.startsWith("data:")) {
+      try {
+        finalImageUrl = await ensureStorageUrl(finalImageUrl, {
+          jobId: result.jobId,
+          roomName: body.roomName,
+          seed: (body as { seed?: number }).seed,
+          modelVersion: result.model,
+        });
+      } catch (storageErr) {
+        // storage 실패 — production에서는 에러로 응답, PoC면 base64 그대로
+        if (process.env.NODE_ENV === "production") {
+          console.error("[render-room] storage upload failed:", storageErr);
+          return NextResponse.json(
+            {
+              error: "이미지 저장 실패",
+              hint:
+                storageErr instanceof Error ? storageErr.message : String(storageErr),
+              backend: result.backend,
+              model: result.model,
+            },
+            { status: 502 },
+          );
+        }
+        // PoC: base64 그대로 진행 (warning만)
+        console.warn("[render-room] storage failed, falling back to base64:", storageErr);
+      }
+    }
+
     // ─── 성공 응답 (기존 shape 보존 + backend/jobId 추가) ───
     return NextResponse.json({
-      imageUrl: result.imageUrl,
+      imageUrl: finalImageUrl,
       revisedPrompt: result.revisedPrompt,
       model: result.model,
       backend: result.backend,

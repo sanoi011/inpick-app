@@ -12,6 +12,7 @@
  */
 
 import { assertModelAllowedForRuntime } from "./model-policy";
+import { ensureStorageUrl } from "@/lib/inpick/storage/image-storage";
 import type {
   ImageGenerationBackend,
   RenderRoomRequest,
