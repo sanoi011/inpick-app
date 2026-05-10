@@ -31,6 +31,8 @@ import {
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
 import MaterialEditor from "./MaterialEditor";
+import VisionMaterialPicker from "./VisionMaterialPicker";
+import type { VisionMaterialAnalyzeRequest } from "@/lib/vision-materials/types";
 import type { SegmentationData } from "@/types/segmentation";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
@@ -137,6 +139,9 @@ export default function Step2Designer({
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomLabel: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
+  // Phase 7 — Vision Material Picker 모달
+  const [visionPickerOpen, setVisionPickerOpen] = useState(false);
+  const [visionPickerRequest, setVisionPickerRequest] = useState<VisionMaterialAnalyzeRequest | null>(null);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
   // 채팅 모드 + 메시지는 local useState로 — 스트리밍 빈번 갱신 시 closure stale 회피
@@ -1324,6 +1329,29 @@ export default function Step2Designer({
         {/* 자재 수정 (세그멘테이션) — 선택된 시안 아래 */}
         {activeRender && selectedIdx != null && hasGenerated && (
           <div className="mt-4">
+            {/* Phase 7 — Vision Material Picker trigger (이미지 전체 분석 → Top-3 후보) */}
+            <div className="mb-3 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setVisionPickerRequest({
+                    projectId: basicInfo.floorplanPropertyId || "current-project",
+                    roomName: ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom,
+                    roomType: activeRoom,
+                    imageUrl: activeRender.url,
+                    sourceImageKind: "ai_render",
+                  });
+                  setVisionPickerOpen(true);
+                }}
+                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                AI 자재 분석 (Top-3 후보)
+              </button>
+              <span className="text-[0.65rem] text-primary-900/60">
+                이미지에서 자재를 자동 매칭하여 실제 브랜드/SKU/스펙 후보를 표시
+              </span>
+            </div>
             <MaterialEditor
               roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
               realWorldAreaSqm={basicInfo.selectedPyeong?.exclusiveArea}
@@ -1336,6 +1364,19 @@ export default function Step2Designer({
           </div>
         )}
       </section>
+
+      {/* Phase 7 — Vision Material Picker 모달 */}
+      <VisionMaterialPicker
+        open={visionPickerOpen}
+        onClose={() => setVisionPickerOpen(false)}
+        request={visionPickerRequest}
+        onSelect={(cand) => {
+          // 사용자가 후보 선택 — 토스트만, MaterialEditor에서 실제 적용
+          console.info(
+            `[step2/vision-picker] 선택: ${cand.brand} ${cand.productName} (SKU=${cand.sku || "-"}, ${Math.round(cand.confidence * 100)}%)`,
+          );
+        }}
+      />
 
       {/* 토큰 부족 모달 */}
       <AnimatePresence>

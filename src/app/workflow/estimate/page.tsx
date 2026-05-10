@@ -63,6 +63,9 @@ interface ConsolidatedRow {
   expenseCost: number;  // 경비 (재료+노무 × rate)
   total: number;
   excludeKey: string;   // 체크박스 토글용
+  // Phase 7 — vision-materials 매칭 메타 (있으면 배지 표시)
+  matchStatus?: "confirmed" | "recommended" | "fallback";
+  confidence?: number;
 }
 
 // 자재 surface + 이름 → 공정 분류
@@ -142,6 +145,17 @@ export default function EstimatePage() {
   const [step1, setStep1] = useState<Step1Data | null>(null);
   const [step2, setStep2] = useState<Step2Data | null>(null);
   const [estimates, setEstimates] = useState<EstimateRoom[]>([]);
+  // Phase 7 — vision-materials matchMetaByRoom (있으면 행에 배지 표시)
+  const [matchMetaByRoom, setMatchMetaByRoom] = useState<
+    Record<
+      string,
+      Array<{
+        matchStatus?: "confirmed" | "recommended" | "fallback";
+        confidence?: number;
+        surface?: string;
+      }>
+    >
+  >({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [vatIncl, setVatIncl] = useState(true);
@@ -281,6 +295,10 @@ export default function EstimatePage() {
         );
       }
       setEstimates(list);
+      // Phase 7 — vision-materials 메타 (있으면 표시)
+      if (data.matchMetaByRoom) {
+        setMatchMetaByRoom(data.matchMetaByRoom);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -337,6 +355,9 @@ export default function EstimatePage() {
         const laborCost = agg.labor;
         const expenseCost = Math.round((materialCost + laborCost) * expenseRate);
         const total = materialCost + laborCost + expenseCost;
+        // Phase 7 — vision-materials 매칭 메타 lookup (roomName + surface 기준)
+        const roomMeta = matchMetaByRoom[room.roomName] || [];
+        const matched = roomMeta.find((m) => m.surface === it.surface);
         rows.push({
           no: no++,
           trade: inferTrade(it.surface, it.materialName),
@@ -352,6 +373,8 @@ export default function EstimatePage() {
           expenseCost,
           total,
           excludeKey: `${room.roomName}::${it.materialName}`,
+          matchStatus: matched?.matchStatus,
+          confidence: matched?.confidence,
         });
       }
     }
@@ -1052,6 +1075,22 @@ function TradeGroup({
                   {r.sku && (
                     <span className="inline-flex items-center rounded bg-amber-50 border border-amber-100 px-1.5 py-0.5 text-[0.6rem] font-mono text-amber-800">
                       SKU {r.sku}
+                    </span>
+                  )}
+                  {/* Phase 7 — vision-materials matchStatus 배지 */}
+                  {r.matchStatus === "confirmed" && (
+                    <span className="inline-flex items-center rounded bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[0.6rem] font-bold text-emerald-800">
+                      확정 {typeof r.confidence === "number" ? `${Math.round(r.confidence * 100)}%` : ""}
+                    </span>
+                  )}
+                  {r.matchStatus === "recommended" && (
+                    <span className="inline-flex items-center rounded bg-amber-100 border border-amber-200 px-1.5 py-0.5 text-[0.6rem] font-bold text-amber-800">
+                      추천 {typeof r.confidence === "number" ? `${Math.round(r.confidence * 100)}%` : ""}
+                    </span>
+                  )}
+                  {r.matchStatus === "fallback" && (
+                    <span className="inline-flex items-center rounded bg-gray-100 border border-gray-200 px-1.5 py-0.5 text-[0.6rem] font-bold text-gray-600">
+                      기본
                     </span>
                   )}
                   <span>{r.roomName}</span>

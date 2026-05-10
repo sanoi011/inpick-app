@@ -19,6 +19,11 @@ import {
 } from "@/lib/inpick/estimate";
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 import { lookupMaterialProduct } from "@/lib/inpick/material-product-lookup";
+import type {
+  AnalyzedSurface,
+  EstimateLineMaterialMeta,
+  SurfaceType,
+} from "@/lib/vision-materials/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -148,10 +153,75 @@ async function enrichWithBrandSku(
   return out;
 }
 
+/**
+ * Phase 6 후속 — vision-materials 분석 결과(AnalyzedSurface[])를
+ * MaterialItem[]으로 변환해 견적에 우선 적용 (대표 지시 vision-material-estimate-dev-plan).
+ *
+ * 정책:
+ *   - confirmed/recommended만 적용 (fallback은 무시 → defaultSurfaces로 보강)
+ *   - SKU hallucination 금지 — top1.materialProductId 있는 것만
+ *   - 매칭된 surface는 unit/unitPrice/brand/sku/spec 채움
+ */
+function visionAnalysisToSurfaces(
+  analyzed: AnalyzedSurface[] | undefined,
+): MaterialItem[] {
+  if (!analyzed || analyzed.length === 0) return [];
+  const out: MaterialItem[] = [];
+  for (const a of analyzed) {
+    const top = a.candidates[0];
+    if (!top || !top.materialProductId) continue;
+    if (a.recommendation.status === "fallback" || a.recommendation.status === "rejected") {
+      continue;
+    }
+    out.push({
+      surface: surfaceTypeToKorean(a.observation.surfaceType),
+      materialName: `${top.brand ? top.brand + " " : ""}${top.productName}`,
+      brand: top.brand,
+      sku: top.sku,
+      spec: top.spec,
+      unit: ((top.unit as MaterialItem["unit"]) || "EA"),
+      unitPriceWon: top.unitPrice || 0,
+      priceSource:
+        a.recommendation.status === "confirmed" ? "vision_estimate" : "standard",
+      confidence: top.confidence,
+    });
+  }
+  return out;
+}
+
+function surfaceTypeToKorean(t: SurfaceType): string {
+  const m: Record<SurfaceType, string> = {
+    floor: "바닥",
+    wall: "벽",
+    ceiling: "천장",
+    tile: "타일",
+    cabinet: "fixture",
+    countertop: "fixture",
+    baseboard: "걸레받이",
+    door: "도어",
+    window: "창호",
+    fixture: "fixture",
+    lighting: "조명",
+    sanitary: "fixture",
+    unknown: "기타",
+  };
+  return m[t] || "기타";
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { rooms } = body;
+    const { rooms, visionAnalysisByRoom } = body as {
+      rooms: Array<{
+        roomName: string;
+        // RoomDim — 호출자가 전달하는 dim (estimate.ts 타입)
+        dim: { name?: string; widthMm: number; depthMm: number; heightMm?: number };
+        renderImageUrl?: string;
+        surfaces?: MaterialItem[];
+      }>;
+      /** Phase 6 후속: vision-materials 분석 결과 (선택) — roomName → AnalyzedSurface[] */
+      visionAnalysisByRoom?: Record<string, AnalyzedSurface[]>;
+    };
     if (!Array.isArray(rooms) || rooms.length === 0) {
       return NextResponse.json({ error: "rooms 배열 필수" }, { status: 400 });
     }
@@ -161,19 +231,36 @@ export async function POST(req: NextRequest) {
     const estimates: RoomEstimate[] = [];
     const fallbackRooms: Array<{ roomName: string; reason: string }> = [];
     const errors: Array<{ roomName: string; error: string }> = [];
+    const matchMetaByRoom: Record<string, EstimateLineMaterialMeta[]> = {};
 
     for (const r of rooms) {
       let surfaces: MaterialItem[] = r.surfaces || [];
-      let usedFallback = false;
+      const usedSources: string[] = [];
 
-      // 이미지 + vision 가능 → 자재 추출 시도
+      // ─── 1순위: visionAnalysisByRoom (Phase 6 후속 통합) ───
+      const visionRoomResult = visionAnalysisByRoom?.[r.roomName];
+      if (visionRoomResult && visionRoomResult.length > 0 && (!surfaces || surfaces.length === 0)) {
+        const visionSurfaces = visionAnalysisToSurfaces(visionRoomResult);
+        if (visionSurfaces.length > 0) {
+          surfaces = visionSurfaces;
+          usedSources.push("vision-materials");
+        }
+      }
+
+      // ─── 2순위: extractMaterialsFromRender (legacy vision 추출) ───
       if ((!surfaces || surfaces.length === 0) && r.renderImageUrl && visionAvailable) {
         try {
           surfaces = await extractMaterialsFromRender({
             renderImageUrl: r.renderImageUrl,
             roomName: r.roomName,
-            dim: r.dim,
+            dim: {
+            name: r.dim.name || r.roomName,
+            widthMm: r.dim.widthMm,
+            depthMm: r.dim.depthMm,
+            heightMm: r.dim.heightMm ?? 2400,
+          },
           });
+          if (surfaces.length > 0) usedSources.push("legacy-vision");
         } catch (e) {
           errors.push({
             roomName: r.roomName,
@@ -183,10 +270,10 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ─── Fallback: 표준 자재 (사용자 자재 컨택 X / vision 실패 / 이미지 없음) ───
+      // ─── 3순위 Fallback: 표준 자재 ───
       if (!surfaces || surfaces.length === 0) {
         surfaces = defaultSurfacesForRoom(r.roomName);
-        usedFallback = true;
+        usedSources.push("standard-default");
         fallbackRooms.push({
           roomName: r.roomName,
           reason: !r.renderImageUrl
@@ -197,14 +284,48 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // ─── 대표 지목 핵심: brand/sku/spec 자동 매칭 (material_products 253K rows) ───
-      // vision 추출 결과 + fallback 모두에 적용. brand/sku 이미 있으면 skip.
+      // ─── brand/SKU 매칭 (material_products 253K rows) ───
+      // vision-materials 결과 + legacy + fallback 모두에 적용. brand/sku 이미 있으면 skip.
       surfaces = await enrichWithBrandSku(surfaces, r.roomName);
+
+      // ─── EstimateLineMaterialMeta 추출 (PDF/UI 표시용) ───
+      matchMetaByRoom[r.roomName] = surfaces.map((s) => {
+        const fromVision =
+          visionRoomResult?.find((a) => surfaceTypeToKorean(a.observation.surfaceType) === s.surface);
+        const status = fromVision?.recommendation.status === "confirmed"
+          ? "confirmed"
+          : fromVision?.recommendation.status === "recommended"
+            ? "recommended"
+            : s.brand
+              ? "recommended"
+              : "fallback";
+        // surface 필드 함께 반환 — UI에서 자재 행과 매칭하는 키로 사용
+        return {
+          surface: s.surface,
+          materialProductId: fromVision?.candidates[0]?.materialProductId,
+          brand: s.brand,
+          productName: s.materialName,
+          sku: s.sku,
+          spec: s.spec,
+          unit: s.unit,
+          unitPrice: s.unitPriceWon,
+          priceSource: s.priceSource,
+          matchStatus: status,
+          confidence: fromVision?.recommendation.confidence ?? s.confidence,
+          fallbackReason: fromVision?.recommendation.fallbackReason,
+          observationId: fromVision?.observation.id,
+        } as EstimateLineMaterialMeta & { surface: string };
+      });
 
       estimates.push(
         buildRoomEstimate({
           roomName: r.roomName,
-          dim: r.dim,
+          dim: {
+            name: r.dim.name || r.roomName,
+            widthMm: r.dim.widthMm,
+            depthMm: r.dim.depthMm,
+            heightMm: r.dim.heightMm ?? 2400,
+          },
           surfaces,
         }),
       );
@@ -226,6 +347,8 @@ export async function POST(req: NextRequest) {
       fallbackRooms,            // 표준 자재 적용된 방 (사용자 안내용)
       skippedRooms: [],         // 호환 — 더 이상 skip 안 함
       errors,
+      // Phase 6 후속 — vision-materials 메타 (UI에서 [확정]/[추천]/[기본] 표시)
+      matchMetaByRoom,
     });
   } catch (e) {
     return NextResponse.json(
