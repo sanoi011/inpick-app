@@ -125,6 +125,8 @@ export default function Step2Designer({
   const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
+  // 가이드 STEP2-INPUT-ANALYSIS Q3 — 일괄 생성 직렬화 진행률
+  const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomLabel: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
@@ -291,6 +293,65 @@ export default function Step2Designer({
     };
   };
 
+  // 가이드 STEP2-INPUT-ANALYSIS §3-1 — 평면도 자연어 wall layout 빌더
+  // 모델이 평면도 이미지 외에도 정확한 형태/벽 위치를 텍스트로 받아 보존률 ↑
+  const buildWallLayout = (roomLabel: string): string => {
+    if (!normalizedFloorplan?.rooms?.length) return "";
+    const me = normalizedFloorplan.rooms.find((r) => r.name === roomLabel);
+    if (!me) return "";
+
+    const w = (me.widthMm / 1000).toFixed(2);
+    const d = (me.depthMm / 1000).toFixed(2);
+    const area = ((me.widthMm * me.depthMm) / 1_000_000).toFixed(1);
+    const xMm = (me as { xMm?: number }).xMm;
+    const yMm = (me as { yMm?: number }).yMm;
+
+    // 벽별 opening 매핑 (남/북/동/서 또는 wall 이름 텍스트)
+    const wallOpenings: Record<"north" | "south" | "east" | "west" | "other", string[]> = {
+      north: [], south: [], east: [], west: [], other: [],
+    };
+    (normalizedFloorplan.openings || []).forEach((op) => {
+      if (!op.wall || !op.wall.includes(roomLabel)) return;
+      const wallText = op.wall;
+      const opType = op.type === "window" || op.type === "sliding"
+        ? `${op.type === "sliding" ? "sliding" : "fixed"} window`
+        : "door";
+      const widthM = op.widthMm ? `${(op.widthMm / 1000).toFixed(1)}m wide` : "";
+      const desc = `${opType} (${widthM})`.trim();
+      if (wallText.includes("남") || wallText.toLowerCase().includes("south")) wallOpenings.south.push(desc);
+      else if (wallText.includes("북") || wallText.toLowerCase().includes("north")) wallOpenings.north.push(desc);
+      else if (wallText.includes("동") || wallText.toLowerCase().includes("east")) wallOpenings.east.push(desc);
+      else if (wallText.includes("서") || wallText.toLowerCase().includes("west")) wallOpenings.west.push(desc);
+      else wallOpenings.other.push(`${desc} on ${wallText}`);
+    });
+
+    const wallLine = (dir: "north" | "south" | "east" | "west", length: string, isExterior: boolean) => {
+      const ops = wallOpenings[dir];
+      const opsText = ops.length > 0 ? `: ${ops.join(", ")}` : ": solid wall";
+      const tag = isExterior ? " (EXTERIOR — windows allowed)" : " (interior partition)";
+      return `  - ${dir.charAt(0).toUpperCase() + dir.slice(1)} wall (${length}m)${tag}${opsText}`;
+    };
+
+    // exterior 추정: 발코니/거실/안방/침실 = 외벽 가능, 욕실/드레스룸/현관 = 내벽
+    const exteriorRooms = ["거실", "안방", "침실", "주방", "발코니", "베란다", "다이닝"];
+    const isExterior = exteriorRooms.some((k) => roomLabel.includes(k));
+
+    const lines = [
+      `Floor plan layout (exact reading from user's actual floor plan):`,
+      `- Room shape: rectangular, ${w}m × ${d}m (${area}m² floor area)`,
+      ...(xMm != null && yMm != null
+        ? [`- Position in apartment: xMm=${xMm}, yMm=${yMm} (top-left corner)`]
+        : []),
+      `- Wall layout (4 walls clockwise from north):`,
+      wallLine("north", w, false),
+      wallLine("east", d, false),
+      wallLine("south", w, isExterior),
+      wallLine("west", d, false),
+    ];
+
+    return lines.join("\n");
+  };
+
   // ── 채팅 모드 핸들러 ──
   const handleChatSend = async () => {
     if (!currentPrompt.trim() || chatStreaming) return;
@@ -395,12 +456,15 @@ export default function Step2Designer({
       const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
       const struct = inferStructure(tab.label);
+      const wallLayout = buildWallLayout(tab.label);  // 가이드 Q1 — 자연어 wall layout
       // 2차+ 시 이전 생성의 revisedPrompt를 reference로 — 같은 방 형태 유지 유도
       const previousRender = renders[renders.length - 1];
       const previousReference =
         !isFirstGen && previousRender
           ? previousRender.revisedPrompt || previousRender.prompt
           : undefined;
+      // 가이드 Q2 — 1차 low (빠름 + 저비용 1차 미리보기). 고화질은 별도 재렌더 버튼(refine-render)에서 처리.
+      const quality: "low" | "medium" | "high" = "low";
       // 클라 측 AbortController — Vercel 300초 + 여유 20초
       const ctrl = new AbortController();
       const timeoutId = setTimeout(() => ctrl.abort(), 320_000);
@@ -416,12 +480,14 @@ export default function Step2Designer({
           style: currentPrompt,
           expansion: basicInfo.expansionType === "extended",
           size: "1024x1024",
+          quality,                                          // Q2 — 1차 low / 재생성 high
           windows: struct.windows,
           doors: struct.doors,
           isInteriorRoom: struct.isInteriorRoom,
           windowWalls: struct.windowWalls,
           doorWalls: struct.doorWalls,
           adjacentRooms: struct.adjacentRooms,
+          wallLayout,                                       // Q1 — 자연어 도면 묘사
           furnishingOptions: roomFurnishings?.[activeRoom] || [],
           // 도면 기반 정보 강화
           aspectRatio: dim.widthMm / dim.depthMm,
@@ -483,14 +549,28 @@ export default function Step2Designer({
     }
     setErrorMsg(null);
     setGenerating(true);
+    setBulkProgress({ current: 0, total: emptyTabs.length, roomLabel: "" });
     try {
-      const results = await Promise.allSettled(
-        emptyTabs.map(async (tab) => {
+      // 가이드 Q3 — 직렬 호출 (Promise.allSettled 동시 호출 → rate limit 위험 → 직렬화)
+      // 가이드 Q2 — 일괄은 quality "low" (1차 미리보기 — 빠름 + 저비용)
+      const results: Array<
+        | { tabKey: string; ok: true; item: RenderItem }
+        | { tabKey: string; ok: false; error: string; label: string }
+      > = [];
+
+      for (let i = 0; i < emptyTabs.length; i++) {
+        const tab = emptyTabs[i];
+        setBulkProgress({ current: i + 1, total: emptyTabs.length, roomLabel: tab.label });
+        try {
           const dim = roomDims[tab.dimKey] || roomDims["거실"];
           const struct = inferStructure(tab.label);
+          const wallLayout = buildWallLayout(tab.label);  // Q1
+          const ctrl = new AbortController();
+          const timeoutId = setTimeout(() => ctrl.abort(), 320_000);
           const res = await fetch("/api/inpick/render-room", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
+            signal: ctrl.signal,
             body: JSON.stringify({
               roomName: tab.label,
               widthMm: dim.widthMm,
@@ -499,42 +579,55 @@ export default function Step2Designer({
               style: conceptPrompt,
               expansion: basicInfo.expansionType === "extended",
               size: "1024x1024",
+              quality: "low",                              // Q2 — 1차 low
               windows: struct.windows,
               doors: struct.doors,
               isInteriorRoom: struct.isInteriorRoom,
               windowWalls: struct.windowWalls,
               doorWalls: struct.doorWalls,
               adjacentRooms: struct.adjacentRooms,
+              wallLayout,                                  // Q1
               aspectRatio: dim.widthMm / dim.depthMm,
               isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
               furnishingOptions: roomFurnishings?.[tab.v] || [],
-              // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
-              // (handleGenerate와 동일 — 이전엔 누락돼 일괄 생성이 항상 "Floorplan not found" 실패)
               propertyId: basicInfo.floorplanPropertyId,
               floorplanImageUrl: basicInfo.normalizedImageUrl
                 || basicInfo.cleanedImageUrl
                 || basicInfo.selectedPyeong?.grandPlanUrl,
             }),
-          });
+          }).finally(() => clearTimeout(timeoutId));
           const data = await res.json();
           if (!res.ok || !data.imageUrl) {
-            throw new Error(
-              `${tab.label}: ${data.error || "이미지 생성 실패"}` +
-              (data.hint ? ` → ${data.hint}` : ""),
-            );
+            results.push({
+              tabKey: tab.v,
+              ok: false,
+              error: `${data.error || "이미지 생성 실패"}${data.hint ? ` → ${data.hint}` : ""}`,
+              label: tab.label,
+            });
+          } else {
+            results.push({
+              tabKey: tab.v,
+              ok: true,
+              item: {
+                url: data.imageUrl,
+                prompt: conceptPrompt,
+                revisedPrompt: data.revisedPrompt,
+                costUsd: data.costUsd ?? 0.01,            // low quality 기본 $0.01
+                timestamp: new Date().toISOString(),
+              } as RenderItem,
+            });
           }
-          return {
+        } catch (e) {
+          results.push({
             tabKey: tab.v,
-            item: {
-              url: data.imageUrl,
-              prompt: conceptPrompt,
-              revisedPrompt: data.revisedPrompt,
-              costUsd: data.costUsd ?? 0.19,
-              timestamp: new Date().toISOString(),
-            } as RenderItem,
-          };
-        }),
-      );
+            ok: false,
+            error: e instanceof Error ? e.message : String(e),
+            label: tab.label,
+          });
+        }
+      }
+      setBulkProgress(null);
+      // ─── 결과 누적 ───
       const next = { ...value };
       next.rendersByRoom = { ...next.rendersByRoom };
       next.selectedByRoom = { ...next.selectedByRoom };
@@ -542,14 +635,13 @@ export default function Step2Designer({
       next.promptByRoom = { ...(next.promptByRoom || {}) };
       const failures: string[] = [];
       for (const r of results) {
-        if (r.status === "fulfilled") {
-          const { tabKey, item } = r.value;
-          const list = [...(next.rendersByRoom[tabKey] || []), item];
-          next.rendersByRoom[tabKey] = list;
-          next.selectedByRoom[tabKey] = list.length - 1;
-          next.generations[tabKey] = (next.generations[tabKey] ?? 0) + 1;
+        if (r.ok) {
+          const list = [...(next.rendersByRoom[r.tabKey] || []), r.item];
+          next.rendersByRoom[r.tabKey] = list;
+          next.selectedByRoom[r.tabKey] = list.length - 1;
+          next.generations[r.tabKey] = (next.generations[r.tabKey] ?? 0) + 1;
         } else {
-          failures.push(r.reason instanceof Error ? r.reason.message : String(r.reason));
+          failures.push(`${r.label}: ${r.error}`);
         }
       }
       onChange(next);
@@ -558,6 +650,7 @@ export default function Step2Designer({
       }
     } finally {
       setGenerating(false);
+      setBulkProgress(null);
     }
   };
 
@@ -948,18 +1041,35 @@ export default function Step2Designer({
                 <div className="rounded-2xl rounded-tl-sm bg-primary-50 border border-primary-100 px-5 py-4 max-w-md">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-                    <p className="text-sm font-bold text-primary-900">AI 디자인 생성 중…</p>
+                    <p className="text-sm font-bold text-primary-900">
+                      {bulkProgress
+                        ? `${bulkProgress.roomLabel || "방"} 생성 중… (${bulkProgress.current}/${bulkProgress.total})`
+                        : "AI 디자인 생성 중…"}
+                    </p>
                   </div>
                   <div className="mt-3 h-2 rounded-full bg-white overflow-hidden">
                     <motion.div
-                      animate={{ width: `${progress}%` }}
+                      animate={{
+                        width: bulkProgress
+                          ? `${(bulkProgress.current / Math.max(1, bulkProgress.total)) * 100}%`
+                          : `${progress}%`,
+                      }}
                       transition={{ duration: 0.3 }}
                       className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
                     />
                   </div>
                   <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
-                    <span className="tabular font-bold">{Math.round(progress)}%</span> · 고퀄리티 인테리어
-                    이미지 생성 중 — 보통 40~80초, 최대 4~5분까지 걸릴 수 있습니다. 실패 시 요금 X
+                    {bulkProgress ? (
+                      <>
+                        <span className="tabular font-bold">{bulkProgress.current}/{bulkProgress.total}</span> 방 완료
+                        — 안전 직렬 호출 (방 1개당 10~30초). 1차 미리보기는 low quality, 만족 시 고화질 재렌더 가능.
+                      </>
+                    ) : (
+                      <>
+                        <span className="tabular font-bold">{Math.round(progress)}%</span> · 1차 미리보기 생성 중
+                        — 보통 10~30초 (low quality). 형태 보존을 위해 평면도 정확 명세 사용.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>

@@ -57,6 +57,14 @@ export interface RenderRoomInput {
    * 미지정 시 "low" — Phase 2 비용 절감 정책.
    */
   quality?: "low" | "medium" | "high";
+  /**
+   * STEP2-INPUT-ANALYSIS Q1 — 자연어 wall layout (Step1에서 자동 빌드).
+   * 형식: "Floor plan layout (exact reading from user's actual floor plan):
+   *        - Room shape: rectangular, 4.5m × 4.0m (18m² floor area)
+   *        - Wall layout: North wall ... East wall ... etc"
+   * 평면도 이미지 외에 텍스트 명세까지 받아 형태 보존률 70~85% 달성.
+   */
+  wallLayout?: string;
 }
 
 export interface RenderRoomResult {
@@ -198,11 +206,16 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
   const previousRefTag = input.previousReference
     ? `\nPrevious render of this same room (preserve same room shape, window/door positions, camera angle): "${input.previousReference.slice(0, 400)}"\n`
     : "";
+  // STEP2-INPUT-ANALYSIS Q1 — wall layout 자연어 묘사 (가장 강하게 강조)
+  const wallLayoutBlock = input.wallLayout
+    ? `\n=== EXACT FLOOR PLAN STRUCTURE (must follow precisely) ===\n${input.wallLayout}\n=== END FLOOR PLAN ===\n`
+    : "";
 
   const prompt =
     `Empty Korean apartment ${input.roomName} interior shell, just after construction completion, 2026 contemporary minimalist standard. ` +
     `한국 아파트 ${input.roomName} 빈 방 마감 사진 (시공 직후, 가구 입주 전 상태, 2026년 최신 인테리어 트렌드). ` +
     `${floorplanTag}` +
+    `${wallLayoutBlock}` +
     `Space: width ${sizes.width}m × depth ${sizes.depth}m × ceiling ${sizes.height}m, ${ratioDesc}. ` +
     `${previousRefTag}` +
     `${structStr}` +
