@@ -21,6 +21,11 @@ import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 import { renderRoomViaBackend } from "@/lib/inpick/image-backends/select-backend";
 import { getFloorplanUrl, hasFloorplan } from "@/lib/inpick/floorplan-storage";
 import {
+  createJob,
+  updateJob,
+  isJobsRepoReady,
+} from "@/lib/inpick/generation-jobs/repository";
+import {
   enforceConsume,
   refundCredits,
   CreditError,
@@ -132,12 +137,62 @@ export async function POST(req: NextRequest) {
 
     // ─── Backend adapter 호출 (Phase 1) ───
     // IMAGE_GEN_BACKEND 환경변수로 분기 (default: "openai" — 기존 path 100% 보존)
-    const result = await renderRoomViaBackend({
+    const renderInput = {
       ...(body as RenderRoomInput & { roomName: string }),
       prompt: body.style || "modern minimal",
       heightMm: body.heightMm || 2400,
       floorplanImageUrl,
-    });
+    };
+
+    // ─── Async mode (Phase 2) ───
+    // IMAGE_GEN_MODE=async일 때만 활성. 기본값 sync.
+    // RunPod backend는 async 권장, OpenAI backend는 sync only (즉시 반환).
+    const asyncMode = process.env.IMAGE_GEN_MODE === "async";
+    const preferredBackend = (process.env.IMAGE_GEN_BACKEND || "openai").toLowerCase();
+    if (asyncMode && preferredBackend !== "openai" && isJobsRepoReady()) {
+      // Job 생성 + backend submit (즉시 반환)
+      const job = await createJob({
+        userId: charge?.userId,
+        backend: "runpod",
+        request: renderInput,
+        metadata: { mode: "async", chargedCredits: charge?.charged ?? 0 },
+      });
+      // backend.renderRoom 호출은 RunPod async submit (Phase 5에서 실제 구현)
+      // 현재는 placeholder — 즉시 결과 또는 externalJobId 반환
+      const result = await renderRoomViaBackend(renderInput);
+      // job 갱신 (status 반영)
+      await updateJob(job.id, {
+        status:
+          result.status === "completed"
+            ? "completed"
+            : result.status === "failed"
+              ? "failed"
+              : "processing",
+        externalJobId: result.jobId,
+        result,
+        resultUrl: result.imageUrl,
+        costUsd: result.costUsd,
+        elapsedMs: result.elapsedMs,
+        error: result.error,
+        hint: result.hint,
+        modelStatus: result.modelStatus,
+      });
+
+      return NextResponse.json({
+        jobId: job.id,
+        status: result.status,
+        imageUrl: result.imageUrl,
+        backend: result.backend,
+        model: result.model,
+        costUsd: result.costUsd,
+        // 호환 — Step2Designer가 imageUrl만 보면 sync 응답으로 처리
+        credits_charged: charge?.charged ?? 0,
+        credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
+      });
+    }
+
+    // ─── Sync mode (기본 — 기존 OpenAI path 유지) ───
+    const result = await renderRoomViaBackend(renderInput);
 
     // ─── 실패 처리 ───
     if (result.status !== "completed" || !result.imageUrl) {
