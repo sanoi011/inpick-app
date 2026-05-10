@@ -508,6 +508,12 @@ export default function Step2Designer({
               aspectRatio: dim.widthMm / dim.depthMm,
               isFromFloorplan: !!normalizedFloorplan?.rooms?.length,
               furnishingOptions: roomFurnishings?.[tab.v] || [],
+              // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
+              // (handleGenerate와 동일 — 이전엔 누락돼 일괄 생성이 항상 "Floorplan not found" 실패)
+              propertyId: basicInfo.floorplanPropertyId,
+              floorplanImageUrl: basicInfo.normalizedImageUrl
+                || basicInfo.cleanedImageUrl
+                || basicInfo.selectedPyeong?.grandPlanUrl,
             }),
           });
           const data = await res.json();
