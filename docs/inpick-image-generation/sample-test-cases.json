@@ -1,0 +1,64 @@
+[
+  {
+    "caseId": "eval_001_living_basic",
+    "label": "거실 기본 (25m² 정사각형)",
+    "roomName": "거실",
+    "prompt": "bright modern Korean apartment living room, white walls, warm oak floor, natural light from large window",
+    "widthMm": 5000,
+    "depthMm": 5000,
+    "heightMm": 2400,
+    "windows": 1,
+    "windowWalls": [
+      "south"
+    ],
+    "doors": 1,
+    "doorWalls": [
+      "west"
+    ],
+    "seed": 12345,
+    "steps": 24,
+    "guidance": 3.5,
+    "expectedNotes": "정사각형 거실. 남쪽 창 하나, 서쪽 문 하나. baseline vs proxy 비교용"
+  },
+  {
+    "caseId": "eval_002_bedroom_long",
+    "label": "안방 긴 직사각형 (3x4m)",
+    "roomName": "안방",
+    "prompt": "Korean apartment master bedroom, soft warm light, beige wallpaper, wood flooring",
+    "widthMm": 3000,
+    "depthMm": 4000,
+    "heightMm": 2400,
+    "windows": 1,
+    "windowWalls": [
+      "east"
+    ],
+    "doors": 1,
+    "doorWalls": [
+      "south"
+    ],
+    "seed": 12345,
+    "steps": 24,
+    "guidance": 3.5,
+    "expectedNotes": "긴 직사각형 — perspective 차이 잘 보임"
+  },
+  {
+    "caseId": "eval_003_kitchen_l",
+    "label": "주방 (4x3m)",
+    "roomName": "주방",
+    "prompt": "modern Korean kitchen, white upper cabinets, dark stone countertop, oak floor",
+    "widthMm": 4000,
+    "depthMm": 3000,
+    "heightMm": 2400,
+    "windows": 1,
+    "windowWalls": [
+      "north"
+    ],
+    "doors": 1,
+    "doorWalls": [
+      "south"
+    ],
+    "seed": 12345,
+    "steps": 24,
+    "guidance": 3.5
+  }
+]
