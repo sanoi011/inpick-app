@@ -1,0 +1,22 @@
+# Vision Materials worker — Phase 3 scaffold dependencies.
+#
+# Phase 3 (현재): mock 모드만 — 최소 의존성
+# Phase 후속: GPU 모델 활성화 시 추가
+
+# RunPod
+runpod>=1.6.0
+
+# 이미지 처리 (mock 모드도 필요)
+Pillow>=10.0.0
+numpy>=1.24.0
+opencv-python-headless>=4.9.0
+
+# Phase 후속에서 활성화 (GPU base image 필요):
+# torch>=2.3.0
+# torchvision>=0.18.0
+# transformers>=4.44.0
+# open-clip-torch>=2.24.0
+# segment-anything-2  # SAM2 (별도 install)
+# groundingdino-py>=0.4.0
+# easyocr>=1.7.1
+# supabase>=2.3.0  # storage upload

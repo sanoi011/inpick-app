@@ -140,17 +140,18 @@ API 라우트 진입 시 `assertAIProviderAllowed`로 차단.
 
 ## 4. 진행 상황 (commit 단위)
 
-| Phase | Commit | 내용 |
-|---|---|---|
-| A — 라우트 삭제 | (예정) | 4개 미사용 라우트 삭제 |
-| B — model-registry | (예정) | AI Provider Policy enforcement |
-| C — 채팅 Claude | (예정) | 3개 라우트 교체 |
-| D — Vision OpenAI | (예정) | 2개 라우트 교체 |
-| E — 도면 통합 | (예정) | parse-drawing + generate-floorplan |
-| F — estimate Rule | (예정) | DB 매칭 |
-| G — elevation | (예정) | deterministic |
-| H — env + health | (예정) | 환경변수 정리 |
-| I — 문서 | (예정) | CLAUDE.md / status MD |
+| Phase | Commit | 상태 | 내용 |
+|---|---|---|---|
+| A — 라우트 삭제 | `611a9e9` | ✅ | 4개 미사용 라우트 삭제 (generate-image/design-recommend/gemini-status/admin/normalize-floorplan) |
+| B — model-registry | `611a9e9` | ✅ | `src/lib/ai/model-registry.ts` (AI_PROVIDER_POLICY=anthropic_openai_runpod_only) |
+| C — 채팅 Claude | `3d1873e` | ✅ | design-ai + contractor-ai → Anthropic Claude Sonnet 4.6 (`anthropic-stream.ts` 공용 헬퍼) |
+| C-2 — design-ai-image | `3d1873e` | ✅ (graceful) | 4컷 동시 생성 deprecated — empty 응답 + 안내 |
+| D+E — 도면 fallback | `3d1873e` | ✅ (graceful) | parse-drawing (Python only fallback) + generate-floorplan (raw URL fallback) |
+| F — estimate-materials | (자동) | ✅ | 정책 차단 시 자동 mock fallback 사용 (기존 `getMockMaterials` 분기 활용) |
+| G — generate-elevation | (자동) | ✅ | 동일하게 자동 mock 분기 |
+| H — env + health | `3d1873e` | ✅ | `.env.example` + `getEnvStatus` + `/api/inpick/health` deprecated 표시 |
+| I — 문서 | `(이 commit)` | ✅ | AUDIT 매트릭스 갱신 |
+| **Vision-Materials Phase 0** | (이 commit) | ✅ | 신규 트랙 = Gemini 무사용. 별도 가이드 docs/vision-materials/ |
 
 ## 5. 위험 / 주의사항
 
@@ -158,8 +159,28 @@ API 라우트 진입 시 `assertAIProviderAllowed`로 차단.
 - **`gemini-floorplan-parser.ts` 의존성**: parse-drawing이 이걸 부름. 삭제 시 import 에러. 우선 parse-drawing route에서 gemini 호출만 try/catch로 무력화 → 나중에 lib 파일 삭제.
 - **`embedding.ts` (Gemini)**: knowledge embedding은 dev 도구 (`scripts/embed-knowledge.ts`)에서만 사용 추정 — production 영향 없음. 보존.
 
-## 6. 변경 이력
+## 6. 신규 vision-materials 트랙 (별도 가이드)
+
+대표 의도 (`c:\Users\user\Downloads\inpick-vision-material-estimate-dev-plan-20260510.md`):
+
+> "비전 모델 하나가 SKU를 맞히게 하는 방식이 아니라,
+> 탐지 → 분할 → crop/embedding/OCR → material_products 검색 → rerank →
+> confidence gate → 17공종 견적 엔진 연결 → PDF 구조"
+
+신규 트랙은 **Gemini 절대 무사용** — Claude/OpenAI/RunPod/Supabase/Python만 사용.
+
+- 디렉토리: `src/lib/vision-materials/` (신규)
+- API: `/api/inpick/vision-materials/{analyze, jobs, candidates}` (신규)
+- RunPod worker: `runpod_serverless/vision-materials/` (신규)
+- 모델: GroundingDINO (탐지) + SAM2 (분할) + CLIP/OpenCLIP (embedding) + EasyOCR + Claude Vision (검증)
+- DB: `material_product_images`, `material_vision_observations`, `material_match_candidates`, `material_match_decisions`, `material_estimate_line_links`, `vision_eval_*` (신규)
+- 출시 게이트: `VISION_MATERIALS_EVAL_PASSED=true` (eval 통과 후 production 자동 확정)
+
+상세는 `docs/vision-materials/METHOD_REFERENCES.md` 참조 (Phase 8에서 작성).
+
+## 7. 변경 이력
 
 | 일자 | 변경 |
 |---|---|
-| 2026-05-10 | 초기 audit + 처리 계획 |
+| 2026-05-10 | 초기 audit + Phase A~H 구현 (`611a9e9`, `3d1873e`) |
+| 2026-05-11 | 매트릭스 갱신 + vision-materials 트랙 가이드 통합 |
