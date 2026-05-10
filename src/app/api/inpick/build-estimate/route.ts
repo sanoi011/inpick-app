@@ -18,6 +18,7 @@ import {
   type RoomEstimate,
 } from "@/lib/inpick/estimate";
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
+import { lookupMaterialProduct } from "@/lib/inpick/material-product-lookup";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -90,6 +91,63 @@ function defaultSurfacesForRoom(roomName: string): MaterialItem[] {
   ];
 }
 
+/**
+ * 자재 lookup으로 brand/sku/spec 채움 (대표 지목 핵심 기능 — "우리의 킥").
+ *
+ * material_products 테이블에서 surface 카테고리별 top product 매칭.
+ * 매칭 성공 시:
+ *   - materialName을 "{brand} {productName}" 형태로 교체
+ *   - brand / sku (model_number) / spec (specification) 채움
+ *   - contractor_price 있으면 unitPriceWon 갱신 + priceSource="korea_price_assoc" → "vision_estimate" 변경
+ * 매칭 실패 시 입력 그대로 (호환).
+ */
+async function enrichWithBrandSku(
+  surfaces: MaterialItem[],
+  roomName: string,
+): Promise<MaterialItem[]> {
+  const out: MaterialItem[] = [];
+  for (const m of surfaces) {
+    // 이미 brand/sku 있으면 skip (vision/사용자 입력 우선)
+    if (m.brand || m.sku) {
+      out.push(m);
+      continue;
+    }
+    try {
+      const match = await lookupMaterialProduct({
+        surface: m.surface,
+        roomName,
+        materialName: m.materialName,
+        preferredGrade: "standard",
+      });
+      if (!match) {
+        out.push(m);
+        continue;
+      }
+      // contractor_price 우선, 없으면 retail_price, 없으면 기존 unitPriceWon 유지
+      const matchedPrice =
+        match.contractorPrice ??
+        match.retailPrice ??
+        m.unitPriceWon;
+      out.push({
+        ...m,
+        materialName: `${match.brand} ${match.productName}`,
+        brand: match.brand,
+        sku: match.sku,
+        spec: match.specification,
+        unitPriceWon: matchedPrice,
+        priceSource: match.contractorPrice ? "vision_estimate" : "standard",
+      });
+    } catch (e) {
+      // lookup 실패 — 원본 그대로
+      console.warn(
+        `[build-estimate] enrich fail for ${m.surface}/${m.materialName}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      out.push(m);
+    }
+  }
+  return out;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -138,6 +196,10 @@ export async function POST(req: NextRequest) {
               : "Vision 실패 — 표준 자재로 산출",
         });
       }
+
+      // ─── 대표 지목 핵심: brand/sku/spec 자동 매칭 (material_products 253K rows) ───
+      // vision 추출 결과 + fallback 모두에 적용. brand/sku 이미 있으면 skip.
+      surfaces = await enrichWithBrandSku(surfaces, r.roomName);
 
       estimates.push(
         buildRoomEstimate({

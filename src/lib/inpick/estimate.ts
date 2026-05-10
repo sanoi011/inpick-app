@@ -216,15 +216,20 @@ export function buildRoomEstimate(input: RoomEstimateInput): RoomEstimate {
     // 2) 단가 — Vision이 못 채운 경우 한국물가협회 KPA 표준 fallback
     let unitPrice = m.unitPriceWon;
     let priceSource: "korea_price_assoc" | "vision_estimate" | "standard" =
-      m.priceSource === "korea_price_assoc" ? "korea_price_assoc" : "vision_estimate";
+      m.priceSource === "korea_price_assoc"
+        ? "korea_price_assoc"
+        : m.priceSource === "standard"
+          ? "standard"
+          : "vision_estimate";
     if (!unitPrice || unitPrice < 1000) {
       const kpa = lookupKpaPrice(m.surface, m.materialName);
       if (kpa) {
         unitPrice = kpa;
         priceSource = "korea_price_assoc";
       }
-    } else {
-      // Vision이 단가 추정한 경우도 KPA 표준이 있으면 KPA 우선 (정밀성)
+    } else if (priceSource !== "standard" && priceSource !== "korea_price_assoc") {
+      // Vision이 단가 추정한 경우만 KPA 우선 (정밀성)
+      // material_products lookup 결과(="standard")는 카탈로그 실측가 → 그대로 신뢰
       const kpa = lookupKpaPrice(m.surface, m.materialName);
       if (kpa && Math.abs(kpa - unitPrice) / Math.max(unitPrice, 1) > 0.5) {
         unitPrice = kpa;

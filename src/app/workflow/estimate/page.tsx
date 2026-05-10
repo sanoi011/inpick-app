@@ -55,6 +55,7 @@ interface ConsolidatedRow {
   materialName: string;
   brand?: string;
   spec?: string;
+  sku?: string;
   unit: string;
   quantity: number;
   materialCost: number; // 재료비 (main + aux)
@@ -343,6 +344,7 @@ export default function EstimatePage() {
           materialName: it.materialName,
           brand: it.brand,
           spec: it.spec,
+          sku: it.sku,
           unit: it.unit,
           quantity: it.quantity,
           materialCost,
@@ -1045,6 +1047,11 @@ function TradeGroup({
                   {r.brand && (
                     <span className="inline-flex items-center rounded bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-primary-700">
                       {r.brand}
+                    </span>
+                  )}
+                  {r.sku && (
+                    <span className="inline-flex items-center rounded bg-amber-50 border border-amber-100 px-1.5 py-0.5 text-[0.6rem] font-mono text-amber-800">
+                      SKU {r.sku}
                     </span>
                   )}
                   <span>{r.roomName}</span>
