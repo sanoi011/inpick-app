@@ -390,18 +390,33 @@ export default function Step2Designer({
         const { value: chunk, done } = await reader.read();
         if (done) break;
         buf += decoder.decode(chunk, { stream: true });
-        const lines = buf.split("\n");
-        buf = lines.pop() || "";
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-          acc += data;
-          setChatMessages((prev) => {
-            const u = [...prev];
-            u[u.length - 1] = { role: "assistant", content: acc };
-            return u;
-          });
+        // SSE event delimiter는 빈 줄 (\n\n) — 그 단위로 자르고 안에서 data: 라인만 추출.
+        // 텍스트 안에 \n이 들어와도 split("\n")로 깨지지 않도록 서버가 JSON으로 인코딩해서 보냄.
+        const events = buf.split("\n\n");
+        buf = events.pop() || "";
+        for (const ev of events) {
+          // 한 event 내 여러 data: 라인이 있을 수 있음 (Anthropic 표준)
+          for (const line of ev.split("\n")) {
+            if (!line.startsWith("data: ")) continue;
+            const data = line.slice(6);
+            if (data === "[DONE]") continue;
+            // 신규 형식: JSON {text: "..."} (줄바꿈 안전)
+            // 호환: 옛 raw 텍스트도 fallback (JSON.parse 실패 시 그대로)
+            let txt = "";
+            try {
+              const j = JSON.parse(data);
+              txt = typeof j.text === "string" ? j.text : "";
+            } catch {
+              txt = data;
+            }
+            if (!txt) continue;
+            acc += txt;
+            setChatMessages((prev) => {
+              const u = [...prev];
+              u[u.length - 1] = { role: "assistant", content: acc };
+              return u;
+            });
+          }
         }
       }
     } catch (e) {

@@ -122,7 +122,13 @@ export async function POST(request: NextRequest) {
                 const j = JSON.parse(data);
                 if (j.type === "content_block_delta" && j.delta?.type === "text_delta") {
                   const txt: string = j.delta.text || "";
-                  if (txt) controller.enqueue(encoder.encode(`data: ${txt}\n\n`));
+                  // 텍스트에 줄바꿈/특수문자가 있어도 안전하게 — JSON 인코딩.
+                  // 클라이언트가 JSON.parse(data).text 로 받음.
+                  if (txt) {
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ text: txt })}\n\n`),
+                    );
+                  }
                 }
                 if (j.type === "message_stop") {
                   controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
