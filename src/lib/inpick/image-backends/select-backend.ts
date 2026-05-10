@@ -31,11 +31,31 @@ import type {
 /**
  * 환경변수에서 선호 백엔드 읽기.
  * 미설정 시 "openai" (안전 기본값).
+ *
+ * Phase 10 production guardrail (가이드 §13):
+ *   - production 환경에서 backend=runpod 또는 auto로 변경하려면
+ *     INPICK_EVAL_REPORT_PASSED=true 환경변수 명시 필요.
+ *   - 미설정 시 production은 무조건 "openai" 강제 (안전).
+ *   - 비production (dev/test/PoC)은 자유.
  */
 export function getPreferredBackend(): ImageBackendName {
   const env = (process.env.IMAGE_GEN_BACKEND || "openai").toLowerCase();
-  if (env === "runpod" || env === "auto") return env;
-  return "openai";
+  const requested: ImageBackendName =
+    env === "runpod" || env === "auto" ? env : "openai";
+
+  // Phase 10 — production guardrail
+  if (process.env.NODE_ENV === "production" && requested !== "openai") {
+    const evalPassed = process.env.INPICK_EVAL_REPORT_PASSED === "true";
+    if (!evalPassed) {
+      console.warn(
+        `[select-backend] Production guardrail: IMAGE_GEN_BACKEND=${requested} requested ` +
+          `but INPICK_EVAL_REPORT_PASSED!=true. Forcing "openai" for safety. ` +
+          `가이드 §13: evaluation harness 통과 후 backend 변경.`,
+      );
+      return "openai";
+    }
+  }
+  return requested;
 }
 
 /**
