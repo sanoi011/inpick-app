@@ -725,11 +725,13 @@ export default function Step2Designer({
   const totalCount = realRoomTabs.length;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[260px_1fr] items-stretch">
-      {/* ─── 좌측 툴바 ─── */}
+    // 캡처 레퍼런스 레이아웃: 좌측 베이지 사이드바 + 메인 흰색(#F8F9F6) 캔버스
+    // 채팅 무한 늘어남 X — 화면 높이 고정, 메시지 영역만 스크롤
+    <div className="grid gap-3 lg:grid-cols-[260px_1fr] items-stretch min-h-[calc(100vh-180px)] rounded-2xl bg-[#EFE8DC] p-3">
+      {/* ─── 좌측 툴바 (베이지 톤 — 대표 지시) ─── */}
       <aside className="flex flex-col gap-3">
         {/* 전체 인테리어 이미지 한번에 생성 — 좌측 상단 (방 선택 위) */}
-        <div className="rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
           <p className="text-xs font-bold text-primary-700 mb-2">
             전체 인테리어 이미지 한번에 생성
           </p>
@@ -756,7 +758,7 @@ export default function Step2Designer({
         </div>
 
         {/* 방 선택 */}
-        <div className="rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
           <div className="flex items-center justify-between mb-2 px-1">
             <p className="text-xs font-bold text-primary-700">방 선택</p>
             <span className="text-[0.6rem] tabular text-primary-900/50">{pyeongLabel}</span>
@@ -855,7 +857,7 @@ export default function Step2Designer({
         </div>
 
         {/* 보유 토큰 */}
-        <div className="rounded-2xl bg-white border border-amber-200 p-3 shadow-card">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
           <div className="flex items-center justify-between">
             <p className="text-xs font-bold text-amber-700">보유 토큰</p>
             <span className="text-lg tabular font-extrabold text-amber-700">
@@ -868,7 +870,7 @@ export default function Step2Designer({
         </div>
 
         {/* 진행 상황 — 좌측 컬럼 하단으로 push (메인 캔버스 하단과 정렬) */}
-        <div className="mt-auto rounded-2xl bg-white border border-primary-200 p-3 shadow-card">
+        <div className="mt-auto rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-xs font-bold text-primary-700">진행 상황</p>
             <span className="text-[0.65rem] tabular font-bold text-primary-900">
@@ -916,15 +918,11 @@ export default function Step2Designer({
         </div>
       </aside>
 
-      {/* ─── 메인: ChatGPT 스타일 채팅 + 이미지 오버랩 ─── */}
+      {/* ─── 메인 캔버스: 흰색 톤(#F8F9F6) — 대표 지시 ─── */}
       <section className="relative flex flex-col">
-        <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] max-h-[calc(100vh-220px)] flex flex-col overflow-hidden">
-          {/* 채팅 헤더 */}
-          <div className={`px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap transition-colors ${
-            chatMode
-              ? "border-amber-300 bg-gradient-to-r from-amber-50 to-primary-100"
-              : "border-primary-100 bg-gradient-to-r from-primary-50/50 to-amber-50/30"
-          }`}>
+        <div className="relative rounded-3xl bg-[#F8F9F6] border border-amber-200/40 shadow-sm flex-1 min-h-[480px] max-h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+          {/* 채팅 헤더 (단조롭게 — 캡처 레퍼런스 스타일) */}
+          <div className="px-5 py-3 border-b border-amber-100/60 flex items-center justify-between gap-3 flex-wrap bg-[#F8F9F6]/80">
             <div className="flex items-center gap-2 min-w-0">
               <Sparkles className="h-4 w-4 text-primary-500 shrink-0" />
               <p className="text-sm font-bold text-primary-900 truncate">
@@ -1144,7 +1142,7 @@ export default function Step2Designer({
                 ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
                 : "대화 충분 — 언제든 디자인 생성 가능";
             return (
-              <div className="px-4 py-3 border-t-2 border-amber-200 bg-gradient-to-r from-amber-100 to-primary-100">
+              <div className="px-4 py-3 border-t border-amber-200/60 bg-[#F8F9F6]">
                 <button
                   type="button"
                   onClick={handleChatToImage}
@@ -1184,10 +1182,10 @@ export default function Step2Designer({
             );
           })()}
 
-          {/* 하단 sticky prompt bar (흰색 60% 투명) */}
-          <div className="border-t border-primary-100 bg-white/60 backdrop-blur-md p-3">
-            <div className="flex items-end gap-2">
-              <div className="flex-1 rounded-2xl border border-primary-200 bg-white/90 px-4 py-2.5 focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-100">
+          {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
+          <div className="border-t border-amber-100/40 bg-[#F8F9F6] p-4">
+            <div className="mx-auto max-w-3xl flex items-end gap-2">
+              <div className="flex-1 rounded-full border border-amber-200/70 bg-white px-5 py-3 shadow-sm focus-within:border-amber-300 focus-within:ring-2 focus-within:ring-amber-100">
                 <textarea
                   value={currentPrompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -1218,8 +1216,10 @@ export default function Step2Designer({
                   (chatMode ? chatStreaming : generating) || !currentPrompt.trim()
                 }
                 aria-label={chatMode ? "메시지 전송" : "이미지 생성"}
-                className={`shrink-0 inline-flex items-center justify-center rounded-2xl text-white shadow-cta hover:bg-primary-600 disabled:opacity-30 transition-all ${
-                  chatMode ? "h-11 w-11 bg-primary-500" : "h-11 gap-1.5 bg-primary-500 px-4 text-sm font-bold"
+                className={`shrink-0 inline-flex items-center justify-center rounded-full text-white shadow-md hover:opacity-95 disabled:opacity-30 transition-all ${
+                  chatMode
+                    ? "h-12 w-12 bg-gradient-to-br from-amber-500 to-amber-700"
+                    : "h-12 gap-1.5 bg-gradient-to-br from-primary-500 to-primary-700 px-5 text-sm font-bold"
                 }`}
               >
                 {chatMode ? (
