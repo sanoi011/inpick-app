@@ -94,9 +94,49 @@ export interface UploadRenderResult {
 /**
  * base64 PNG → Supabase Storage 업로드 → public URL 반환.
  *
- * production 모드에서 storage 미설정 시 에러.
- * PoC 모드(non-production)에서 storage 미설정 시 base64 그대로 반환 (data URL).
+ * 정책 (2026-05-11 fix):
+ *   - storage 업로드 성공 → production-storage URL
+ *   - storage 미설정 또는 업로드 실패 (Bucket not found 등) → base64 fallback
+ *   - IMAGE_STORAGE_STRICT=true 일 때만 production에서 실패 시 throw (운영 정책)
+ *
+ * 이전 정책 (Phase 3 0580a46):
+ *   - production = storage 강제 → bucket 없으면 사용자에게 502 에러
+ *   - bucket이 자동 생성 안 되니까 production 깨짐
  */
+
+/** 버킷 자동 생성 시도 (한 번만) — 이미 존재하면 silent OK */
+let _bucketEnsured = false;
+async function ensureBucketExists(supa: ReturnType<typeof getSupabaseAdmin>): Promise<boolean> {
+  if (_bucketEnsured) return true;
+  try {
+    const { data: list, error: listErr } = await supa.storage.listBuckets();
+    if (listErr) {
+      console.warn(`[image-storage] listBuckets error: ${listErr.message}`);
+      return false;
+    }
+    const exists = (list || []).some((b: { name: string }) => b.name === BUCKET);
+    if (exists) {
+      _bucketEnsured = true;
+      return true;
+    }
+    // 생성 시도 (public read)
+    const { error: createErr } = await supa.storage.createBucket(BUCKET, {
+      public: true,
+      fileSizeLimit: 20 * 1024 * 1024, // 20MB
+    });
+    if (createErr) {
+      console.warn(`[image-storage] createBucket fail: ${createErr.message}`);
+      return false;
+    }
+    _bucketEnsured = true;
+    console.info(`[image-storage] bucket "${BUCKET}" auto-created`);
+    return true;
+  } catch (e) {
+    console.warn(`[image-storage] ensureBucket error: ${e instanceof Error ? e.message : String(e)}`);
+    return false;
+  }
+}
+
 export async function uploadRenderImage(
   imageBase64: string,
   options: FilenameInput = {},
@@ -110,25 +150,34 @@ export async function uploadRenderImage(
     return { mode: "failed", error: "base64 입력 없음" };
   }
 
+  const dataUrl = `data:image/png;base64,${cleanB64}`;
+  const strictMode = process.env.IMAGE_STORAGE_STRICT === "true";
+
   // ─── Storage 미설정 ───
   if (!isStorageReady()) {
-    if (isProductionMode()) {
+    if (isProductionMode() && strictMode) {
       return {
         mode: "failed",
         error:
           "Production 모드에서 storage 미설정 — IMAGE_STORAGE_PROVIDER + IMAGE_STORAGE_BUCKET 필수",
       };
     }
-    // PoC — base64 그대로 반환
-    return {
-      mode: "poc-base64",
-      url: `data:image/png;base64,${cleanB64}`,
-    };
+    // 기본 — base64 fallback (production도 허용 — 사용자 흐름 우선)
+    if (isProductionMode()) {
+      console.warn(
+        "[image-storage] storage 미설정 — base64 fallback 사용 중 (production). " +
+          "Vercel/Supabase에 IMAGE_STORAGE_BUCKET=renders + bucket 생성 권장.",
+      );
+    }
+    return { mode: "poc-base64", url: dataUrl };
   }
 
   // ─── Supabase 업로드 ───
   try {
     const supa = getSupabaseAdmin();
+    // 버킷 자동 생성 시도 (한 번만)
+    await ensureBucketExists(supa);
+
     const buffer = Buffer.from(cleanB64, "base64");
     const filename = generateRenderFilename(options);
     const path = filename;
@@ -142,7 +191,14 @@ export async function uploadRenderImage(
       });
 
     if (uploadError) {
-      return { mode: "failed", error: `Supabase upload: ${uploadError.message}` };
+      // Bucket not found 등 — base64 fallback (strict 모드만 실패)
+      if (strictMode && isProductionMode()) {
+        return { mode: "failed", error: `Supabase upload: ${uploadError.message}` };
+      }
+      console.warn(
+        `[image-storage] upload fail — base64 fallback: ${uploadError.message}`,
+      );
+      return { mode: "poc-base64", url: dataUrl };
     }
 
     // Public URL
@@ -154,7 +210,11 @@ export async function uploadRenderImage(
       publicUrl = publicUrl.replace(supaUrl, PUBLIC_BASE_URL);
     }
     if (!publicUrl) {
-      return { mode: "failed", error: "Public URL 생성 실패" };
+      // Public URL 생성 실패 — base64 fallback (strict만 실패)
+      if (strictMode && isProductionMode()) {
+        return { mode: "failed", error: "Public URL 생성 실패" };
+      }
+      return { mode: "poc-base64", url: dataUrl };
     }
 
     return {
@@ -163,10 +223,12 @@ export async function uploadRenderImage(
       storedAt: `${BUCKET}/${path}`,
     };
   } catch (e) {
-    return {
-      mode: "failed",
-      error: e instanceof Error ? e.message : String(e),
-    };
+    const msg = e instanceof Error ? e.message : String(e);
+    if (process.env.IMAGE_STORAGE_STRICT === "true" && isProductionMode()) {
+      return { mode: "failed", error: msg };
+    }
+    console.warn(`[image-storage] unexpected — base64 fallback: ${msg}`);
+    return { mode: "poc-base64", url: dataUrl };
   }
 }
 
