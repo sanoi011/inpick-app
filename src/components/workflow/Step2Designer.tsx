@@ -921,6 +921,51 @@ export default function Step2Designer({
       {/* ─── 메인 캔버스: 흰색 톤(#F8F9F6) — 대표 지시 ─── */}
       <section className="relative flex flex-col">
         <div className="relative rounded-3xl bg-[#F8F9F6] border border-amber-200/40 shadow-sm flex-1 min-h-[480px] max-h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+          {/* Step1 선택 정보 — 캔버스 최상단 (주소/단지/평형/면적/확장형/예산) */}
+          {(basicInfo.selectedAddress || basicInfo.selectedComplex || basicInfo.selectedPyeong) && (
+            <div className="px-5 py-2 bg-[#EFE8DC]/40 border-b border-amber-100/60 text-[0.7rem] text-primary-900/70 flex flex-wrap items-center gap-x-3 gap-y-1">
+              {basicInfo.selectedAddress?.roadAddress && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-primary-900/40">주소</span>
+                  <span className="font-medium text-primary-900">
+                    {basicInfo.selectedAddress.roadAddress}
+                  </span>
+                </span>
+              )}
+              {basicInfo.selectedComplex?.complexName && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-primary-900/40">단지</span>
+                  <span className="font-medium text-primary-900">
+                    {basicInfo.selectedComplex.complexName}
+                  </span>
+                </span>
+              )}
+              {basicInfo.selectedPyeong && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-primary-900/40">평형</span>
+                  <span className="font-medium text-primary-900">
+                    {basicInfo.selectedPyeong.pyeongName}형 · {basicInfo.selectedPyeong.exclusiveArea}㎡
+                  </span>
+                </span>
+              )}
+              {basicInfo.expansionType && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-primary-900/40">발코니</span>
+                  <span className="font-medium text-primary-900">
+                    {basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
+                  </span>
+                </span>
+              )}
+              {typeof basicInfo.budget === "number" && basicInfo.budget > 0 && (
+                <span className="inline-flex items-center gap-1">
+                  <span className="text-primary-900/40">예산</span>
+                  <span className="font-medium text-primary-900">
+                    {basicInfo.budget.toLocaleString()}만원
+                  </span>
+                </span>
+              )}
+            </div>
+          )}
           {/* 채팅 헤더 (단조롭게 — 캡처 레퍼런스 스타일) */}
           <div className="px-5 py-3 border-b border-amber-100/60 flex items-center justify-between gap-3 flex-wrap bg-[#F8F9F6]/80">
             <div className="flex items-center gap-2 min-w-0">
