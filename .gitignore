@@ -27,6 +27,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+.env.local.backup*
 
 # vercel
 .vercel
@@ -77,6 +78,7 @@ services/pdf_parser/models/*.pt
 services/pdf_parser/outputs/
 services/pdf_parser/__pycache__/
 services/pdf_parser/**/__pycache__/
+runpod_serverless/**/__pycache__/
 
 # Local brainstorming screenshots
 /skill/
