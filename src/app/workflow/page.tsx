@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Camera, Sparkles, X } from "lucide-react";
 import Notch from "@/components/workflow/Notch";
 import TokenBadge from "@/components/workflow/TokenBadge";
 import Step1Cards, { Step1Data } from "@/components/workflow/Step1Cards";
@@ -10,6 +10,9 @@ import Step2Designer, { Step2Data } from "@/components/workflow/Step2Designer";
 import { useTokens } from "@/hooks/useTokens";
 import { useRouter } from "next/navigation";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
+
+// 빠른 진입 모드 — 평수 프리셋
+const QUICK_PYEONG_PRESETS = [10, 15, 20, 24, 30, 34, 40, 50];
 
 const TOTAL_STEPS = 5;
 
@@ -36,7 +39,38 @@ export default function WorkflowPage() {
 
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeError, setNormalizeError] = useState<string | null>(null);
+  // 빠른 사진 진입 모달
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickPyeong, setQuickPyeong] = useState<number>(24);
   const hydratedRef = useRef(false);
+
+  const startQuickPhotoFlow = () => {
+    const pyeong = Math.max(5, Math.min(150, Math.round(quickPyeong || 24)));
+    const exclusiveArea = Math.round(pyeong * 3.3058 * 10) / 10;
+    setStep1({
+      basicInfo: {
+        mode: "address",
+        budget: 3500,
+        expansionType: "basic",
+        selectedPyeong: {
+          pyeongNo: -1,
+          pyeongName: `${pyeong}평`,
+          exclusiveArea,
+        },
+      },
+      buildingType: "apartment",
+      rooms: [],
+    });
+    setStep2({
+      selectedByRoom: {},
+      generations: {},
+      rendersByRoom: {},
+      promptByRoom: {},
+      chatMode: true,
+    });
+    setQuickOpen(false);
+    setStep(2);
+  };
 
   // 마운트 시 sessionStorage 복원 (토큰 충전 갔다 와도 진행 상태 유지)
   useEffect(() => {
@@ -261,6 +295,37 @@ export default function WorkflowPage() {
                   </p>
                 </div>
 
+                {/* 빠른 진입 — 사진 + 평수만으로 AI 상담으로 직행 */}
+                <div className="mt-8">
+                  <button
+                    type="button"
+                    onClick={() => setQuickOpen(true)}
+                    className="group relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/40 bg-white/90 px-6 py-5 text-left shadow-card-hover backdrop-blur transition hover:bg-white"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta">
+                        <Camera className="h-6 w-6" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-extrabold tracking-tight text-primary-900">
+                            도면 없이 사진으로 바로 시작
+                          </p>
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700">
+                            STEP 1 건너뛰기
+                          </span>
+                        </div>
+                        <p className="mt-1 text-sm text-primary-900/70 leading-relaxed">
+                          평수만 알려주시면 AI 상담으로 바로 이동해요. 원하는 인테리어 사진을 첨부하고
+                          <span className="font-bold text-primary-700"> &ldquo;이렇게 꾸며줘&rdquo;</span>라고 말씀하시면,
+                          AI가 분석해서 디자인 이미지와 견적까지 만들어 드려요.
+                        </p>
+                      </div>
+                      <Sparkles className="h-5 w-5 text-amber-500 shrink-0 group-hover:scale-110 transition" />
+                    </div>
+                  </button>
+                </div>
+
                 <div className="mt-12">
                   <Step1Cards
                     value={step1}
@@ -356,6 +421,102 @@ export default function WorkflowPage() {
             )}
           </AnimatePresence>
         </section>
+
+        {/* 빠른 사진 진입 — 평수 모달 */}
+        <AnimatePresence>
+          {quickOpen && (
+            <>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setQuickOpen(false)}
+                className="fixed inset-0 z-[85] bg-primary-900/55 backdrop-blur-sm"
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 12 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 12 }}
+                className="fixed left-1/2 top-1/2 z-[86] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+              >
+                <button
+                  onClick={() => setQuickOpen(false)}
+                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-primary-900/50 hover:bg-primary-50 hover:text-primary-900"
+                  aria-label="닫기"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta">
+                  <Camera className="h-6 w-6" />
+                </div>
+                <h3 className="mt-4 text-xl font-extrabold tracking-tight text-primary-900">
+                  평수만 알려주세요
+                </h3>
+                <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                  AI 상담으로 바로 이동합니다. 원하시는 인테리어 사진을 첨부하고{" "}
+                  <span className="font-bold text-primary-700">대화로 디자인</span>까지 진행해요.
+                </p>
+
+                <div className="mt-5">
+                  <p className="text-xs font-bold text-primary-700 mb-2">평형 선택</p>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {QUICK_PYEONG_PRESETS.map((p) => {
+                      const active = quickPyeong === p;
+                      return (
+                        <button
+                          key={p}
+                          type="button"
+                          onClick={() => setQuickPyeong(p)}
+                          className={`rounded-lg border px-2 py-2 text-sm font-bold transition ${
+                            active
+                              ? "border-primary-500 bg-primary-500 text-white shadow-cta"
+                              : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
+                          }`}
+                        >
+                          {p}평
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <label className="text-xs font-bold text-primary-700">직접 입력</label>
+                    <input
+                      type="number"
+                      min={5}
+                      max={150}
+                      value={quickPyeong}
+                      onChange={(e) => setQuickPyeong(Number(e.target.value) || 0)}
+                      className="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm tabular text-primary-900 outline-none focus:border-primary-400"
+                    />
+                    <span className="text-xs text-primary-900/60">평</span>
+                  </div>
+                  <p className="mt-1.5 text-[0.7rem] text-primary-900/50">
+                    약 {Math.round((quickPyeong || 0) * 3.3058 * 10) / 10}m² (전용면적)
+                  </p>
+                </div>
+
+                <div className="mt-6 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setQuickOpen(false)}
+                    className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="button"
+                    onClick={startQuickPhotoFlow}
+                    disabled={!quickPyeong || quickPyeong < 5}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40"
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    AI 상담 시작
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
         {/* 하단 stepper — jeton walkthrough 패턴 (활성 dot width 확장) */}
         <footer className="sticky bottom-6 z-30 mx-auto flex max-w-md items-center justify-center px-6 pb-6">

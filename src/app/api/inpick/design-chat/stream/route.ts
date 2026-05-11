@@ -28,6 +28,11 @@ const SYSTEM_PROMPT = `당신은 InPick의 인테리어 상담 AI입니다.
 - 정보가 충분하면 마지막에 '이미지를 생성하시겠습니까?' 물어봄
 - 사용자가 구체적인 자재/가구/색상 등을 물으면 인테리어 전문가로서 즉시 추천 (예: "손잡이 추천" → 바로 손잡이 종류와 추천 시작)
 
+이미지가 첨부된 경우:
+- 사진을 자세히 보고 공간 유형/현재 상태/구조/마감재/조명/가구를 한국어로 정확히 묘사
+- 사용자의 "이렇게 꾸며줘"/"이 분위기로" 요청에 맞춰 변경할 부분과 유지할 부분을 구체적으로 제안
+- 평수/방 정보가 없다면 사진 기반으로 추정하고 사용자에게 확인 질문
+
 수집할 정보:
 1. 공간 종류 (거실/안방/부엌/욕실 등)
 2. 평수/면적
@@ -35,9 +40,66 @@ const SYSTEM_PROMPT = `당신은 InPick의 인테리어 상담 AI입니다.
 4. 톤/컬러
 5. 특별 요구사항 (수납, 조명, 가구 등)`;
 
+interface ChatImageRef {
+  data: string; // base64 (data URL prefix 제거된 본문)
+  mediaType?: string; // image/jpeg | image/png | image/webp | image/gif
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: ChatImageRef[]; // user 메시지에만 의미 있음
+}
+
+const ALLOWED_MEDIA_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+]);
+
+function buildAnthropicContent(m: ChatMessage):
+  | string
+  | Array<
+      | { type: "text"; text: string }
+      | {
+          type: "image";
+          source: { type: "base64"; media_type: string; data: string };
+        }
+    > {
+  if (m.role !== "user" || !m.images || m.images.length === 0) {
+    return m.content;
+  }
+  const blocks: Array<
+    | { type: "text"; text: string }
+    | {
+        type: "image";
+        source: { type: "base64"; media_type: string; data: string };
+      }
+  > = [];
+  for (const img of m.images) {
+    if (!img?.data) continue;
+    const mt = img.mediaType && ALLOWED_MEDIA_TYPES.has(img.mediaType)
+      ? img.mediaType
+      : "image/jpeg";
+    // dataURL이 통째로 들어왔으면 prefix 떼어내기
+    const data = img.data.startsWith("data:")
+      ? img.data.replace(/^data:[^;]+;base64,/, "")
+      : img.data;
+    if (!data) continue;
+    blocks.push({
+      type: "image",
+      source: { type: "base64", media_type: mt, data },
+    });
+  }
+  // 텍스트는 마지막에 (Claude vision 권장 순서: 이미지 → 텍스트)
+  if (m.content && m.content.trim()) {
+    blocks.push({ type: "text", text: m.content });
+  } else if (blocks.length > 0) {
+    // 텍스트가 비어있어도 이미지만 보낼 수 있도록 최소 안내
+    blocks.push({ type: "text", text: "(이미지 첨부)" });
+  }
+  return blocks;
 }
 
 export async function POST(request: NextRequest) {
@@ -80,7 +142,7 @@ export async function POST(request: NextRequest) {
           },
         ],
         stream: true,
-        messages: messages.map((m) => ({ role: m.role, content: m.content })),
+        messages: messages.map((m) => ({ role: m.role, content: buildAnthropicContent(m) })),
       }),
     });
 

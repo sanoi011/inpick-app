@@ -21,6 +21,7 @@ import {
   Layers,
   X,
   Sparkles,
+  Paperclip,
 } from "lucide-react";
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
@@ -75,9 +76,19 @@ export interface RenderItem {
   refinedAt?: string;
 }
 
+export interface ChatImageAttachment {
+  /** 원본 dataURL (UI 미리보기) */
+  dataUrl: string;
+  /** Anthropic 전송용 순수 base64 (prefix 제외) */
+  base64: string;
+  mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  fileName?: string;
+}
+
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  images?: ChatImageAttachment[]; // user 메시지에만 의미 있음
 }
 
 export interface Step2Data {
@@ -162,6 +173,10 @@ export default function Step2Designer({
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(value.chatMessages ?? []);
   const [chatStreaming, setChatStreaming] = useState(false);
   const [extractingPrompt, setExtractingPrompt] = useState(false);
+  // 다음 user 메시지에 함께 보낼 첨부 이미지 (전송 후 초기화)
+  const [pendingAttachments, setPendingAttachments] = useState<ChatImageAttachment[]>([]);
+  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const chatFileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // 부모(value)와 sync — 페이지 이탈 후 복원용. 단, 매 chunk마다 X (debounce).
@@ -404,20 +419,103 @@ export default function Step2Designer({
     return lines.join("\n");
   };
 
+  // ── 채팅 첨부 이미지 핸들러 ──
+  const readFileAsBase64 = (file: File) =>
+    new Promise<{ base64: string; dataUrl: string }>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(reader.error || new Error("파일 읽기 실패"));
+      reader.onload = () => {
+        const dataUrl = String(reader.result || "");
+        const m = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!m) return reject(new Error("이미지 형식이 올바르지 않습니다"));
+        resolve({ base64: m[2], dataUrl });
+      };
+      reader.readAsDataURL(file);
+    });
+
+  const handlePickChatFiles = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setAttachmentError(null);
+    const MAX = 4;
+    const MAX_BYTES = 8 * 1024 * 1024; // 8MB/장 (Anthropic 권장 한도)
+    const accepted: ChatImageAttachment[] = [];
+    for (let i = 0; i < files.length; i++) {
+      if (pendingAttachments.length + accepted.length >= MAX) {
+        setAttachmentError(`이미지는 최대 ${MAX}장까지 첨부할 수 있어요`);
+        break;
+      }
+      const f = files[i];
+      if (!f.type.startsWith("image/")) {
+        setAttachmentError("이미지 파일만 첨부할 수 있어요");
+        continue;
+      }
+      if (f.size > MAX_BYTES) {
+        setAttachmentError("8MB 이하의 이미지만 첨부할 수 있어요");
+        continue;
+      }
+      const mt: ChatImageAttachment["mediaType"] =
+        f.type === "image/png"
+          ? "image/png"
+          : f.type === "image/webp"
+            ? "image/webp"
+            : f.type === "image/gif"
+              ? "image/gif"
+              : "image/jpeg";
+      try {
+        const { base64, dataUrl } = await readFileAsBase64(f);
+        accepted.push({ dataUrl, base64, mediaType: mt, fileName: f.name });
+      } catch (e) {
+        setAttachmentError(e instanceof Error ? e.message : "이미지 첨부 실패");
+      }
+    }
+    if (accepted.length > 0) {
+      setPendingAttachments((prev) => [...prev, ...accepted]);
+    }
+    // 같은 파일 재선택 가능하게 input 초기화
+    if (chatFileInputRef.current) chatFileInputRef.current.value = "";
+  };
+
+  const removePendingAttachment = (idx: number) => {
+    setPendingAttachments((prev) => prev.filter((_, i) => i !== idx));
+  };
+
   // ── 채팅 모드 핸들러 ──
   const handleChatSend = async () => {
-    if (!currentPrompt.trim() || chatStreaming) return;
+    const hasText = !!currentPrompt.trim();
+    const hasImages = pendingAttachments.length > 0;
+    if ((!hasText && !hasImages) || chatStreaming) return;
     setErrorMsg(null);
-    const userMsg: ChatMessage = { role: "user", content: currentPrompt.trim() };
+    setAttachmentError(null);
+    // 텍스트가 비어있는데 이미지만 있으면 기본 안내 텍스트 자동 삽입
+    const userText = hasText
+      ? currentPrompt.trim()
+      : hasImages
+        ? "이 사진처럼 꾸미고 싶어요. 어떻게 추천해주실래요?"
+        : "";
+    const userMsg: ChatMessage = {
+      role: "user",
+      content: userText,
+      images: hasImages ? [...pendingAttachments] : undefined,
+    };
     const next = [...chatMessages, userMsg];
     setChatMessages([...next, { role: "assistant", content: "" }]);
     setPrompt("");
+    setPendingAttachments([]);
     setChatStreaming(true);
     try {
       const res = await fetch("/api/inpick/design-chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: next }),
+        body: JSON.stringify({
+          messages: next.map((m) => ({
+            role: m.role,
+            content: m.content,
+            images: m.images?.map((img) => ({
+              data: img.base64,
+              mediaType: img.mediaType,
+            })),
+          })),
+        }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -794,6 +892,12 @@ export default function Step2Designer({
               // Step1에서 선택한 방인지
               const isSelectedInStep1 = isAll || selectedRoomKeys.includes(t.v);
               const Icon = t.icon;
+              // 현재 생성 중인 방인지 — bulk면 진행중 방, 단건이면 active room
+              const isGeneratingThis = generating && (
+                bulkProgress
+                  ? bulkProgress.roomLabel === t.label
+                  : sel
+              );
               return (
                 <div key={t.v} className="relative">
                   <button
@@ -809,7 +913,9 @@ export default function Step2Designer({
                       }
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all ${
-                      sel
+                      isGeneratingThis
+                        ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white shadow-cta ring-2 ring-amber-300 ring-offset-1 animate-pulse"
+                        : sel
                         ? isAll
                           ? "bg-gradient-to-r from-primary-500 to-amber-400 text-white shadow-cta"
                           : "bg-primary-500 text-white shadow-cta"
@@ -824,7 +930,12 @@ export default function Step2Designer({
                       <Icon className="h-3.5 w-3.5" />
                       {t.label}
                     </span>
-                    {decided && (
+                    {isGeneratingThis ? (
+                      <span className="inline-flex items-center gap-1 rounded bg-white/25 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
+                        <Loader2 className="h-2.5 w-2.5 animate-spin" />
+                        생성중
+                      </span>
+                    ) : decided ? (
                       <span
                         className={`text-[0.6rem] font-bold tabular px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
                           sel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
@@ -833,7 +944,7 @@ export default function Step2Designer({
                         <Check className="h-2 w-2" strokeWidth={3} />
                         {count}
                       </span>
-                    )}
+                    ) : null}
                   </button>
                   {/* popup — 클릭 토글만, "전체" 제외 */}
                   <AnimatePresence>
@@ -1118,20 +1229,43 @@ export default function Step2Designer({
               </div>
             )}
 
-            {/* AI 상담 메시지 (chatMode 일 때, 텍스트 대화) */}
+            {/* AI 상담 메시지 (chatMode 일 때, 텍스트 + 이미지 첨부 대화) */}
             {chatMode && chatMessages.map((m, i) => (
               <div
                 key={`chat-${i}`}
                 className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-md rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${
+                  className={`max-w-md rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${
                     m.role === "user"
                       ? "bg-primary-500 text-white rounded-tr-sm"
                       : "bg-primary-50 text-primary-900 rounded-tl-sm border border-primary-100"
                   }`}
                 >
-                  {m.content || (chatStreaming && i === chatMessages.length - 1 ? "…" : "")}
+                  {/* 첨부 이미지 (user 메시지) */}
+                  {m.role === "user" && m.images && m.images.length > 0 && (
+                    <div
+                      className={`flex flex-wrap gap-1.5 px-2 pt-2 ${
+                        m.content ? "" : "pb-2"
+                      }`}
+                    >
+                      {m.images.map((img, idx) => (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          key={idx}
+                          src={img.dataUrl}
+                          alt={img.fileName || `attached-${idx}`}
+                          className="h-28 w-28 object-cover rounded-lg border border-white/40"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {/* 텍스트 본문 */}
+                  {(m.content || (chatStreaming && i === chatMessages.length - 1)) && (
+                    <div className="whitespace-pre-wrap px-4 py-2.5">
+                      {m.content || "…"}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -1280,7 +1414,62 @@ export default function Step2Designer({
 
           {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
           <div className="border-t border-amber-100/40 bg-[#F8F9F6] p-4">
+            {/* 첨부 이미지 미리보기 (chat 모드에서만) */}
+            {chatMode && pendingAttachments.length > 0 && (
+              <div className="mx-auto max-w-3xl mb-2 flex flex-wrap gap-1.5">
+                {pendingAttachments.map((img, idx) => (
+                  <div
+                    key={idx}
+                    className="relative h-16 w-16 rounded-lg overflow-hidden border border-amber-200 bg-white shadow-sm"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img.dataUrl}
+                      alt={img.fileName || `pending-${idx}`}
+                      className="absolute inset-0 w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removePendingAttachment(idx)}
+                      className="absolute -top-1 -right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white shadow ring-2 ring-white"
+                      aria-label="첨부 제거"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {chatMode && attachmentError && (
+              <p className="mx-auto max-w-3xl mb-2 text-[0.7rem] text-amber-700 flex items-center gap-1">
+                <AlertCircle className="h-3 w-3" />
+                {attachmentError}
+              </p>
+            )}
             <div className="mx-auto max-w-3xl flex items-end gap-2">
+              {/* 이미지 첨부 (chat 모드 전용) */}
+              {chatMode && (
+                <>
+                  <input
+                    ref={chatFileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    multiple
+                    className="hidden"
+                    onChange={(e) => handlePickChatFiles(e.target.files)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => chatFileInputRef.current?.click()}
+                    disabled={chatStreaming || pendingAttachments.length >= 4}
+                    className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-white text-amber-700 shadow-sm hover:bg-amber-50 disabled:opacity-40 transition"
+                    aria-label="사진 첨부"
+                    title="사진 첨부 (최대 4장 · 8MB 이하)"
+                  >
+                    <Paperclip className="h-5 w-5" />
+                  </button>
+                </>
+              )}
               <div className="flex-1 rounded-full border border-amber-200/70 bg-white px-5 py-3 shadow-sm focus-within:border-amber-300 focus-within:ring-2 focus-within:ring-amber-100">
                 <textarea
                   value={currentPrompt}
@@ -1294,7 +1483,9 @@ export default function Step2Designer({
                   }}
                   placeholder={
                     chatMode
-                      ? "어떤 공간을 꾸미고 싶으세요? 자유롭게 말씀해주세요"
+                      ? pendingAttachments.length > 0
+                        ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요 (비워두고 전송도 OK)"
+                        : "어떤 공간을 꾸미고 싶으세요? 사진을 첨부하면 더 정확해요"
                       : activeRoom === "all"
                         ? "전체 컨셉 입력 — 모든 방에 같은 스타일로 일괄 생성. 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
                         : hasGenerated
@@ -1309,7 +1500,9 @@ export default function Step2Designer({
                 type="button"
                 onClick={chatMode ? handleChatSend : handleGenerate}
                 disabled={
-                  (chatMode ? chatStreaming : generating) || !currentPrompt.trim()
+                  chatMode
+                    ? chatStreaming || (!currentPrompt.trim() && pendingAttachments.length === 0)
+                    : generating || !currentPrompt.trim()
                 }
                 aria-label={chatMode ? "메시지 전송" : "이미지 생성"}
                 className={`shrink-0 inline-flex items-center justify-center rounded-full text-white shadow-md hover:opacity-95 disabled:opacity-30 transition-all ${
@@ -1363,6 +1556,93 @@ export default function Step2Designer({
               </div>
             )}
           </div>
+
+          {/* 생성 중 캔버스 오버레이 — 큰 placeholder + 진행률 + 이전 이미지 흐림 */}
+          <AnimatePresence>
+            {generating && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="absolute inset-3 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-50 via-white to-amber-50 border-2 border-primary-300 shadow-2xl pointer-events-auto"
+                style={{ zIndex: 25 }}
+              >
+                {/* 이전 이미지 (있으면 흐림 배경으로) */}
+                {activeRender && (
+                  <img
+                    src={activeRender.refinedUrl || activeRender.url}
+                    alt="previous"
+                    className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm scale-110"
+                  />
+                )}
+                {/* shimmer 오버레이 */}
+                <div className="absolute inset-0 pointer-events-none">
+                  <motion.div
+                    animate={{ x: ["-100%", "100%"] }}
+                    transition={{ duration: 2.2, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent"
+                  />
+                </div>
+                {/* 중앙 카드 */}
+                <div className="absolute inset-0 flex items-center justify-center p-6">
+                  <div className="text-center max-w-md">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta"
+                    >
+                      <Sparkles className="h-10 w-10" />
+                    </motion.div>
+                    <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-primary-900">
+                      {bulkProgress
+                        ? `${bulkProgress.roomLabel || "방"} AI 디자인 생성 중`
+                        : "AI 디자인 생성 중"}
+                    </h3>
+                    <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                      {bulkProgress ? (
+                        <>
+                          전체 방을 순차 생성하고 있습니다.
+                          <br />
+                          <span className="font-bold text-primary-700 tabular">
+                            {bulkProgress.current}/{bulkProgress.total}
+                          </span>
+                          {" "}완료 — 잠시만 기다려주세요.
+                        </>
+                      ) : (
+                        <>
+                          평면도·자재·치수를 분석해서
+                          <br />
+                          <span className="font-bold text-primary-700">고해상도 인테리어 이미지</span>를 만들고 있어요.
+                        </>
+                      )}
+                    </p>
+                    <div className="mt-6 mx-auto max-w-xs">
+                      <div className="h-2.5 rounded-full bg-white/80 overflow-hidden shadow-inner border border-primary-100">
+                        <motion.div
+                          animate={{
+                            width: bulkProgress
+                              ? `${(bulkProgress.current / Math.max(1, bulkProgress.total)) * 100}%`
+                              : `${progress}%`,
+                          }}
+                          transition={{ duration: 0.4 }}
+                          className="h-full bg-gradient-to-r from-primary-500 to-amber-500"
+                        />
+                      </div>
+                      <p className="mt-2 text-xs font-bold tabular text-primary-700">
+                        {bulkProgress
+                          ? `${Math.round((bulkProgress.current / Math.max(1, bulkProgress.total)) * 100)}%`
+                          : `${Math.round(progress)}%`}
+                      </p>
+                    </div>
+                    <div className="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-primary-900/60">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      <span>보통 20~40초 소요</span>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* 풀스크린 이미지 오버랩 (선택된 시안 큰 보기) */}
           <AnimatePresence>
