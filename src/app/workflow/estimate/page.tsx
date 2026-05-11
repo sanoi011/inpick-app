@@ -24,6 +24,7 @@ import {
   Wallet,
   Layers,
   ChevronDown,
+  FileText,
 } from "lucide-react";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
@@ -939,18 +940,64 @@ export default function EstimatePage() {
 
                   <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                     <div className="flex items-center gap-2">
-                      <Lock className="h-3.5 w-3.5 text-amber-600" />
+                      <FileText className="h-3.5 w-3.5 text-primary-600" />
                       <p className="text-[0.85rem] font-bold tracking-tight text-primary-900">
-                        출력 제한
+                        건축공사 견적서
                       </p>
                     </div>
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-primary-900/60">
-                      PDF·엑셀 다운로드는 계약 진행 단계에서 활성화됩니다.
+                      A4 가로 4페이지 (갑지 + 총괄표 + 총괄내역서 + 공종별내역서)
                     </p>
-                    <div className="mt-3 space-y-1.5">
-                      <LockedButton icon={Download} label="견적서 PDF" />
-                      <LockedButton icon={FileSpreadsheet} label="상세 내역 엑셀" />
-                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          // 1. estimate document 발행
+                          const res = await fetch("/api/inpick/estimate-documents", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              projectId:
+                                (typeof window !== "undefined" &&
+                                  new URLSearchParams(window.location.search).get("projectId")) ||
+                                "preview",
+                              mode: "consumer_preview",
+                              buildEstimateResult: {
+                                estimates,
+                                grandTotal: { mainTotal: grandTotal.main, auxTotal: grandTotal.aux, laborTotal: grandTotal.labor, totalWon: grandTotal.total },
+                                matchMetaByRoom,
+                              },
+                            }),
+                          });
+                          const data = await res.json();
+                          if (!res.ok && !data.package) {
+                            alert("견적서 발행 실패: " + (data.error || "unknown"));
+                            return;
+                          }
+                          // 2. 클라이언트 측 jsPDF 렌더
+                          const { renderEstimatePackagePdf } = await import(
+                            "@/lib/inpick/estimate-documents/pdf/estimate-pdf"
+                          );
+                          const { pdfBlob } = await renderEstimatePackagePdf({ package: data.package });
+                          // 3. 다운로드
+                          const url = URL.createObjectURL(pdfBlob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `INPICK_견적서_${data.documentNo || "draft"}.pdf`;
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        } catch (e) {
+                          alert("PDF 생성 실패: " + (e instanceof Error ? e.message : String(e)));
+                        }
+                      }}
+                      className="mt-3 inline-flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-95 transition"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      A4 가로 PDF 다운로드
+                    </button>
+                    <p className="mt-2 text-[0.65rem] text-primary-900/50 text-center">
+                      건축공사 업체용 형식 (갑지 / 총괄표 / 총괄내역 / 공종별)
+                    </p>
                   </div>
 
                   <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
