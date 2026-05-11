@@ -57,6 +57,12 @@ export class OpenAIBackend implements ImageGenerationBackend {
     }
 
     // ─── 3. RenderRoomRequest → OpenAIRenderInput 변환 ───
+    // Launch-critical (2026-05-11): compiledPrompt (RenderRoomSpec 기반)가 있으면
+    // wallLayout 자리에 합쳐서 OpenAI prompt에 ARCHITECTURAL FACTS / MUST SHOW/NOT 강제.
+    const wallLayoutWithSpec = input.compiledPrompt
+      ? input.compiledPrompt + (input.wallLayout ? `\n\n[LEGACY WALL LAYOUT]\n${input.wallLayout}` : "")
+      : input.wallLayout;
+
     const openaiInput: OpenAIRenderInput = {
       roomName: input.roomName,
       widthMm: input.widthMm ?? 4500,
@@ -77,7 +83,7 @@ export class OpenAIBackend implements ImageGenerationBackend {
       previousReference: input.previousReference,
       floorplanImageUrl: input.floorplanImageUrl,
       quality: input.quality === "draft" ? "low" : input.quality === "standard" ? "medium" : input.quality === "high" ? "high" : input.quality,
-      wallLayout: input.wallLayout,
+      wallLayout: wallLayoutWithSpec,
     };
 
     // ─── 4. 호출 ───

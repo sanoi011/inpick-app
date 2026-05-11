@@ -1,0 +1,68 @@
+[
+  {
+    "caseId": "master-bedroom-balcony-unextended-84a",
+    "label": "안방 + 안방발코니 비확장 (84A㎡)",
+    "roomName": "안방",
+    "prompt": "warm wood master bedroom",
+    "widthMm": 3500,
+    "depthMm": 4200,
+    "heightMm": 2400,
+    "expansion": false,
+    "adjacentRooms": ["안방발코니"],
+    "seed": 12345,
+    "steps": 24,
+    "guidance": 3.5,
+    "expectedNotes": "안방 벽 직접 창 금지. 미닫이문 + 발코니 공간 + 발코니 외벽 외부창."
+  },
+  {
+    "caseId": "master-bedroom-balcony-extended-84a",
+    "label": "안방 + 안방발코니 확장 (84A㎡)",
+    "roomName": "안방",
+    "prompt": "modern minimal master bedroom",
+    "widthMm": 3500,
+    "depthMm": 5200,
+    "heightMm": 2400,
+    "expansion": true,
+    "adjacentRooms": ["안방발코니"],
+    "seed": 12345,
+    "expectedNotes": "확장 — 미닫이문 없음. 확장된 외벽에 외부창."
+  },
+  {
+    "caseId": "living-room-balcony-unextended-84b",
+    "label": "거실 + 거실발코니 비확장 (84B㎡)",
+    "roomName": "거실",
+    "prompt": "scandinavian living room",
+    "widthMm": 5500,
+    "depthMm": 4500,
+    "heightMm": 2400,
+    "expansion": false,
+    "adjacentRooms": ["거실발코니"],
+    "seed": 12345,
+    "expectedNotes": "거실-거실발코니 미닫이문. 발코니 외벽 외부창."
+  },
+  {
+    "caseId": "kitchen-utility-84a",
+    "label": "주방 + 다용도실 (84A㎡)",
+    "roomName": "주방",
+    "prompt": "modern korean kitchen with dark stone countertop",
+    "widthMm": 3000,
+    "depthMm": 4000,
+    "heightMm": 2400,
+    "adjacentRooms": ["다용도실"],
+    "seed": 12345,
+    "expectedNotes": "주방-다용도실 internal sliding/interior door. 외부창 다용도실 외벽."
+  },
+  {
+    "caseId": "small-bedroom-direct-window-84a",
+    "label": "작은방 외벽 직접 창 (84A㎡)",
+    "roomName": "침실2",
+    "prompt": "warm bedroom",
+    "widthMm": 2800,
+    "depthMm": 3000,
+    "heightMm": 2400,
+    "windows": 1,
+    "windowWalls": ["east"],
+    "seed": 12345,
+    "expectedNotes": "발코니 없음. 외벽 직접 외부창 OK."
+  }
+]

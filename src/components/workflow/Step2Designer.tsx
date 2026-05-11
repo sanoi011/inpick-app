@@ -138,6 +138,17 @@ export default function Step2Designer({
   // 가이드 STEP2-INPUT-ANALYSIS Q3 — 일괄 생성 직렬화 진행률
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomLabel: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  // Launch-critical (2026-05-11) — RenderRoomSpec 요약 (room별)
+  const [renderSpecByRoom, setRenderSpecByRoom] = useState<
+    Record<
+      string,
+      {
+        explanationKo?: string;
+        warnings: string[];
+        confidence: number;
+      }
+    >
+  >({});
   const [insufficientOpen, setInsufficientOpen] = useState(false);
   // Phase 7 — Vision Material Picker 모달
   const [visionPickerOpen, setVisionPickerOpen] = useState(false);
@@ -569,6 +580,17 @@ export default function Step2Designer({
         costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
       };
+      // Launch-critical: renderSpec 응답 저장
+      if (result.renderSpec) {
+        setRenderSpecByRoom((prev) => ({
+          ...prev,
+          [activeRoom]: {
+            explanationKo: result.renderSpec!.explanationKo,
+            warnings: result.renderSpec!.warnings || [],
+            confidence: result.renderSpec!.confidence,
+          },
+        }));
+      }
       // 2차+ 시 토큰 차감 (성공 후에만 — 실패 시 차감 없음)
       if (!isFirstGen) {
         const ok = await onConsumeToken(1, "ai_render");
@@ -966,6 +988,35 @@ export default function Step2Designer({
               )}
             </div>
           )}
+          {/* Launch-critical: RenderRoomSpec 요약 (active room 기준) */}
+          {(() => {
+            const spec = renderSpecByRoom[activeRoom];
+            if (!spec) return null;
+            const lowConf = spec.confidence < 0.7;
+            return (
+              <div
+                className={`px-5 py-2 border-b text-[0.7rem] ${
+                  lowConf
+                    ? "bg-amber-50/80 border-amber-200/60 text-amber-900"
+                    : "bg-emerald-50/60 border-emerald-200/60 text-emerald-900"
+                }`}
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center rounded bg-white/70 border border-current/20 px-1.5 py-0.5 font-bold">
+                    도면 인식 {Math.round(spec.confidence * 100)}%
+                  </span>
+                  {spec.explanationKo && (
+                    <span className="font-medium">{spec.explanationKo}</span>
+                  )}
+                </div>
+                {spec.warnings.length > 0 && (
+                  <div className="mt-1 text-[0.65rem] opacity-80">
+                    ⚠ {spec.warnings.slice(0, 2).join(" · ")}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           {/* 채팅 헤더 (단조롭게 — 캡처 레퍼런스 스타일) */}
           <div className="px-5 py-3 border-b border-amber-100/60 flex items-center justify-between gap-3 flex-wrap bg-[#F8F9F6]/80">
             <div className="flex items-center gap-2 min-w-0">

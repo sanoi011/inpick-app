@@ -27,6 +27,15 @@ import {
 } from "@/lib/inpick/generation-jobs/repository";
 import { ensureStorageUrl } from "@/lib/inpick/storage/image-storage";
 import {
+  buildRenderRoomSpec,
+  type ParsedFloorPlanLike,
+} from "@/lib/inpick/floorplan/render-room-spec-builder";
+import { validateRenderRoomSpec } from "@/lib/inpick/floorplan/render-spec-validator";
+import {
+  compileRenderPrompt,
+  renderSpecToBriefSummary,
+} from "@/lib/inpick/image-backends/prompt-compiler";
+import {
   enforceConsume,
   refundCredits,
   CreditError,
@@ -136,6 +145,62 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // ─── Launch-critical: RenderRoomSpec build (2026-05-11) ───
+    // RENDER_ROOM_SPEC_ENABLED=true이면 도면 구조를 spec으로 변환 → prompt에 강제
+    // 가이드: docs/launch/LAUNCH_ERROR_AUDIT_20260511.md
+    const renderSpecEnabled = process.env.RENDER_ROOM_SPEC_ENABLED !== "false";
+    let renderRoomSpec: ReturnType<typeof buildRenderRoomSpec> | null = null;
+    let renderSpecWarnings: string[] = [];
+    let compiledPrompt: string | undefined;
+    if (renderSpecEnabled) {
+      try {
+        // body.normalizedFloorplan 또는 body.parsedFloorPlan에 ParsedFloorPlan이 있으면 사용
+        // 없으면 minimal spec (heuristic + room name만)
+        const fp: ParsedFloorPlanLike =
+          (body as unknown as { normalizedFloorplan?: ParsedFloorPlanLike })
+            .normalizedFloorplan ||
+          (body as unknown as { parsedFloorPlan?: ParsedFloorPlanLike })
+            .parsedFloorPlan || {
+            rooms: [
+              { id: "target", name: body.roomName, areaM2: undefined },
+              // adjacentRooms를 fallback 방으로 등록
+              ...(body.adjacentRooms || []).map((n, i) => ({
+                id: `adj_${i}`,
+                name: n,
+              })),
+            ],
+          };
+        renderRoomSpec = buildRenderRoomSpec({
+          parsedFloorPlan: fp,
+          targetRoomName: body.roomName,
+          extensionOptions: (body as unknown as { extensionOptions?: import("@/lib/inpick/floorplan/render-room-spec").ExtensionOptions })
+            .extensionOptions,
+          expansion: body.expansion,
+        });
+        const validation = validateRenderRoomSpec(renderRoomSpec);
+        renderSpecWarnings = [...validation.errors, ...validation.warnings];
+        // prompt compile
+        compiledPrompt = compileRenderPrompt({
+          userPrompt: body.style,
+          stylePrompt: (body as unknown as { stylePreset?: string }).stylePreset,
+          roomName: body.roomName,
+          renderRoomSpec,
+          wallLayout: body.wallLayout,
+        });
+        console.info(
+          `[render-room] spec built: ${renderSpecToBriefSummary(renderRoomSpec)} (warnings=${renderSpecWarnings.length})`,
+        );
+      } catch (specErr) {
+        // RenderRoomSpec 생성 실패 — 기존 path 그대로 진행 (절대 차단 X)
+        console.warn(
+          `[render-room] spec build failed: ${specErr instanceof Error ? specErr.message : String(specErr)}`,
+        );
+        renderSpecWarnings.push(
+          `RENDER_SPEC_BUILD_FAILED: ${specErr instanceof Error ? specErr.message : String(specErr)}`,
+        );
+      }
+    }
+
     // ─── Backend adapter 호출 (Phase 1) ───
     // IMAGE_GEN_BACKEND 환경변수로 분기 (default: "openai" — 기존 path 100% 보존)
     const renderInput = {
@@ -143,6 +208,11 @@ export async function POST(req: NextRequest) {
       prompt: body.style || "modern minimal",
       heightMm: body.heightMm || 2400,
       floorplanImageUrl,
+      // launch-critical: RenderRoomSpec + compiled prompt 전달
+      renderRoomSpec: renderRoomSpec ?? undefined,
+      compiledPrompt,
+      extensionOptions: (body as unknown as { extensionOptions?: import("@/lib/inpick/floorplan/render-room-spec").ExtensionOptions })
+        .extensionOptions,
     };
 
     // ─── Async mode (Phase 2) ───
@@ -262,7 +332,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ─── 성공 응답 (기존 shape 보존 + backend/jobId 추가) ───
+    // ─── 성공 응답 (기존 shape 보존 + backend/jobId/renderSpec 추가) ───
     return NextResponse.json({
       imageUrl: finalImageUrl,
       revisedPrompt: result.revisedPrompt,
@@ -272,6 +342,25 @@ export async function POST(req: NextRequest) {
       jobId: result.jobId,
       credits_charged: charge?.charged ?? 0,
       credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
+      // Launch-critical: render spec 요약 (UI 표시용)
+      renderSpec: renderRoomSpec
+        ? {
+            confidence: renderRoomSpec.confidence,
+            targetRoom: renderRoomSpec.targetRoom.name,
+            attachedZones: renderRoomSpec.attachedZones.map((z) => ({
+              name: z.name,
+              type: z.type,
+              treatment: z.treatment,
+            })),
+            openings: renderRoomSpec.openings.map((o) => ({
+              kind: o.kind,
+              from: renderRoomSpec!.rooms.find((r) => r.id === o.fromRoomId)?.name,
+              to: renderRoomSpec!.rooms.find((r) => r.id === o.toRoomId)?.name,
+            })),
+            explanationKo: renderRoomSpec.renderConstraints.explanationKo,
+            warnings: renderSpecWarnings,
+          }
+        : undefined,
     });
   } catch (e) {
     // backend adapter 외부 에러 (예상 외) — 환불 + 일반 에러

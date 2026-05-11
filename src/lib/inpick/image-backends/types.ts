@@ -101,6 +101,14 @@ export interface RenderRoomRequest {
   roomGeometry?: RoomGeometry | RoomGeometryHint;
   camera?: RoomCamera | RoomCameraHint;
 
+  // Launch-critical RenderRoomSpec (2026-05-11) — 도면 구조 강제
+  // 가이드: docs/launch/LAUNCH_ERROR_AUDIT_20260511.md
+  renderRoomSpec?: import("@/lib/inpick/floorplan/render-room-spec").RenderRoomSpec;
+  /** prompt-compiler가 미리 만든 prompt (지정 시 backend는 이 prompt 사용) */
+  compiledPrompt?: string;
+  /** 확장형/기본형 등 (공간별) */
+  extensionOptions?: import("@/lib/inpick/floorplan/render-room-spec").ExtensionOptions;
+
   // 콜러 컨텍스트 (env, request id 등)
   requestId?: string;
 }

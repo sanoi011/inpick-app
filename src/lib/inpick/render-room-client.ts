@@ -61,6 +61,15 @@ export interface RenderRoomClientResult {
   wasAsync: boolean;
   /** debug — 총 polling 시간 ms */
   pollingMs?: number;
+  /** Launch-critical (2026-05-11) — RenderRoomSpec summary */
+  renderSpec?: {
+    confidence: number;
+    targetRoom: string;
+    attachedZones: Array<{ name: string; type: string; treatment: string }>;
+    openings: Array<{ kind: string; from?: string; to?: string }>;
+    explanationKo?: string;
+    warnings: string[];
+  };
 }
 
 export interface RenderRoomClientError {
@@ -153,6 +162,7 @@ export async function renderRoomViaClient(
       costUsd: postData.costUsd as number | undefined,
       jobId: postData.jobId as string | undefined,
       wasAsync: false,
+      renderSpec: postData.renderSpec as RenderRoomClientResult["renderSpec"],
     };
   }
 

@@ -179,9 +179,14 @@ export async function POST(request: NextRequest) {
       categoryCompatible: compatible,
     });
 
-    // auto_high_confidence면 decision 자동 저장
+    // Launch-critical (2026-05-11): auto_high_confidence는 eval 통과 후만.
+    // mock worker 응답이면 confirmed라도 절대 저장 X.
+    const evalPassed = process.env.VISION_MATERIALS_EVAL_PASSED === "true";
+    const isMockWorker = worker.source === "mock";
     if (
       recommendation.status === "confirmed" &&
+      evalPassed &&
+      !isMockWorker &&
       observationIds[i] &&
       !observationIds[i].startsWith("mock-")
     ) {
@@ -191,6 +196,13 @@ export async function POST(request: NextRequest) {
         decisionType: "auto_high_confidence",
         confidence: recommendation.confidence,
       });
+    } else if (recommendation.status === "confirmed" && (isMockWorker || !evalPassed)) {
+      // confirmed 강등 — UI에서 confirmed로 표시되지 않도록 status를 recommended로 변경
+      // (mock 또는 eval 미통과)
+      recommendation.status = "recommended";
+      recommendation.fallbackReason =
+        recommendation.fallbackReason ||
+        (isMockWorker ? "MOCK_WORKER_NOT_PRODUCTION_GRADE" : "VISION_MATERIALS_EVAL_NOT_PASSED");
     }
 
     analyzed.push({
