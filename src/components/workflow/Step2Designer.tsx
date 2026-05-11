@@ -918,7 +918,7 @@ export default function Step2Designer({
 
       {/* ─── 메인: ChatGPT 스타일 채팅 + 이미지 오버랩 ─── */}
       <section className="relative flex flex-col">
-        <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] flex flex-col overflow-hidden">
+        <div className="relative rounded-3xl bg-white border border-primary-100 shadow-card flex-1 min-h-[480px] max-h-[calc(100vh-220px)] flex flex-col overflow-hidden">
           {/* 채팅 헤더 */}
           <div className={`px-5 py-3 border-b flex items-center justify-between gap-3 flex-wrap transition-colors ${
             chatMode

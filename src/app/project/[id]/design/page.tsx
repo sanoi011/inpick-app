@@ -269,6 +269,11 @@ export default function FloorPlanPage() {
     if (!selectedAddress) return;
     setPendingBuildingForExpanded(null);
 
+    // 블라인드 처리 — 이전 raw 네이버 도면이 잠시도 보이지 않게 즉시 clear
+    // 생성 완료 후 onComplete에서 finalUrl로 다시 set됨
+    setFloorPlanImageUrl(null);
+    setFloorPlan(null);
+
     const addressData: ProjectAddress = {
       roadAddress: selectedAddress.roadAddress,
       zipCode: selectedAddress.zipCode,
