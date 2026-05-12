@@ -1,114 +1,226 @@
+/**
+ * POST /api/payments/checkout
+ *
+ * Toss Payment Widget 호출 직전, payment_intents 생성 + orderId 발급.
+ *
+ * 가이드: c:\Users\user\Downloads\inpick-auth-payment-token-admin-dev-plan-20260512.md §7-2
+ *
+ * 핵심:
+ *  - 로그인 + consumer_profiles 존재 필수
+ *  - phone_verified=true 필수 (출시 v0 정책)
+ *  - productCode → payment_products에서 amount 조회 (클라이언트 amount 무시)
+ *  - orderId 서버 생성 (UNIQUE)
+ *  - Toss 키 없으면 mock 모드 (직접 크레딧 충전 — 개발/테스트용)
+ */
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { creditTokensAfterPayment } from "@/lib/inpick/tokens/ledger";
 
-// POST: 결제 세션 생성
-export async function POST(request: NextRequest) {
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+function getAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return null;
+  return createServiceClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+interface CheckoutBody {
+  productCode?: string;
+  // legacy 호환
+  packageId?: string;
+  projectId?: string;
+  returnPath?: string;
+}
+
+// legacy packageId → 새 productCode 매핑 (호환)
+const LEGACY_PACKAGE_MAP: Record<string, string> = {
+  "pkg-10": "ai_credit_10",
+  "pkg-30": "ai_credit_30",
+  "pkg-50": "ai_credit_30",
+  "pkg-100": "ai_credit_100",
+  "pkg-300": "ai_credit_100",
+};
+
+export async function POST(req: NextRequest) {
   const supabase = createClient();
-
-  // 소비자 인증 확인
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) {
+    return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as CheckoutBody;
+  const productCode =
+    body.productCode || (body.packageId ? LEGACY_PACKAGE_MAP[body.packageId] : undefined);
+  if (!productCode) {
     return NextResponse.json(
-      { error: "로그인이 필요합니다" },
-      { status: 401 }
+      { error: "missing_product_code", hint: "productCode 필수" },
+      { status: 400 },
     );
   }
 
-  try {
-    const body = await request.json();
-    const { packageId } = body;
-    const userId = user.id;
+  const admin = getAdmin();
+  if (!admin) {
+    return NextResponse.json({ error: "service not configured" }, { status: 500 });
+  }
 
-    if (!packageId) {
-      return NextResponse.json(
-        { error: "packageId가 필요합니다." },
-        { status: 400 }
-      );
-    }
+  // 1) consumer_profiles 존재 + phone_verified 검증
+  const { data: profile } = await admin
+    .from("consumer_profiles")
+    .select("id, phone_verified, name, phone")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (!profile) {
+    return NextResponse.json(
+      {
+        error: "profile_required",
+        hint: "회원가입 절차를 완료해주세요.",
+      },
+      { status: 403 },
+    );
+  }
+  // 출시 v0: phone_verified 정책 — Phase 1 (SMS provider 가입 전)에는 임시로 phone 존재만 검증
+  const requirePhoneVerified = process.env.REQUIRE_PHONE_VERIFIED === "true";
+  if (requirePhoneVerified && !(profile as { phone_verified: boolean }).phone_verified) {
+    return NextResponse.json(
+      {
+        error: "phone_verification_required",
+        hint: "휴대폰 인증이 필요합니다. /mypage/account에서 인증을 완료해주세요.",
+      },
+      { status: 403 },
+    );
+  }
 
-    // 패키지 확인
-    const PACKAGES: Record<string, { credits: number; price: number; label: string }> = {
-      "pkg-10": { credits: 10, price: 1000, label: "10 크레딧" },
-      "pkg-50": { credits: 50, price: 4500, label: "50 크레딧" },
-      "pkg-100": { credits: 100, price: 8000, label: "100 크레딧" },
-      "pkg-300": { credits: 300, price: 21000, label: "300 크레딧" },
-    };
+  // 2) product 조회 (서버 amount 기준)
+  const { data: product, error: pErr } = await admin
+    .from("payment_products")
+    .select("*")
+    .eq("code", productCode)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (pErr || !product) {
+    return NextResponse.json(
+      { error: "product_not_found", hint: `productCode=${productCode} 비활성 또는 없음` },
+      { status: 404 },
+    );
+  }
+  const prod = product as {
+    id: string;
+    code: string;
+    product_type: string;
+    name_ko: string;
+    amount_krw: number;
+    credit_amount: number;
+    bonus_credit_amount: number;
+  };
 
-    const pkg = PACKAGES[packageId];
-    if (!pkg) {
-      return NextResponse.json({ error: "유효하지 않은 패키지" }, { status: 400 });
-    }
+  // 3) orderId 생성 (UUID 기반, UNIQUE 보장)
+  const orderId = `INPICK_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+  const origin = req.headers.get("origin") || process.env.NEXT_PUBLIC_SITE_URL || "https://interiorpick.co.kr";
+  const successUrl = `${origin}/payments/success?orderId=${orderId}`;
+  const failUrl = `${origin}/payments/fail?orderId=${orderId}`;
 
-    const orderId = crypto.randomUUID();
+  // 4) payment_intents INSERT
+  const { data: intent, error: intentErr } = await admin
+    .from("payment_intents")
+    .insert({
+      user_id: user.id,
+      project_id: body.projectId || null,
+      product_id: prod.id,
+      order_id: orderId,
+      order_name: `INPICK ${prod.name_ko}`,
+      product_type: prod.product_type,
+      amount_krw: prod.amount_krw,
+      status: "created",
+      provider: "toss",
+      customer_key: user.id,
+      success_url: successUrl,
+      fail_url: failUrl,
+      metadata: { productCode: prod.code, returnPath: body.returnPath },
+    })
+    .select("id, order_id")
+    .single();
+  if (intentErr || !intent) {
+    console.error("[checkout] intent insert fail:", intentErr?.message);
+    return NextResponse.json(
+      { error: "intent_create_failed", hint: intentErr?.message },
+      { status: 500 },
+    );
+  }
 
-    // credit_transactions에 pending 레코드
-    await supabase.from("credit_transactions").insert({
-      user_id: userId,
-      amount: pkg.credits,
-      type: "CHARGE",
-      description: `${pkg.label} 충전 (결제 대기)`,
-      metadata: { orderId, packageId, price: pkg.price, status: "pending" },
-    });
+  // 5) Mock 모드 (Toss 키 미설정 시) — 즉시 충전 + paid 상태
+  const clientKey = process.env.TOSS_PAYMENTS_CLIENT_KEY;
+  if (!clientKey || clientKey.includes("test_gck_") === false && clientKey.length < 20) {
+    // 키 없거나 dummy면 mock
+    await admin
+      .from("payment_intents")
+      .update({ status: "paid" })
+      .eq("id", (intent as { id: string }).id);
 
-    // Toss Payments 키 확인
-    const clientKey = process.env.TOSS_PAYMENTS_CLIENT_KEY;
-    const isMockMode = !clientKey;
+    // mock payment row
+    const mockPaymentKey = `mock_${orderId}`;
+    const { data: mockPayment } = await admin
+      .from("payments")
+      .insert({
+        payment_intent_id: (intent as { id: string }).id,
+        user_id: user.id,
+        provider: "toss",
+        payment_key: mockPaymentKey,
+        order_id: orderId,
+        method: "mock",
+        amount_krw: prod.amount_krw,
+        status: "DONE",
+        approved_at: new Date().toISOString(),
+        raw_payment: { mock: true },
+      })
+      .select("id")
+      .single();
 
-    if (isMockMode) {
-      // Mock 모드: 바로 크레딧 충전
-      const { data: current } = await supabase
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", userId)
-        .single();
-
-      const currentBalance = current?.balance || 0;
-
-      await supabase
-        .from("user_credits")
-        .upsert(
-          {
-            user_id: userId,
-            balance: currentBalance + pkg.credits,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "user_id" }
+    // 크레딧 충전
+    if (mockPayment) {
+      try {
+        const credit = await creditTokensAfterPayment({
+          userId: user.id,
+          paymentId: (mockPayment as { id: string }).id,
+          productCode: prod.code,
+          paidCredits: prod.credit_amount,
+          bonusCredits: prod.bonus_credit_amount,
+          reasonKo: `${prod.name_ko} 구매 (Mock)`,
+        });
+        return NextResponse.json({
+          mockMode: true,
+          orderId,
+          paymentIntentId: (intent as { id: string }).id,
+          balanceAfter: credit.balanceAfter,
+          creditsAdded: prod.credit_amount + prod.bonus_credit_amount,
+        });
+      } catch (err) {
+        console.error("[checkout] mock credit fail:", err);
+        return NextResponse.json(
+          { error: "mock_credit_failed", hint: err instanceof Error ? err.message : "unknown" },
+          { status: 500 },
         );
-
-      // 트랜잭션 완료 기록
-      await supabase.from("credit_transactions").insert({
-        user_id: userId,
-        amount: pkg.credits,
-        type: "CHARGE",
-        description: `${pkg.label} 충전 완료 (테스트 모드)`,
-      });
-
-      return NextResponse.json({
-        mockMode: true,
-        credits: pkg.credits,
-        newBalance: currentBalance + pkg.credits,
-      });
+      }
     }
-
-    // 실제 Toss Payments 모드
-    const origin = request.headers.get("origin") || "https://inpick.vercel.app";
-
-    return NextResponse.json({
-      mockMode: false,
-      orderId,
-      amount: pkg.price,
-      orderName: `INPICK ${pkg.label}`,
-      clientKey,
-      successUrl: `${origin}/payments/success?orderId=${orderId}&amount=${pkg.price}&credits=${pkg.credits}`,
-      failUrl: `${origin}/payments/fail`,
-    });
-  } catch (err) {
-    console.error("Checkout POST error:", err);
-    return NextResponse.json(
-      { error: "결제 세션 생성 실패" },
-      { status: 500 }
-    );
   }
+
+  // 6) Production 모드 — Toss widget 호출 필요한 정보 반환
+  return NextResponse.json({
+    mockMode: false,
+    paymentIntentId: (intent as { id: string }).id,
+    orderId,
+    orderName: `INPICK ${prod.name_ko}`,
+    amount: prod.amount_krw,
+    customerKey: user.id,
+    customerName: (profile as { name: string }).name,
+    successUrl,
+    failUrl,
+    clientKey,
+  });
 }
