@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "motion/react";
 import { Layers, Check, ChevronDown, Building2, Home, Store, Box, RotateCcw } from "lucide-react";
 import BasicInfoCard, { BasicInfoData } from "./BasicInfoCard";
@@ -153,12 +154,17 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   const update = <K extends keyof Step1Data>(k: K, v: Step1Data[K]) =>
     onChange({ ...value, [k]: v });
 
-  // 기본정보 완료 — 평형 선택만 있어도 진행 가능 (grandPlanUrl 강제 X)
-  const inputDone =
+  // workflowEntry 기반 — 아파트 도면 모드만 주소 입력 필수 (도면 호출용)
+  // 상가/사무실/도면없는 주거는 도면 호출 불가능 → 주소 선택 (다음 단계 진행 가능)
+  const isApartmentDrawingMode = value.workflowEntry === "apartment_drawing";
+
+  // 기본정보 완료 — 아파트 도면 모드일 때만 강제
+  const addressInputDone =
     (value.basicInfo.mode === "address" &&
       (!!value.basicInfo.selectedPyeong || !!value.basicInfo.selectedAddress)) ||
     (value.basicInfo.mode === "upload" && !!value.basicInfo.uploadedFloorplan?.dataUrl) ||
     (value.basicInfo.mode === "lidar" && !!value.basicInfo.lidarScan?.dataUrl);
+  const inputDone = isApartmentDrawingMode ? addressInputDone : true;
   // expansionType 미선택 시 'basic' 자동 기본값으로 통과
   // 예산은 견적 단계에서 자동 산출 — Step1에서 미리 받지 않음 (과장 견적 방지)
   const basicDone = inputDone;
@@ -231,39 +237,30 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             어떻게 시작할까요?
           </h3>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <button
-              type="button"
+            <ModeEntryCard
               onClick={() => selectMode("apartment_drawing")}
-              className="rounded-2xl border-2 border-blue-200 bg-blue-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
-            >
-              <div className="text-2xl">🏢</div>
-              <p className="mt-2 text-sm font-bold text-primary-900">아파트 도면으로</p>
-              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
-                주소·평형 검색으로 도면을 불러옵니다. 방별 정밀 디자인 + 17공종 견적.
-              </p>
-            </button>
-            <button
-              type="button"
+              bgImage="/mode-cards/apartment-drawing.jpg"
+              fallbackEmoji="🏢"
+              accent="from-blue-500/70 to-blue-700/80"
+              title="아파트 도면으로"
+              description="주소·평형 검색으로 도면을 불러옵니다. 방별 정밀 디자인 + 17공종 견적."
+            />
+            <ModeEntryCard
               onClick={() => selectMode("photo_residential")}
-              className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
-            >
-              <div className="text-2xl">🏠</div>
-              <p className="mt-2 text-sm font-bold text-primary-900">내 공간 사진으로</p>
-              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
-                도면 없이도 가능. 원룸·투룸·아파트 등 평수 + 사진 기반.
-              </p>
-            </button>
-            <button
-              type="button"
+              bgImage="/mode-cards/photo-residential.jpg"
+              fallbackEmoji="🏠"
+              accent="from-amber-500/70 to-amber-700/80"
+              title="내 공간 사진으로"
+              description="도면 없이도 가능. 원룸·투룸·아파트 등 평수 + 사진 기반."
+            />
+            <ModeEntryCard
               onClick={() => selectMode("photo_commercial")}
-              className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
-            >
-              <div className="text-2xl">☕</div>
-              <p className="mt-2 text-sm font-bold text-primary-900">상가·사무실</p>
-              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
-                카페·식당·미용실·사무실 등 업종별 zone 디자인 + 가견적.
-              </p>
-            </button>
+              bgImage="/mode-cards/photo-commercial.jpg"
+              fallbackEmoji="☕"
+              accent="from-emerald-500/70 to-emerald-700/80"
+              title="상가·사무실"
+              description="카페·식당·미용실·사무실 등 업종별 zone 디자인 + 가견적."
+            />
           </div>
         </div>
       )}
@@ -288,14 +285,17 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
           </button>
         </div>
       )}
-      <div className="grid gap-5 lg:grid-cols-2 lg:gap-7">
-      {/* Card 1: 기본정보 입력 (3 모드 + 예산) */}
-      <Card title="기본정보 입력" icon={Layers} done={basicDone}>
-        <BasicInfoCard
-          value={value.basicInfo}
-          onChange={(next) => update("basicInfo", next)}
-        />
-      </Card>
+      <div className={`grid gap-5 ${isApartmentDrawingMode ? "lg:grid-cols-2 lg:gap-7" : "lg:grid-cols-1"}`}>
+      {/* Card 1: 기본정보 입력 — 아파트 도면 모드에서만 필수 표시
+         (상가/사무실/사진 모드는 도면 호출 불가능하므로 주소 입력 선택) */}
+      {isApartmentDrawingMode && (
+        <Card title="기본정보 입력" icon={Layers} done={basicDone}>
+          <BasicInfoCard
+            value={value.basicInfo}
+            onChange={(next) => update("basicInfo", next)}
+          />
+        </Card>
+      )}
 
       {/* Card 2: 시공범위 (건물유형별 동적 UI) */}
       <Card title="시공 범위" icon={Layers} done={scopeOk}>
@@ -610,5 +610,57 @@ function Card({
       </div>
       <div className="mt-6">{children}</div>
     </motion.div>
+  );
+}
+
+// ─── 3-mode 진입 카드 — 배경 이미지 + 텍스트 오버레이 ───
+function ModeEntryCard({
+  onClick,
+  bgImage,
+  fallbackEmoji,
+  accent,
+  title,
+  description,
+}: {
+  onClick: () => void;
+  bgImage: string;
+  fallbackEmoji: string;
+  accent: string; // tailwind from-/to- color classes
+  title: string;
+  description: string;
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="group relative h-72 w-full overflow-hidden rounded-2xl border-2 border-primary-100 text-left transition hover:border-primary-500 hover:shadow-lg"
+    >
+      {!imgFailed && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={bgImage}
+          alt={title}
+          onError={() => setImgFailed(true)}
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+        />
+      )}
+      {imgFailed && (
+        <div className={`absolute inset-0 bg-gradient-to-br ${accent} flex items-center justify-center text-6xl`}>
+          <span aria-hidden>{fallbackEmoji}</span>
+        </div>
+      )}
+      {/* 가독성을 위한 그라데이션 오버레이 (하단 어둡게) */}
+      <div className={`absolute inset-0 bg-gradient-to-t ${accent}`} style={{ mixBlendMode: "multiply", opacity: 0.55 }} />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
+      {/* 텍스트 */}
+      <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+        <p className="text-base font-bold tracking-tight drop-shadow-md">{title}</p>
+        <p className="mt-1 text-[0.72rem] leading-relaxed text-white/90 drop-shadow">
+          {description}
+        </p>
+      </div>
+    </button>
   );
 }

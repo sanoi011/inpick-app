@@ -313,37 +313,6 @@ export default function WorkflowPage() {
                   </p>
                 </div>
 
-                {/* 빠른 진입 — 사진 + 평수만으로 AI 상담으로 직행 */}
-                <div className="mt-8">
-                  <button
-                    type="button"
-                    onClick={() => setQuickOpen(true)}
-                    className="group relative w-full max-w-3xl overflow-hidden rounded-3xl border border-white/40 bg-white/90 px-6 py-5 text-left shadow-card-hover backdrop-blur transition hover:bg-white"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta">
-                        <Camera className="h-6 w-6" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-base font-extrabold tracking-tight text-primary-900">
-                            도면 없이 사진으로 바로 시작
-                          </p>
-                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[0.65rem] font-bold text-amber-700">
-                            STEP 1 건너뛰기
-                          </span>
-                        </div>
-                        <p className="mt-1 text-sm text-primary-900/70 leading-relaxed">
-                          평수만 알려주시면 AI 상담으로 바로 이동해요. 원하는 인테리어 사진을 첨부하고
-                          <span className="font-bold text-primary-700"> &ldquo;이렇게 꾸며줘&rdquo;</span>라고 말씀하시면,
-                          AI가 분석해서 디자인 이미지와 견적까지 만들어 드려요.
-                        </p>
-                      </div>
-                      <Sparkles className="h-5 w-5 text-amber-500 shrink-0 group-hover:scale-110 transition" />
-                    </div>
-                  </button>
-                </div>
-
                 <div className="mt-12">
                   <Step1Cards
                     value={step1}
