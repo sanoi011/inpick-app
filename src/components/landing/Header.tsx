@@ -28,8 +28,6 @@ import { Menu, X, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher";
-import { SignupModal } from "@/components/auth/SignupModal";
-import { LoginModal } from "@/components/auth/LoginModal";
 
 interface HeaderProps {
   brandName?: string;
@@ -51,8 +49,6 @@ export default function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [showLogin, setShowLogin] = useState(false);
-  const [showSignup, setShowSignup] = useState(false);
   const { user, loading: authLoading, signOut } = useAuth();
   const colors = COLORS.light;
 
@@ -98,18 +94,11 @@ export default function Header({
         <div className="hidden md:flex items-center gap-2 shrink-0">
           <LocaleSwitcher />
           {!authLoading && !user && (
-            <>
-              <motion.button type="button" onClick={() => setShowLogin(true)} className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
-                style={{ color: isScrolled ? colors.textMuted : "rgba(255,255,255,0.7)" }}
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                로그인
-              </motion.button>
-              <motion.button type="button" onClick={() => setShowSignup(true)} className="rounded-full px-3 py-1.5 text-sm font-semibold whitespace-nowrap"
-                style={{ color: isScrolled ? "#EA580C" : "#FFFFFF", border: isScrolled ? "1px solid #FDBA74" : "1px solid rgba(255,255,255,0.4)" }}
-                whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
-                회원가입
-              </motion.button>
-            </>
+            <motion.a href="/auth" className="rounded-full px-4 py-1.5 text-sm font-medium transition-colors whitespace-nowrap"
+              style={{ color: isScrolled ? colors.textMuted : "rgba(255,255,255,0.7)" }}
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
+              로그인
+            </motion.a>
           )}
           {!authLoading && user && (
             <>
@@ -192,15 +181,10 @@ export default function Header({
                 </div>
                 <div className="mt-6 flex flex-col gap-3">
                   {!authLoading && !user && (
-                    <>
-                      <button type="button" onClick={() => { setMobileMenuOpen(false); setShowLogin(true); }} className="rounded-full px-4 py-3 text-center text-sm font-medium border border-gray-200"
-                        style={{ color: colors.text }}>
-                        로그인
-                      </button>
-                      <button type="button" onClick={() => { setMobileMenuOpen(false); setShowSignup(true); }} className="rounded-full px-4 py-3 text-center text-sm font-semibold bg-orange-500 text-white hover:bg-orange-600">
-                        회원가입
-                      </button>
-                    </>
+                    <a href="/auth" className="rounded-full px-4 py-3 text-center text-sm font-medium"
+                      style={{ color: colors.textMuted }} onClick={() => setMobileMenuOpen(false)}>
+                      로그인 / 회원가입
+                    </a>
                   )}
                   {!authLoading && user && (
                     <>
@@ -238,23 +222,6 @@ export default function Header({
           </>
         )}
       </AnimatePresence>
-
-      <LoginModal
-        open={showLogin}
-        onClose={() => setShowLogin(false)}
-        onSwitchToSignup={() => {
-          setShowLogin(false);
-          setShowSignup(true);
-        }}
-      />
-      <SignupModal
-        open={showSignup}
-        onClose={() => setShowSignup(false)}
-        onSwitchToLogin={() => {
-          setShowSignup(false);
-          setShowLogin(true);
-        }}
-      />
     </header>
   );
 }

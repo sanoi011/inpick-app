@@ -13,6 +13,7 @@ import {
   Hexagon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { SignupModal } from "@/components/auth/SignupModal";
 
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
@@ -120,11 +121,10 @@ function OAuthRow({
 function ConsumerAuthForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const [isSignUp, setIsSignUp] = useState(searchParams.get("mode") === "signup");
+  const [showSignupModal, setShowSignupModal] = useState(searchParams.get("mode") === "signup");
   const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -169,47 +169,6 @@ function ConsumerAuthForm() {
     } catch (err) {
       console.error("[auth] login error", err);
       setError("로그인 중 오류가 발생했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setMessage("");
-    setNeedsConfirm(false);
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: name, account_type: "consumer" },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (error) {
-        setError(
-          error.message.includes("already registered")
-            ? "이미 가입된 이메일입니다."
-            : error.message
-        );
-        return;
-      }
-      // Supabase는 이미 가입된 이메일이어도 200으로 응답하지만 identities=[]를 반환함
-      // 이를 명시적으로 감지해서 사용자에게 안내
-      if (data?.user && (data.user.identities?.length ?? 0) === 0) {
-        setError("이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해주세요.");
-        return;
-      }
-      setMessage("확인 이메일을 발송했습니다. 받은 메일함과 스팸함을 확인해주세요.");
-      setNeedsConfirm(true);
-      setPassword("");
-      setName("");
-    } catch (err) {
-      console.error("[auth] signup error", err);
-      setError("회원가입 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -344,43 +303,26 @@ function ConsumerAuthForm() {
 
       <div className="mb-5 flex rounded-full bg-primary-50 p-1">
         <button
-          className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors ${
-            !isSignUp ? "bg-white text-ink shadow-sm" : "text-ink-60"
-          }`}
-          onClick={() => {
-            setIsSignUp(false);
-            setError("");
-            setMessage("");
-          }}
+          type="button"
+          className="flex-1 rounded-full bg-white py-2 text-[13px] font-semibold text-ink shadow-sm"
+          aria-current="page"
         >
           로그인
         </button>
         <button
-          className={`flex-1 rounded-full py-2 text-[13px] font-semibold transition-colors ${
-            isSignUp ? "bg-white text-ink shadow-sm" : "text-ink-60"
-          }`}
+          type="button"
           onClick={() => {
-            setIsSignUp(true);
             setError("");
             setMessage("");
+            setShowSignupModal(true);
           }}
+          className="flex-1 rounded-full py-2 text-[13px] font-semibold text-ink-60 transition-colors hover:text-ink"
         >
           회원가입
         </button>
       </div>
 
-      <form onSubmit={isSignUp ? handleSignUp : handleLogin} className="flex flex-col gap-3.5">
-        {isSignUp && (
-          <Field label="이름">
-            <Input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="이름을 입력하세요"
-              required
-            />
-          </Field>
-        )}
+      <form onSubmit={handleLogin} className="flex flex-col gap-3.5">
         <Field label="이메일">
           <Input
             type="email"
@@ -401,45 +343,22 @@ function ConsumerAuthForm() {
           />
         </Field>
         <PrimaryButton type="submit" loading={loading}>
-          {isSignUp ? (
-            <>
-              회원가입 <Hexagon className="h-3.5 w-3.5 fill-current" />
-              <span className="text-[12px] opacity-90">+5 토큰 증정</span>
-            </>
-          ) : (
-            <>
-              로그인 <ArrowRight className="h-3.5 w-3.5" />
-            </>
-          )}
+          로그인 <ArrowRight className="h-3.5 w-3.5" />
         </PrimaryButton>
       </form>
 
-      {!isSignUp && (
-        <div className="mt-4 flex flex-col items-center gap-2 text-center">
-          <button
-            onClick={() => {
-              setForgotMode(true);
-              setError("");
-              setMessage("");
-            }}
-            className="text-[13px] text-ink-60 hover:text-primary-500"
-          >
-            비밀번호를 잊으셨나요?
-          </button>
-          {needsConfirm && (
-            <button
-              type="button"
-              onClick={handleResendConfirm}
-              disabled={loading || !email}
-              className="text-[13px] font-semibold text-primary-500 hover:text-primary-600 disabled:opacity-50"
-            >
-              확인 메일 다시 보내기
-            </button>
-          )}
-        </div>
-      )}
-      {isSignUp && needsConfirm && (
-        <div className="mt-4 text-center">
+      <div className="mt-4 flex flex-col items-center gap-2 text-center">
+        <button
+          onClick={() => {
+            setForgotMode(true);
+            setError("");
+            setMessage("");
+          }}
+          className="text-[13px] text-ink-60 hover:text-primary-500"
+        >
+          비밀번호를 잊으셨나요?
+        </button>
+        {needsConfirm && (
           <button
             type="button"
             onClick={handleResendConfirm}
@@ -448,8 +367,24 @@ function ConsumerAuthForm() {
           >
             확인 메일 다시 보내기
           </button>
-        </div>
-      )}
+        )}
+        <p className="text-[12px] text-ink-60">
+          계정이 없으신가요?{" "}
+          <button
+            type="button"
+            onClick={() => setShowSignupModal(true)}
+            className="font-semibold text-primary-500 hover:underline"
+          >
+            회원가입 <Hexagon className="inline h-3 w-3 align-text-bottom" /> +5 토큰
+          </button>
+        </p>
+      </div>
+
+      <SignupModal
+        open={showSignupModal}
+        onClose={() => setShowSignupModal(false)}
+        onSwitchToLogin={() => setShowSignupModal(false)}
+      />
     </FormFrame>
   );
 }
