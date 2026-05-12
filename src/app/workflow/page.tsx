@@ -5,7 +5,12 @@ import { motion, AnimatePresence } from "motion/react";
 import { ArrowLeft, Loader2, Camera, Sparkles, X } from "lucide-react";
 import Notch from "@/components/workflow/Notch";
 import TokenBadge from "@/components/workflow/TokenBadge";
-import Step1Cards, { Step1Data } from "@/components/workflow/Step1Cards";
+import Step1Cards, {
+  Step1Data,
+  type PhotoCommercialBusiness,
+  type PhotoResidentialSpace,
+  type WorkflowEntry,
+} from "@/components/workflow/Step1Cards";
 import Step2Designer, { Step2Data } from "@/components/workflow/Step2Designer";
 import { useTokens } from "@/hooks/useTokens";
 import { useRouter } from "next/navigation";
@@ -39,18 +44,27 @@ export default function WorkflowPage() {
 
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeError, setNormalizeError] = useState<string | null>(null);
-  // 빠른 사진 진입 모달
+  // 빠른 사진 진입 모달 (다단계: 모드 선택 → 세부 입력 → 평수)
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickPyeong, setQuickPyeong] = useState<number>(24);
+  const [quickMode, setQuickMode] = useState<WorkflowEntry | null>(null);
+  const [quickPhotoSpace, setQuickPhotoSpace] = useState<PhotoResidentialSpace>("apartment");
+  const [quickBusiness, setQuickBusiness] = useState<PhotoCommercialBusiness>("cafe");
   const hydratedRef = useRef(false);
 
   const startQuickPhotoFlow = () => {
-    const pyeong = Math.max(5, Math.min(150, Math.round(quickPyeong || 24)));
+    if (!quickMode) return;
+    const pyeong = Math.max(5, Math.min(500, Math.round(quickPyeong || 24)));
     const exclusiveArea = Math.round(pyeong * 3.3058 * 10) / 10;
+
+    // 모드별 step1 분기 — buildingType은 기존 호환을 위해 매핑
+    const buildingType =
+      quickMode === "photo_commercial" ? "store" : quickMode === "photo_residential" ? "apartment" : "apartment";
+
     setStep1({
       basicInfo: {
         mode: "address",
-        budget: 3500,
+        budget: quickMode === "photo_commercial" ? 5000 : 3500,
         expansionType: "basic",
         selectedPyeong: {
           pyeongNo: -1,
@@ -58,7 +72,10 @@ export default function WorkflowPage() {
           exclusiveArea,
         },
       },
-      buildingType: "apartment",
+      buildingType,
+      workflowEntry: quickMode,
+      photoSpaceType: quickMode === "photo_residential" ? quickPhotoSpace : undefined,
+      commercialBusiness: quickMode === "photo_commercial" ? quickBusiness : undefined,
       rooms: [],
     });
     setStep2({
@@ -69,6 +86,7 @@ export default function WorkflowPage() {
       chatMode: true,
     });
     setQuickOpen(false);
+    setQuickMode(null);
     setStep(2);
   };
 
@@ -411,6 +429,9 @@ export default function WorkflowPage() {
                   basicInfo={step1.basicInfo}
                   normalizedFloorplan={step1.normalizedFloorplan}
                   roomFurnishings={step1.roomFurnishings}
+                  workflowEntry={step1.workflowEntry}
+                  photoSpaceType={step1.photoSpaceType}
+                  commercialBusiness={step1.commercialBusiness}
                   value={step2}
                   onChange={setStep2}
                   tokenBalance={balance}
@@ -450,68 +471,174 @@ export default function WorkflowPage() {
                   <Camera className="h-6 w-6" />
                 </div>
                 <h3 className="mt-4 text-xl font-extrabold tracking-tight text-primary-900">
-                  평수만 알려주세요
+                  {!quickMode ? "어떤 공간이세요?" : "평수만 알려주세요"}
                 </h3>
                 <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
-                  AI 상담으로 바로 이동합니다. 원하시는 인테리어 사진을 첨부하고{" "}
-                  <span className="font-bold text-primary-700">대화로 디자인</span>까지 진행해요.
+                  {!quickMode
+                    ? "도면 없이 사진으로 시작합니다. 공간 유형을 먼저 선택해주세요."
+                    : "사진 첨부와 함께 AI 상담으로 진행됩니다."}
                 </p>
 
-                <div className="mt-5">
-                  <p className="text-xs font-bold text-primary-700 mb-2">평형 선택</p>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {QUICK_PYEONG_PRESETS.map((p) => {
-                      const active = quickPyeong === p;
-                      return (
-                        <button
-                          key={p}
-                          type="button"
-                          onClick={() => setQuickPyeong(p)}
-                          className={`rounded-lg border px-2 py-2 text-sm font-bold transition ${
-                            active
-                              ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                              : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
-                          }`}
-                        >
-                          {p}평
-                        </button>
-                      );
-                    })}
+                {/* 1단계: 모드 선택 */}
+                {!quickMode && (
+                  <div className="mt-5 space-y-2">
+                    <button
+                      type="button"
+                      onClick={() => setQuickMode("photo_residential")}
+                      className="w-full rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-4 text-left transition hover:border-primary-400 hover:bg-primary-50/50"
+                    >
+                      <p className="text-sm font-bold text-primary-900">🏠 내 집 (도면 없이)</p>
+                      <p className="mt-1 text-[0.72rem] text-primary-900/60">
+                        원룸·투룸·아파트·주택 등. 도면이 없거나 못 찾는 경우.
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setQuickMode("photo_commercial")}
+                      className="w-full rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4 text-left transition hover:border-primary-400 hover:bg-primary-50/50"
+                    >
+                      <p className="text-sm font-bold text-primary-900">☕ 상가·사무실</p>
+                      <p className="mt-1 text-[0.72rem] text-primary-900/60">
+                        카페·식당·미용실·학원·사무실 등. 업종별 zone 디자인.
+                      </p>
+                    </button>
                   </div>
-                  <div className="mt-3 flex items-center gap-2">
-                    <label className="text-xs font-bold text-primary-700">직접 입력</label>
-                    <input
-                      type="number"
-                      min={5}
-                      max={150}
-                      value={quickPyeong}
-                      onChange={(e) => setQuickPyeong(Number(e.target.value) || 0)}
-                      className="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm tabular text-primary-900 outline-none focus:border-primary-400"
-                    />
-                    <span className="text-xs text-primary-900/60">평</span>
+                )}
+
+                {/* 2단계: 모드별 세부 입력 */}
+                {quickMode === "photo_residential" && (
+                  <div className="mt-5">
+                    <p className="text-xs font-bold text-primary-700 mb-2">공간 유형</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { v: "studio", label: "원룸" },
+                        { v: "one_bed", label: "투룸" },
+                        { v: "two_bed", label: "쓰리룸" },
+                        { v: "apartment", label: "아파트" },
+                        { v: "house", label: "단독주택" },
+                        { v: "officetel", label: "오피스텔" },
+                      ] as Array<{ v: PhotoResidentialSpace; label: string }>).map((s) => {
+                        const active = quickPhotoSpace === s.v;
+                        return (
+                          <button
+                            key={s.v}
+                            type="button"
+                            onClick={() => setQuickPhotoSpace(s.v)}
+                            className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
+                              active
+                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
+                                : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
+                            }`}
+                          >
+                            {s.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <p className="mt-1.5 text-[0.7rem] text-primary-900/50">
-                    약 {Math.round((quickPyeong || 0) * 3.3058 * 10) / 10}m² (전용면적)
-                  </p>
-                </div>
+                )}
+
+                {quickMode === "photo_commercial" && (
+                  <div className="mt-5">
+                    <p className="text-xs font-bold text-primary-700 mb-2">업종</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {([
+                        { v: "cafe", label: "카페" },
+                        { v: "restaurant", label: "식당" },
+                        { v: "bakery", label: "베이커리" },
+                        { v: "bar", label: "주점/바" },
+                        { v: "beauty_salon", label: "미용실" },
+                        { v: "clinic", label: "병원" },
+                        { v: "academy", label: "학원" },
+                        { v: "office", label: "사무실" },
+                        { v: "gym", label: "헬스/필라테스" },
+                        { v: "retail", label: "판매점" },
+                        { v: "studio_space", label: "스튜디오" },
+                        { v: "other_commercial", label: "기타" },
+                      ] as Array<{ v: PhotoCommercialBusiness; label: string }>).map((b) => {
+                        const active = quickBusiness === b.v;
+                        return (
+                          <button
+                            key={b.v}
+                            type="button"
+                            onClick={() => setQuickBusiness(b.v)}
+                            className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
+                              active
+                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
+                                : "border-emerald-200 bg-white text-primary-900 hover:border-primary-300"
+                            }`}
+                          >
+                            {b.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3단계: 평수 입력 (모드 선택 후) */}
+                {quickMode && (
+                  <div className="mt-5">
+                    <p className="text-xs font-bold text-primary-700 mb-2">평형 선택</p>
+                    <div className="grid grid-cols-4 gap-1.5">
+                      {QUICK_PYEONG_PRESETS.map((p) => {
+                        const active = quickPyeong === p;
+                        return (
+                          <button
+                            key={p}
+                            type="button"
+                            onClick={() => setQuickPyeong(p)}
+                            className={`rounded-lg border px-2 py-2 text-sm font-bold transition ${
+                              active
+                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
+                                : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
+                            }`}
+                          >
+                            {p}평
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 flex items-center gap-2">
+                      <label className="text-xs font-bold text-primary-700">직접 입력</label>
+                      <input
+                        type="number"
+                        min={5}
+                        max={500}
+                        value={quickPyeong}
+                        onChange={(e) => setQuickPyeong(Number(e.target.value) || 0)}
+                        className="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm tabular text-primary-900 outline-none focus:border-primary-400"
+                      />
+                      <span className="text-xs text-primary-900/60">평</span>
+                    </div>
+                    <p className="mt-1.5 text-[0.7rem] text-primary-900/50">
+                      약 {Math.round((quickPyeong || 0) * 3.3058 * 10) / 10}m²
+                    </p>
+                  </div>
+                )}
 
                 <div className="mt-6 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => setQuickOpen(false)}
+                    onClick={() => {
+                      if (quickMode) setQuickMode(null);
+                      else setQuickOpen(false);
+                    }}
                     className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
                   >
-                    취소
+                    {quickMode ? "이전" : "취소"}
                   </button>
-                  <button
-                    type="button"
-                    onClick={startQuickPhotoFlow}
-                    disabled={!quickPyeong || quickPyeong < 5}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40"
-                  >
-                    <Sparkles className="h-4 w-4" />
-                    AI 상담 시작
-                  </button>
+                  {quickMode && (
+                    <button
+                      type="button"
+                      onClick={startQuickPhotoFlow}
+                      disabled={!quickPyeong || quickPyeong < 5}
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      AI 상담 시작
+                    </button>
+                  )}
                 </div>
               </motion.div>
             </>

@@ -51,9 +51,57 @@ export interface NormalizedFloorplan {
   notes: string;
 }
 
+/**
+ * Workflow entry mode — 사용자가 어떤 흐름으로 진입했는지.
+ * - apartment_drawing: 아파트 도면 기반 (주소→평형→도면→방별)
+ * - photo_residential: 도면 없는 주거 (원룸/투룸/아파트 사진 기반)
+ * - photo_commercial: 상가/사무실 (업종 + zone 기반)
+ *
+ * Step1Cards 첫 화면에서 선택하거나, "도면없이 사진으로 바로 시작" CTA가 photo_* 모드 트리거.
+ */
+export type WorkflowEntry =
+  | "apartment_drawing"
+  | "photo_residential"
+  | "photo_commercial";
+
+/**
+ * 도면 없는 주거 모드의 공간 종류 (Step2 탭 단위).
+ */
+export type PhotoResidentialSpace =
+  | "studio"        // 원룸
+  | "one_bed"       // 투룸
+  | "two_bed"       // 쓰리룸
+  | "apartment"     // 아파트 (도면 없이)
+  | "house"         // 단독주택
+  | "officetel"     // 오피스텔
+  | "other_residential";
+
+/**
+ * 상가/사무실 모드의 업종 (Step2 zone 템플릿 결정).
+ */
+export type PhotoCommercialBusiness =
+  | "cafe"
+  | "restaurant"
+  | "retail"
+  | "beauty_salon"
+  | "clinic"
+  | "academy"
+  | "office"
+  | "gym"
+  | "bakery"
+  | "bar"
+  | "studio_space"
+  | "other_commercial";
+
 export interface Step1Data {
   basicInfo: BasicInfoData;
   buildingType: BuildingType | null;
+  /** 신규 — workflow 진입 모드. 미지정 시 기존 buildingType 기반으로 추정. */
+  workflowEntry?: WorkflowEntry;
+  /** photo_residential 모드: 공간 종류 */
+  photoSpaceType?: PhotoResidentialSpace;
+  /** photo_commercial 모드: 업종 */
+  commercialBusiness?: PhotoCommercialBusiness;
   rooms: string[];
   floorLevel?: string;
   storeUsage?: string;

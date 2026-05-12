@@ -39,7 +39,8 @@ import type { SegmentationData } from "@/types/segmentation";
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
 
-const ROOM_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
+// 아파트 도면 모드 — 9개 방 (기존)
+const APARTMENT_ROOM_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
   { v: "all", label: "전체", dimKey: "거실", icon: Layers },
   { v: "living", label: "거실", dimKey: "거실", icon: Home },
   { v: "master", label: "안방", dimKey: "안방", icon: Bed },
@@ -50,6 +51,99 @@ const ROOM_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof 
   { v: "balcony", label: "베란다", dimKey: "발코니", icon: Layers },
   { v: "dress", label: "드레스룸", dimKey: "드레스룸", icon: Layers },
 ];
+
+// 도면 없는 주거 모드 — 단순화된 공간 6개
+const PHOTO_RESIDENTIAL_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
+  { v: "all", label: "전체", dimKey: "거실", icon: Layers },
+  { v: "living", label: "거실/다이닝", dimKey: "거실", icon: Home },
+  { v: "bedroom", label: "침실", dimKey: "안방", icon: Bed },
+  { v: "kitchen", label: "주방", dimKey: "주방", icon: ChefHat },
+  { v: "bath", label: "욕실", dimKey: "욕실1", icon: Bath },
+  { v: "other", label: "기타", dimKey: "거실", icon: Layers },
+];
+
+// 상가/사무실 zone — 업종별로 동적 생성 (commercialBusiness prop 기반)
+const COMMERCIAL_ZONE_TABS_BY_BUSINESS: Record<string, Array<{ v: string; label: string; dimKey: string; icon: typeof Home }>> = {
+  cafe: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "메인 홀", dimKey: "홀", icon: Home },
+    { v: "counter", label: "카운터", dimKey: "카운터", icon: ChefHat },
+    { v: "kitchen", label: "주방", dimKey: "주방", icon: ChefHat },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+    { v: "facade", label: "파사드", dimKey: "외부", icon: DoorOpen },
+  ],
+  restaurant: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "홀", dimKey: "홀", icon: Home },
+    { v: "kitchen", label: "주방", dimKey: "주방", icon: ChefHat },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+    { v: "facade", label: "파사드", dimKey: "외부", icon: DoorOpen },
+  ],
+  bakery: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "쇼룸", dimKey: "홀", icon: Home },
+    { v: "counter", label: "카운터", dimKey: "카운터", icon: ChefHat },
+    { v: "kitchen", label: "베이킹실", dimKey: "주방", icon: ChefHat },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  bar: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "홀", dimKey: "홀", icon: Home },
+    { v: "counter", label: "바", dimKey: "카운터", icon: ChefHat },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  beauty_salon: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "메인 홀", dimKey: "홀", icon: Home },
+    { v: "treatment_room", label: "시술실", dimKey: "시술실", icon: Bed },
+    { v: "counter", label: "카운터", dimKey: "카운터", icon: DoorOpen },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  clinic: [
+    { v: "all", label: "전체", dimKey: "대기실", icon: Layers },
+    { v: "main_hall", label: "대기실", dimKey: "대기실", icon: Home },
+    { v: "treatment_room", label: "진료실", dimKey: "진료실", icon: Bed },
+    { v: "counter", label: "접수처", dimKey: "접수", icon: DoorOpen },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  academy: [
+    { v: "all", label: "전체", dimKey: "강의실", icon: Layers },
+    { v: "office_room", label: "강의실", dimKey: "강의실", icon: Home },
+    { v: "main_hall", label: "로비", dimKey: "로비", icon: DoorOpen },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  office: [
+    { v: "all", label: "전체", dimKey: "오피스", icon: Layers },
+    { v: "office_room", label: "오픈 오피스", dimKey: "오피스", icon: Home },
+    { v: "main_hall", label: "회의실", dimKey: "회의실", icon: Home },
+    { v: "counter", label: "리셉션", dimKey: "리셉션", icon: DoorOpen },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+  gym: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "운동 공간", dimKey: "홀", icon: Home },
+    { v: "treatment_room", label: "PT실", dimKey: "PT실", icon: Bed },
+    { v: "restroom", label: "탈의실/샤워", dimKey: "탈의실", icon: Bath },
+  ],
+  retail: [
+    { v: "all", label: "전체", dimKey: "매장", icon: Layers },
+    { v: "main_hall", label: "매장 홀", dimKey: "매장", icon: Home },
+    { v: "counter", label: "카운터", dimKey: "카운터", icon: DoorOpen },
+    { v: "fitting_room", label: "피팅룸", dimKey: "피팅룸", icon: Bed },
+    { v: "facade", label: "파사드", dimKey: "외부", icon: DoorOpen },
+  ],
+  studio_space: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "촬영존", dimKey: "홀", icon: Home },
+    { v: "restroom", label: "탈의/화장실", dimKey: "화장실", icon: Bath },
+  ],
+  other_commercial: [
+    { v: "all", label: "전체", dimKey: "홀", icon: Layers },
+    { v: "main_hall", label: "메인 공간", dimKey: "홀", icon: Home },
+    { v: "counter", label: "카운터", dimKey: "카운터", icon: DoorOpen },
+    { v: "restroom", label: "화장실", dimKey: "화장실", icon: Bath },
+  ],
+};
 
 const STYLE_PRESETS = [
   "모던 미니멀",
@@ -109,6 +203,10 @@ interface Props {
   basicInfo: BasicInfoData;
   normalizedFloorplan?: NormalizedFloorplan;
   roomFurnishings?: Record<string, string[]>;
+  /** 워크플로 진입 모드 — Step2 탭 분기 결정 */
+  workflowEntry?: "apartment_drawing" | "photo_residential" | "photo_commercial";
+  photoSpaceType?: string;
+  commercialBusiness?: string;
   value: Step2Data;
   onChange: (next: Step2Data) => void;
   tokenBalance: number;
@@ -121,6 +219,9 @@ export default function Step2Designer({
   basicInfo,
   normalizedFloorplan,
   roomFurnishings,
+  workflowEntry,
+  photoSpaceType,
+  commercialBusiness,
   value,
   onChange,
   tokenBalance,
@@ -130,9 +231,24 @@ export default function Step2Designer({
   // 가이드: Step2 방 목록에서 베란다/드레스룸 제외 (이미지 생성 X). 단 견적 면적엔 포함.
   // 이유: 베란다/드레스룸은 일반적으로 Step2 인테리어 디자인 생성 대상이 아님.
   const RENDER_EXCLUDED = ["balcony", "dress"];
+
+  // ROOM_TABS — 진입 모드별 분기 (MD plan §3-3)
+  const ROOM_TABS = useMemo(() => {
+    if (workflowEntry === "photo_commercial") {
+      const key = commercialBusiness || "other_commercial";
+      return COMMERCIAL_ZONE_TABS_BY_BUSINESS[key] || COMMERCIAL_ZONE_TABS_BY_BUSINESS.other_commercial;
+    }
+    if (workflowEntry === "photo_residential") {
+      return PHOTO_RESIDENTIAL_TABS;
+    }
+    return APARTMENT_ROOM_TABS;
+  }, [workflowEntry, commercialBusiness]);
+
+  void photoSpaceType; // 향후 세분화 hook
+
   const availableTabs = useMemo(
     () => ROOM_TABS.filter((t) => !RENDER_EXCLUDED.includes(t.v)),
-    [],
+    [ROOM_TABS],
   );
   // Step1에서 선택한 방 = 진행 카운트의 분모 (베란다/드레스룸 제외). 비어있거나 "all"이면 모든 렌더 대상.
   const selectedRoomKeys = useMemo(() => {
@@ -643,17 +759,21 @@ export default function Step2Designer({
       if (!res.ok || !data.image_prompt) {
         throw new Error(data.error || "상담 내용 정리 실패");
       }
-      // 모드 분기: 도면(propertyId/normalizedImageUrl) 없으면 photo_only 흐름으로
-      // MD plan §0 — photo_only는 절대 handleBulkGenerate (→ render-room) 호출 X
+      // 모드 분기 — workflowEntry 우선, 폴백으로 floorplan 유무
+      // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasFloorplan =
         !!basicInfo.floorplanPropertyId ||
         !!basicInfo.normalizedImageUrl ||
         !!basicInfo.uploadedFloorplan?.dataUrl;
-      if (!hasFloorplan) {
+      const isPhotoMode =
+        workflowEntry === "photo_residential" ||
+        workflowEntry === "photo_commercial" ||
+        !hasFloorplan;
+      if (isPhotoMode) {
         await handlePhotoStyleGenerate(data.image_prompt);
         return;
       }
-      // 도면이 있는 경우만 기존 방별 일괄 생성
+      // 아파트 도면 모드만 기존 방별 일괄 생성
       await handleBulkGenerate(data.image_prompt);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
