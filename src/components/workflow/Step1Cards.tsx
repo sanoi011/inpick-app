@@ -183,6 +183,21 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
 
+  // 3-mode entry card 선택 시 workflowEntry + buildingType 함께 세팅
+  const selectMode = (entry: WorkflowEntry) => {
+    const buildingType: BuildingType =
+      entry === "photo_commercial" ? "store" : "apartment";
+    onChange({
+      ...value,
+      workflowEntry: entry,
+      buildingType,
+      // 모드 바뀌면 의존 필드 초기화
+      rooms: [],
+      storeUsage: undefined,
+      storeUsageEtc: undefined,
+    });
+  };
+
   return (
     <div className="space-y-3">
       {/* 상단 — 처음부터 다시 버튼 */}
@@ -202,6 +217,74 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
           >
             <RotateCcw className="h-3.5 w-3.5" />
             처음부터 다시
+          </button>
+        </div>
+      )}
+
+      {/* 3-mode entry — 어떻게 시작할까요? (MD plan §3-1) */}
+      {!value.workflowEntry && (
+        <div className="rounded-[28px] border border-primary-100 bg-white/85 p-6 shadow-card backdrop-blur-2xl">
+          <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-500">
+            INPICK 시작하기
+          </p>
+          <h3 className="mt-2 text-lg font-extrabold tracking-tight text-primary-900">
+            어떻게 시작할까요?
+          </h3>
+          <div className="mt-4 grid gap-3 md:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => selectMode("apartment_drawing")}
+              className="rounded-2xl border-2 border-blue-200 bg-blue-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
+            >
+              <div className="text-2xl">🏢</div>
+              <p className="mt-2 text-sm font-bold text-primary-900">아파트 도면으로</p>
+              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
+                주소·평형 검색으로 도면을 불러옵니다. 방별 정밀 디자인 + 17공종 견적.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode("photo_residential")}
+              className="rounded-2xl border-2 border-amber-200 bg-amber-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
+            >
+              <div className="text-2xl">🏠</div>
+              <p className="mt-2 text-sm font-bold text-primary-900">내 공간 사진으로</p>
+              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
+                도면 없이도 가능. 원룸·투룸·아파트 등 평수 + 사진 기반.
+              </p>
+            </button>
+            <button
+              type="button"
+              onClick={() => selectMode("photo_commercial")}
+              className="rounded-2xl border-2 border-emerald-200 bg-emerald-50/40 p-4 text-left transition hover:border-primary-500 hover:bg-primary-50"
+            >
+              <div className="text-2xl">☕</div>
+              <p className="mt-2 text-sm font-bold text-primary-900">상가·사무실</p>
+              <p className="mt-1 text-[0.7rem] text-primary-900/60 leading-relaxed">
+                카페·식당·미용실·사무실 등 업종별 zone 디자인 + 가견적.
+              </p>
+            </button>
+          </div>
+        </div>
+      )}
+      {value.workflowEntry && (
+        <div className="flex items-center justify-between rounded-2xl border border-primary-100 bg-white/70 px-4 py-2">
+          <span className="text-[0.72rem] text-primary-900/70">
+            현재 모드 ·{" "}
+            <span className="font-bold text-primary-700">
+              {value.workflowEntry === "apartment_drawing"
+                ? "아파트 도면"
+                : value.workflowEntry === "photo_residential"
+                  ? "내 공간 사진"
+                  : "상가·사무실"}
+            </span>
+          </span>
+          <button
+            type="button"
+            onClick={() => onChange({ ...value, workflowEntry: undefined })}
+            className="text-[0.7rem] font-semibold text-primary-600 hover:underline"
+          >
+            모드 변경
           </button>
         </div>
       )}

@@ -12,9 +12,15 @@ export async function GET(request: NextRequest) {
 
   try {
     if (view === "bids") {
+      // 입찰 + estimate (의뢰자 정보) + contractor (사업자 정보) JOIN
       let query = supabase
         .from("bids")
-        .select("*", { count: "exact" })
+        .select(
+          `*,
+          estimates ( id, address, region, total_estimate_won, status ),
+          specialty_contractors ( id, company_name, region, rating, review_count )`,
+          { count: "exact" }
+        )
         .order("created_at", { ascending: false })
         .range(offset, offset + limit - 1);
 
@@ -28,10 +34,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ items: data || [], total: count || 0, page, limit });
     }
 
-    // contracts view
+    // contracts view — estimate + bid + contractor FK 조인
     let query = supabase
       .from("contracts")
-      .select("*", { count: "exact" })
+      .select(
+        `*,
+        estimates ( id, address, region, total_estimate_won, user_id ),
+        bids ( id, bid_amount, start_available_date, duration_days ),
+        specialty_contractors ( id, company_name, region, contact_name, rating )`,
+        { count: "exact" }
+      )
       .order("created_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
