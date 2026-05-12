@@ -205,8 +205,89 @@ export default function EstimatePage() {
     setLoading(true);
     setError(null);
     try {
-      const normalizedRooms = s1.normalizedFloorplan?.rooms || [];
+      // ─── 모드별 분기 (MD plan §10) ──────────────────────────────
+      // photo_residential → photo_only 가견적 (면적×등급)
+      // photo_commercial → commercial 가견적 (zone×업종×등급+설비)
+      // apartment_drawing → 기존 17공종 자재 견적
       const area = s1.basicInfo.selectedPyeong?.exclusiveArea;
+
+      if (s1.workflowEntry === "photo_residential") {
+        const res = await fetch("/api/inpick/build-estimate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectMode: "photo_only",
+            areaM2: area || 50,
+            budgetTier:
+              s1.basicInfo.expansionType === "extended" ? "premium" : "standard",
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.hint || "견적 생성 실패");
+        // 가견적 결과를 estimates 형식으로 변환 (UI 호환)
+        setEstimates([
+          {
+            roomName: `전체 (${data.pyung?.toFixed?.(1) ?? "?"}평) — ${data.disclaimerKo ?? ""}`,
+            totalAreaM2: data.areaM2 ?? 0,
+            items: [],
+            mainTotalWon: data.breakdown?.directCostWon ?? 0,
+            auxTotalWon: 0,
+            laborTotalWon: 0,
+            totalWon: data.grandTotalWon ?? 0,
+          },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      if (s1.workflowEntry === "photo_commercial") {
+        // commercial은 ROOM_TABS의 zone들을 buildCommercialEstimate에 전달
+        // 기본 비율 분배 (사용자가 ZoneEditor에서 수정 안 했으면)
+        const totalAreaM2 = area || 100;
+        // Step2의 rendersByRoom 키를 zone으로 사용
+        const zonesFromRenders = Object.keys(s2.rendersByRoom || {}).filter(
+          (k) => k !== "all",
+        );
+        const zoneInputs = (zonesFromRenders.length > 0
+          ? zonesFromRenders
+          : ["main_hall", "counter", "kitchen", "restroom"]
+        ).map((zoneKey, i, arr) => ({
+          id: zoneKey,
+          nameKo: zoneKey,
+          type: zoneKey,
+          areaM2: totalAreaM2 / arr.length, // 균등 분배 (사용자 입력 없으면)
+        }));
+        const res = await fetch("/api/inpick/build-estimate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectMode: "commercial",
+            businessType: s1.commercialBusiness || "other_commercial",
+            budgetTier:
+              s1.basicInfo.expansionType === "extended" ? "premium" : "standard",
+            zones: zoneInputs,
+            requiredSystems: [],
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || data.hint || "견적 생성 실패");
+        setEstimates([
+          {
+            roomName: `${data.businessType || "상가"} (${data.totalPyung?.toFixed?.(1) ?? "?"}평) — ${data.disclaimerKo ?? ""}`,
+            totalAreaM2: data.totalAreaM2 ?? 0,
+            items: [],
+            mainTotalWon: data.breakdown?.zonesDirectCostWon ?? 0,
+            auxTotalWon: data.breakdown?.systemSurchargeWon ?? 0,
+            laborTotalWon: 0,
+            totalWon: data.grandTotalWon ?? 0,
+          },
+        ]);
+        setLoading(false);
+        return;
+      }
+
+      // 아파트 도면 모드 (기존 흐름) ────────────────────────────────
+      const normalizedRooms = s1.normalizedFloorplan?.rooms || [];
       const pyeong = area ? classifyPyeong(area) : "30평";
       const standardDims = estimateRoomDimsFromPyeong(pyeong);
 

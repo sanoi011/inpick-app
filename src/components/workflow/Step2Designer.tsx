@@ -232,17 +232,41 @@ export default function Step2Designer({
   // 이유: 베란다/드레스룸은 일반적으로 Step2 인테리어 디자인 생성 대상이 아님.
   const RENDER_EXCLUDED = ["balcony", "dress"];
 
-  // ROOM_TABS — 진입 모드별 분기 (MD plan §3-3)
+  // 사용자가 추가한 custom 실 (모드 무관, 모든 모드에서 +/- 가능)
+  const [customTabs, setCustomTabs] = useState<Array<{ v: string; label: string; dimKey: string; icon: typeof Home }>>([]);
+  const [showAddTabInput, setShowAddTabInput] = useState(false);
+  const [newTabLabel, setNewTabLabel] = useState("");
+
+  // ROOM_TABS — 진입 모드별 분기 + 사용자 custom 합산 (MD plan §3-3)
   const ROOM_TABS = useMemo(() => {
-    if (workflowEntry === "photo_commercial") {
-      const key = commercialBusiness || "other_commercial";
-      return COMMERCIAL_ZONE_TABS_BY_BUSINESS[key] || COMMERCIAL_ZONE_TABS_BY_BUSINESS.other_commercial;
-    }
-    if (workflowEntry === "photo_residential") {
-      return PHOTO_RESIDENTIAL_TABS;
-    }
-    return APARTMENT_ROOM_TABS;
-  }, [workflowEntry, commercialBusiness]);
+    const base = (() => {
+      if (workflowEntry === "photo_commercial") {
+        const key = commercialBusiness || "other_commercial";
+        return COMMERCIAL_ZONE_TABS_BY_BUSINESS[key] || COMMERCIAL_ZONE_TABS_BY_BUSINESS.other_commercial;
+      }
+      if (workflowEntry === "photo_residential") {
+        return PHOTO_RESIDENTIAL_TABS;
+      }
+      return APARTMENT_ROOM_TABS;
+    })();
+    return [...base, ...customTabs];
+  }, [workflowEntry, commercialBusiness, customTabs]);
+
+  const addCustomTab = () => {
+    const label = newTabLabel.trim();
+    if (!label) return;
+    const v = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    setCustomTabs((prev) => [
+      ...prev,
+      { v, label, dimKey: "거실", icon: Layers },
+    ]);
+    setNewTabLabel("");
+    setShowAddTabInput(false);
+  };
+
+  const removeCustomTab = (v: string) => {
+    setCustomTabs((prev) => prev.filter((t) => t.v !== v));
+  };
 
   void photoSpaceType; // 향후 세분화 hook
 
@@ -1086,7 +1110,7 @@ export default function Step2Designer({
                   : sel
               );
               return (
-                <div key={t.v} className="relative">
+                <div key={t.v} className="relative group">
                   <button
                     data-room-tab
                     onClick={(e) => {
@@ -1133,6 +1157,21 @@ export default function Step2Designer({
                       </span>
                     ) : null}
                   </button>
+                  {/* custom 탭은 삭제 X 버튼 표시 */}
+                  {t.v.startsWith("custom_") && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeCustomTab(t.v);
+                        if (sel) setActiveRoom(availableTabs[0]?.v ?? "living");
+                      }}
+                      className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 shadow"
+                      title="실 삭제"
+                    >
+                      <X className="h-2.5 w-2.5" />
+                    </button>
+                  )}
                   {/* popup — 클릭 토글만, "전체" 제외 */}
                   <AnimatePresence>
                     {!isAll && openRoomPopup === t.v && (
@@ -1173,6 +1212,41 @@ export default function Step2Designer({
                 </div>
               );
             })}
+            {/* 사용자 실 추가 — 모든 모드 공통 */}
+            {showAddTabInput ? (
+              <div className="flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50/40 px-2 py-1.5">
+                <input
+                  type="text"
+                  value={newTabLabel}
+                  onChange={(e) => setNewTabLabel(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addCustomTab();
+                    if (e.key === "Escape") {
+                      setShowAddTabInput(false);
+                      setNewTabLabel("");
+                    }
+                  }}
+                  placeholder="실 이름 입력 (예: 서재, 다용도실)"
+                  autoFocus
+                  className="flex-1 rounded bg-white border border-primary-200 px-2 py-1 text-xs outline-none focus:border-primary-400"
+                />
+                <button
+                  type="button"
+                  onClick={addCustomTab}
+                  className="rounded bg-primary-500 px-2 py-1 text-xs font-bold text-white hover:bg-primary-600"
+                >
+                  추가
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowAddTabInput(true)}
+                className="w-full rounded-lg border border-dashed border-primary-300 bg-white/50 px-3 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50 hover:border-primary-400"
+              >
+                + 실 추가
+              </button>
+            )}
           </div>
         </div>
 
