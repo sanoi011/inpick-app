@@ -9,7 +9,67 @@
  *   - commercial은 면적/층고/전면폭으로 ShellGeometry 추정
  */
 
-export type ProjectMode = "residential" | "commercial";
+export type ProjectMode = "residential" | "commercial" | "photo_only";
+
+/**
+ * 생성 API 라우팅용 타입 — extract 결과의 generationType과 endpoint 매핑.
+ * 가이드: inpick-mode-separated-ai-pipeline-dev-plan-20260512.md §4
+ */
+export type GenerationType =
+  | "apartment_room"      // 도면 기반 방별 (render-room)
+  | "reference_style"     // 참고 스타일 사진 → 새 이미지 (render-photo-style)
+  | "own_space_remodel"   // 내 공간 사진 → 구조 보존 edit (render-space-edit)
+  | "commercial_zone"     // 상가 zone 이미지 (render-commercial-zone)
+  | "consultation_only";  // 상담만, 이미지 생성 X
+
+export interface GenerationRoute {
+  endpoint: string | null;
+  requiresPropertyId: boolean;
+  requiresFloorplan: boolean;
+}
+
+/**
+ * generationType → 호출할 endpoint + 요구사항.
+ */
+export function routeGenerationPlan(generationType: GenerationType): GenerationRoute {
+  switch (generationType) {
+    case "apartment_room":
+      return {
+        endpoint: "/api/inpick/render-room",
+        requiresPropertyId: true,
+        requiresFloorplan: true,
+      };
+    case "reference_style":
+      return {
+        endpoint: "/api/inpick/render-photo-style",
+        requiresPropertyId: false,
+        requiresFloorplan: false,
+      };
+    case "own_space_remodel":
+      return {
+        endpoint: "/api/inpick/render-space-edit",
+        requiresPropertyId: false,
+        requiresFloorplan: false,
+      };
+    case "commercial_zone":
+      return {
+        endpoint: "/api/inpick/render-commercial-zone",
+        requiresPropertyId: false,
+        requiresFloorplan: false,
+      };
+    case "consultation_only":
+      return { endpoint: null, requiresPropertyId: false, requiresFloorplan: false };
+  }
+}
+
+/**
+ * projectMode → 기본 generationType (extract 실패 시 fallback).
+ */
+export function defaultGenerationTypeForMode(mode: ProjectMode): GenerationType {
+  if (mode === "commercial") return "commercial_zone";
+  if (mode === "photo_only") return "reference_style";
+  return "apartment_room";
+}
 
 export type ResidentialBuildingType =
   | "apartment"

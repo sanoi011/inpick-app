@@ -53,6 +53,8 @@ interface RenderBody extends RenderRoomInput {
   propertyId?: string;
   /** v2 §5-1 quality tier — 기본 "low" (1차 미리보기 1토큰), "high"는 2토큰 */
   quality?: "low" | "medium" | "high";
+  /** 모드 검증 — apartment 외 모드에서 잘못 호출되는 것 차단 (mode_mismatch) */
+  projectMode?: "residential" | "commercial" | "photo_only" | string;
 }
 
 export async function POST(req: NextRequest) {
@@ -77,7 +79,48 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── v2 §4-2 토큰 차감 (인증 + 잔액 검증) ──
+    // ─── mode_mismatch 가드 (토큰 차감 전) ─────────────────
+    // apartment 도면 기반 전용. photo_only/commercial은 별도 엔드포인트 사용.
+    if (
+      body.projectMode &&
+      body.projectMode !== "residential" &&
+      body.projectMode !== "apartment"
+    ) {
+      return NextResponse.json(
+        {
+          error: "mode_mismatch",
+          hint:
+            "render-room은 아파트 도면 기반 생성 전용입니다. " +
+            "사진 모드는 /api/inpick/render-photo-style, " +
+            "상가/사무실 모드는 /api/inpick/render-commercial-zone을 사용하세요.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ─── missing_floorplan 가드 (토큰 차감 전) ─────────────
+    // Storage에서 propertyId로 자동 로드 시도 후, 그래도 없으면 차단.
+    let floorplanImageUrl = body.floorplanImageUrl;
+    if (!floorplanImageUrl && body.propertyId) {
+      if (await hasFloorplan(body.propertyId, "normalized")) {
+        floorplanImageUrl = getFloorplanUrl(body.propertyId, "normalized") || undefined;
+      } else if (await hasFloorplan(body.propertyId, "original")) {
+        floorplanImageUrl = getFloorplanUrl(body.propertyId, "original") || undefined;
+      }
+    }
+    if (!floorplanImageUrl) {
+      return NextResponse.json(
+        {
+          error: "missing_floorplan",
+          hint:
+            "아파트 도면이 필요합니다. Step1에서 주소+평형 선택 → /api/inpick/normalize-floorplan으로 propertyId 확보 후 재시도하거나, " +
+            "사진 기반 모드는 /api/inpick/render-photo-style을 사용하세요.",
+        },
+        { status: 400 },
+      );
+    }
+
+    // ─── v2 §4-2 토큰 차감 (모든 validation 통과 후) ──
     const feature: CreditFeature =
       body.quality === "high" ? "render-room-high" : "render-room";
     try {
@@ -125,25 +168,7 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
-    // 가이드 §3 정책: 평면도 이미지 강제. propertyId 또는 floorplanImageUrl 둘 중 하나 필수.
-    let floorplanImageUrl = body.floorplanImageUrl;
-    if (!floorplanImageUrl && body.propertyId) {
-      // Storage에서 normalized 또는 original URL 조회
-      if (await hasFloorplan(body.propertyId, "normalized")) {
-        floorplanImageUrl = getFloorplanUrl(body.propertyId, "normalized") || undefined;
-      } else if (await hasFloorplan(body.propertyId, "original")) {
-        floorplanImageUrl = getFloorplanUrl(body.propertyId, "original") || undefined;
-      }
-    }
-    if (!floorplanImageUrl) {
-      return NextResponse.json(
-        {
-          error: "Floorplan not found. Crawl first.",
-          hint: "Step1에서 주소+평형 선택 → /api/inpick/normalize-floorplan 호출 → propertyId 확보 후 다시 시도",
-        },
-        { status: 400 },
-      );
-    }
+    // floorplanImageUrl는 토큰 차감 전 단계에서 이미 검증·로드됨.
 
     // ─── Launch-critical: RenderRoomSpec build (2026-05-11) ───
     // RENDER_ROOM_SPEC_ENABLED=true이면 도면 구조를 spec으로 변환 → prompt에 강제

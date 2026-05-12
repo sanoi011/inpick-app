@@ -572,6 +572,63 @@ export default function Step2Designer({
     }
   };
 
+  // 사진/상가 모드: 도면 없을 때 단일 이미지 생성 (render-photo-style)
+  // MD plan §5-1, §6 — propertyId 없는 사용자가 render-room에 잘못 태워지는 것 차단
+  const handlePhotoStyleGenerate = async (stylePrompt: string) => {
+    if (tokenBalance < 1) {
+      setInsufficientOpen(true);
+      return;
+    }
+    setGenerating(true);
+    setProgress(0);
+    setErrorMsg(null);
+    try {
+      const areaM2 = basicInfo.selectedPyeong?.exclusiveArea;
+      const budgetTier =
+        basicInfo.expansionType === "extended"
+          ? "premium"
+          : basicInfo.budget && basicInfo.budget >= 5000
+            ? "standard"
+            : "basic";
+      const res = await fetch("/api/inpick/render-photo-style", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectMode: "photo_only",
+          stylePrompt,
+          areaM2,
+          budgetTier,
+          quality: "low",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.hint || data.error || "이미지 생성 실패");
+      }
+      // 결과를 현재 활성 탭(또는 "all")에 추가 — 기존 UI 호환
+      const targetKey = activeRoom === "all" ? "living" : activeRoom;
+      const item: RenderItem = {
+        url: data.imageUrl,
+        prompt: stylePrompt,
+        revisedPrompt: data.prompt,
+        costUsd: data.costUsd ?? 0.01,
+        timestamp: new Date().toISOString(),
+      };
+      onChange({
+        ...value,
+        rendersByRoom: {
+          ...value.rendersByRoom,
+          [targetKey]: [...(value.rendersByRoom[targetKey] || []), item],
+        },
+      });
+      setProgress(100);
+    } catch (e) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const handleChatToImage = async () => {
     if (chatMessages.length === 0 || extractingPrompt || generating) return;
     setErrorMsg(null);
@@ -586,7 +643,17 @@ export default function Step2Designer({
       if (!res.ok || !data.image_prompt) {
         throw new Error(data.error || "상담 내용 정리 실패");
       }
-      // 추출된 prompt로 비어있는 방 일괄 생성 (기존 handleBulkGenerate 재사용)
+      // 모드 분기: 도면(propertyId/normalizedImageUrl) 없으면 photo_only 흐름으로
+      // MD plan §0 — photo_only는 절대 handleBulkGenerate (→ render-room) 호출 X
+      const hasFloorplan =
+        !!basicInfo.floorplanPropertyId ||
+        !!basicInfo.normalizedImageUrl ||
+        !!basicInfo.uploadedFloorplan?.dataUrl;
+      if (!hasFloorplan) {
+        await handlePhotoStyleGenerate(data.image_prompt);
+        return;
+      }
+      // 도면이 있는 경우만 기존 방별 일괄 생성
       await handleBulkGenerate(data.image_prompt);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
