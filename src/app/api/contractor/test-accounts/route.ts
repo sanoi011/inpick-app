@@ -54,7 +54,7 @@ export async function GET() {
             email: primary.email,
             company_name: primary.company_name,
             password_note: "비밀번호 없음 — OAuth 사용 또는 /api/contractor/login 이메일 입력만으로 진입",
-            login_url: "https://inpick-app.vercel.app/contractor/login",
+            login_url: `${process.env.NEXT_PUBLIC_SITE_URL || "https://interiorpick.co.kr"}/contractor/login`,
           }
         : null,
       all: existing || [],
