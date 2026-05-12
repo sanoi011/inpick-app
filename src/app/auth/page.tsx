@@ -129,34 +129,45 @@ function ConsumerAuthForm() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
+  const [needsConfirm, setNeedsConfirm] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
     const err = searchParams.get("error");
     if (err === "auth_failed") {
       setError("소셜 로그인에 실패했습니다. 다시 시도해주세요.");
+    } else if (err === "naver_failed") {
+      setError("네이버 로그인에 실패했습니다. 다시 시도해주세요.");
     }
   }, [searchParams]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    setNeedsConfirm(false);
     setLoading(true);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setError(
-          error.message.includes("Invalid login")
-            ? "이메일 또는 비밀번호가 올바르지 않습니다."
-            : error.message
-        );
-      } else {
-        const returnUrl = searchParams.get("returnUrl");
-        router.push(returnUrl || "/");
-        // server component 세션 동기화 — 미들웨어가 새 쿠키 읽도록
-        router.refresh();
+        const msg = error.message || "";
+        if (msg.toLowerCase().includes("email not confirmed")) {
+          setNeedsConfirm(true);
+          setError("이메일 인증이 완료되지 않았습니다. 받은 메일함에서 인증 링크를 눌러주세요.");
+        } else if (msg.toLowerCase().includes("invalid login")) {
+          setError("이메일 또는 비밀번호가 올바르지 않습니다.");
+        } else if (msg.toLowerCase().includes("too many") || msg.toLowerCase().includes("rate limit")) {
+          setError("잠시 후 다시 시도해주세요. 너무 많은 시도가 감지되었습니다.");
+        } else {
+          setError(msg || "로그인에 실패했습니다.");
+        }
+        return;
       }
-    } catch {
+      // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
+      const returnUrl = searchParams.get("returnUrl");
+      window.location.href = returnUrl || "/";
+    } catch (err) {
+      console.error("[auth] login error", err);
       setError("로그인 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
@@ -166,9 +177,11 @@ function ConsumerAuthForm() {
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setMessage("");
+    setNeedsConfirm(false);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -182,14 +195,48 @@ function ConsumerAuthForm() {
             ? "이미 가입된 이메일입니다."
             : error.message
         );
-      } else {
-        setMessage("확인 이메일을 발송했습니다. 이메일을 확인해주세요.");
-        setEmail("");
-        setPassword("");
-        setName("");
+        return;
       }
-    } catch {
+      // Supabase는 이미 가입된 이메일이어도 200으로 응답하지만 identities=[]를 반환함
+      // 이를 명시적으로 감지해서 사용자에게 안내
+      if (data?.user && (data.user.identities?.length ?? 0) === 0) {
+        setError("이미 가입된 이메일입니다. 로그인하거나 비밀번호 찾기를 이용해주세요.");
+        return;
+      }
+      setMessage("확인 이메일을 발송했습니다. 받은 메일함과 스팸함을 확인해주세요.");
+      setNeedsConfirm(true);
+      setPassword("");
+      setName("");
+    } catch (err) {
+      console.error("[auth] signup error", err);
       setError("회원가입 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendConfirm = async () => {
+    if (!email) {
+      setError("이메일을 입력해주세요.");
+      return;
+    }
+    setError("");
+    setMessage("");
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      if (error) {
+        setError(error.message || "확인 메일 재발송에 실패했습니다.");
+      } else {
+        setMessage("확인 메일을 다시 보냈습니다. 받은 메일함과 스팸함을 확인해주세요.");
+      }
+    } catch (err) {
+      console.error("[auth] resend error", err);
+      setError("재발송 중 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -197,17 +244,17 @@ function ConsumerAuthForm() {
 
   const handleOAuth = async (provider: OAuthProvider) => {
     setError("");
-    if (provider === "naver") {
-      // Naver는 Supabase 미지원 — 추후 커스텀 OAuth 라우트 구현 예정
-      setError("네이버 로그인은 곧 지원됩니다.");
-      return;
-    }
-    if (provider === "kakao" || provider === "apple") {
-      // Supabase에서 활성 시 즉시 작동. 미설정 시 supabase 측 에러 안내.
-    }
     setOauthLoading(provider);
     try {
       const returnUrl = searchParams.get("returnUrl");
+      if (provider === "naver") {
+        // 네이버는 Supabase 공식 미지원 — 커스텀 OAuth 라우트로 위임
+        const params = new URLSearchParams();
+        params.set("account_type", "consumer");
+        if (returnUrl) params.set("next", returnUrl);
+        window.location.href = `/api/auth/naver/start?${params.toString()}`;
+        return;
+      }
       const callbackUrl = returnUrl
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
         : `${window.location.origin}/auth/callback`;
@@ -219,7 +266,8 @@ function ConsumerAuthForm() {
         setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
         setOauthLoading(null);
       }
-    } catch {
+    } catch (err) {
+      console.error("[auth] oauth error", err);
       setError("소셜 로그인 중 오류가 발생했습니다.");
       setOauthLoading(null);
     }
@@ -367,7 +415,7 @@ function ConsumerAuthForm() {
       </form>
 
       {!isSignUp && (
-        <div className="mt-4 text-center">
+        <div className="mt-4 flex flex-col items-center gap-2 text-center">
           <button
             onClick={() => {
               setForgotMode(true);
@@ -377,6 +425,28 @@ function ConsumerAuthForm() {
             className="text-[13px] text-ink-60 hover:text-primary-500"
           >
             비밀번호를 잊으셨나요?
+          </button>
+          {needsConfirm && (
+            <button
+              type="button"
+              onClick={handleResendConfirm}
+              disabled={loading || !email}
+              className="text-[13px] font-semibold text-primary-500 hover:text-primary-600 disabled:opacity-50"
+            >
+              확인 메일 다시 보내기
+            </button>
+          )}
+        </div>
+      )}
+      {isSignUp && needsConfirm && (
+        <div className="mt-4 text-center">
+          <button
+            type="button"
+            onClick={handleResendConfirm}
+            disabled={loading || !email}
+            className="text-[13px] font-semibold text-primary-500 hover:text-primary-600 disabled:opacity-50"
+          >
+            확인 메일 다시 보내기
           </button>
         </div>
       )}
@@ -432,12 +502,15 @@ function ContractorAuthForm() {
 
   const handleOAuth = async (provider: OAuthProvider) => {
     setError("");
-    if (provider === "naver") {
-      setError("네이버 로그인은 곧 지원됩니다.");
-      return;
-    }
     setOauthLoading(provider);
     try {
+      if (provider === "naver") {
+        const params = new URLSearchParams();
+        params.set("account_type", "contractor");
+        params.set("next", "/contractor");
+        window.location.href = `/api/auth/naver/start?${params.toString()}`;
+        return;
+      }
       // 사업자도 supabase OAuth 사용 — callback에서 contractor 등록 페이지로 분기
       const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/contractor")}`;
       const { error } = await supabase.auth.signInWithOAuth({
@@ -451,7 +524,8 @@ function ContractorAuthForm() {
         setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
         setOauthLoading(null);
       }
-    } catch {
+    } catch (err) {
+      console.error("[auth] contractor oauth error", err);
       setError("소셜 로그인 중 오류가 발생했습니다.");
       setOauthLoading(null);
     }

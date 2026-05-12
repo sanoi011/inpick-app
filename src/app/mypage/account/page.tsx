@@ -26,8 +26,17 @@ export default function MyPageAccount() {
   const [deleteText, setDeleteText] = useState("");
   const [deleting, setDeleting] = useState(false);
 
-  const provider = user?.app_metadata?.provider || "email";
+  const provider = user?.user_metadata?.provider || user?.app_metadata?.provider || "email";
   const isEmailUser = provider === "email";
+
+  const providerLabel: Record<string, { label: string; cls: string }> = {
+    google: { label: "Google", cls: "bg-red-50 text-red-700" },
+    kakao: { label: "카카오", cls: "bg-yellow-50 text-yellow-700" },
+    naver: { label: "네이버", cls: "bg-green-50 text-green-700" },
+    apple: { label: "Apple", cls: "bg-gray-900 text-white" },
+    email: { label: "이메일", cls: "bg-gray-100 text-gray-600" },
+  };
+  const providerInfo = providerLabel[provider] ?? providerLabel.email;
 
   useEffect(() => {
     if (user) {
@@ -98,8 +107,8 @@ export default function MyPageAccount() {
           <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-600">{initials}</div>
           <div>
             <p className="text-sm font-medium text-gray-900">{fullName || user.email?.split("@")[0]}</p>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${provider === "google" ? "bg-red-50 text-red-700" : provider === "kakao" ? "bg-yellow-50 text-yellow-700" : "bg-gray-100 text-gray-600"}`}>
-              <Shield className="w-3 h-3" />{provider === "google" ? "Google" : provider === "kakao" ? "카카오" : "이메일"}
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${providerInfo.cls}`}>
+              <Shield className="w-3 h-3" />{providerInfo.label}
             </span>
           </div>
         </div>
