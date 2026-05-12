@@ -212,11 +212,24 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     // ─── projectMode 분기 (MD §10) ────────────────────────────
-    // photo_only / commercial은 17공종 정밀 견적 대신 가견적(면적×등급, zone×업종 단가)을 반환.
     if (body.projectMode === "photo_only") {
       return buildPhotoOnlyEstimate(body);
     }
     if (body.projectMode === "commercial") {
+      // scopeSpec 우선 — CommercialScopeSpec 기반 line item 견적 (정확)
+      if (body.scopeSpec) {
+        try {
+          const { buildCommercialEstimateFromScope } = await import(
+            "@/lib/inpick/commercial/estimate-from-scope"
+          );
+          const result = buildCommercialEstimateFromScope(body.scopeSpec);
+          return NextResponse.json(result);
+        } catch (err) {
+          console.error("[build-estimate] scope-based estimate failed:", err);
+          // 폴백으로 기존 zone × 업종 단가 가견적
+        }
+      }
+      // 폴백 (scope 없을 때) — 기존 zone × 단가
       return buildCommercialEstimate(body);
     }
 
