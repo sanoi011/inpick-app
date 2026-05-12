@@ -211,6 +211,15 @@ function surfaceTypeToKorean(t: SurfaceType): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+    // ─── projectMode 분기 (MD §10) ────────────────────────────
+    // photo_only / commercial은 17공종 정밀 견적 대신 가견적(면적×등급, zone×업종 단가)을 반환.
+    if (body.projectMode === "photo_only") {
+      return buildPhotoOnlyEstimate(body);
+    }
+    if (body.projectMode === "commercial") {
+      return buildCommercialEstimate(body);
+    }
+
     const { rooms, visionAnalysisByRoom } = body as {
       rooms: Array<{
         roomName: string;
@@ -356,4 +365,307 @@ export async function POST(req: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+/* ─── photo_only / commercial 가견적 (MD §10-3, §10-4) ─────────────────
+ * 17공종 정밀 견적이 불가능한 모드를 위한 단순화된 견적.
+ * UI에 "현장 실측 필요" 안내 함께 표시. */
+
+const PHOTO_ONLY_UNIT_PRICE_BY_GRADE_PER_PYEONG: Record<"basic" | "standard" | "premium", number> = {
+  basic: 600_000,
+  standard: 900_000,
+  premium: 1_500_000,
+};
+
+const PYEONG_TO_M2 = 3.305785;
+
+function buildPhotoOnlyEstimate(body: Record<string, unknown>) {
+  const areaM2 = Number(body.areaM2 ?? body.totalAreaM2 ?? 0);
+  const pyung = Number(body.pyung ?? (areaM2 ? areaM2 / PYEONG_TO_M2 : 0));
+  const tier: "basic" | "standard" | "premium" =
+    (body.budgetTier as "basic" | "standard" | "premium") ?? "standard";
+
+  if (!pyung || pyung <= 0) {
+    return NextResponse.json(
+      { error: "missing_area", hint: "areaM2 또는 pyung이 필요합니다." },
+      { status: 400 },
+    );
+  }
+  const unitPricePerPyeong = PHOTO_ONLY_UNIT_PRICE_BY_GRADE_PER_PYEONG[tier];
+  const directCost = Math.round(pyung * unitPricePerPyeong);
+  const indirect = Math.round(directCost * 0.06); // 관리비 6%
+  const profit = Math.round((directCost + indirect) * 0.05); // 이윤 5%
+  const subtotal = directCost + indirect + profit;
+  const vat = Math.round(subtotal * 0.1);
+  const grandTotalWon = subtotal + vat;
+
+  return NextResponse.json({
+    mode: "photo_only",
+    quotationType: "rough_estimate",
+    pyung,
+    areaM2: pyung * PYEONG_TO_M2,
+    budgetTier: tier,
+    unitPricePerPyeongWon: unitPricePerPyeong,
+    breakdown: {
+      directCostWon: directCost,
+      indirectCostWon: indirect,
+      profitWon: profit,
+      vatWon: vat,
+    },
+    grandTotalWon,
+    disclaimerKo:
+      "사진 기반 가견적입니다. 정확한 견적은 현장 실측, 철거 범위, 설비 상태, 선택 자재에 따라 달라질 수 있습니다.",
+  });
+}
+
+type CommercialBusinessKey =
+  | "cafe"
+  | "restaurant"
+  | "retail"
+  | "beauty_salon"
+  | "clinic"
+  | "academy"
+  | "office"
+  | "gym"
+  | "bakery"
+  | "bar"
+  | "studio"
+  | "other_commercial";
+
+type CommercialZoneKey =
+  | "main_hall"
+  | "counter"
+  | "kitchen"
+  | "storage"
+  | "restroom"
+  | "treatment_room"
+  | "fitting_room"
+  | "office_room"
+  | "front_facade"
+  | "signage"
+  | "corridor"
+  | "other";
+
+// 업종 × zone 단가 (원/평) — 임시값. KPA/조달청 기준은 P3에서 보강.
+const COMMERCIAL_UNIT_PRICE_PER_PYEONG: Record<
+  CommercialBusinessKey,
+  Partial<Record<CommercialZoneKey, number>>
+> = {
+  cafe: {
+    main_hall: 1_100_000,
+    counter: 1_500_000,
+    kitchen: 1_800_000,
+    restroom: 2_000_000,
+    storage: 600_000,
+    front_facade: 1_200_000,
+    signage: 1_500_000,
+    corridor: 700_000,
+    other: 900_000,
+  },
+  restaurant: {
+    main_hall: 1_000_000,
+    counter: 1_400_000,
+    kitchen: 2_200_000,
+    restroom: 2_000_000,
+    storage: 600_000,
+    front_facade: 1_200_000,
+    signage: 1_500_000,
+    corridor: 700_000,
+    other: 900_000,
+  },
+  retail: {
+    main_hall: 900_000,
+    counter: 1_200_000,
+    storage: 500_000,
+    fitting_room: 1_000_000,
+    front_facade: 1_500_000,
+    signage: 1_500_000,
+    corridor: 600_000,
+    other: 800_000,
+  },
+  beauty_salon: {
+    main_hall: 1_000_000,
+    counter: 1_200_000,
+    treatment_room: 1_300_000,
+    storage: 500_000,
+    restroom: 1_800_000,
+    front_facade: 1_100_000,
+    signage: 1_300_000,
+    corridor: 700_000,
+    other: 900_000,
+  },
+  clinic: {
+    main_hall: 1_100_000,
+    counter: 1_400_000,
+    treatment_room: 1_600_000,
+    storage: 600_000,
+    restroom: 2_000_000,
+    front_facade: 1_300_000,
+    signage: 1_400_000,
+    corridor: 800_000,
+    other: 900_000,
+  },
+  academy: {
+    office_room: 900_000,
+    main_hall: 800_000,
+    restroom: 1_500_000,
+    storage: 400_000,
+    front_facade: 1_100_000,
+    signage: 1_300_000,
+    corridor: 600_000,
+    other: 700_000,
+  },
+  office: {
+    office_room: 800_000,
+    main_hall: 700_000,
+    counter: 1_000_000,
+    storage: 400_000,
+    restroom: 1_500_000,
+    front_facade: 1_000_000,
+    signage: 900_000,
+    corridor: 600_000,
+    other: 700_000,
+  },
+  gym: {
+    main_hall: 900_000,
+    treatment_room: 1_100_000,
+    storage: 500_000,
+    restroom: 1_800_000,
+    front_facade: 1_200_000,
+    signage: 1_300_000,
+    corridor: 700_000,
+    other: 800_000,
+  },
+  bakery: {
+    main_hall: 1_100_000,
+    counter: 1_500_000,
+    kitchen: 2_000_000,
+    restroom: 1_900_000,
+    storage: 600_000,
+    front_facade: 1_200_000,
+    signage: 1_400_000,
+    corridor: 700_000,
+    other: 900_000,
+  },
+  bar: {
+    main_hall: 1_300_000,
+    counter: 1_700_000,
+    kitchen: 1_900_000,
+    restroom: 2_000_000,
+    storage: 600_000,
+    front_facade: 1_400_000,
+    signage: 1_600_000,
+    corridor: 800_000,
+    other: 1_000_000,
+  },
+  studio: {
+    main_hall: 1_100_000,
+    storage: 500_000,
+    restroom: 1_700_000,
+    front_facade: 1_200_000,
+    signage: 1_300_000,
+    corridor: 700_000,
+    other: 900_000,
+  },
+  other_commercial: {
+    main_hall: 900_000,
+    counter: 1_100_000,
+    storage: 500_000,
+    restroom: 1_800_000,
+    front_facade: 1_100_000,
+    signage: 1_300_000,
+    corridor: 700_000,
+    other: 800_000,
+  },
+};
+
+// 설비 가산 (1식 정액, 만원)
+const SYSTEM_SURCHARGE_WON: Record<string, number> = {
+  water_supply: 500_000,
+  drainage: 500_000,
+  ventilation: 800_000,
+  kitchen_exhaust: 1_500_000,
+  electrical_upgrade: 1_000_000,
+  fire_sprinkler: 1_200_000,
+  soundproofing: 1_500_000,
+  signage: 1_000_000,
+  gas: 800_000,
+  hvac: 1_200_000,
+};
+
+function buildCommercialEstimate(body: Record<string, unknown>) {
+  const businessType = (body.businessType as CommercialBusinessKey) || "other_commercial";
+  const tier = ((body.budgetTier as "basic" | "standard" | "premium") ?? "standard");
+  const zones = (body.zones as Array<{
+    id?: string;
+    nameKo?: string;
+    type?: CommercialZoneKey;
+    areaM2?: number;
+    requiredSystems?: string[];
+  }>) || [];
+  const requiredSystems = (body.requiredSystems as string[]) || [];
+
+  if (zones.length === 0) {
+    return NextResponse.json(
+      { error: "missing_zones", hint: "zones 배열이 비어있습니다." },
+      { status: 400 },
+    );
+  }
+
+  const tierMultiplier = { basic: 0.8, standard: 1.0, premium: 1.4 }[tier];
+  const businessPrices = COMMERCIAL_UNIT_PRICE_PER_PYEONG[businessType] || {};
+
+  const zoneEstimates = zones.map((z) => {
+    const areaM2 = Number(z.areaM2 || 0);
+    const pyung = areaM2 / PYEONG_TO_M2;
+    const zoneType: CommercialZoneKey = z.type || "other";
+    const basePerPyeong = businessPrices[zoneType] ?? businessPrices.other ?? 900_000;
+    const directWon = Math.round(pyung * basePerPyeong * tierMultiplier);
+    return {
+      id: z.id,
+      nameKo: z.nameKo,
+      type: zoneType,
+      areaM2,
+      pyung,
+      unitPricePerPyeongWon: Math.round(basePerPyeong * tierMultiplier),
+      directCostWon: directWon,
+    };
+  });
+  const zonesDirectCost = zoneEstimates.reduce((s, z) => s + z.directCostWon, 0);
+
+  const systemSurchargeWon = requiredSystems.reduce(
+    (s, k) => s + (SYSTEM_SURCHARGE_WON[k] ?? 0),
+    0,
+  );
+
+  const directCost = zonesDirectCost + systemSurchargeWon;
+  const indirect = Math.round(directCost * 0.06);
+  const profit = Math.round((directCost + indirect) * 0.05);
+  const subtotal = directCost + indirect + profit;
+  const vat = Math.round(subtotal * 0.1);
+  const grandTotalWon = subtotal + vat;
+
+  const totalAreaM2 = zones.reduce((s, z) => s + Number(z.areaM2 || 0), 0);
+
+  return NextResponse.json({
+    mode: "commercial",
+    quotationType: "rough_estimate",
+    businessType,
+    budgetTier: tier,
+    totalAreaM2,
+    totalPyung: totalAreaM2 / PYEONG_TO_M2,
+    zones: zoneEstimates,
+    requiredSystems,
+    breakdown: {
+      zonesDirectCostWon: zonesDirectCost,
+      systemSurchargeWon,
+      directCostWon: directCost,
+      indirectCostWon: indirect,
+      profitWon: profit,
+      vatWon: vat,
+    },
+    grandTotalWon,
+    disclaimerKo:
+      "상가/사무실 가견적입니다. 정확한 견적은 업종별 설비 사양, 소방·환기·전기 증설 범위, 자재 등급에 따라 달라질 수 있어 현장 실측이 필요합니다.",
+  });
 }

@@ -11,9 +11,11 @@ import type {
   CommercialBusinessType,
   CommercialProgramSpec,
   CommercialSystemRequirement,
+  CommercialZoneSpec,
 } from "@/lib/inpick/workflow/project-mode";
 import { businessTypeLabelKo } from "@/lib/inpick/workflow/project-mode";
 import { commercialZoneTemplates, defaultRequiredSystems } from "@/lib/inpick/commercial/templates";
+import CommercialZoneEditor from "./CommercialZoneEditor";
 
 interface Props {
   value?: Partial<CommercialProgramSpec>;
@@ -70,6 +72,11 @@ export default function CommercialInfoPanel({ value, onChange }: Props) {
   const [hasFloorPlan, setHasFloorPlan] = useState(value?.hasExistingFloorPlan || false);
   const [restroomIncluded, setRestroomIncluded] = useState(value?.restroomIncluded ?? true);
   const [kitchenRequired, setKitchenRequired] = useState(value?.kitchenRequired || false);
+  const [zones, setZones] = useState<CommercialZoneSpec[]>(
+    value?.zones && value.zones.length > 0
+      ? value.zones
+      : commercialZoneTemplates(value?.businessType || "cafe"),
+  );
 
   const buildAndEmit = useCallback(
     (overrides?: Partial<CommercialProgramSpec>) => {
@@ -93,7 +100,7 @@ export default function CommercialInfoPanel({ value, onChange }: Props) {
         electricalUpgradeRequired: requiredSystems.includes("electrical_upgrade"),
         fireSafetyRequired: requiredSystems.includes("fire_sprinkler"),
         requiredSystems,
-        zones: commercialZoneTemplates(businessType),
+        zones,
         ...overrides,
       };
       onChange?.(spec);
@@ -108,9 +115,15 @@ export default function CommercialInfoPanel({ value, onChange }: Props) {
       hasFloorPlan,
       restroomIncluded,
       kitchenRequired,
+      zones,
       onChange,
     ],
   );
+
+  const handleZonesChange = (newZones: CommercialZoneSpec[]) => {
+    setZones(newZones);
+    setTimeout(() => buildAndEmit({ zones: newZones }), 0);
+  };
 
   const toggleSystem = (sys: CommercialSystemRequirement) => {
     const next = requiredSystems.includes(sys)
@@ -137,7 +150,13 @@ export default function CommercialInfoPanel({ value, onChange }: Props) {
                   setBusinessType(b.key);
                   const newSystems = defaultRequiredSystems(b.key);
                   setRequiredSystems(newSystems);
-                  setTimeout(() => buildAndEmit({ businessType: b.key, requiredSystems: newSystems }), 0);
+                  // 업종 변경 시 zones도 새 템플릿으로 리셋 (사용자가 면적 입력 이전이면 부담 없음)
+                  const newZones = commercialZoneTemplates(b.key);
+                  setZones(newZones);
+                  setTimeout(
+                    () => buildAndEmit({ businessType: b.key, requiredSystems: newSystems, zones: newZones }),
+                    0,
+                  );
                 }}
                 className={`flex flex-col items-center gap-1 rounded-lg border p-2 text-[0.7rem] transition ${
                   active
@@ -240,6 +259,14 @@ export default function CommercialInfoPanel({ value, onChange }: Props) {
           })}
         </div>
       </div>
+
+      {/* Zone 편집 */}
+      <CommercialZoneEditor
+        businessType={businessType}
+        totalAreaM2={areaM2}
+        zones={zones}
+        onChange={handleZonesChange}
+      />
 
       {/* 기타 옵션 */}
       <div className="flex flex-wrap gap-2 text-[0.7rem]">
