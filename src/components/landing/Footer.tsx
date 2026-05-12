@@ -10,12 +10,12 @@ const HOME_LINKS = [
 ];
 
 const COMPANY_INFO = {
-  copyright: "Copyright © 2026 AIOD. All rights reserved.",
-  businessNumber: "사업자등록번호: -",
-  ceo: "회사명: AIOD | 플랫폼명: INPICK",
-  email: "이메일: tjsqhs011@naver.com",
+  copyright: "Copyright © 2026 주식회사 아이오드 (AIOD). All rights reserved.",
+  ceo: "운영사: 주식회사 아이오드 (AIOD) | 서비스명: INPICK",
+  businessNumber: "사업자등록번호: 384-81-04107",
   phone: "대표: 김선본",
-  address: "소재지: 대전광역시",
+  address: "소재지: 대전광역시 유성구 대학로 82, 539-2호",
+  email: "이메일: tjsqhs011@naver.com",
 };
 
 const LEGAL_LINKS = [
