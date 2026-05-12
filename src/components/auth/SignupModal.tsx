@@ -272,9 +272,6 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
           </div>
         ) : step === "confirm" ? (
           <FinalConsentStep
-            name={name}
-            email={email}
-            phone={phone}
             agreeMarketing={agreeMarketing}
             finalConsent={finalConsent}
             setFinalConsent={setFinalConsent}
@@ -598,9 +595,6 @@ function CheckRow({
 }
 
 function FinalConsentStep({
-  name,
-  email,
-  phone,
   agreeMarketing,
   finalConsent,
   setFinalConsent,
@@ -609,9 +603,6 @@ function FinalConsentStep({
   onBack,
   onConfirm,
 }: {
-  name: string;
-  email: string;
-  phone: string;
   agreeMarketing: boolean;
   finalConsent: boolean;
   setFinalConsent: (v: boolean) => void;
@@ -623,7 +614,7 @@ function FinalConsentStep({
   return (
     <div className="px-7 pb-7 pt-2">
       <p className="mb-3 text-[12px] text-gray-500">
-        아래 항목을 INPICK에서 수집·이용합니다. 동의 후 가입이 완료됩니다.
+        아래 약관에 동의하시면 가입이 완료됩니다.
       </p>
 
       {error && (
@@ -633,42 +624,7 @@ function FinalConsentStep({
         </div>
       )}
 
-      {/* 수집·이용 안내표 */}
-      <div className="overflow-hidden rounded-xl border border-gray-200">
-        <table className="w-full text-[12px]">
-          <thead className="bg-gray-50 text-gray-600">
-            <tr>
-              <th className="px-3 py-2 text-left font-semibold">항목</th>
-              <th className="px-3 py-2 text-left font-semibold">수집값</th>
-              <th className="px-3 py-2 text-left font-semibold">활용 목적</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-100 text-gray-700">
-            <tr>
-              <td className="px-3 py-2 font-medium">이름</td>
-              <td className="px-3 py-2">{name}</td>
-              <td className="px-3 py-2">견적·계약서 의뢰자 표기, 사업자 매칭 시 호칭</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-medium">이메일</td>
-              <td className="px-3 py-2 break-all">{email}</td>
-              <td className="px-3 py-2">로그인 ID, 견적·계약 진행 알림 발송</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-medium">휴대폰번호</td>
-              <td className="px-3 py-2">{phone}</td>
-              <td className="px-3 py-2">사업자와의 직접 연락 수단, 중복가입 방지</td>
-            </tr>
-            <tr>
-              <td className="px-3 py-2 font-medium">암호화 비밀번호</td>
-              <td className="px-3 py-2 text-gray-400">••••••••</td>
-              <td className="px-3 py-2">계정 인증 (해시 저장, 평문 보관 안 함)</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-3 space-y-2 rounded-xl bg-amber-50 p-3 text-[12px] text-amber-900">
+      <div className="space-y-2 rounded-xl border border-gray-200 bg-white p-3 text-[12px] text-black">
         <p className="font-semibold">보유·이용 기간</p>
         <p>회원 탈퇴 시 즉시 파기. 단, 관련 법령에 따라 다음 정보는 별도 보관됩니다.</p>
         <ul className="ml-4 list-disc space-y-0.5">
@@ -678,7 +634,7 @@ function FinalConsentStep({
         </ul>
       </div>
 
-      <div className="mt-3 rounded-xl bg-blue-50 p-3 text-[12px] text-blue-900">
+      <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3 text-[12px] text-black">
         <p className="font-semibold">제3자 제공</p>
         <p className="mt-1">
           견적 요청 시 입찰에 참여하는 사업자에게 의뢰자 이름·휴대폰번호가 제공됩니다. 동의하지 않을 권리가 있으나, 견적 요청 기능을 이용하실 수 없습니다.
@@ -686,7 +642,7 @@ function FinalConsentStep({
       </div>
 
       {agreeMarketing && (
-        <div className="mt-3 rounded-xl bg-purple-50 p-3 text-[12px] text-purple-900">
+        <div className="mt-3 rounded-xl border border-gray-200 bg-white p-3 text-[12px] text-black">
           <p className="font-semibold">[선택] 마케팅 정보 수신</p>
           <p className="mt-1">
             이벤트·할인쿠폰·신규 기능 안내를 이메일·SMS로 발송합니다. 마이페이지에서 언제든 수신 거부 가능합니다.
