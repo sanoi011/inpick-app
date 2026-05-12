@@ -104,11 +104,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3) Supabase Auth signUp — 이메일 확인 메일 자동 발송
+  // 3) Supabase Auth user 생성 — email_confirm=true로 즉시 인증 처리.
+  //    이유: Supabase 기본 SMTP는 시간당 4건 제한 → production에서 메일 발송 신뢰 불가.
+  //    휴대폰 UNIQUE + 약관 동의 시각 기록으로 식별 충분. 이메일 검증은 Phase 2 (커스텀 SMTP) 후 도입.
   const { data: signUpData, error: signUpErr } = await admin.auth.admin.createUser({
     email,
     password: body.password,
-    email_confirm: false, // 이메일 인증 후 활성화
+    email_confirm: true,
     user_metadata: {
       full_name: name,
       account_type: "consumer",
@@ -125,19 +127,7 @@ export async function POST(req: NextRequest) {
   }
   const userId = signUpData.user.id;
 
-  // 4) 확인 메일 발송 (admin createUser는 메일 발송 안 함 → generateLink로 명시 발송)
-  const redirectTo = body.emailRedirectTo || `${new URL(req.url).origin}/auth/callback`;
-  const { error: linkErr } = await admin.auth.admin.generateLink({
-    type: "signup",
-    email,
-    password: body.password!,
-    options: { redirectTo },
-  });
-  if (linkErr) {
-    console.warn("[signup] generateLink warning:", linkErr.message);
-  }
-
-  // 5) consumer_profiles INSERT — phone UNIQUE 위반 시 race condition 안전망
+  // 4) consumer_profiles INSERT — phone UNIQUE 위반 시 race condition 안전망
   const { error: profileErr } = await admin.from("consumer_profiles").insert({
     id: userId,
     email,
@@ -166,7 +156,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     userId,
-    message:
-      "회원가입이 완료되었습니다. 등록하신 이메일로 인증 메일을 발송했습니다. 받은 메일함에서 인증 링크를 클릭해주세요.",
+    message: "회원가입이 완료되었습니다. 바로 로그인해주세요.",
   });
 }

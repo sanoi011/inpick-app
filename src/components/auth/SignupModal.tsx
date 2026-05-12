@@ -257,7 +257,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
               <CheckCircle2 className="mx-auto mb-3 h-12 w-12 text-green-600" />
               <p className="text-sm font-semibold text-green-900">{success}</p>
               <p className="mt-2 text-xs text-green-700">
-                받은 메일함과 스팸함을 확인해주세요. 인증을 완료해야 로그인이 가능합니다.
+                바로 로그인하실 수 있습니다.
               </p>
             </div>
             <button
