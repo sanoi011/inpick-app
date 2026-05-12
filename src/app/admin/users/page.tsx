@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus } from "lucide-react";
+import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -9,6 +9,15 @@ interface ConsumerUser {
   id: string;
   email: string;
   name: string;
+  phone: string;
+  provider: string;
+  emailConfirmedAt: string | null;
+  lastSignInAt: string | null;
+  phoneVerified: boolean;
+  agreedTermsAt: string | null;
+  agreedPrivacyAt: string | null;
+  agreedAge14At: string | null;
+  agreedMarketingAt: string | null;
   balance: number;
   freeGenerationsUsed: number;
   projectCount: number;
@@ -125,6 +134,62 @@ export default function AdminUsersPage() {
     setGranting(false);
   }
 
+  function formatPhone(raw: string): string {
+    const d = raw.replace(/[^0-9]/g, "");
+    if (d.length === 11) return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+    if (d.length === 10) return `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}`;
+    return raw || "-";
+  }
+
+  function providerBadge(p: string) {
+    const map: Record<string, { label: string; cls: string }> = {
+      email: { label: "이메일", cls: "bg-gray-100 text-gray-600" },
+      google: { label: "Google", cls: "bg-red-50 text-red-700" },
+      kakao: { label: "카카오", cls: "bg-yellow-50 text-yellow-700" },
+      naver: { label: "네이버", cls: "bg-green-50 text-green-700" },
+      apple: { label: "Apple", cls: "bg-gray-900 text-white" },
+    };
+    const m = map[p] ?? map.email;
+    return <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${m.cls}`}>{m.label}</span>;
+  }
+
+  function exportConsumerCsv() {
+    const headers = [
+      "ID", "이메일", "이름", "휴대폰", "가입경로", "이메일인증", "휴대폰인증",
+      "약관동의시각", "개인정보동의시각", "만14세동의시각", "마케팅동의시각",
+      "마지막로그인", "크레딧잔액", "무료사용", "프로젝트수", "가입일",
+    ];
+    const rows = consumers.map((u) => [
+      u.id,
+      u.email,
+      u.name,
+      formatPhone(u.phone),
+      u.provider,
+      u.emailConfirmedAt ? "Y" : "N",
+      u.phoneVerified ? "Y" : "N",
+      u.agreedTermsAt || "",
+      u.agreedPrivacyAt || "",
+      u.agreedAge14At || "",
+      u.agreedMarketingAt || "",
+      u.lastSignInAt || "",
+      String(u.balance),
+      `${u.freeGenerationsUsed}/1`,
+      String(u.projectCount),
+      u.createdAt,
+    ]);
+    const csv = [headers, ...rows]
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(","))
+      .join("\r\n");
+    // BOM for Excel 한글 호환
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `inpick_consumers_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleSeedTestAccounts() {
     setSeeding(true);
     setSeedResult(null);
@@ -155,6 +220,12 @@ export default function AdminUsersPage() {
         <h2 className="text-xl font-bold text-gray-900">사용자 관리</h2>
         <div className="flex items-center gap-2">
           <p className="text-sm text-gray-500">총 {total}명</p>
+          {tab === "consumer" && (
+            <button onClick={exportConsumerCsv} disabled={consumers.length === 0}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700 disabled:opacity-50">
+              <Download className="w-4 h-4" /> CSV 내보내기
+            </button>
+          )}
           <button onClick={handleSeedTestAccounts} disabled={seeding}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700 disabled:opacity-50">
             {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
@@ -221,8 +292,10 @@ export default function AdminUsersPage() {
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이메일</th>
                   <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이름</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">크레딧 잔액</th>
-                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">무료 사용</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">휴대폰</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">가입경로</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">인증·약관</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">크레딧</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">프로젝트</th>
                   <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">가입일</th>
                   <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">크레딧 관리</th>
@@ -230,19 +303,33 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {consumers.length === 0 ? (
-                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
+                  <tr><td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">
                     <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />등록된 소비자가 없습니다
                   </td></tr>
                 ) : consumers.map((u) => (
                   <tr key={u.id} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm text-gray-600">{u.email || <span className="text-gray-300">-</span>}</td>
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{u.name || <span className="text-gray-300">미입력</span>}</td>
+                    <td className="px-4 py-3 text-sm text-gray-600 whitespace-nowrap">{u.phone ? formatPhone(u.phone) : <span className="text-gray-300">-</span>}</td>
+                    <td className="px-4 py-3">{providerBadge(u.provider)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-center gap-1.5 text-[11px]">
+                        <span title="이메일 인증" className={u.emailConfirmedAt ? "text-green-600" : "text-gray-300"}>
+                          {u.emailConfirmedAt ? <CheckCircle2 className="w-3.5 h-3.5" /> : <XCircle className="w-3.5 h-3.5" />}
+                        </span>
+                        <span title="필수 약관" className={u.agreedTermsAt && u.agreedPrivacyAt && u.agreedAge14At ? "text-green-600" : "text-gray-300"}>
+                          {u.agreedTermsAt && u.agreedPrivacyAt && u.agreedAge14At ? "약관✓" : "약관-"}
+                        </span>
+                        <span title="마케팅 수신" className={u.agreedMarketingAt ? "text-purple-600" : "text-gray-300"}>
+                          {u.agreedMarketingAt ? "광고✓" : ""}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3 text-sm text-right font-medium">
                       <span className={u.balance > 0 ? "text-blue-600" : "text-gray-400"}>{u.balance.toLocaleString()}</span>
                     </td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-500">{u.freeGenerationsUsed}/1</td>
                     <td className="px-4 py-3 text-sm text-right text-gray-500">{u.projectCount}건</td>
-                    <td className="px-4 py-3 text-sm text-right text-gray-400">{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
+                    <td className="px-4 py-3 text-sm text-right text-gray-400 whitespace-nowrap">{new Date(u.createdAt).toLocaleDateString("ko-KR")}</td>
                     <td className="px-4 py-3">
                       {grantTarget === u.id ? (
                         <div className="space-y-2">

@@ -91,15 +91,50 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const users = filteredUsers.map((u) => ({
-      id: u.id,
-      email: u.email || "",
-      name: (u.user_metadata?.full_name as string) || "",
-      balance: creditMap[u.id]?.balance || 0,
-      freeGenerationsUsed: creditMap[u.id]?.free_generations_used || 0,
-      projectCount: projectCounts[u.id] || 0,
-      createdAt: u.created_at,
-    }));
+    // consumer_profiles LEFT JOIN (phone, 약관 동의, 본인인증)
+    interface ProfileRow {
+      id: string;
+      phone: string | null;
+      agreed_terms_at: string | null;
+      agreed_privacy_at: string | null;
+      agreed_age14_at: string | null;
+      agreed_marketing_at: string | null;
+      phone_verified: boolean | null;
+    }
+    const profileMap: Record<string, ProfileRow> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("consumer_profiles")
+        .select(
+          "id, phone, agreed_terms_at, agreed_privacy_at, agreed_age14_at, agreed_marketing_at, phone_verified"
+        )
+        .in("id", userIds);
+      (profiles || []).forEach((p: ProfileRow) => {
+        profileMap[p.id] = p;
+      });
+    }
+
+    const users = filteredUsers.map((u) => {
+      const p = profileMap[u.id];
+      return {
+        id: u.id,
+        email: u.email || "",
+        name: (u.user_metadata?.full_name as string) || "",
+        phone: p?.phone || (u.user_metadata?.phone as string) || "",
+        provider: (u.app_metadata?.provider as string) || "email",
+        emailConfirmedAt: u.email_confirmed_at || null,
+        lastSignInAt: u.last_sign_in_at || null,
+        phoneVerified: p?.phone_verified ?? false,
+        agreedTermsAt: p?.agreed_terms_at || null,
+        agreedPrivacyAt: p?.agreed_privacy_at || null,
+        agreedAge14At: p?.agreed_age14_at || null,
+        agreedMarketingAt: p?.agreed_marketing_at || null,
+        balance: creditMap[u.id]?.balance || 0,
+        freeGenerationsUsed: creditMap[u.id]?.free_generations_used || 0,
+        projectCount: projectCounts[u.id] || 0,
+        createdAt: u.created_at,
+      };
+    });
 
     return NextResponse.json({
       users,
