@@ -32,8 +32,8 @@ function getAdmin(): any {
   return createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }
 
-export async function POST(req: NextRequest, { params }: { params: { contractId: string } }) {
-  const contractId = params.contractId;
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const contractId = params.id;
   if (!contractId) return NextResponse.json({ error: "contractId 필수" }, { status: 400 });
 
   const body = (await req.json().catch(() => ({}))) as { estimateDocumentId?: string };
@@ -134,14 +134,14 @@ export async function POST(req: NextRequest, { params }: { params: { contractId:
  * GET /api/contracts/[contractId]/drawing-package/status
  * (별도 route.ts 또는 query로 처리 — 여기서는 GET 메서드 추가)
  */
-export async function GET(_req: NextRequest, { params }: { params: { contractId: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const admin = getAdmin();
   if (!admin) return NextResponse.json({ error: "Supabase 미설정" }, { status: 503 });
 
   const { data: set } = await admin
     .from("construction_drawing_sets")
     .select("id, source_scope_hash, source_floorplan_hash, source_material_hash, quality_status, revision, created_at")
-    .eq("contract_id", params.contractId)
+    .eq("contract_id", params.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

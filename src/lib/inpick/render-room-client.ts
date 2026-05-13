@@ -70,6 +70,15 @@ export interface RenderRoomClientResult {
     explanationKo?: string;
     warnings: string[];
   };
+  /** P6-4: 도면 기반 생성 메타 — render-room route가 채워서 응답 */
+  metadata?: {
+    floorplanUsed?: boolean;
+    floorplanImageUrl?: string;
+    propertyId?: string;
+    renderSpecKind?: "RenderRoomSpec_v1" | "text_only";
+    renderSpecConfidence?: number;
+    roomName?: string;
+  };
 }
 
 export interface RenderRoomClientError {
@@ -163,6 +172,7 @@ export async function renderRoomViaClient(
       jobId: postData.jobId as string | undefined,
       wasAsync: false,
       renderSpec: postData.renderSpec as RenderRoomClientResult["renderSpec"],
+      metadata: postData.metadata as RenderRoomClientResult["metadata"],
     };
   }
 

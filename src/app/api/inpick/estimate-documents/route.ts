@@ -70,20 +70,28 @@ export async function POST(req: NextRequest) {
 
   const mode: EstimateDocumentMode = body.mode || "consumer_preview";
 
-  // consumer_id 조회
+  // consumer_id 조회 — workflow preview 모드(consumer_projects 미생성)에서도 PDF 생성 허용
   const admin = getAdmin();
   let consumerId = "";
+  const isPreviewMode = mode === "consumer_preview";
   if (admin) {
-    const { data: project } = await admin
-      .from("consumer_projects")
-      .select("user_id")
-      .eq("id", body.projectId)
-      .maybeSingle();
-    if (project) {
-      consumerId = (project as { user_id?: string }).user_id || "";
+    // projectId가 uuid 형식일 때만 DB 조회 (preview / sessionStorage uuid 둘 다 처리)
+    const looksLikeUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      body.projectId,
+    );
+    if (looksLikeUuid) {
+      const { data: project } = await admin
+        .from("consumer_projects")
+        .select("user_id")
+        .eq("id", body.projectId)
+        .maybeSingle();
+      if (project) {
+        consumerId = (project as { user_id?: string }).user_id || "";
+      }
     }
   }
-  if (!consumerId) {
+  // preview 모드는 consumer 누락 허용 — anonymous 사용자에게도 PDF 미리보기 제공
+  if (!consumerId && !isPreviewMode) {
     return NextResponse.json(
       { error: "PROJECT_NOT_FOUND_OR_NO_CONSUMER", hint: "유효한 projectId가 필요" },
       { status: 404 },
@@ -144,15 +152,20 @@ export async function POST(req: NextRequest) {
     buildEstimateResult: body.buildEstimateResult,
   });
 
-  // DB insert
-  const inserted = await insertEstimateDocument(pkg, {
-    rfqId: body.rfqId,
-    bidId: body.bidId,
-    contractId: body.contractId,
-    contractorId: body.contractorId,
-  });
+  // DB insert — preview 모드는 실패해도 200 (anonymous 사용자 PDF 다운로드 지원)
+  let inserted: { id: string; documentNo: string } | null = null;
+  try {
+    inserted = await insertEstimateDocument(pkg, {
+      rfqId: body.rfqId,
+      bidId: body.bidId,
+      contractId: body.contractId,
+      contractorId: body.contractorId,
+    });
+  } catch (err) {
+    console.warn("[estimate-documents] insert exception (non-fatal):", err);
+  }
 
-  if (!inserted) {
+  if (!inserted && !isPreviewMode) {
     return NextResponse.json(
       {
         error: "DOCUMENT_INSERT_FAILED",
@@ -164,8 +177,8 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    documentId: inserted.id,
-    documentNo: inserted.documentNo,
+    documentId: inserted?.id,
+    documentNo: inserted?.documentNo || pkg.documentNo,
     mode,
     status: pkg.status,
     totalAmount: pkg.summary.totalAmount,

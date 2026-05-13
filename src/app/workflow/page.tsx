@@ -15,6 +15,13 @@ import Step2Designer, { Step2Data } from "@/components/workflow/Step2Designer";
 import { useTokens } from "@/hooks/useTokens";
 import { useRouter } from "next/navigation";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
+// P8: workflow 상태 사용자×프로젝트 DB 영속화 + design_outputs 이미지 복원
+import {
+  fetchDesignOutputs,
+  fetchWorkflowState,
+  getOrCreateWorkflowProjectId,
+  saveWorkflowState,
+} from "@/lib/inpick/estimate-context/client";
 
 // 빠른 진입 모드 — 평수 프리셋
 const QUICK_PYEONG_PRESETS = [10, 15, 20, 24, 30, 34, 40, 50];
@@ -90,23 +97,123 @@ export default function WorkflowPage() {
     setStep(2);
   };
 
-  // 마운트 시 sessionStorage 복원 (토큰 충전 갔다 와도 진행 상태 유지)
+  // 마운트 시 복원 — sessionStorage + DB workflow_state + design_outputs 3중 병합 (P9-FIX)
+  //   - sessionStorage: 즉시 표시 (가장 빠름, 같은 브라우저 세션)
+  //   - DB workflow_state: 다른 기기 / 새로고침 복원
+  //   - design_outputs: 이미지 URL 보강 (workflow_state에 없거나 base64 깨졌을 때)
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const s1raw = sessionStorage.getItem("workflow_step1");
-      const s2raw = sessionStorage.getItem("workflow_step2");
-      const stepRaw = sessionStorage.getItem("workflow_step");
-      if (s1raw) setStep1(JSON.parse(s1raw));
-      if (s2raw) setStep2(JSON.parse(s2raw));
-      if (stepRaw === "2") setStep(2);
-    } catch (e) {
-      console.warn("workflow restore fail", e);
-    }
-    hydratedRef.current = true;
+    let cancelled = false;
+    const run = async () => {
+      // Step 1: sessionStorage 먼저 복원 (즉시 표시)
+      let s1: Step1Data | null = null;
+      let s2: Step2Data | null = null;
+      let lastStep = 1;
+      try {
+        const s1raw = sessionStorage.getItem("workflow_step1");
+        const s2raw = sessionStorage.getItem("workflow_step2");
+        const stepRaw = sessionStorage.getItem("workflow_step");
+        if (s1raw) s1 = JSON.parse(s1raw) as Step1Data;
+        if (s2raw) s2 = JSON.parse(s2raw) as Step2Data;
+        if (stepRaw === "2") lastStep = 2;
+      } catch (e) {
+        console.warn("[workflow] sessionStorage restore fail", e);
+      }
+
+      // Step 2: DB workflow_state — sessionStorage가 비어있거나 더 오래된 경우 우선
+      const projectId = getOrCreateWorkflowProjectId();
+      if (projectId) {
+        try {
+          const dbRow = await fetchWorkflowState(projectId);
+          if (cancelled) return;
+          if (dbRow?.exists && dbRow.workflowState) {
+            const ws = dbRow.workflowState;
+            // sessionStorage가 비어있으면 DB 사용 / 있으면 둘 다 활용
+            if (!s1 && ws.step1) s1 = ws.step1 as unknown as Step1Data;
+            if (!s2 && ws.step2) s2 = ws.step2 as unknown as Step2Data;
+            if (lastStep === 1 && ws.lastStep === 2) lastStep = 2;
+          }
+        } catch (e) {
+          console.warn("[workflow] DB restore fail", e);
+        }
+      }
+
+      // Step 3: design_outputs로 rendersByRoom 이미지 보강 (P9 핵심 FIX)
+      //   - workflow_state에 base64가 strip된 경우 / 다른 기기에서 가져온 경우 / 안 저장된 경우
+      //   - 이미 sessionStorage에 살아있는 이미지는 그대로 둠 (덮어쓰지 X)
+      if (projectId && s2) {
+        try {
+          const outputs = await fetchDesignOutputs(projectId);
+          if (cancelled) return;
+          if (outputs.length > 0) {
+            const next: Step2Data = { ...s2, rendersByRoom: { ...(s2.rendersByRoom || {}) } };
+            const ROOM_KEY_MAP: Record<string, string> = {
+              거실: "living",
+              안방: "master",
+              주방: "kitchen",
+              부엌: "kitchen",
+              "욕실1": "bath",
+              욕실: "bath",
+              "침실1": "bedroom",
+              침실: "bedroom",
+              현관: "entrance",
+              발코니: "balcony",
+              드레스룸: "dress",
+            };
+            for (const o of outputs) {
+              if (!o.imageUrl) continue;
+              // targetId 그대로 또는 한국어 이름 매핑으로 키 결정
+              const key = ROOM_KEY_MAP[o.targetName] || o.targetId || "living";
+              const existing = next.rendersByRoom[key] || [];
+              // 동일 URL이면 skip
+              if (existing.some((r) => r.url === o.imageUrl || r.refinedUrl === o.imageUrl))
+                continue;
+              // 깨진 base64 marker 제거
+              const cleaned = existing.filter(
+                (r) => !r.url?.startsWith("[base64") && !r.refinedUrl?.startsWith("[base64"),
+              );
+              cleaned.push({
+                url: o.imageUrl,
+                prompt: o.prompt || "",
+                costUsd: 0,
+                timestamp: o.createdAt || new Date().toISOString(),
+              });
+              next.rendersByRoom[key] = cleaned;
+              if (next.selectedByRoom[key] == null) {
+                next.selectedByRoom[key] = cleaned.length - 1;
+              }
+            }
+            s2 = next;
+            console.info(
+              `[workflow] design_outputs 보강 — ${outputs.length}개 이미지 → rendersByRoom`,
+            );
+          }
+        } catch (e) {
+          console.warn("[workflow] design_outputs 보강 실패 (non-fatal):", e);
+        }
+      }
+
+      // Step 4: state 적용 + sessionStorage 동기화
+      if (s1) setStep1(s1);
+      if (s2) setStep2(s2);
+      if (lastStep === 2) setStep(2);
+      try {
+        if (s1) sessionStorage.setItem("workflow_step1", JSON.stringify(s1));
+        if (s2) sessionStorage.setItem("workflow_step2", JSON.stringify(s2));
+        sessionStorage.setItem("workflow_step", String(lastStep));
+      } catch {
+        /* quota */
+      }
+      hydratedRef.current = true;
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // 변경 시 자동 저장
+  // 변경 시 자동 저장 — sessionStorage 즉시 + DB 디바운스 (P8)
+  const dbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydratedRef.current) return;
     try {
@@ -116,6 +223,18 @@ export default function WorkflowPage() {
     } catch {
       /* quota / private mode */
     }
+    // DB 디바운스 저장 (1.2초)
+    if (dbSaveTimer.current) clearTimeout(dbSaveTimer.current);
+    dbSaveTimer.current = setTimeout(() => {
+      const projectId = getOrCreateWorkflowProjectId();
+      if (!projectId) return;
+      void saveWorkflowState({
+        projectId,
+        step1: step1 as unknown as Record<string, unknown>,
+        step2: step2 as unknown as Record<string, unknown>,
+        lastStep: step,
+      });
+    }, 1200);
   }, [step1, step2, step]);
 
   const goNext = async () => {
@@ -182,14 +301,47 @@ export default function WorkflowPage() {
     }
   };
   const goPrev = () => setStep(1);
-  const goBranch = () => {
+  const goBranch = async () => {
     if (typeof window !== "undefined") {
       sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
       sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
     }
-    // branch 페이지 우회 — 사용자가 견적으로 직접 가는 흐름 원함
-    // (AR은 branch 페이지에서 따로 들어갈 수 있음)
-    router.push("/workflow/estimate");
+    // P2: estimate_contexts finalize 시도 — contextId 받으면 그 ID로 견적 페이지 이동.
+    //     실패해도 견적 페이지로는 무조건 이동 (sessionStorage 폴백 사용)
+    let contextIdQuery = "";
+    try {
+      const projectMode: "apartment" | "photo_only" | "commercial" =
+        step1.workflowEntry === "photo_residential"
+          ? "photo_only"
+          : step1.workflowEntry === "photo_commercial"
+            ? "commercial"
+            : "apartment";
+      const projectId = sessionStorage.getItem("workflow_project_id");
+      if (projectId) {
+        const res = await fetch("/api/inpick/estimate-context/finalize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            projectId,
+            projectMode,
+            step1Snapshot: step1,
+          }),
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { contextId?: string };
+          if (data.contextId) {
+            contextIdQuery = `?contextId=${encodeURIComponent(data.contextId)}`;
+          }
+        } else {
+          console.warn(
+            `[workflow] estimate-context finalize skipped (status ${res.status}) — using sessionStorage`,
+          );
+        }
+      }
+    } catch (err) {
+      console.warn("[workflow] estimate-context finalize error (non-fatal):", err);
+    }
+    router.push(`/workflow/estimate${contextIdQuery}`);
   };
 
   return (
@@ -359,6 +511,8 @@ export default function WorkflowPage() {
                         sessionStorage.removeItem("workflow_step1");
                         sessionStorage.removeItem("workflow_step2");
                         sessionStorage.removeItem("workflow_step");
+                        // P1: workflow projectId도 함께 초기화 (새 세션 시작)
+                        sessionStorage.removeItem("workflow_project_id");
                       } catch {
                         /* private mode */
                       }

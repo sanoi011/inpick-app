@@ -367,6 +367,15 @@ export async function POST(req: NextRequest) {
       jobId: result.jobId,
       credits_charged: charge?.charged ?? 0,
       credits_remaining: charge && charge.balance >= 0 ? charge.balance : undefined,
+      // P6-4: 도면 기반 생성 메타 — 사용자가 "도면 기반 생성됨" 배지 표시 가능
+      metadata: {
+        floorplanUsed: !!floorplanImageUrl,
+        floorplanImageUrl: floorplanImageUrl || undefined,
+        propertyId: body.propertyId,
+        renderSpecKind: renderRoomSpec ? "RenderRoomSpec_v1" : "text_only",
+        renderSpecConfidence: renderRoomSpec?.confidence,
+        roomName: body.roomName,
+      },
       // Launch-critical: render spec 요약 (UI 표시용)
       renderSpec: renderRoomSpec
         ? {

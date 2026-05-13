@@ -38,9 +38,9 @@ function getAdmin(): any {
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { contractId: string } },
+  { params }: { params: { id: string } },
 ) {
-  const contractId = params.contractId;
+  const contractId = params.id;
   if (!contractId) return NextResponse.json({ error: "contractId 필수" }, { status: 400 });
 
   const body = (await req.json().catch(() => ({}))) as { sourceBidEstimateDocumentId?: string };

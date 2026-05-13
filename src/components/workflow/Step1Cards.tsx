@@ -180,7 +180,9 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         ? !!value.storeUsage
         : false);
 
-  const allOk = basicDone && scopeOk;
+  // P6-2: 도면 정형화 진행 중이면 "내 공간 꾸미기" 버튼 비활성 — Step2에서 도면 기반 생성이 보장되도록
+  const normalizing = !!value.basicInfo.normalizing;
+  const allOk = basicDone && scopeOk && !normalizing;
   // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
   const missing: string[] = [];
   if (!inputDone) missing.push("주소·평형 또는 도면");
@@ -188,6 +190,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   if (!value.buildingType) missing.push("건물 유형");
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
+  if (normalizing) missing.push("도면 정리 완료 대기");
 
   // 3-mode entry card 선택 시 workflowEntry + buildingType 함께 세팅
   const selectMode = (entry: WorkflowEntry) => {
@@ -413,6 +416,10 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             <>
               내 공간 꾸미기
               <ChevronDown className="h-3.5 w-3.5 animate-bounce-down" />
+            </>
+          ) : normalizing ? (
+            <>
+              도면 정리 중… 잠시만 기다려주세요
             </>
           ) : (
             <>다음 단계 — 입력 필요: {missing.join(" · ")}</>

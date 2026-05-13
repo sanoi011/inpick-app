@@ -387,7 +387,9 @@ function AddressMode({ value, onChange }: Props) {
         console.warn("[floorplan-cache] failed:", e);
       }
 
-      // STEP 2: 평면도 정형화 (expansion 적용)
+      // STEP 2: 평면도 정형화 — P6-1 빠른 모드
+      //   skipImageClean=true → Vision(방/치수)만 받음, ~8-15초 (clean 포함 시 40초+)
+      //   클리닝(워터마크 제거+바닥 매핑)은 백그라운드로 fire-and-forget — 사용자는 즉시 Step2 진입 가능
       const aptName = value.selectedAddress?.buildingName || "";
       const address =
         value.selectedAddress?.roadAddress ||
@@ -402,7 +404,7 @@ function AddressMode({ value, onChange }: Props) {
           unitName: aptName,
           address,
           aptName,
-          skipImageClean: false,
+          skipImageClean: true, // P6-1: 빠른 응답 — vision 결과만 받고 즉시 진행 가능
           expansion: expansion === "extended",
         }),
       });
@@ -413,8 +415,9 @@ function AddressMode({ value, onChange }: Props) {
           selectedPyeong: p,
           expansionType: expansion,
           floorplanPropertyId: data.property_id,
-          cleanedImageUrl: data.cleanedImageUrl,
-          normalizedImageUrl: data.normalizedImageUrl,
+          // cleanedImageUrl이 없으면 원본 그대로 사용 (Step2에서도 동일 fallback)
+          cleanedImageUrl: data.cleanedImageUrl || stableUrl,
+          normalizedImageUrl: data.normalizedImageUrl || stableUrl,
           dimensionOverlaySvg: data.dimensionOverlaySvg,
           totalWidthMm: data.totalWidthMm,
           totalDepthMm: data.totalDepthMm,
@@ -424,6 +427,24 @@ function AddressMode({ value, onChange }: Props) {
           normalizedPyeong: data.pyeong,
           normalizing: false,
         });
+        // P6-1: 백그라운드 클리닝 (워터마크 제거 + 바닥 매핑) — 완료해도 사용자 진행 안 막음.
+        //       완료되면 normalized.png가 storage에 저장돼 다음 호출부터 즉시 활용됨.
+        if (!data.cleanedImageUrl) {
+          void fetch("/api/inpick/normalize-floorplan", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: stableUrl,
+              exclusiveAreaM2: p.exclusiveArea,
+              unitName: aptName,
+              address,
+              aptName,
+              skipImageClean: false,
+              expansion: expansion === "extended",
+              propertyId: data.property_id, // 같은 propertyId로 호출 → storage normalized.png 갱신
+            }),
+          }).catch((e) => console.warn("[floorplan-clean] background failed (non-fatal):", e));
+        }
       } else {
         onChange({ ...value, selectedPyeong: p, expansionType: expansion, normalizing: false });
       }

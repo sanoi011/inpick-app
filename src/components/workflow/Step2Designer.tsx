@@ -35,6 +35,9 @@ import MaterialEditor from "./MaterialEditor";
 import VisionMaterialPicker from "./VisionMaterialPicker";
 import type { VisionMaterialAnalyzeRequest } from "@/lib/vision-materials/types";
 import type { SegmentationData } from "@/types/segmentation";
+// P1: 이미지 생성 결과를 견적 evidence로 DB 저장 — workflow blocking 제거 핵심
+import { saveDesignOutputAfterRender } from "@/lib/inpick/estimate-context/client";
+import type { ProjectMode } from "@/lib/inpick/estimate-context/types";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
@@ -168,6 +171,15 @@ export interface RenderItem {
   segmentation?: SegmentationData;
   refinedUrl?: string;
   refinedAt?: string;
+  /** P6-4: 도면 기반 생성 메타 (render-room 응답에서 채워짐) */
+  metadata?: {
+    floorplanUsed?: boolean;
+    floorplanImageUrl?: string;
+    propertyId?: string;
+    renderSpecKind?: "RenderRoomSpec_v1" | "text_only";
+    renderSpecConfidence?: number;
+    roomName?: string;
+  };
 }
 
 export interface ChatImageAttachment {
@@ -231,6 +243,14 @@ export default function Step2Designer({
   // 가이드: Step2 방 목록에서 베란다/드레스룸 제외 (이미지 생성 X). 단 견적 면적엔 포함.
   // 이유: 베란다/드레스룸은 일반적으로 Step2 인테리어 디자인 생성 대상이 아님.
   const RENDER_EXCLUDED = ["balcony", "dress"];
+
+  // P1: workflowEntry → projectMode 매핑 (design_outputs evidence 저장용)
+  const currentProjectMode: ProjectMode =
+    workflowEntry === "photo_residential"
+      ? "photo_only"
+      : workflowEntry === "photo_commercial"
+        ? "commercial"
+        : "apartment";
 
   // 사용자가 추가한 custom 실 (모드 무관, 모든 모드에서 +/- 가능)
   const [customTabs, setCustomTabs] = useState<Array<{ v: string; label: string; dimKey: string; icon: typeof Home }>>([]);
@@ -762,6 +782,18 @@ export default function Step2Designer({
         },
       });
       setProgress(100);
+      // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
+      const targetTab = ROOM_TABS.find((t) => t.v === targetKey);
+      void saveDesignOutputAfterRender({
+        projectMode: currentProjectMode,
+        targetType: currentProjectMode === "commercial" ? "zone" : "whole",
+        targetId: targetKey,
+        targetName: targetTab?.label || targetKey,
+        renderKind:
+          currentProjectMode === "commercial" ? "zone_render" : "full_render",
+        imageUrl: data.imageUrl,
+        prompt: data.prompt || stylePrompt,
+      });
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -783,21 +815,29 @@ export default function Step2Designer({
       if (!res.ok || !data.image_prompt) {
         throw new Error(data.error || "상담 내용 정리 실패");
       }
-      // 모드 분기 — workflowEntry 우선, 폴백으로 floorplan 유무
+      // 모드 분기 — workflowEntry 명시적으로만 결정 (MD §3 silent fallback 금지)
       // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasFloorplan =
         !!basicInfo.floorplanPropertyId ||
         !!basicInfo.normalizedImageUrl ||
         !!basicInfo.uploadedFloorplan?.dataUrl;
-      const isPhotoMode =
-        workflowEntry === "photo_residential" ||
-        workflowEntry === "photo_commercial" ||
-        !hasFloorplan;
-      if (isPhotoMode) {
+      const explicitPhotoMode =
+        workflowEntry === "photo_residential" || workflowEntry === "photo_commercial";
+
+      if (explicitPhotoMode) {
         await handlePhotoStyleGenerate(data.image_prompt);
         return;
       }
-      // 아파트 도면 모드만 기존 방별 일괄 생성
+      // P6-3: 아파트 모드인데 도면 없으면 photo로 silent fallback 금지 — 명확한 오류
+      if (!hasFloorplan) {
+        setErrorMsg(
+          "아파트 도면 기반 생성에는 평면도가 필요합니다.\n" +
+            "Step1로 돌아가 주소·평형을 다시 선택하거나 도면을 업로드해주세요.\n" +
+            "(도면 없이 진행하려면 워크플로 처음으로 가서 '내 집 (사진 모드)'를 선택하세요)",
+        );
+        return;
+      }
+      // 아파트 도면 모드 — 방별 일괄 생성
       await handleBulkGenerate(data.image_prompt);
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
@@ -888,7 +928,20 @@ export default function Step2Designer({
         revisedPrompt: result.revisedPrompt,
         costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
+        // P6-4: render-room이 채워준 도면 기반 메타 그대로 RenderItem에 저장
+        metadata: result.metadata,
       };
+      // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
+      void saveDesignOutputAfterRender({
+        projectMode: currentProjectMode,
+        targetType: currentProjectMode === "commercial" ? "zone" : "room",
+        targetId: activeRoom,
+        targetName: tab.label,
+        renderKind:
+          currentProjectMode === "commercial" ? "zone_render" : "room_render",
+        imageUrl: result.imageUrl,
+        prompt: result.revisedPrompt || currentPrompt,
+      });
       // Launch-critical: renderSpec 응답 저장
       if (result.renderSpec) {
         setRenderSpecByRoom((prev) => ({
@@ -1001,7 +1054,20 @@ export default function Step2Designer({
                 revisedPrompt: result.revisedPrompt,
                 costUsd: result.costUsd ?? 0.01,            // low quality 기본 $0.01
                 timestamp: new Date().toISOString(),
+                // P6-4: 도면 기반 생성 메타 패스스루
+                metadata: result.metadata,
               } as RenderItem,
+            });
+            // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
+            void saveDesignOutputAfterRender({
+              projectMode: currentProjectMode,
+              targetType: currentProjectMode === "commercial" ? "zone" : "room",
+              targetId: tab.v,
+              targetName: tab.label,
+              renderKind:
+                currentProjectMode === "commercial" ? "zone_render" : "room_render",
+              imageUrl: result.imageUrl,
+              prompt: result.revisedPrompt || conceptPrompt,
             });
           }
         } catch (e) {
@@ -1282,7 +1348,11 @@ export default function Step2Designer({
           <a
             href="/workflow/estimate"
             onClick={(e) => {
-              // sessionStorage에 step1/step2 저장 후 navigation 진행
+              // P2: contextId 기반 라우팅을 위해 동기 네비게이션 차단.
+              //     onComplete (goBranch)가 async finalize 후 router.push로 contextId 포함하여 이동.
+              //     finalize 실패 시에도 goBranch가 안전한 fallback URL로 push 처리함.
+              e.preventDefault();
+              // sessionStorage에 step1/step2 저장 후 onComplete 호출
               try {
                 sessionStorage.setItem("workflow_step1", JSON.stringify({
                   basicInfo,
@@ -1295,10 +1365,7 @@ export default function Step2Designer({
               } catch {
                 /* private mode */
               }
-              // onComplete (workflow page의 goBranch)도 호출 — sessionStorage 갱신 + router.push 백업
-              onComplete();
-              // a href 자체로도 navigation 발생 — JS 실패해도 보장
-              if (e.defaultPrevented) return;
+              void onComplete();
             }}
             className={`relative z-10 mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-bold shadow-cta transition-all cursor-pointer ${
               allRoomsDecided
@@ -1932,6 +1999,30 @@ export default function Step2Designer({
                     ✓ 고화질 재렌더
                   </div>
                 )}
+                {/* P6-4: 도면 기반 생성됨 배지 — 사용자가 신뢰도 확인 가능 */}
+                {activeRender.metadata?.floorplanUsed && (
+                  <div
+                    className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1 text-[0.7rem] font-bold text-white shadow"
+                    title={`도면 기반 생성 (${activeRender.metadata.renderSpecKind ?? "spec"}${
+                      activeRender.metadata.renderSpecConfidence
+                        ? ` · 신뢰도 ${Math.round(activeRender.metadata.renderSpecConfidence * 100)}%`
+                        : ""
+                    })`}
+                  >
+                    🏗️ 도면 기반
+                    {activeRender.metadata.renderSpecConfidence && (
+                      <span className="ml-0.5 opacity-80">
+                        · {Math.round(activeRender.metadata.renderSpecConfidence * 100)}%
+                      </span>
+                    )}
+                  </div>
+                )}
+                {activeRender.metadata?.renderSpecKind === "text_only" &&
+                  !activeRender.metadata?.floorplanUsed && (
+                    <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
+                      ⚠️ 도면 없이 생성됨
+                    </div>
+                  )}
               </motion.div>
             )}
           </AnimatePresence>
@@ -1983,10 +2074,10 @@ export default function Step2Designer({
                 className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                AI 자재 분석 (Top-3 후보)
+                자재 정밀 분석 다시 실행
               </button>
               <span className="text-[0.65rem] text-primary-900/60">
-                이미지에서 자재를 자동 매칭하여 실제 브랜드/SKU/스펙 후보를 표시
+                이미지 생성 시 자동 분석이 진행됩니다. 결과를 다시 보거나 특정 부위를 재분석할 때 사용하세요.
               </span>
             </div>
             <MaterialEditor

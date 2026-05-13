@@ -24,6 +24,16 @@ import type {
   EstimateLineMaterialMeta,
   SurfaceType,
 } from "@/lib/vision-materials/types";
+// P2: contextId 기반 견적 합성 (design_outputs + materialEvidence + userEdits)
+import { buildEstimateFromContext } from "@/lib/inpick/estimate-context/build-estimate-from-context";
+// P5: legacy 경로에서도 design_outputs DB의 materialHints를 자동 활용
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient } from "@/lib/supabase/server";
+import type { MaterialHint } from "@/lib/inpick/estimate-context/types";
+// P7: estimate-v2 공종별 실행내역서 엔진
+import { buildConstructionEstimate } from "@/lib/inpick/estimate-v2/build-construction-estimate";
+import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
+import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -189,6 +199,296 @@ function visionAnalysisToSurfaces(
   return out;
 }
 
+/**
+ * P0 폴백: Step1에서 방을 선택 안 한 경우 평수 기반 표준 방 셋 생성.
+ * - 평수 < 15평: 거실 + 안방 + 욕실 + 주방 (소형)
+ * - 15~25평: 거실 + 안방 + 침실1 + 주방 + 욕실 (중형)
+ * - 25평 이상: 거실 + 안방 + 침실1 + 침실2 + 주방 + 욕실 + 현관 (대형)
+ *
+ * 면적은 areaM2 / pyung 입력에서 추출 (없으면 30평 기본).
+ */
+function buildFallbackRoomsFromArea(body: Record<string, unknown>): Array<{
+  roomName: string;
+  dim: { name?: string; widthMm: number; depthMm: number; heightMm?: number };
+  renderImageUrl?: string;
+  surfaces?: MaterialItem[];
+}> | null {
+  const areaM2 = Number(body.areaM2 ?? body.totalAreaM2 ?? 0);
+  const pyungFromInput = Number(body.pyung ?? 0);
+  const pyung = pyungFromInput > 0 ? pyungFromInput : areaM2 > 0 ? areaM2 / PYEONG_TO_M2 : 30;
+
+  // 기본 방 (거실 단일) — 평수 정보가 전혀 없을 때
+  const baseRooms: Array<{ roomName: string; widthMm: number; depthMm: number }> = [];
+  if (pyung < 15) {
+    baseRooms.push({ roomName: "거실", widthMm: 3500, depthMm: 4200 });
+    baseRooms.push({ roomName: "안방", widthMm: 3000, depthMm: 3500 });
+    baseRooms.push({ roomName: "주방", widthMm: 2400, depthMm: 3000 });
+    baseRooms.push({ roomName: "욕실1", widthMm: 1600, depthMm: 2100 });
+  } else if (pyung < 25) {
+    baseRooms.push({ roomName: "거실", widthMm: 4200, depthMm: 5000 });
+    baseRooms.push({ roomName: "안방", widthMm: 3300, depthMm: 4000 });
+    baseRooms.push({ roomName: "침실1", widthMm: 2800, depthMm: 3300 });
+    baseRooms.push({ roomName: "주방", widthMm: 2700, depthMm: 3500 });
+    baseRooms.push({ roomName: "욕실1", widthMm: 1800, depthMm: 2200 });
+  } else {
+    baseRooms.push({ roomName: "거실", widthMm: 4800, depthMm: 5800 });
+    baseRooms.push({ roomName: "안방", widthMm: 3600, depthMm: 4200 });
+    baseRooms.push({ roomName: "침실1", widthMm: 3000, depthMm: 3500 });
+    baseRooms.push({ roomName: "침실2", widthMm: 2800, depthMm: 3300 });
+    baseRooms.push({ roomName: "주방", widthMm: 3000, depthMm: 3800 });
+    baseRooms.push({ roomName: "욕실1", widthMm: 1800, depthMm: 2400 });
+    baseRooms.push({ roomName: "현관", widthMm: 1500, depthMm: 1800 });
+  }
+
+  return baseRooms.map((r) => ({
+    roomName: r.roomName,
+    dim: { name: r.roomName, widthMm: r.widthMm, depthMm: r.depthMm, heightMm: 2400 },
+  }));
+}
+
+/**
+ * P7: contextId → estimate_contexts 조회 → SurfacePlan[] → ConstructionEstimate (17공종).
+ *
+ * 응답에 v2 견적과 legacy-호환 estimates/grandTotal을 함께 담아 UI 점진 마이그레이션 가능.
+ * context 미존재 또는 service 미설정 시 null 반환.
+ */
+async function buildConstructionEstimateFromContextId(
+  contextId: string,
+): Promise<Record<string, unknown> | null> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn("[build-estimate-v2] service not configured");
+    return null;
+  }
+  const admin = createServiceClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  const { data, error } = await admin
+    .from("estimate_contexts")
+    .select("*")
+    .eq("id", contextId)
+    .single();
+  if (error || !data) {
+    console.warn("[build-estimate-v2] context not found:", error?.message);
+    return null;
+  }
+  // step1_snapshot에서 방 면적 추출
+  const step1 = (data.step1_snapshot ?? {}) as {
+    basicInfo?: { selectedPyeong?: { exclusiveArea?: number } };
+    normalizedFloorplan?: { rooms?: Array<{ name: string; widthMm?: number; depthMm?: number }> };
+  };
+  const roomAreasByName: Record<string, number> = {};
+  // normalizedFloorplan의 방 면적 (mm → m²) 사용
+  for (const r of step1.normalizedFloorplan?.rooms ?? []) {
+    if (r.widthMm && r.depthMm) {
+      roomAreasByName[r.name] = (r.widthMm * r.depthMm) / 1_000_000;
+    }
+  }
+  // 전체 평수도 옵션
+  const totalAreaM2 = step1.basicInfo?.selectedPyeong?.exclusiveArea;
+  if (totalAreaM2 && Object.keys(roomAreasByName).length === 0) {
+    roomAreasByName["전체"] = totalAreaM2;
+  }
+
+  const { surfacePlans, quantityBasisByRoom } = buildSurfacePlansFromContext({
+    projectId: String(data.project_id),
+    projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
+    designOutputs: Array.isArray(data.design_outputs_snapshot)
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (data.design_outputs_snapshot as any[])
+      : [],
+    userMaterialEdits: Array.isArray(data.user_material_edits_snapshot)
+      ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (data.user_material_edits_snapshot as any[])
+      : [],
+    roomAreasByName,
+  });
+
+  const constructionEstimate: ConstructionEstimate = buildConstructionEstimate({
+    projectId: String(data.project_id),
+    projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
+    surfacePlans,
+    quantityBasisByRoom,
+  });
+
+  // legacy 호환 — 기존 견적 페이지가 사용하는 estimates[]/grandTotal 형태로도 제공
+  const legacyEstimates = convertV2ToLegacyEstimates(constructionEstimate);
+
+  return {
+    estimateVersion: "construction_trade_v2",
+    constructionEstimate,
+    // legacy compat fields
+    estimates: legacyEstimates,
+    grandTotal: {
+      mainTotal: constructionEstimate.totals.directMaterial,
+      auxTotal: 0,
+      laborTotal: constructionEstimate.totals.directLabor,
+      totalWon: constructionEstimate.totals.totalWithVat,
+    },
+    quotationType: "construction_trade_estimate",
+    warnings: constructionEstimate.warnings,
+    matchMetaByRoom: {},
+  };
+}
+
+/** ConstructionEstimate를 legacy EstimateRoom[] 형태로 변환 (점진 마이그레이션 호환) */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function convertV2ToLegacyEstimates(est: ConstructionEstimate): any[] {
+  // roomName으로 그룹화하여 EstimateRoom[]-like
+  const byRoom = new Map<string, ConstructionEstimate["lines"]>();
+  for (const l of est.lines) {
+    if (!byRoom.has(l.roomName)) byRoom.set(l.roomName, []);
+    byRoom.get(l.roomName)!.push(l);
+  }
+  return Array.from(byRoom.entries()).map(([roomName, lines]) => {
+    const mainTotalWon = lines.reduce((s, l) => s + l.materialAmount, 0);
+    const laborTotalWon = lines.reduce((s, l) => s + l.laborAmount, 0);
+    const auxTotalWon = lines.reduce((s, l) => s + l.expenseAmount, 0);
+    return {
+      roomName,
+      totalAreaM2: 0,
+      items: lines.map((l) => ({
+        surface: l.surfaceType || l.tradeNameKo,
+        materialName: `[${l.tradeNameKo}/${l.subTradeNameKo}] ${l.itemNameKo}`,
+        brand: l.brand,
+        spec: l.spec,
+        sku: l.sku,
+        quantity: l.quantity,
+        unit: l.unit === "m2" ? "m²" : l.unit,
+        unitPriceWon: l.materialUnitPrice + l.laborUnitPrice + l.expenseUnitPrice,
+        subtotalWon: l.totalAmount,
+        category: l.materialAmount > 0 ? "main" : l.laborAmount > 0 ? "labor" : "aux",
+      })),
+      mainTotalWon,
+      auxTotalWon,
+      laborTotalWon,
+      totalWon: mainTotalWon + laborTotalWon + auxTotalWon,
+    };
+  });
+}
+
+/**
+ * P5: design_outputs DB의 material_hints를 fetch해서 visionAnalysisByRoom-like 구조로 변환.
+ *
+ * - body에 visionAnalysisByRoom이 있으면 body 우선 (사용자가 명시적으로 보낸 값)
+ * - design_outputs는 보충용 (body에 없는 roomName만 추가)
+ * - 인증 실패/projectId 없음 → body 그대로 반환 (에러 throw 안 함)
+ */
+async function mergeWithDesignOutputs(
+  fromBody: Record<string, AnalyzedSurface[]> | undefined,
+  projectId: string | undefined,
+): Promise<Record<string, AnalyzedSurface[]> | undefined> {
+  if (!projectId) return fromBody;
+  try {
+    const supabase = createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return fromBody;
+
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return fromBody;
+    const admin = createServiceClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const { data, error } = await admin
+      .from("design_outputs")
+      .select("target_name, material_hints, status")
+      .eq("project_id", projectId)
+      .eq("user_id", user.id);
+    if (error || !data) return fromBody;
+
+    const merged: Record<string, AnalyzedSurface[]> = { ...(fromBody ?? {}) };
+    for (const row of data) {
+      const name = String(row.target_name);
+      if (merged[name]) continue; // body 우선
+      const hints = Array.isArray(row.material_hints)
+        ? (row.material_hints as MaterialHint[])
+        : [];
+      const surfaces = materialHintsToAnalyzedSurfaces(hints, name);
+      if (surfaces.length > 0) merged[name] = surfaces;
+    }
+    return Object.keys(merged).length > 0 ? merged : fromBody;
+  } catch (err) {
+    console.warn("[build-estimate] mergeWithDesignOutputs failed (non-fatal):", err);
+    return fromBody;
+  }
+}
+
+/**
+ * MaterialHint[] → AnalyzedSurface[] 변환.
+ * vision 분석 미완료 (prompt_extract / scope_default)인 경우에도 1차 evidence로 활용.
+ */
+function materialHintsToAnalyzedSurfaces(
+  hints: MaterialHint[],
+  targetName: string,
+): AnalyzedSurface[] {
+  const out: AnalyzedSurface[] = [];
+  for (const h of hints) {
+    const status =
+      h.source === "user_selected"
+        ? "confirmed"
+        : h.source === "vision_analysis"
+          ? h.confidence >= 0.7
+            ? "confirmed"
+            : "recommended"
+          : "recommended";
+    const surfaceType: SurfaceType = mapHintSurfaceToVisionType(h.surfaceType);
+    out.push({
+      observation: {
+        id: `hint-${targetName}-${h.surfaceType}`,
+        surfaceType,
+        bbox: { x: 0, y: 0, width: 0, height: 0 },
+        coarseLabels: [],
+        confidence: h.confidence,
+        // 최소 필드만 채움 — vision-materials 분석 후엔 더 풍부함
+      } as AnalyzedSurface["observation"],
+      candidates: [
+        {
+          materialProductId: h.sku ?? `prompt-${h.materialCategory}`,
+          brand: h.brand,
+          productName: h.materialNameKo ?? h.materialCategory,
+          sku: h.sku,
+          spec: undefined,
+          unit: "m²",
+          unitPrice: 0,
+          confidence: h.confidence,
+        } as AnalyzedSurface["candidates"][number],
+      ],
+      recommendation: {
+        status: status as AnalyzedSurface["recommendation"]["status"],
+        confidence: h.confidence,
+      } as AnalyzedSurface["recommendation"],
+    });
+  }
+  return out;
+}
+
+function mapHintSurfaceToVisionType(s: MaterialHint["surfaceType"]): SurfaceType {
+  switch (s) {
+    case "floor":
+      return "floor";
+    case "wall":
+      return "wall";
+    case "ceiling":
+      return "ceiling";
+    case "door":
+      return "door";
+    case "window":
+      return "window";
+    case "counter":
+      return "countertop";
+    case "lighting":
+      return "lighting";
+    case "built_in_furniture":
+      return "cabinet";
+    default:
+      return "unknown";
+  }
+}
+
 function surfaceTypeToKorean(t: SurfaceType): string {
   const m: Record<SurfaceType, string> = {
     floor: "바닥",
@@ -211,6 +511,23 @@ function surfaceTypeToKorean(t: SurfaceType): string {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // P2: contextId가 있으면 estimate_contexts에서 evidence 스냅샷을 읽어 견적 생성.
+    //   - design_outputs.material_hints 기반 surfaces 합성
+    //   - 사용자 자재 선택 / vision 분석 결과를 우선 반영
+    //   - rooms/zones 입력은 무시하고 context를 truth로 사용
+    // P7: estimateVersion="construction_trade_v2" 명시 또는 기본 v2 사용 시 17공종 엔진 실행
+    if (typeof body.contextId === "string" && body.contextId.length > 0) {
+      const useV2 = body.estimateVersion !== "legacy_surface";
+      if (useV2) {
+        const v2Result = await buildConstructionEstimateFromContextId(body.contextId);
+        if (v2Result) return NextResponse.json(v2Result);
+      }
+      const ctxResult = await buildEstimateFromContext(body.contextId);
+      if (ctxResult) return NextResponse.json(ctxResult);
+      // context 조회 실패 → 기존 분기로 폴백 (워크플로 막지 않음)
+    }
+
     // ─── projectMode 분기 (MD §10) ────────────────────────────
     if (body.projectMode === "photo_only") {
       return buildPhotoOnlyEstimate(body);
@@ -233,7 +550,7 @@ export async function POST(req: NextRequest) {
       return buildCommercialEstimate(body);
     }
 
-    const { rooms, visionAnalysisByRoom } = body as {
+    const { rooms, visionAnalysisByRoom: visionAnalysisByRoomFromBody } = body as {
       rooms: Array<{
         roomName: string;
         // RoomDim — 호출자가 전달하는 dim (estimate.ts 타입)
@@ -244,18 +561,35 @@ export async function POST(req: NextRequest) {
       /** Phase 6 후속: vision-materials 분석 결과 (선택) — roomName → AnalyzedSurface[] */
       visionAnalysisByRoom?: Record<string, AnalyzedSurface[]>;
     };
-    if (!Array.isArray(rooms) || rooms.length === 0) {
-      return NextResponse.json({ error: "rooms 배열 필수" }, { status: 400 });
+    // P0: rooms 비어있으면 차단하지 않음 — 평수 기반 표준 방 셋으로 폴백
+    //  (한 방이라도 이미지가 있거나 사용자 자재 선택이 있으면 그것만 계상)
+    const fallbackRoomsFromArea = !Array.isArray(rooms) || rooms.length === 0
+      ? buildFallbackRoomsFromArea(body)
+      : null;
+    const effectiveRooms = fallbackRoomsFromArea ?? rooms;
+    const blockingWarnings: string[] = [];
+    if (fallbackRoomsFromArea) {
+      blockingWarnings.push(
+        "Step1에서 방을 선택하지 않아 평수 기반 표준 방 셋(거실/주방/안방/욕실)으로 산출했습니다.",
+      );
     }
     // 정책 변경: OpenAI 키 없어도 표준 자재로 견적 생성 가능 (vision 자재 추출만 실패)
     const visionAvailable = hasOpenAIKey();
+
+    // P5: design_outputs DB에서 materialHints를 가져와 visionAnalysisByRoom으로 자동 보강.
+    //   - contextId 경로가 실패해도, 인증 OK + projectId 있으면 evidence 그대로 활용
+    //   - body의 visionAnalysisByRoom과 병합 (body 우선)
+    const visionAnalysisByRoom = await mergeWithDesignOutputs(
+      visionAnalysisByRoomFromBody,
+      body.projectId as string | undefined,
+    );
 
     const estimates: RoomEstimate[] = [];
     const fallbackRooms: Array<{ roomName: string; reason: string }> = [];
     const errors: Array<{ roomName: string; error: string }> = [];
     const matchMetaByRoom: Record<string, EstimateLineMaterialMeta[]> = {};
 
-    for (const r of rooms) {
+    for (const r of effectiveRooms) {
       let surfaces: MaterialItem[] = r.surfaces || [];
       const usedSources: string[] = [];
 
@@ -369,6 +703,8 @@ export async function POST(req: NextRequest) {
       fallbackRooms,            // 표준 자재 적용된 방 (사용자 안내용)
       skippedRooms: [],         // 호환 — 더 이상 skip 안 함
       errors,
+      warnings: blockingWarnings,
+      quotationType: blockingWarnings.length > 0 ? "rough_estimate" : "design_based_estimate",
       // Phase 6 후속 — vision-materials 메타 (UI에서 [확정]/[추천]/[기본] 표시)
       matchMetaByRoom,
     });
@@ -394,14 +730,16 @@ const PYEONG_TO_M2 = 3.305785;
 
 function buildPhotoOnlyEstimate(body: Record<string, unknown>) {
   const areaM2 = Number(body.areaM2 ?? body.totalAreaM2 ?? 0);
-  const pyung = Number(body.pyung ?? (areaM2 ? areaM2 / PYEONG_TO_M2 : 0));
+  let pyung = Number(body.pyung ?? (areaM2 ? areaM2 / PYEONG_TO_M2 : 0));
   const tier: "basic" | "standard" | "premium" =
     (body.budgetTier as "basic" | "standard" | "premium") ?? "standard";
 
+  // P0: 면적 누락 시 차단하지 않고 기본 24평으로 폴백 + 경고 안내
+  const warnings: string[] = [];
   if (!pyung || pyung <= 0) {
-    return NextResponse.json(
-      { error: "missing_area", hint: "areaM2 또는 pyung이 필요합니다." },
-      { status: 400 },
+    pyung = 24;
+    warnings.push(
+      "면적 정보가 없어 기본 24평(약 79.3㎡)으로 가견적을 산출했습니다. 정확한 견적은 면적을 입력해주세요.",
     );
   }
   const unitPricePerPyeong = PHOTO_ONLY_UNIT_PRICE_BY_GRADE_PER_PYEONG[tier];
@@ -426,6 +764,7 @@ function buildPhotoOnlyEstimate(body: Record<string, unknown>) {
       vatWon: vat,
     },
     grandTotalWon,
+    warnings,
     disclaimerKo:
       "사진 기반 가견적입니다. 정확한 견적은 현장 실측, 철거 범위, 설비 상태, 선택 자재에 따라 달라질 수 있습니다.",
   });
@@ -608,8 +947,9 @@ const SYSTEM_SURCHARGE_WON: Record<string, number> = {
 
 function buildCommercialEstimate(body: Record<string, unknown>) {
   const businessType = (body.businessType as CommercialBusinessKey) || "other_commercial";
-  const tier = ((body.budgetTier as "basic" | "standard" | "premium") ?? "standard");
-  const zones = (body.zones as Array<{
+  const tier: "basic" | "standard" | "premium" =
+    (body.budgetTier as "basic" | "standard" | "premium") ?? "standard";
+  let zones = (body.zones as Array<{
     id?: string;
     nameKo?: string;
     type?: CommercialZoneKey;
@@ -617,15 +957,25 @@ function buildCommercialEstimate(body: Record<string, unknown>) {
     requiredSystems?: string[];
   }>) || [];
   const requiredSystems = (body.requiredSystems as string[]) || [];
+  const inputTotalAreaM2 = Number(body.totalAreaM2 ?? body.areaM2 ?? 0);
 
+  // P0: zones 누락 시 차단하지 않고 업종 기본 zone 셋 + 면적 추정으로 폴백
+  const warnings: string[] = [];
   if (zones.length === 0) {
-    return NextResponse.json(
-      { error: "missing_zones", hint: "zones 배열이 비어있습니다." },
-      { status: 400 },
+    const fallbackTotalAreaM2 = inputTotalAreaM2 > 0 ? inputTotalAreaM2 : 100;
+    const zoneTypes: CommercialZoneKey[] = ["main_hall", "counter", "kitchen", "restroom"];
+    zones = zoneTypes.map((t) => ({
+      id: t,
+      nameKo: t,
+      type: t,
+      areaM2: fallbackTotalAreaM2 / zoneTypes.length,
+    }));
+    warnings.push(
+      `zone 정보가 없어 업종 기본 zone 셋(${zoneTypes.join("/")})으로 가견적을 산출했습니다. 정확한 견적은 zone을 구성해주세요.`,
     );
   }
 
-  const tierMultiplier = { basic: 0.8, standard: 1.0, premium: 1.4 }[tier];
+  const tierMultiplier = { basic: 0.8, standard: 1.0, premium: 1.4 }[tier] || 1.0;
   const businessPrices = COMMERCIAL_UNIT_PRICE_PER_PYEONG[businessType] || {};
 
   const zoneEstimates = zones.map((z) => {
@@ -678,6 +1028,7 @@ function buildCommercialEstimate(body: Record<string, unknown>) {
       vatWon: vat,
     },
     grandTotalWon,
+    warnings,
     disclaimerKo:
       "상가/사무실 가견적입니다. 정확한 견적은 업종별 설비 사양, 소방·환기·전기 증설 범위, 자재 등급에 따라 달라질 수 있어 현장 실측이 필요합니다.",
   });
