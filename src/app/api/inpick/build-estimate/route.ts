@@ -31,7 +31,11 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { MaterialHint } from "@/lib/inpick/estimate-context/types";
 // P7: estimate-v2 공종별 실행내역서 엔진
-import { buildConstructionEstimate } from "@/lib/inpick/estimate-v2/build-construction-estimate";
+// P12: async 버전 — DB product/price resolver 호출하여 line에 brand/sku/source 채움
+import {
+  buildConstructionEstimate,
+  buildConstructionEstimateWithProductResolution,
+} from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 
@@ -305,12 +309,14 @@ async function buildConstructionEstimateFromContextId(
     roomAreasByName,
   });
 
-  const constructionEstimate: ConstructionEstimate = buildConstructionEstimate({
-    projectId: String(data.project_id),
-    projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
-    surfacePlans,
-    quantityBasisByRoom,
-  });
+  // P12: server-side에서 DB product/price resolver 호출 → line에 brand/sku/manufacturer/source 채움
+  const constructionEstimate: ConstructionEstimate =
+    await buildConstructionEstimateWithProductResolution({
+      projectId: String(data.project_id),
+      projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
+      surfacePlans,
+      quantityBasisByRoom,
+    });
 
   // legacy 호환 — 기존 견적 페이지가 사용하는 estimates[]/grandTotal 형태로도 제공
   const legacyEstimates = convertV2ToLegacyEstimates(constructionEstimate);

@@ -197,6 +197,58 @@ export interface RoomQuantityBasis {
   assumptions: string[];
 }
 
+// ─── P12 product/price resolution 타입 ──────────────────────
+
+export type ProductMatchStatus =
+  | "confirmed"
+  | "recommended"
+  | "category_default"
+  | "standard_fallback";
+
+export type MaterialPriceSource =
+  | "material_price_lookup"
+  | "material_price_observations"
+  | "contractor_price"
+  | "catalog_price"
+  | "category_standard"
+  | "kpa_standard"
+  | "manual_override";
+
+export interface ResolvedMaterialProduct {
+  materialProductId?: string;
+  brand?: string;
+  manufacturer?: string;
+  supplierName?: string;
+  vendorName?: string;
+  productName: string;
+  sku?: string;
+  modelNo?: string;
+  spec?: string;
+  unit?: string;
+  categoryCode?: string;
+  categoryName?: string;
+  matchStatus: ProductMatchStatus;
+  matchConfidence: number;
+  fallbackReason?: string;
+  raw?: unknown;
+}
+
+export interface ResolvedMaterialPrice {
+  unitPrice: number;
+  currency: "KRW";
+  priceSource: MaterialPriceSource;
+  priceSourceId?: string;
+  appliedAt?: string;
+  confidence: number;
+  fallbackReason?: string;
+  raw?: unknown;
+}
+
+export interface ProductResolvedLineMeta {
+  product?: ResolvedMaterialProduct;
+  price?: ResolvedMaterialPrice;
+}
+
 // ─── 출력: ConstructionEstimateLine ─────────────────────────
 
 export interface ConstructionEstimateLine {
@@ -218,6 +270,25 @@ export interface ConstructionEstimateLine {
   brand?: string;
   sku?: string;
   spec?: string;
+
+  // P12: product/price meta — DB resolver가 채움
+  materialProductId?: string;
+  manufacturer?: string;
+  supplierName?: string;
+  vendorName?: string;
+  productName?: string;
+  modelNo?: string;
+  productSpec?: string;
+  productUnit?: string;
+  materialCategoryCode?: string;
+  materialCategoryName?: string;
+  materialPriceSource?: MaterialPriceSource;
+  materialPriceSourceId?: string;
+  materialPriceAppliedAt?: string;
+  productMatchStatus?: ProductMatchStatus;
+  productMatchConfidence?: number;
+  priceConfidence?: number;
+  fallbackReason?: string;
 
   unit: EstimateUnit;
   quantityFormulaKo: string;

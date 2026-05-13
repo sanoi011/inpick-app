@@ -398,9 +398,18 @@ export const BATHROOM_FULL_REMODEL_RULE: WorkPackageRule = {
   ],
 };
 
-/** 5. 주방 패키지 — 5 lines */
+/**
+ * 5. 주방 패키지 — P12-4: set 1 고정 단일 라인 → 12개 세부 라인으로 분해.
+ *
+ * 가이드: inpick-estimate-v2-product-price-pdf-fix-plan-20260513.md §7-3
+ * 8,900,000 set 1 고정값은 폐기. m/ea/m² 단위로 정밀 산출.
+ *
+ * 주방 카운터 길이 추정 (kitchen-plan-builder.ts):
+ *   <5㎡: 2.4m / 5-8㎡: 3.0m / 8-12㎡: 3.6m / ≥12㎡: 4.2m
+ * 도면 치수가 있으면 그것을 우선.
+ */
 export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
-  id: "kitchen_standard_remodel",
+  id: "kitchen_detailed_remodel",
   match: {
     roomTypes: ["kitchen"],
     surfaceTypes: ["counter", "cabinet", "sink", "wall", "lighting"],
@@ -414,25 +423,28 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
     actions: ["replace", "demolish_and_new", "new_install"],
   },
   outputLines: [
+    // 02-20 철거
     {
       tradeCode: "02",
       tradeNameKo: "철거공사",
       subTradeCode: "02-20",
       subTradeNameKo: "주방 철거",
       taskNameKo: "기존 싱크대 및 주방 가구 철거",
-      defaultItemNameKo: "싱크대 철거",
-      unit: "set",
-      quantityFormula: "manual_one_set",
-      costModel: { defaultLaborUnitPrice: 180000, defaultExpenseUnitPrice: 60000 },
-      assumptions: [],
+      defaultItemNameKo: "주방 싱크대 철거",
+      unit: "m",
+      quantityFormula: "room_perimeter",
+      quantityMultiplier: 0.5, // 주방 둘레의 절반 (싱크대 라인) 근사
+      costModel: { defaultLaborUnitPrice: 45000, defaultExpenseUnitPrice: 8000 },
+      assumptions: ["주방 둘레의 약 50%를 싱크대 라인으로 가정 (실측 시 조정)"],
     },
+    // 05-21 급배수
     {
       tradeCode: "05",
       tradeNameKo: "설비공사",
-      subTradeCode: "05-20",
+      subTradeCode: "05-21",
       subTradeNameKo: "주방 급배수",
-      taskNameKo: "주방 급배수 연결",
-      defaultItemNameKo: "급배수 연결",
+      taskNameKo: "주방 급수·배수 연결",
+      defaultItemNameKo: "급배수 배관 연결",
       unit: "set",
       quantityFormula: "manual_one_set",
       costModel: {
@@ -440,15 +452,16 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
         defaultLaborUnitPrice: 160000,
         defaultExpenseUnitPrice: 20000,
       },
-      assumptions: [],
+      assumptions: ["기존 배관 위치 유지 가정. 위치 이동 시 별도 추가."],
     },
+    // 04-21 전기
     {
       tradeCode: "04",
       tradeNameKo: "전기공사",
-      subTradeCode: "04-20",
+      subTradeCode: "04-21",
       subTradeNameKo: "주방 전기",
-      taskNameKo: "주방 콘센트·조명 배선",
-      defaultItemNameKo: "주방 전기 배선",
+      taskNameKo: "주방 콘센트 및 전용회로",
+      defaultItemNameKo: "콘센트 + 전용회로",
       unit: "set",
       quantityFormula: "manual_one_set",
       costModel: {
@@ -456,40 +469,186 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
         defaultLaborUnitPrice: 220000,
         defaultExpenseUnitPrice: 30000,
       },
-      assumptions: [],
+      assumptions: ["인덕션/식기세척기 전용회로 1식 가정"],
     },
+    // 12-11 하부장 — 길이당 (m)
     {
       tradeCode: "12",
       tradeNameKo: "가구·싱크공사",
-      subTradeCode: "12-10",
-      subTradeNameKo: "싱크대",
-      taskNameKo: "싱크대 하부장·상부장 설치",
-      defaultItemNameKo: "싱크대",
-      unit: "set",
-      quantityFormula: "manual_one_set",
+      subTradeCode: "12-11",
+      subTradeNameKo: "하부장",
+      taskNameKo: "주방 하부장 설치",
+      defaultItemNameKo: "하부장 (도어+서랍 포함)",
+      defaultSpec: "H850 × D600",
+      unit: "m",
+      quantityFormula: "room_perimeter",
+      quantityMultiplier: 0.5,
       costModel: {
         materialUnitPriceKey: "selected_material_unit_price",
-        defaultMaterialUnitPrice: 1800000,
-        defaultLaborUnitPrice: 450000,
-        defaultExpenseUnitPrice: 80000,
+        defaultMaterialUnitPrice: 450000, // m당
+        defaultLaborUnitPrice: 80000,
+        defaultExpenseUnitPrice: 10000,
       },
-      assumptions: ["기본형 싱크대 기준입니다."],
+      assumptions: ["m당 단가 기준. 도면 정확 시 m수 조정."],
     },
+    // 12-12 상부장 — 길이당 (m)
     {
-      tradeCode: "14",
-      tradeNameKo: "주방공사",
-      subTradeCode: "14-01",
-      subTradeNameKo: "상판·벽마감",
-      taskNameKo: "주방 상판 및 벽면 마감",
-      defaultItemNameKo: "주방 상판·벽마감",
-      unit: "set",
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-12",
+      subTradeNameKo: "상부장",
+      taskNameKo: "주방 상부장 설치",
+      defaultItemNameKo: "상부장",
+      defaultSpec: "H720 × D350",
+      unit: "m",
+      quantityFormula: "room_perimeter",
+      quantityMultiplier: 0.4, // 상부장은 하부장보다 약간 짧음 (창문 영역 차감)
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 380000,
+        defaultLaborUnitPrice: 65000,
+        defaultExpenseUnitPrice: 10000,
+      },
+      assumptions: ["창문/후드 영역 차감 후 약 40% 적용. m당 단가."],
+    },
+    // 12-13 키큰장 — 1ea (옵션)
+    {
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-13",
+      subTradeNameKo: "키큰장",
+      taskNameKo: "키큰장/팬트리 설치",
+      defaultItemNameKo: "키큰장 (냉장고장 또는 팬트리)",
+      defaultSpec: "H2100 × W600",
+      unit: "ea",
+      quantityFormula: "fixture_count",
+      quantityMultiplier: 1, // 기본 1ea — KitchenPlan에서 조정
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 550000,
+        defaultLaborUnitPrice: 80000,
+        defaultExpenseUnitPrice: 15000,
+      },
+      assumptions: ["키큰장 1개 가정. 없으면 사용자가 제외 가능."],
+    },
+    // 12-14 상판 — 길이당 (m)
+    {
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-14",
+      subTradeNameKo: "상판",
+      taskNameKo: "주방 상판 시공",
+      defaultItemNameKo: "엔지니어드스톤 상판",
+      defaultSpec: "20T",
+      unit: "m",
+      quantityFormula: "room_perimeter",
+      quantityMultiplier: 0.5,
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 280000,
+        defaultLaborUnitPrice: 50000,
+        defaultExpenseUnitPrice: 8000,
+      },
+      assumptions: ["엔지니어드스톤 표준. 천연석/세라믹 선택 시 단가 변동."],
+    },
+    // 12-15 싱크볼 — 1ea
+    {
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-15",
+      subTradeNameKo: "싱크볼",
+      taskNameKo: "싱크볼 설치",
+      defaultItemNameKo: "언더마운트 싱크볼",
+      defaultSpec: "단조 SUS304",
+      unit: "ea",
+      quantityFormula: "fixture_count",
+      quantityMultiplier: 1,
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 220000,
+        defaultLaborUnitPrice: 35000,
+        defaultExpenseUnitPrice: 5000,
+      },
+      assumptions: ["단조 SUS304 표준. 더블볼/세라믹 선택 시 단가 변동."],
+    },
+    // 12-16 수전 — 1ea
+    {
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-16",
+      subTradeNameKo: "수전",
+      taskNameKo: "주방 수전 설치",
+      defaultItemNameKo: "주방 수전",
+      defaultSpec: "거위목 수전",
+      unit: "ea",
+      quantityFormula: "fixture_count",
+      quantityMultiplier: 1,
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 120000,
+        defaultLaborUnitPrice: 25000,
+        defaultExpenseUnitPrice: 3000,
+      },
+      assumptions: ["표준 거위목 수전. 정수기 직결형 선택 시 추가."],
+    },
+    // 12-17 후드/쿡탑 — 1ea
+    {
+      tradeCode: "12",
+      tradeNameKo: "가구·싱크공사",
+      subTradeCode: "12-17",
+      subTradeNameKo: "후드·쿡탑",
+      taskNameKo: "후드·쿡탑 설치",
+      defaultItemNameKo: "주방 후드 + 인덕션",
+      defaultSpec: "후드 600/인덕션 3구",
+      unit: "ea",
+      quantityFormula: "fixture_count",
+      quantityMultiplier: 1,
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 850000, // 후드+쿡탑 묶음
+        defaultLaborUnitPrice: 80000,
+        defaultExpenseUnitPrice: 10000,
+      },
+      assumptions: ["후드 + 인덕션 패키지. 빌트인 가스/오븐 선택 시 단가 변동."],
+    },
+    // 07-31 백스플래시 타일 — m²
+    {
+      tradeCode: "07",
+      tradeNameKo: "타일공사",
+      subTradeCode: "07-31",
+      subTradeNameKo: "주방 백스플래시",
+      taskNameKo: "주방 백스플래시 타일",
+      defaultItemNameKo: "포세린 타일 (백스플래시)",
+      defaultSpec: "200×100 또는 300×600",
+      unit: "m2",
+      quantityFormula: "room_perimeter",
+      // m² = 둘레의 절반 (상하부장 사이 벽) × 0.6m (높이)
+      quantityMultiplier: 0.3,
+      wasteFactor: 0.07,
+      costModel: {
+        materialUnitPriceKey: "selected_material_unit_price",
+        defaultMaterialUnitPrice: 42000,
+        defaultLaborUnitPrice: 38000,
+        defaultExpenseUnitPrice: 4000,
+      },
+      assumptions: ["상하부장 사이 백스플래시. 높이 600mm 기준."],
+    },
+    // 15-21 폐기물
+    {
+      tradeCode: "15",
+      tradeNameKo: "폐기물·운반·양중",
+      subTradeCode: "15-21",
+      subTradeNameKo: "주방 폐기물",
+      taskNameKo: "주방 폐기물 반출",
+      defaultItemNameKo: "폐가구·폐자재 반출",
+      unit: "lot",
       quantityFormula: "manual_one_set",
       costModel: {
-        defaultMaterialUnitPrice: 650000,
-        defaultLaborUnitPrice: 220000,
-        defaultExpenseUnitPrice: 30000,
+        defaultMaterialUnitPrice: 0,
+        defaultLaborUnitPrice: 80000,
+        defaultExpenseUnitPrice: 70000,
       },
-      assumptions: [],
+      assumptions: ["1식 기준 — 양중 포함."],
     },
   ],
 };

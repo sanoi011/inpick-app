@@ -16,6 +16,8 @@ import {
 } from "./quantity-formulas";
 import { ALL_WORK_PACKAGE_RULES } from "./work-package-rules";
 import { getTradeSortOrder } from "./trades";
+import { resolveMaterialProductForLine } from "./product-resolver";
+import { resolveMaterialPriceForLine } from "./price-resolver";
 import type {
   ConfidenceSummary,
   ConstructionEstimate,
@@ -24,6 +26,8 @@ import type {
   EstimateTotals,
   MaterialSummary,
   ProjectMode,
+  ResolvedMaterialPrice,
+  ResolvedMaterialProduct,
   RoomQuantityBasis,
   RoomSummary,
   SurfacePlan,
@@ -39,6 +43,133 @@ export interface BuildConstructionEstimateInput {
   surfacePlans: SurfacePlan[];
   quantityBasisByRoom: Record<string, RoomQuantityBasis>;
   rateOverrides?: Partial<EstimateRateConfig>;
+}
+
+/**
+ * P12: async 버전 — DB에서 product/price resolver 호출 후 line에 brand/sku/source 채움.
+ * 사용처: build-estimate API server-side. client-builder는 sync 버전 사용.
+ */
+export async function buildConstructionEstimateWithProductResolution(
+  input: BuildConstructionEstimateInput,
+): Promise<ConstructionEstimate> {
+  const rawLines: ConstructionEstimateLine[] = [];
+
+  for (const surfacePlan of input.surfacePlans) {
+    const basis = input.quantityBasisByRoom[surfacePlan.roomId];
+    if (!basis) {
+      rawLines.push(createWarningLine(surfacePlan));
+      continue;
+    }
+
+    const matchedRules = findWorkPackageRules(surfacePlan);
+    if (matchedRules.length === 0) {
+      rawLines.push(createFallbackLine(surfacePlan, basis));
+      continue;
+    }
+
+    for (const rule of matchedRules) {
+      for (const template of rule.outputLines) {
+        if (!shouldIncludeTemplate(template, surfacePlan, basis)) continue;
+        const line = createEstimateLine(surfacePlan, basis, template);
+        // P12: 재료비 있는 line만 resolver 실행 (노무비/경비만 있는 라인은 skip)
+        if (line.materialUnitPrice > 0 || hasMaterialIntent(template)) {
+          try {
+            const product = await resolveMaterialProductForLine({
+              surfacePlan,
+              workOutput: {
+                taskNameKo: template.taskNameKo,
+                defaultItemNameKo: template.defaultItemNameKo,
+                defaultSpec: template.defaultSpec,
+                tradeCode: template.tradeCode,
+                subTradeCode: template.subTradeCode,
+              },
+              roomName: surfacePlan.roomName,
+              surfaceType: surfacePlan.surfaceType,
+            });
+            const price = await resolveMaterialPriceForLine({
+              product,
+              unit: template.unit,
+              overridePriceWon: surfacePlan.selectedMaterialUnitPrice,
+              fallbackDefaultPriceWon: template.costModel.defaultMaterialUnitPrice,
+            });
+            applyResolvedProductPriceToLine(line, product, price);
+          } catch (err) {
+            console.warn("[build-construction-estimate] resolver failed for line:", line.id, err);
+          }
+        }
+        rawLines.push(line);
+      }
+    }
+  }
+
+  const deduped = mergeDuplicateLines(rawLines);
+  const sorted = sortEstimateLines(deduped);
+
+  return {
+    id: randomId(),
+    projectId: input.projectId,
+    projectMode: input.projectMode,
+    version: 1,
+    lines: sorted,
+    tradeSummaries: summarizeByTrade(sorted),
+    roomSummaries: summarizeByRoom(sorted),
+    materialSummary: summarizeMaterials(sorted),
+    totals: computeTotals(sorted, input.rateOverrides),
+    confidenceSummary: computeConfidenceSummary(sorted),
+    assumptions: collectUniqueStrings(sorted.flatMap((l) => l.assumptions)),
+    warnings: collectUniqueStrings(sorted.flatMap((l) => l.warnings)),
+  };
+}
+
+/** WorkPackageLineTemplate이 자재가 있는 작업인지 (단가 0이라도 자재 의도 있으면 resolver 호출) */
+function hasMaterialIntent(template: WorkPackageLineTemplate): boolean {
+  // 가구·싱크공사(12), 욕실공사(13), 주방공사(14), 바닥재공사(10), 도배공사(09), 타일공사(07), 도장공사(08), 창호(11) 등
+  return ["07", "08", "09", "10", "11", "12", "13", "14"].includes(template.tradeCode);
+}
+
+/** Resolver 결과를 line에 채움 */
+function applyResolvedProductPriceToLine(
+  line: ConstructionEstimateLine,
+  product: ResolvedMaterialProduct,
+  price: ResolvedMaterialPrice,
+) {
+  // product
+  line.materialProductId = product.materialProductId;
+  line.brand = product.brand ?? line.brand;
+  line.manufacturer = product.manufacturer;
+  line.supplierName = product.supplierName;
+  line.vendorName = product.vendorName;
+  line.productName = product.productName;
+  line.sku = product.sku ?? line.sku;
+  line.modelNo = product.modelNo;
+  line.productSpec = product.spec ?? line.spec;
+  line.productUnit = product.unit;
+  line.materialCategoryCode = product.categoryCode;
+  line.materialCategoryName = product.categoryName;
+  line.productMatchStatus = product.matchStatus;
+  line.productMatchConfidence = product.matchConfidence;
+  // price — 새 단가가 의미있게 잡혔으면 갱신
+  if (price.unitPrice > 0) {
+    line.materialUnitPrice = price.unitPrice;
+    line.materialAmount = Math.round(price.unitPrice * line.quantity);
+    line.totalAmount = line.materialAmount + line.laborAmount + line.expenseAmount;
+  }
+  line.materialPriceSource = price.priceSource;
+  line.materialPriceSourceId = price.priceSourceId;
+  line.materialPriceAppliedAt = price.appliedAt;
+  line.priceConfidence = price.confidence;
+  // fallbackReason — product 우선, 없으면 price
+  line.fallbackReason = product.fallbackReason || price.fallbackReason;
+  // itemNameKo 보강: brand가 있으면 "{brand} {productName}"
+  if (product.brand && product.productName) {
+    line.itemNameKo = `${product.brand} ${product.productName}`;
+  } else if (product.productName) {
+    line.itemNameKo = product.productName;
+  }
+  // assumptions에 source 명시
+  if (product.matchStatus === "standard_fallback") {
+    line.assumptions.push(`자재 매칭 미확정 — ${product.fallbackReason ?? "표준 카테고리 단가 적용"}`);
+  }
 }
 
 export function buildConstructionEstimate(

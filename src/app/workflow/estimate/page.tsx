@@ -44,6 +44,20 @@ import {
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/client-builder";
 
+// P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
+function priceSourceLabel(source: string): string {
+  const map: Record<string, string> = {
+    manual_override: "사용자/사업자 확정",
+    material_price_lookup: "물가협회 단가",
+    material_price_observations: "최근 30일 평균",
+    contractor_price: "납품사 단가",
+    catalog_price: "카탈로그 단가",
+    category_standard: "카테고리 표준",
+    kpa_standard: "KPA 표준 fallback",
+  };
+  return map[source] ?? source;
+}
+
 // P4: 견적 line item source — 사용자가 한 눈에 "이 가격이 어디서 왔는지" 알 수 있게
 type LineSourceKind =
   | "user_selected_material"
@@ -1420,10 +1434,27 @@ function EstimatePage() {
                                   <p className="text-[0.65rem] text-primary-900/55 mt-0.5">
                                     {line.itemNameKo}
                                     {line.spec ? ` · ${line.spec}` : ""}
-                                    {line.brand ? ` · ${line.brand}` : ""}
                                   </p>
+                                  {/* P12: 제조사/브랜드/SKU/단가출처 표시 — DB 매칭된 line만 */}
+                                  {(line.brand || line.manufacturer || line.sku) && (
+                                    <p className="text-[0.62rem] text-blue-700 mt-0.5 font-semibold">
+                                      {line.manufacturer && `${line.manufacturer} · `}
+                                      {line.brand}
+                                      {line.sku && ` · SKU ${line.sku}`}
+                                    </p>
+                                  )}
                                   <p className="text-[0.62rem] text-primary-900/40 mt-0.5">
                                     산출: {line.quantityFormulaKo}
+                                    {line.materialPriceSource && line.materialPriceSource !== "kpa_standard" && (
+                                      <span className="ml-1 text-emerald-700">
+                                        · 단가: {priceSourceLabel(line.materialPriceSource)}
+                                      </span>
+                                    )}
+                                    {line.fallbackReason && (
+                                      <span className="ml-1 text-rose-600" title={line.fallbackReason}>
+                                        · ⚠️ 표준 fallback
+                                      </span>
+                                    )}
                                   </p>
                                 </div>
                                 <div className="text-right tabular text-primary-900/80">
@@ -1484,44 +1515,143 @@ function EstimatePage() {
                   </div>
                 )}
 
-                {/* P7-4: 자재별 보기 — constructionEstimate.materialSummary */}
+                {/* P7-4 + P12: 자재집계표 — 제조사/브랜드/SKU/단가출처 표시 */}
                 {!loading && !error && viewMode === "material" && constructionEstimate && (
-                  <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
-                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
-                      자재 집계
-                    </p>
-                    <table className="w-full text-sm">
+                  <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card overflow-x-auto">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
+                        자재집계표 ({constructionEstimate.materialSummary.length}건)
+                      </p>
+                      <p className="text-[0.6rem] text-primary-900/50">
+                        제조사 / 브랜드 / 납품사 / SKU / 단가출처 표시
+                      </p>
+                    </div>
+                    <table className="w-full text-[0.8rem] tabular">
                       <thead>
-                        <tr className="border-b border-primary-100 text-primary-900/60 text-[0.7rem]">
-                          <th className="py-2 text-left">분류</th>
-                          <th className="py-2 text-left">품명</th>
-                          <th className="py-2 text-left">규격/SKU</th>
-                          <th className="py-2 text-right">수량</th>
-                          <th className="py-2 text-right">금액</th>
+                        <tr className="border-b-2 border-primary-200 text-primary-900/60 text-[0.65rem] bg-primary-50/40">
+                          <th className="px-2 py-2 text-left w-12">No</th>
+                          <th className="px-2 py-2 text-left">분류</th>
+                          <th className="px-2 py-2 text-left">자재명</th>
+                          <th className="px-2 py-2 text-left">제조사/납품사</th>
+                          <th className="px-2 py-2 text-left">SKU/규격</th>
+                          <th className="px-2 py-2 text-right">수량</th>
+                          <th className="px-2 py-2 text-right">단가</th>
+                          <th className="px-2 py-2 text-right">금액</th>
+                          <th className="px-2 py-2 text-left">단가출처</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {constructionEstimate.materialSummary.map((m, i) => (
-                          <tr key={i} className="border-b border-primary-50">
-                            <td className="py-2 text-primary-700 text-[0.72rem]">
-                              {m.materialCategory}
-                            </td>
-                            <td className="py-2 font-bold text-primary-900">
-                              {m.brand ? `${m.brand} ` : ""}
-                              {m.itemNameKo}
-                            </td>
-                            <td className="py-2 text-[0.72rem] text-primary-900/60">
-                              {m.spec || "-"}
-                              {m.sku ? ` · ${m.sku}` : ""}
-                            </td>
-                            <td className="py-2 text-right tabular">
-                              {m.quantity.toLocaleString()} {m.unit === "m2" ? "m²" : m.unit}
-                            </td>
-                            <td className="py-2 text-right tabular font-bold text-primary-900">
-                              ₩ {m.amount.toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
+                        {/* P12: materialSummary는 brand/sku만 있어서 단가 정보 부족.
+                             대신 constructionEstimate.lines를 자재별로 그룹화하여 단가출처 노출 */}
+                        {(() => {
+                          // 자재 키(brand+itemNameKo+spec)로 그룹화
+                          const byMaterial = new Map<
+                            string,
+                            {
+                              category: string;
+                              brand?: string;
+                              manufacturer?: string;
+                              supplierName?: string;
+                              itemNameKo: string;
+                              sku?: string;
+                              spec?: string;
+                              unit: string;
+                              totalQty: number;
+                              totalAmount: number;
+                              priceSource?: string;
+                              fallbackReason?: string;
+                            }
+                          >();
+                          for (const l of constructionEstimate.lines) {
+                            if (!l.included || l.materialAmount <= 0) continue;
+                            const key = [
+                              l.brand ?? "",
+                              l.manufacturer ?? "",
+                              l.itemNameKo,
+                              l.spec ?? "",
+                              l.unit,
+                            ].join("|");
+                            let row = byMaterial.get(key);
+                            if (!row) {
+                              row = {
+                                category: l.tradeNameKo,
+                                brand: l.brand,
+                                manufacturer: l.manufacturer,
+                                supplierName: l.supplierName,
+                                itemNameKo: l.itemNameKo,
+                                sku: l.sku,
+                                spec: l.spec ?? l.productSpec,
+                                unit: l.unit,
+                                totalQty: 0,
+                                totalAmount: 0,
+                                priceSource: l.materialPriceSource,
+                                fallbackReason: l.fallbackReason,
+                              };
+                              byMaterial.set(key, row);
+                            }
+                            row.totalQty += l.quantity;
+                            row.totalAmount += l.materialAmount;
+                          }
+                          const rows = Array.from(byMaterial.values()).sort(
+                            (a, b) => b.totalAmount - a.totalAmount,
+                          );
+                          return rows.map((r, i) => (
+                            <tr key={i} className="border-b border-primary-50">
+                              <td className="px-2 py-2 text-primary-900/40 tabular">{i + 1}</td>
+                              <td className="px-2 py-2 text-primary-700 text-[0.7rem]">
+                                {r.category}
+                              </td>
+                              <td className="px-2 py-2 font-bold text-primary-900">
+                                {r.brand ? `${r.brand} ` : ""}
+                                {r.itemNameKo}
+                              </td>
+                              <td className="px-2 py-2 text-[0.7rem] text-primary-900/70">
+                                {r.manufacturer || "-"}
+                                {r.supplierName && (
+                                  <p className="text-[0.62rem] text-primary-900/50">
+                                    납품 {r.supplierName}
+                                  </p>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-[0.7rem] text-primary-900/60 font-mono">
+                                {r.sku ? `SKU ${r.sku}` : "-"}
+                                {r.spec && (
+                                  <p className="text-[0.62rem] text-primary-900/40">{r.spec}</p>
+                                )}
+                              </td>
+                              <td className="px-2 py-2 text-right tabular">
+                                {Math.round(r.totalQty * 10) / 10}{" "}
+                                {r.unit === "m2" ? "m²" : r.unit}
+                              </td>
+                              <td className="px-2 py-2 text-right tabular text-primary-900/70">
+                                ₩ {Math.round(r.totalAmount / r.totalQty).toLocaleString()}
+                              </td>
+                              <td className="px-2 py-2 text-right tabular font-bold text-primary-900">
+                                ₩ {r.totalAmount.toLocaleString()}
+                              </td>
+                              <td className="px-2 py-2 text-[0.7rem]">
+                                {r.priceSource ? (
+                                  <span
+                                    className={
+                                      r.priceSource === "material_price_lookup" ||
+                                      r.priceSource === "contractor_price"
+                                        ? "text-emerald-700 font-semibold"
+                                        : r.priceSource === "kpa_standard" ||
+                                            r.priceSource === "category_standard"
+                                          ? "text-rose-600"
+                                          : "text-primary-700"
+                                    }
+                                    title={r.fallbackReason ?? ""}
+                                  >
+                                    {priceSourceLabel(r.priceSource)}
+                                  </span>
+                                ) : (
+                                  <span className="text-primary-900/40">미확정</span>
+                                )}
+                              </td>
+                            </tr>
+                          ));
+                        })()}
                       </tbody>
                     </table>
                   </div>
