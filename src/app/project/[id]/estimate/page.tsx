@@ -181,7 +181,8 @@ export default function EstimatePage() {
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
-  const [viewMode, setViewMode] = useState<"room" | "trade">("room");
+  // P10: 기본 보기를 공종별로 — 종건/인테리어 업체 표준 견적서 양식 (MD §1-1)
+  const [viewMode, setViewMode] = useState<"room" | "trade">("trade");
   const [exporting, setExporting] = useState(false);
   const [ceilingHeight, setCeilingHeight] = useState(2200); // mm 기본값
   const [extensions, setExtensions] = useState<QuantityExtensions>({});
