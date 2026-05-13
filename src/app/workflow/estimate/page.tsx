@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
@@ -205,7 +205,26 @@ const ROOM_ICONS: Record<string, typeof Home> = {
 type FilterCategory = "all" | "main" | "aux" | "labor";
 type SortBy = "default" | "price-desc" | "price-asc" | "name";
 
-export default function EstimatePage() {
+// P11-FIX: useSearchParams 사용 페이지는 Suspense로 감싸야 prerender 통과 (Vercel 빌드 에러 4회 원인)
+// 가이드: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+export default function EstimatePageWithSuspense() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-[#FDF7F4] flex items-center justify-center">
+          <div className="flex items-center gap-3 text-primary-900">
+            <Loader2 className="h-5 w-5 animate-spin" />
+            <span className="text-sm font-semibold">견적서 불러오는 중…</span>
+          </div>
+        </main>
+      }
+    >
+      <EstimatePage />
+    </Suspense>
+  );
+}
+
+function EstimatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // P2: workflow page의 finalize가 발급한 contextId — 있으면 evidence 기반 견적 합성
