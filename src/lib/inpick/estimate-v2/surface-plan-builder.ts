@@ -111,6 +111,8 @@ export interface BuildSurfacePlansInput {
   materialEvidence?: unknown[];
   /** Step1에서 가져온 방 면적 (없으면 design_output target_id 기반 추정) */
   roomAreasByName?: Record<string, number>;
+  /** P14-1: 도면 치수 (mm) — Step1 normalizedFloorplan.rooms 기반 */
+  floorplanDimsByName?: Record<string, { widthMm?: number; depthMm?: number }>;
 }
 
 export interface BuildSurfacePlansResult {
@@ -253,17 +255,23 @@ export function buildSurfacePlansFromContext(
 
   // QuantityBasis — 방별로 계산
   const quantityBasisByRoom: Record<string, RoomQuantityBasis> = {};
+  // P14-1: 도면 치수 lookup (room name 기반)
+  const floorplanDimsByName = input.floorplanDimsByName || {};
   for (const [roomId, roomName] of Array.from(rooms.entries())) {
     const roomType = inferRoomType(roomName);
     const areaM2 =
       input.roomAreasByName?.[roomName] ??
       input.roomAreasByName?.[roomId] ??
       defaultAreaForRoomType(roomType);
+    const dims = floorplanDimsByName[roomName] || floorplanDimsByName[roomId];
     const basisInput: ComputeRoomQuantityBasisInput = {
       roomId,
       roomName,
       roomType,
       areaM2,
+      widthM: dims?.widthMm ? dims.widthMm / 1000 : undefined,
+      depthM: dims?.depthMm ? dims.depthMm / 1000 : undefined,
+      basisSource: dims ? "floorplan_asset" : undefined,
     };
     quantityBasisByRoom[roomId] = computeRoomQuantityBasis(basisInput);
   }

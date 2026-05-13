@@ -60,20 +60,27 @@ export async function buildConstructionEstimateWithProductResolution(
 ): Promise<ConstructionEstimate> {
   const rawLines: ConstructionEstimateLine[] = [];
 
-  // P13-2: 주방 SurfacePlan이 있으면 KitchenPlan 미리 생성 (room별 1회)
+  // P13-2 + P14-1: 주방 SurfacePlan이 있으면 KitchenPlan 미리 생성 (room별 1회)
   const kitchenPlansByRoom = new Map<string, KitchenPlan>();
   for (const sp of input.surfacePlans) {
     if (sp.roomType === "kitchen" && !kitchenPlansByRoom.has(sp.roomId)) {
       const basis = input.quantityBasisByRoom[sp.roomId];
+      // P14-1: surfacePlan.floorplanRoom 또는 basis.widthM/depthM에서 도면 치수 확보
+      const floorplanRoom =
+        sp.floorplanRoom ||
+        (basis?.widthM && basis?.depthM
+          ? {
+              widthMm: basis.widthM * 1000,
+              depthMm: basis.depthM * 1000,
+            }
+          : undefined);
       kitchenPlansByRoom.set(
         sp.roomId,
         buildKitchenPlan({
           projectId: input.projectId,
           roomName: sp.roomName,
           kitchenBasis: basis,
-          floorplanRoom: basis
-            ? { widthMm: undefined, depthMm: undefined } // TODO: surfacePlan에 도면 치수 전달
-            : undefined,
+          floorplanRoom,
         }),
       );
     }
@@ -123,6 +130,10 @@ export async function buildConstructionEstimateWithProductResolution(
                 defaultSpec: template.defaultSpec,
                 tradeCode: template.tradeCode,
                 subTradeCode: template.subTradeCode,
+                // P15-3: template의 카테고리 코드 전달 → resolver가 우선 사용
+                materialCategoryCode: template.materialCategoryCode,
+                requiredProductMatch: template.requiredProductMatch,
+                highValue: template.highValue,
               },
               roomName: surfacePlan.roomName,
               surfaceType: surfacePlan.surfaceType,
@@ -210,6 +221,18 @@ function applyResolvedProductPriceToLine(
   // assumptions에 source 명시
   if (product.matchStatus === "standard_fallback") {
     line.assumptions.push(`자재 매칭 미확정 — ${product.fallbackReason ?? "표준 카테고리 단가 적용"}`);
+  }
+  // P15-4: 고액 fallback 경고 — 500K+ standard_fallback이면 warning 추가
+  const HIGH_VALUE_THRESHOLD = 500_000;
+  if (
+    (product.matchStatus === "standard_fallback" || product.matchStatus === "category_default") &&
+    line.totalAmount >= HIGH_VALUE_THRESHOLD
+  ) {
+    line.warnings.push(
+      `⚠️ 고액 품목(₩${line.totalAmount.toLocaleString()})이 DB 상품/단가 매칭 없이 ${
+        product.matchStatus === "standard_fallback" ? "표준 fallback" : "카테고리 기본"
+      }으로 산정됨 — 사업자 입찰 시 변동 가능.`,
+    );
   }
 }
 

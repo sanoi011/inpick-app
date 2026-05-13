@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { label: "도면 인식 로그", href: "/admin/drawing-logs", icon: FileImage },
   { label: "평면도 라이브러리", href: "/admin/floor-plans", icon: Library },
   { label: "자재 / 단가 DB", href: "/admin/materials", icon: Package },
+  { label: "견적 품질 진단", href: "/admin/estimate-quality", icon: AlertTriangle },
   { label: "크롤러 운영", href: "/admin/crawlers", icon: RefreshCw },
   { label: "개발 로드맵", href: "/admin/roadmap", icon: Rocket },
   { label: "환경 설정", href: "/admin/settings", icon: Settings },

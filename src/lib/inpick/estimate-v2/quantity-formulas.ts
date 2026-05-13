@@ -100,6 +100,9 @@ export function computeRoomQuantityBasis(
     doorCount,
     windowCount,
     fixtureCount: input.fixtureCount,
+    // P14-1: width/depth가 입력에 있으면 basis에 그대로 보존 (KitchenPlan 등에서 활용)
+    widthM: input.widthM,
+    depthM: input.depthM,
     heightM,
     basisSource,
     assumptions,

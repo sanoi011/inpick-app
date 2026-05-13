@@ -16,6 +16,11 @@
  *   - resolver 실패 시 throw 안 함 — standard_fallback ResolvedMaterialProduct 반환
  */
 import { lookupMaterialProduct } from "@/lib/inpick/material-product-lookup";
+import {
+  resolveCategoryFromEstimateLine,
+  resolveCategoryFromText,
+} from "@/lib/inpick/material-taxonomy/category-resolver";
+import { getCategoryByCode } from "@/lib/inpick/material-taxonomy/category-seed";
 import type {
   ResolvedMaterialProduct,
   SurfacePlan,
@@ -24,13 +29,17 @@ import type {
 
 export interface ResolveProductInput {
   surfacePlan?: SurfacePlan;
-  /** WorkPackageOutput 내부 정보 — taskName / itemName / spec */
+  /** WorkPackageOutput 내부 정보 — taskName / itemName / spec / categoryCode */
   workOutput: {
     taskNameKo: string;
     defaultItemNameKo: string;
     defaultSpec?: string;
     tradeCode: string;
     subTradeCode: string;
+    /** P15-3: WorkPackageLineTemplate.materialCategoryCode 그대로 전달 */
+    materialCategoryCode?: string;
+    requiredProductMatch?: boolean;
+    highValue?: boolean;
   };
   roomName: string;
   /** "fixture" / "floor" / "wall" / "ceiling" 등 */
@@ -135,7 +144,37 @@ export async function resolveMaterialProductForLine(
     }
   }
 
-  // ─── 4~5순위: category_default / standard_fallback ───
+  // ─── P15-3: 4순위 — WorkPackageOutput.materialCategoryCode 또는 텍스트에서 추정한 카테고리 ───
+  const resolvedCategory =
+    (input.workOutput.materialCategoryCode
+      ? { categoryCode: input.workOutput.materialCategoryCode, category: getCategoryByCode(input.workOutput.materialCategoryCode), confidence: 1.0, specHints: {}, matchedAliases: [input.workOutput.materialCategoryCode] }
+      : null) ||
+    resolveCategoryFromEstimateLine({
+      itemName: materialName,
+      spec: input.surfacePlan?.spec || input.workOutput.defaultSpec,
+      materialCategory: input.surfacePlan?.materialCategory || input.hintCategory,
+      tradeCode: input.workOutput.tradeCode,
+    });
+
+  if (resolvedCategory?.category) {
+    const cat = resolvedCategory.category;
+    return {
+      productName: cat.displayNameKo,
+      brand: undefined,
+      sku: undefined,
+      spec: input.surfacePlan?.spec || input.workOutput.defaultSpec,
+      unit: cat.defaultUnit,
+      categoryCode: cat.categoryCode,
+      categoryName: `${cat.majorNameKo} > ${cat.middleNameKo} > ${cat.minorNameKo}`,
+      matchStatus: "category_default",
+      matchConfidence: resolvedCategory.confidence * 0.5, // category만 매칭은 0.5 미만
+      fallbackReason:
+        `material_products row 매칭 실패 — 카테고리(${cat.categoryCode})만 식별. ` +
+        `DB seed 필요 또는 사용자 직접 자재 선택 권장.`,
+    };
+  }
+
+  // ─── 5순위: 진짜 standard_fallback (카테고리도 모름) ───
   return {
     productName: materialName,
     brand: undefined,
@@ -144,7 +183,7 @@ export async function resolveMaterialProductForLine(
     matchStatus: "standard_fallback",
     matchConfidence: 0.3,
     fallbackReason: surface
-      ? `material_products에서 surface=${surface} room=${input.roomName} 매칭 후보 없음`
-      : `surfaceType 미정 — 자재 후보 검색 불가`,
+      ? `material_products에서 surface=${surface} room=${input.roomName} 매칭 후보 없음, 카테고리도 추론 불가`
+      : `surfaceType 미정 + 카테고리 추론 불가 — 자재 후보 검색 불가`,
   };
 }

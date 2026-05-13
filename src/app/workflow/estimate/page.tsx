@@ -282,6 +282,59 @@ function EstimatePage() {
   // P7: 공종별 견적 v2 — contextId 경로에서 받음
   const [constructionEstimate, setConstructionEstimate] = useState<ConstructionEstimate | null>(null);
   const [viewMode, setViewMode] = useState<"trade" | "room" | "surface" | "material">("trade");
+  // P14-4: 사용자가 제외한 v2 line ID 집합 — 토글 시 총액 재계산
+  const [excludedV2Lines, setExcludedV2Lines] = useState<Set<string>>(new Set());
+
+  const toggleV2LineIncluded = (lineId: string) => {
+    setExcludedV2Lines((prev) => {
+      const next = new Set(prev);
+      if (next.has(lineId)) next.delete(lineId);
+      else next.add(lineId);
+      return next;
+    });
+  };
+
+  // P14-4: 제외 라인 반영한 v2 재계산 (간접비/관리비/이윤/VAT 자동)
+  const adjustedV2 = useMemo(() => {
+    if (!constructionEstimate) return null;
+    const lines = constructionEstimate.lines.map((l) => ({
+      ...l,
+      included: !excludedV2Lines.has(l.id),
+    }));
+    let directMaterial = 0;
+    let directLabor = 0;
+    let directExpense = 0;
+    for (const l of lines) {
+      if (!l.included) continue;
+      directMaterial += l.materialAmount;
+      directLabor += l.laborAmount;
+      directExpense += l.expenseAmount;
+    }
+    const directTotal = directMaterial + directLabor + directExpense;
+    const indirectCost = Math.round(directTotal * 0.06);
+    const generalManagement = Math.round(directTotal * 0.04);
+    const profit = Math.round((directTotal + indirectCost + generalManagement) * 0.05);
+    const subtotal = directTotal + indirectCost + generalManagement + profit;
+    const vat = Math.round(subtotal * 0.1);
+    return {
+      lines,
+      totals: {
+        directMaterial,
+        directLabor,
+        directExpense,
+        directTotal,
+        indirectCost,
+        generalManagement,
+        profit,
+        vat,
+        totalWithVat: subtotal + vat,
+      },
+      excludedCount: excludedV2Lines.size,
+      excludedAmount: constructionEstimate.lines
+        .filter((l) => excludedV2Lines.has(l.id))
+        .reduce((s, l) => s + l.totalAmount, 0),
+    };
+  }, [constructionEstimate, excludedV2Lines]);
   const [vatIncl, setVatIncl] = useState(true);
   const [filterCat, setFilterCat] = useState<FilterCategory>("all");
   const [sortBy, setSortBy] = useState<SortBy>("default");
@@ -1048,7 +1101,8 @@ function EstimatePage() {
 
   // 표준 견적서 형식 — 재료비 / 노무비 / 경비
   //   P7-4: v2 견적이 있으면 그쪽 totals 우선, 없으면 legacy 계산
-  const v2Totals = constructionEstimate?.totals;
+  //   P14-4: 사용자가 라인 제외했으면 adjustedV2.totals 우선
+  const v2Totals = adjustedV2?.totals ?? constructionEstimate?.totals;
   const materialCost = v2Totals ? v2Totals.directMaterial : grandTotal.main + grandTotal.aux;
   const laborCost = v2Totals ? v2Totals.directLabor : grandTotal.labor;
   const expenseCost = v2Totals
@@ -1416,11 +1470,22 @@ function EstimatePage() {
                             </span>
                           </div>
                           <div className="divide-y divide-primary-50">
-                            {lines.map((line) => (
+                            {lines.map((line) => {
+                              const isExcluded = excludedV2Lines.has(line.id);
+                              return (
                               <div
                                 key={line.id}
-                                className="grid grid-cols-[60px_120px_110px_1fr_90px_130px] gap-2 px-5 py-2.5 text-xs items-center"
+                                className={`grid grid-cols-[28px_60px_120px_110px_1fr_90px_130px] gap-2 px-5 py-2.5 text-xs items-center ${
+                                  isExcluded ? "opacity-50" : ""
+                                }`}
                               >
+                                <input
+                                  type="checkbox"
+                                  checked={!isExcluded}
+                                  onChange={() => toggleV2LineIncluded(line.id)}
+                                  className="accent-primary-500"
+                                  title="견적 포함/제외 토글"
+                                />
                                 <div className="text-primary-900/40 tabular">{line.sortNo}</div>
                                 <div className="font-bold text-primary-700">
                                   {line.subTradeCode}
@@ -1460,7 +1525,7 @@ function EstimatePage() {
                                 <div className="text-right tabular text-primary-900/80">
                                   {line.quantity.toLocaleString()} {line.unit === "m2" ? "m²" : line.unit}
                                 </div>
-                                <div className="text-right tabular font-bold text-primary-900">
+                                <div className={`text-right tabular font-bold ${isExcluded ? "line-through text-primary-900/40" : "text-primary-900"}`}>
                                   ₩ {line.totalAmount.toLocaleString()}
                                   <p className="text-[0.6rem] text-primary-900/40 font-normal">
                                     재 {line.materialAmount.toLocaleString()} · 노{" "}
@@ -1468,11 +1533,24 @@ function EstimatePage() {
                                   </p>
                                 </div>
                               </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </section>
                       );
                     })}
+                    {/* P14-4: 제외 항목 합계 표시 + v2 재계산 totals */}
+                    {adjustedV2 && adjustedV2.excludedCount > 0 && (
+                      <div className="mt-3 rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 flex items-center justify-between">
+                        <span className="text-xs text-zinc-700">
+                          제외 {adjustedV2.excludedCount}건 ·{" "}
+                          <span className="line-through">₩ {adjustedV2.excludedAmount.toLocaleString()}</span> 절감
+                        </span>
+                        <span className="text-sm font-bold text-primary-900 tabular">
+                          조정 합계 ₩ {adjustedV2.totals.totalWithVat.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 )}
 

@@ -105,6 +105,12 @@ export interface SurfacePlan {
     set?: number;
   };
 
+  /** P14-1: 도면 치수 (mm) — 있으면 KitchenPlan 등에서 floorplan_inferred 활용 */
+  floorplanRoom?: {
+    widthMm?: number;
+    depthMm?: number;
+  };
+
   source: EvidenceSource;
   confidence: number;
   evidenceRefs: Array<{
@@ -139,6 +145,13 @@ export interface WorkPackageLineTemplate {
   taskNameKo: string;
   defaultItemNameKo: string;
   defaultSpec?: string;
+
+  /** P15-3: 자재 카테고리 코드 — material_products 매칭 강제 (없으면 fallback) */
+  materialCategoryCode?: string;
+  /** P15-4: 매칭 필수 여부 — true면 fallback 시 warning 자동 추가 */
+  requiredProductMatch?: boolean;
+  /** P15-4: 고액 품목 (500K+ standard_fallback이면 경고) */
+  highValue?: boolean;
 
   unit: EstimateUnit;
 
@@ -186,6 +199,10 @@ export interface RoomQuantityBasis {
   doorCount: number;
   windowCount: number;
   fixtureCount?: number;
+
+  /** P14-1: 도면 width/depth (m) — KitchenPlan 등에서 floorplan_inferred 사용 */
+  widthM?: number;
+  depthM?: number;
 
   heightM: number;
 

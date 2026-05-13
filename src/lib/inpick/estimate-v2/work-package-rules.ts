@@ -77,6 +77,9 @@ export const WOOD_FLOOR_RULE: WorkPackageRule = {
       taskNameKo: "강마루 시공",
       defaultItemNameKo: "강마루",
       defaultSpec: "7.5T",
+      // P15-3: 카테고리 코드 명시 — material_products 매칭 강제
+      materialCategoryCode: "MAT-FLR-ENGINEERED",
+      requiredProductMatch: true,
       unit: "m2",
       quantityFormula: "floor_area",
       wasteFactor: 0.05,
@@ -194,6 +197,8 @@ export const WALLPAPER_RULE: WorkPackageRule = {
       subTradeNameKo: "마감 도배",
       taskNameKo: "실크벽지 시공",
       defaultItemNameKo: "실크벽지",
+      materialCategoryCode: "MAT-WAL-WALLPAPER-SILK",
+      requiredProductMatch: true,
       unit: "m2",
       quantityFormula: "surface_area",
       wasteFactor: 0.05,
@@ -263,6 +268,8 @@ export const PORCELAIN_TILE_RULE: WorkPackageRule = {
       taskNameKo: "포세린 타일 시공",
       defaultItemNameKo: "포세린 타일",
       defaultSpec: "600×600",
+      materialCategoryCode: "MAT-FLR-PORCELAIN",
+      requiredProductMatch: true,
       unit: "m2",
       quantityFormula: "surface_area",
       wasteFactor: 0.07,
@@ -370,6 +377,9 @@ export const BATHROOM_FULL_REMODEL_RULE: WorkPackageRule = {
       subTradeNameKo: "도기·수전",
       taskNameKo: "양변기·세면기·수전 설치",
       defaultItemNameKo: "욕실 도기·수전",
+      materialCategoryCode: "MEC-SAN-TOILET",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "set",
       quantityFormula: "manual_one_set",
       costModel: {
@@ -480,6 +490,9 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
       taskNameKo: "주방 하부장 설치",
       defaultItemNameKo: "하부장 (도어+서랍 포함)",
       defaultSpec: "H850 × D600",
+      materialCategoryCode: "FUR-KIT-LOWER-CAB",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "m",
       quantityFormula: "room_perimeter",
       quantityMultiplier: 0.5,
@@ -500,6 +513,9 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
       taskNameKo: "주방 상부장 설치",
       defaultItemNameKo: "상부장",
       defaultSpec: "H720 × D350",
+      materialCategoryCode: "FUR-KIT-UPPER-CAB",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "m",
       quantityFormula: "room_perimeter",
       quantityMultiplier: 0.4, // 상부장은 하부장보다 약간 짧음 (창문 영역 차감)
@@ -540,6 +556,9 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
       taskNameKo: "주방 상판 시공",
       defaultItemNameKo: "엔지니어드스톤 상판",
       defaultSpec: "20T",
+      materialCategoryCode: "FUR-KIT-COUNTERTOP",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "m",
       quantityFormula: "room_perimeter",
       quantityMultiplier: 0.5,
@@ -600,6 +619,9 @@ export const KITCHEN_STANDARD_RULE: WorkPackageRule = {
       taskNameKo: "후드·쿡탑 설치",
       defaultItemNameKo: "주방 후드 + 인덕션",
       defaultSpec: "후드 600/인덕션 3구",
+      materialCategoryCode: "FUR-KIT-HOOD",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "ea",
       quantityFormula: "fixture_count",
       quantityMultiplier: 1,
@@ -818,6 +840,8 @@ export const PAINT_RULE: WorkPackageRule = {
       taskNameKo: "친환경 수성 도장 2회",
       defaultItemNameKo: "친환경 수성 페인트",
       defaultSpec: "VOC-free",
+      materialCategoryCode: "MAT-WAL-PAINT",
+      requiredProductMatch: true,
       unit: "m2",
       quantityFormula: "surface_area",
       wasteFactor: 0.05,
@@ -887,6 +911,8 @@ export const LIGHTING_ELECTRICAL_RULE: WorkPackageRule = {
       taskNameKo: "조명기구 설치",
       defaultItemNameKo: "LED 매입등 또는 펜던트",
       defaultSpec: "150mm 매입 / 12W LED",
+      materialCategoryCode: "ELE-LGT-DOWNLIGHT",
+      requiredProductMatch: true,
       unit: "ea",
       quantityFormula: "fixture_count",
       quantityMultiplier: 1,
@@ -1023,6 +1049,9 @@ export const WINDOW_DOOR_RULE: WorkPackageRule = {
       taskNameKo: "창호 또는 도어 설치",
       defaultItemNameKo: "방문 또는 시스템 창호",
       defaultSpec: "ABS 도어 / 22T 알루미늄",
+      materialCategoryCode: "MAT-DOOR-ABS",
+      requiredProductMatch: true,
+      highValue: true,
       unit: "ea",
       quantityFormula: "fixture_count",
       quantityMultiplier: 1,
@@ -1054,6 +1083,9 @@ export const WINDOW_DOOR_RULE: WorkPackageRule = {
   ],
 };
 
+// P14-5: 상가/사무실 18~22공종 룰
+import { ALL_COMMERCIAL_RULES } from "./commercial-rules";
+
 /** 모든 규칙 — 견적 엔진이 surfacePlan과 매칭할 때 순회 */
 export const ALL_WORK_PACKAGE_RULES: WorkPackageRule[] = [
   WOOD_FLOOR_RULE,
@@ -1067,4 +1099,6 @@ export const ALL_WORK_PACKAGE_RULES: WorkPackageRule[] = [
   LIGHTING_ELECTRICAL_RULE,
   SCAFFOLD_PROTECTION_RULE,
   WINDOW_DOOR_RULE,
+  // P14-5 상가/사무실 5종 (18~22)
+  ...ALL_COMMERCIAL_RULES,
 ];

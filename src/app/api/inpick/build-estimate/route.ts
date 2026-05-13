@@ -251,6 +251,144 @@ function buildFallbackRoomsFromArea(body: Record<string, unknown>): Array<{
 }
 
 /**
+ * P14-2: ConstructionEstimate → construction_estimates + construction_estimate_lines + snapshots DB INSERT.
+ * fire-and-forget — 견적 응답은 막지 않음. 실패해도 silent (log only).
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function persistEstimateToDb(
+  admin: any,
+  estimate: ConstructionEstimate,
+  projectId: string,
+  userId: string,
+  contextId: string,
+): Promise<void> {
+  if (!admin) return;
+  try {
+    // 1) construction_estimates row 생성
+    const { data: estRow, error: estErr } = await admin
+      .from("construction_estimates")
+      .insert({
+        id: estimate.id,
+        project_id: projectId,
+        user_id: userId,
+        project_mode: estimate.projectMode,
+        version: estimate.version,
+        estimate_json: estimate,
+        total_with_vat: estimate.totals.totalWithVat,
+        confidence_avg: estimate.confidenceSummary.averageConfidence,
+        source_summary: estimate.confidenceSummary,
+      })
+      .select("id")
+      .single();
+    if (estErr || !estRow) {
+      console.warn("[build-estimate] estimates INSERT failed:", estErr?.message);
+      return;
+    }
+    const estimateId = estRow.id;
+
+    // 2) construction_estimate_lines bulk INSERT
+    const lineRows = estimate.lines.map((l) => ({
+      estimate_id: estimateId,
+      estimate_context_id: contextId,
+      project_id: projectId,
+      user_id: userId,
+      sort_no: l.sortNo,
+      trade_code: l.tradeCode,
+      trade_name_ko: l.tradeNameKo,
+      sub_trade_code: l.subTradeCode,
+      sub_trade_name_ko: l.subTradeNameKo,
+      room_id: l.roomId,
+      room_name: l.roomName,
+      room_type: l.roomType,
+      surface_type: l.surfaceType,
+      task_name_ko: l.taskNameKo,
+      item_name_ko: l.itemNameKo,
+      brand: l.brand,
+      sku: l.sku,
+      spec: l.spec,
+      unit: l.unit,
+      quantity_formula_ko: l.quantityFormulaKo,
+      quantity: l.quantity,
+      material_unit_price: l.materialUnitPrice,
+      labor_unit_price: l.laborUnitPrice,
+      expense_unit_price: l.expenseUnitPrice,
+      material_amount: l.materialAmount,
+      labor_amount: l.laborAmount,
+      expense_amount: l.expenseAmount,
+      total_amount: l.totalAmount,
+      included: l.included,
+      source: l.source,
+      confidence: l.confidence,
+      evidence_refs: l.evidenceRefs,
+      assumptions: l.assumptions,
+      warnings: l.warnings,
+      // P12: product/price meta
+      material_product_id: l.materialProductId,
+      manufacturer: l.manufacturer,
+      supplier_name: l.supplierName,
+      vendor_name: l.vendorName,
+      product_name: l.productName,
+      model_no: l.modelNo,
+      product_spec: l.productSpec,
+      product_unit: l.productUnit,
+      material_category_code: l.materialCategoryCode,
+      material_category_name: l.materialCategoryName,
+      material_price_source: l.materialPriceSource,
+      material_price_source_id: l.materialPriceSourceId,
+      material_price_applied_at: l.materialPriceAppliedAt,
+      product_match_status: l.productMatchStatus,
+      product_match_confidence: l.productMatchConfidence,
+      price_confidence: l.priceConfidence,
+      fallback_reason: l.fallbackReason,
+    }));
+    const { data: insertedLines, error: linesErr } = await admin
+      .from("construction_estimate_lines")
+      .insert(lineRows)
+      .select("id, material_product_id, brand, manufacturer, supplier_name, sku, spec, material_unit_price, material_price_source, fallback_reason");
+    if (linesErr) {
+      console.warn("[build-estimate] lines INSERT failed:", linesErr.message);
+      return;
+    }
+
+    // 3) snapshots — product 매칭된 line만 INSERT
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const snapshotRows = ((insertedLines ?? []) as any[])
+      .filter((l) => l.material_product_id)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((l: any) => {
+        const row = l as Record<string, unknown>;
+        return {
+          estimate_line_id: row.id,
+          project_id: projectId,
+          user_id: userId,
+          material_product_id: row.material_product_id,
+          brand: row.brand,
+          manufacturer: row.manufacturer,
+          supplier_name: row.supplier_name,
+          sku: row.sku,
+          spec: row.spec,
+          unit_price: row.material_unit_price,
+          price_source: row.material_price_source,
+          fallback_reason: row.fallback_reason,
+        };
+      });
+    if (snapshotRows.length > 0) {
+      const { error: snapErr } = await admin
+        .from("estimate_line_product_snapshots")
+        .insert(snapshotRows);
+      if (snapErr) {
+        console.warn("[build-estimate] snapshots INSERT failed:", snapErr.message);
+      }
+    }
+    console.info(
+      `[build-estimate] persisted estimateId=${estimateId} lines=${lineRows.length} snapshots=${snapshotRows.length}`,
+    );
+  } catch (err) {
+    console.warn("[build-estimate] persistEstimateToDb error:", err);
+  }
+}
+
+/**
  * P7: contextId → estimate_contexts 조회 → SurfacePlan[] → ConstructionEstimate (17공종).
  *
  * 응답에 v2 견적과 legacy-호환 estimates/grandTotal을 함께 담아 UI 점진 마이그레이션 가능.
@@ -283,10 +421,13 @@ async function buildConstructionEstimateFromContextId(
     normalizedFloorplan?: { rooms?: Array<{ name: string; widthMm?: number; depthMm?: number }> };
   };
   const roomAreasByName: Record<string, number> = {};
+  // P14-1: 방 도면 치수 (mm) → KitchenPlan/RoomQuantityBasis에 전달
+  const floorplanDimsByName: Record<string, { widthMm?: number; depthMm?: number }> = {};
   // normalizedFloorplan의 방 면적 (mm → m²) 사용
   for (const r of step1.normalizedFloorplan?.rooms ?? []) {
     if (r.widthMm && r.depthMm) {
       roomAreasByName[r.name] = (r.widthMm * r.depthMm) / 1_000_000;
+      floorplanDimsByName[r.name] = { widthMm: r.widthMm, depthMm: r.depthMm };
     }
   }
   // 전체 평수도 옵션
@@ -307,6 +448,7 @@ async function buildConstructionEstimateFromContextId(
         (data.user_material_edits_snapshot as any[])
       : [],
     roomAreasByName,
+    floorplanDimsByName,
   });
 
   // P12: server-side에서 DB product/price resolver 호출 → line에 brand/sku/manufacturer/source 채움
@@ -317,6 +459,12 @@ async function buildConstructionEstimateFromContextId(
       surfacePlans,
       quantityBasisByRoom,
     });
+
+  // P14-2: construction_estimate_lines + snapshot DB INSERT (fire-and-forget)
+  //   견적 발행 시 현재 자재/단가/제조사 스냅샷 영속 — 사업자 입찰 학습 + 발행 후 단가 변경 불변
+  void persistEstimateToDb(admin, constructionEstimate, String(data.project_id), String(data.user_id), contextId).catch(
+    (err) => console.warn("[build-estimate] persistEstimateToDb failed (non-fatal):", err),
+  );
 
   // legacy 호환 — 기존 견적 페이지가 사용하는 estimates[]/grandTotal 형태로도 제공
   const legacyEstimates = convertV2ToLegacyEstimates(constructionEstimate);
