@@ -1,13 +1,18 @@
 /**
- * A4 가로 견적서 PDF — 4페이지 단일 진입.
+ * A4 가로 견적서 PDF — 7페이지 양식 (P13-1 확장).
  *
- * 가이드: c:\Users\user\Downloads\inpick-construction-estimate-drawing-package-plan-20260511.md §7
+ * 가이드:
+ *   - inpick-construction-estimate-drawing-package-plan-20260511.md §7
+ *   - inpick-estimate-v2-product-price-pdf-fix-plan-20260513.md §8 — 자재집계표 분리
  *
  * 페이지 순서:
  *   1. 갑지 (cover)
  *   2. 총괄표 (cost-summary)
  *   3. 총괄내역서 (trade-summary)
- *   4. 공종별내역서 (trade-detail — 다중 페이지 가능)
+ *   4. 공종별내역서 (trade-detail — 다중 페이지 가능, 작업 중심)
+ *   5. 자재집계표 (material-summary — 제조사/SKU/단가출처 분리)        [P13-1 신규]
+ *   6. 산출근거서 (computation-basis — DB확정/카테고리/표준 비율)      [P13-1 신규]
+ *   7. 특기사항·제외사항 (assumptions-exclusions)                         [P13-1 신규]
  */
 import jsPDF from "jspdf";
 import type { EstimateDocumentPackage } from "../types";
@@ -43,6 +48,18 @@ export async function renderEstimatePackagePdf(input: {
 
   // ─── 4. 공종별내역서 ───
   drawTradeDetailPages(doc, pkg);
+  doc.addPage("a4", "landscape");
+
+  // ─── 5. 자재집계표 (P13-1 신규) ───
+  drawMaterialSummaryPages(doc, pkg);
+  doc.addPage("a4", "landscape");
+
+  // ─── 6. 산출근거서 (P13-1 신규) ───
+  drawComputationBasisPage(doc, pkg);
+  doc.addPage("a4", "landscape");
+
+  // ─── 7. 특기사항/제외사항 (P13-1 신규) ───
+  drawAssumptionsExclusionsPage(doc, pkg);
 
   // 페이지 번호 + footer
   const total = doc.getNumberOfPages();
@@ -397,6 +414,349 @@ function drawTradeDetailPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
     }
     y += 3;
   }
+}
+
+// ─── 5. 자재집계표 (P13-1) — 제조사/브랜드/납품사/SKU/단가출처 분리 ───
+function drawMaterialSummaryPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(14);
+  doc.text("자 재 집 계 표", PAGE.width / 2, 18, { align: "center" });
+  doc.setFontSize(8);
+  doc.setFont("NanumGothic", "normal");
+  doc.setTextColor(100, 100, 100);
+  doc.text(
+    "제조사 / 브랜드 / 납품사 / SKU / 규격 / 단가 출처 — 상품 중심 집계",
+    PAGE.width / 2,
+    24,
+    { align: "center" },
+  );
+  doc.setTextColor(0, 0, 0);
+
+  // 자재 키별 그룹화 (brand + itemName + spec + unit)
+  type MatRow = {
+    category: string;
+    brand?: string;
+    manufacturer?: string;
+    supplierName?: string;
+    productName: string;
+    sku?: string;
+    spec?: string;
+    unit: string;
+    qty: number;
+    amount: number;
+    priceSource?: string;
+    appliedAt?: string;
+    matchStatus?: string;
+    fallbackReason?: string;
+  };
+  const byMaterial = new Map<string, MatRow>();
+  for (const l of pkg.lines) {
+    if (!l.materialAmount || l.materialAmount <= 0) continue;
+    const key = [l.brand ?? "", l.manufacturer ?? "", l.itemName, l.spec ?? "", l.unit].join("|");
+    let row = byMaterial.get(key);
+    if (!row) {
+      row = {
+        category: l.materialCategoryName || l.tradeName,
+        brand: l.brand,
+        manufacturer: l.manufacturer,
+        supplierName: l.supplierName || l.vendorName,
+        productName: l.productName || l.itemName,
+        sku: l.sku || l.modelNo,
+        spec: l.spec || l.productSpec,
+        unit: l.unit,
+        qty: 0,
+        amount: 0,
+        priceSource: l.priceSource,
+        appliedAt: l.appliedAt,
+        matchStatus: l.matchStatus,
+        fallbackReason: l.fallbackReason,
+      };
+      byMaterial.set(key, row);
+    }
+    row.qty += l.quantity;
+    row.amount += l.materialAmount;
+  }
+  const rows = Array.from(byMaterial.values()).sort((a, b) => b.amount - a.amount);
+
+  // 컬럼 정의
+  const cols = [
+    { label: "No.", x: PAGE.marginX, w: 8, align: "right" as const },
+    { label: "분류", x: PAGE.marginX + 8, w: 22 },
+    { label: "자재명", x: PAGE.marginX + 30, w: 40 },
+    { label: "제조사", x: PAGE.marginX + 70, w: 25 },
+    { label: "납품사", x: PAGE.marginX + 95, w: 22 },
+    { label: "SKU/모델", x: PAGE.marginX + 117, w: 22 },
+    { label: "규격", x: PAGE.marginX + 139, w: 22 },
+    { label: "단위", x: PAGE.marginX + 161, w: 8 },
+    { label: "수량", x: PAGE.marginX + 169, w: 12, align: "right" as const },
+    { label: "단가", x: PAGE.marginX + 181, w: 22, align: "right" as const },
+    { label: "금액", x: PAGE.marginX + 203, w: 28, align: "right" as const },
+    { label: "단가출처", x: PAGE.marginX + 231, w: 30 },
+    { label: "적용일", x: PAGE.marginX + 261, w: 16 },
+  ];
+
+  let y = 30;
+  // 컬럼 헤더
+  const drawHeader = () => {
+    doc.setFont("NanumGothic", "bold");
+    doc.setFontSize(6.5);
+    doc.setFillColor(24, 56, 95);
+    doc.setTextColor(255, 255, 255);
+    doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 5.5, "F");
+    for (const c of cols) {
+      const tx = c.align === "right" ? c.x + c.w - 1 : c.x + 1;
+      doc.text(c.label, tx, y + 2, { align: c.align || "left" });
+    }
+    doc.setTextColor(0, 0, 0);
+    y += 5.5;
+  };
+  drawHeader();
+
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(6.5);
+  let no = 1;
+  for (const r of rows) {
+    if (y > PAGE.height - 12) {
+      doc.addPage("a4", "landscape");
+      y = 20;
+      drawHeader();
+      doc.setFont("NanumGothic", "normal");
+      doc.setFontSize(6.5);
+    }
+    // 컬럼 값
+    doc.text(String(no), cols[0].x + cols[0].w - 1, y + 3, { align: "right" });
+    doc.text(truncate(r.category, 12), cols[1].x + 1, y + 3);
+    const productLabel = r.brand ? `${r.brand} ${r.productName}` : r.productName;
+    doc.text(truncate(productLabel, 22), cols[2].x + 1, y + 3);
+    doc.text(truncate(r.manufacturer || "-", 14), cols[3].x + 1, y + 3);
+    doc.text(truncate(r.supplierName || "-", 12), cols[4].x + 1, y + 3);
+    doc.text(truncate(r.sku || "-", 12), cols[5].x + 1, y + 3);
+    doc.text(truncate(r.spec || "-", 12), cols[6].x + 1, y + 3);
+    doc.text(r.unit === "m2" ? "m²" : r.unit, cols[7].x + 1, y + 3);
+    doc.text(fmtQuantity(r.qty), cols[8].x + cols[8].w - 1, y + 3, { align: "right" });
+    const unitPrice = r.qty > 0 ? Math.round(r.amount / r.qty) : 0;
+    doc.text(fmtWon(unitPrice), cols[9].x + cols[9].w - 1, y + 3, { align: "right" });
+    doc.setFont("NanumGothic", "bold");
+    doc.text(fmtWon(r.amount), cols[10].x + cols[10].w - 1, y + 3, { align: "right" });
+    doc.setFont("NanumGothic", "normal");
+    // 단가출처 — fallback이면 빨강
+    if (r.priceSource === "kpa_standard" || r.priceSource === "category_standard") {
+      doc.setTextColor(180, 60, 60);
+    } else if (r.priceSource === "material_price_lookup" || r.priceSource === "contractor_price") {
+      doc.setTextColor(30, 130, 80);
+    }
+    doc.text(truncate(priceSourceLabelKo(r.priceSource), 16), cols[11].x + 1, y + 3);
+    doc.setTextColor(0, 0, 0);
+    doc.text(r.appliedAt ? fmtDate(r.appliedAt) : "-", cols[12].x + 1, y + 3);
+    no++;
+    y += 5;
+  }
+
+  // 하단: 통계
+  y += 5;
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(8);
+  doc.text("자재 총계", PAGE.marginX, y);
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(7);
+  const totalQty = rows.length;
+  const totalAmount = rows.reduce((s, r) => s + r.amount, 0);
+  const verified = rows.filter(
+    (r) =>
+      r.priceSource === "material_price_lookup" ||
+      r.priceSource === "contractor_price" ||
+      r.priceSource === "manual_override",
+  ).length;
+  const fallback = rows.filter(
+    (r) => r.priceSource === "kpa_standard" || r.priceSource === "category_standard",
+  ).length;
+  doc.text(
+    `자재 ${totalQty}건  ·  총 ${fmtWon(totalAmount)}  ·  DB 확정 ${verified}건  ·  표준 fallback ${fallback}건`,
+    PAGE.marginX,
+    y + 5,
+  );
+}
+
+/** 단가출처 한국어 라벨 */
+function priceSourceLabelKo(s?: string): string {
+  const map: Record<string, string> = {
+    manual_override: "사용자/사업자 확정",
+    material_price_lookup: "물가협회 단가",
+    material_price_observations: "최근 30일 평균",
+    contractor_price: "납품사 단가",
+    catalog_price: "카탈로그 단가",
+    category_standard: "카테고리 표준",
+    kpa_standard: "KPA 표준 fallback",
+  };
+  return s ? map[s] || s : "-";
+}
+
+// ─── 6. 산출근거서 (P13-1) ───
+function drawComputationBasisPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(14);
+  doc.text("산 출 근 거 서", PAGE.width / 2, 18, { align: "center" });
+
+  let y = 32;
+  doc.setFontSize(10);
+  doc.text("1. 수량 산출 기준", PAGE.marginX, y);
+  y += 6;
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  const basisLines = [
+    "• 바닥면적: 도면 치수 기반 또는 평형 표준 (도면 없을 시 둘레 = 4 × √면적 근사)",
+    "• 벽면적: 둘레 × 층고 (2.4m 기본) - 개구부 차감 (문 1.8㎡, 창 1.5㎡)",
+    "• 천장면적: 바닥면적 동일",
+    "• 걸레받이 둘레: 방 둘레",
+    "• 손실률: 마루 5%, 벽지 5%, 타일 7% 적용 (단위 수량 × 1+wasteFactor)",
+    "• 욕실/주방/발코니: 습식공간 방수 시공 자동 포함",
+    "• 욕실 벽 노출률 0% (도배 X — 별도 타일 공정), 주방 55%, 드레스룸 70%, 발코니/다용도실 85%",
+  ];
+  for (const t of basisLines) {
+    doc.text(t, PAGE.marginX + 2, y);
+    y += 4.5;
+  }
+  doc.setTextColor(0, 0, 0);
+
+  y += 6;
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(10);
+  doc.text("2. 자재/단가 출처 분포", PAGE.marginX, y);
+  y += 6;
+  // 라인별 source 통계
+  const sourceCounts: Record<string, { count: number; amount: number }> = {};
+  for (const l of pkg.lines) {
+    const key = l.priceSource || "미확정";
+    if (!sourceCounts[key]) sourceCounts[key] = { count: 0, amount: 0 };
+    sourceCounts[key].count++;
+    sourceCounts[key].amount += l.totalAmount;
+  }
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  const sortedSources = Object.entries(sourceCounts).sort((a, b) => b[1].amount - a[1].amount);
+  for (const [source, stat] of sortedSources) {
+    const isDb = ["material_price_lookup", "contractor_price", "manual_override"].includes(source);
+    if (isDb) doc.setTextColor(30, 130, 80);
+    else if (source === "kpa_standard" || source === "category_standard") doc.setTextColor(180, 60, 60);
+    doc.text(
+      `• ${priceSourceLabelKo(source)} — ${stat.count}건, 금액 ${fmtWon(stat.amount)}`,
+      PAGE.marginX + 2,
+      y,
+    );
+    doc.setTextColor(0, 0, 0);
+    y += 4.5;
+  }
+
+  y += 6;
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(10);
+  doc.text("3. 간접비·관리비·이윤·VAT 적용", PAGE.marginX, y);
+  y += 6;
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  const rateLines = [
+    "• 간접비: 직접공사비 × 6%",
+    "• 일반관리비: 직접공사비 × 4%",
+    "• 이윤: (직접공사비 + 간접비 + 관리비) × 5%",
+    "• 부가가치세: 공급가액 × 10%",
+    "• 총액 = 직접공사비 + 간접비 + 관리비 + 이윤 + VAT",
+  ];
+  for (const t of rateLines) {
+    doc.text(t, PAGE.marginX + 2, y);
+    y += 4.5;
+  }
+  doc.setTextColor(0, 0, 0);
+}
+
+// ─── 7. 특기사항·제외사항 (P13-1) ───
+function drawAssumptionsExclusionsPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(14);
+  doc.text("특 기 사 항 · 제 외 사 항", PAGE.width / 2, 18, { align: "center" });
+
+  let y = 32;
+  doc.setFontSize(10);
+  doc.text("1. 견적 적용 가정 (Assumptions)", PAGE.marginX, y);
+  y += 6;
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+
+  const assumptions = pkg.assumptions && pkg.assumptions.length > 0
+    ? pkg.assumptions
+    : [
+        "현장 실측 전 가견적입니다. 실제 시공 면적과 차이가 있을 수 있습니다.",
+        "기존 마감 철거가 필요한 것으로 가정했습니다.",
+        "기존 배관/전기 위치 유지 — 위치 이동 시 별도 추가 발생.",
+        "도면 치수가 부족한 부위는 평형 표준치수 또는 면적 기반 추정입니다.",
+      ];
+  for (const t of assumptions) {
+    const wrapped = doc.splitTextToSize(`• ${t}`, PAGE.width - PAGE.marginX * 2 - 4) as string[];
+    for (const line of wrapped) {
+      if (y > PAGE.height - 20) {
+        doc.addPage("a4", "landscape");
+        y = 20;
+      }
+      doc.text(line, PAGE.marginX + 2, y);
+      y += 4.5;
+    }
+  }
+  doc.setTextColor(0, 0, 0);
+
+  y += 6;
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(10);
+  doc.text("2. 제외 사항 (Exclusions)", PAGE.marginX, y);
+  y += 6;
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  const exclusions = pkg.exclusions && pkg.exclusions.length > 0
+    ? pkg.exclusions
+    : [
+        "구조 변경 (벽체 신설/철거, 슬라브 관통 등)",
+        "누수/하자 보수 (현장 확인 후 별도 견적)",
+        "도시가스 신설 또는 이설",
+        "소방·인허가 관련 비용 (상가/사무실의 경우)",
+        "사용자가 직접 구매한 자재 (자재비만 제외, 시공비는 포함)",
+        "건물 외부 공사 (외벽/창호 교체 외)",
+        "야간 작업/공휴일 작업 (별도 협의)",
+      ];
+  for (const t of exclusions) {
+    const wrapped = doc.splitTextToSize(`• ${t}`, PAGE.width - PAGE.marginX * 2 - 4) as string[];
+    for (const line of wrapped) {
+      if (y > PAGE.height - 20) {
+        doc.addPage("a4", "landscape");
+        y = 20;
+      }
+      doc.text(line, PAGE.marginX + 2, y);
+      y += 4.5;
+    }
+  }
+  doc.setTextColor(0, 0, 0);
+
+  y += 6;
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(10);
+  doc.text("3. 견적 유효기간 및 변경 가능 조건", PAGE.marginX, y);
+  y += 6;
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(60, 60, 60);
+  const validity = [
+    `견적 유효기간: ${pkg.validUntil ? fmtDate(pkg.validUntil) : "발행일로부터 30일"}`,
+    "현장 실측·도면 정밀 확인 후 자재 수량 5% 이내 조정 가능.",
+    "자재 단가는 시공일 기준 시장 단가로 재확인 후 적용.",
+    "사용자가 자재 등급(basic/standard/premium)을 변경하면 금액 재산정.",
+    "사업자 입찰 또는 계약 시 본 견적은 참고 자료이며, 최종 금액은 계약서 기준.",
+  ];
+  for (const t of validity) {
+    doc.text(`• ${t}`, PAGE.marginX + 2, y);
+    y += 4.5;
+  }
+  doc.setTextColor(0, 0, 0);
 }
 
 // ─── Footer (모든 페이지) ───

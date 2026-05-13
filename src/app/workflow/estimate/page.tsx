@@ -2058,6 +2058,8 @@ function EstimatePage() {
                                 grandTotal: { mainTotal: grandTotal.main, auxTotal: grandTotal.aux, laborTotal: grandTotal.labor, totalWon: grandTotal.total },
                                 matchMetaByRoom,
                               },
+                              // P13-1: v2 견적 lines 전달 — PDF 자재집계표/산출근거서에서 활용
+                              constructionEstimate: constructionEstimate || undefined,
                             }),
                           });
                           let data: { package?: unknown; documentNo?: string; error?: string; hint?: string };

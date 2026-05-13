@@ -18,6 +18,12 @@ import { ALL_WORK_PACKAGE_RULES } from "./work-package-rules";
 import { getTradeSortOrder } from "./trades";
 import { resolveMaterialProductForLine } from "./product-resolver";
 import { resolveMaterialPriceForLine } from "./price-resolver";
+// P13-2: KitchenPlan으로 주방 라인 수량 정밀화
+import {
+  buildKitchenPlan,
+  getKitchenLineQuantity,
+  type KitchenPlan,
+} from "./kitchen-plan-builder";
 import type {
   ConfidenceSummary,
   ConstructionEstimate,
@@ -54,6 +60,25 @@ export async function buildConstructionEstimateWithProductResolution(
 ): Promise<ConstructionEstimate> {
   const rawLines: ConstructionEstimateLine[] = [];
 
+  // P13-2: 주방 SurfacePlan이 있으면 KitchenPlan 미리 생성 (room별 1회)
+  const kitchenPlansByRoom = new Map<string, KitchenPlan>();
+  for (const sp of input.surfacePlans) {
+    if (sp.roomType === "kitchen" && !kitchenPlansByRoom.has(sp.roomId)) {
+      const basis = input.quantityBasisByRoom[sp.roomId];
+      kitchenPlansByRoom.set(
+        sp.roomId,
+        buildKitchenPlan({
+          projectId: input.projectId,
+          roomName: sp.roomName,
+          kitchenBasis: basis,
+          floorplanRoom: basis
+            ? { widthMm: undefined, depthMm: undefined } // TODO: surfacePlan에 도면 치수 전달
+            : undefined,
+        }),
+      );
+    }
+  }
+
   for (const surfacePlan of input.surfacePlans) {
     const basis = input.quantityBasisByRoom[surfacePlan.roomId];
     if (!basis) {
@@ -67,10 +92,26 @@ export async function buildConstructionEstimateWithProductResolution(
       continue;
     }
 
+    const kitchenPlan = kitchenPlansByRoom.get(surfacePlan.roomId);
+
     for (const rule of matchedRules) {
       for (const template of rule.outputLines) {
         if (!shouldIncludeTemplate(template, surfacePlan, basis)) continue;
         const line = createEstimateLine(surfacePlan, basis, template);
+        // P13-2: 주방 룰의 라인이면 KitchenPlan으로 수량 정밀화 (룰의 quantityMultiplier 무시)
+        if (kitchenPlan && template.tradeCode.match(/^(02|04|05|07|12|14|15)$/)) {
+          const planQty = getKitchenLineQuantity(template.subTradeCode, kitchenPlan);
+          if (planQty != null && planQty > 0) {
+            const newQty = Math.round(planQty * (1 + (template.wasteFactor ?? 0)) * 10) / 10;
+            line.quantity = newQty;
+            line.materialAmount = Math.round(line.materialUnitPrice * newQty);
+            line.laborAmount = Math.round(line.laborUnitPrice * newQty);
+            line.expenseAmount = Math.round(line.expenseUnitPrice * newQty);
+            line.totalAmount = line.materialAmount + line.laborAmount + line.expenseAmount;
+            line.quantityFormulaKo = `KitchenPlan ${template.subTradeCode} · ${kitchenPlan.source}`;
+            line.assumptions.push(`주방 ${template.subTradeNameKo}: ${kitchenPlan.source} 기반 ${newQty}${template.unit}`);
+          }
+        }
         // P12: 재료비 있는 line만 resolver 실행 (노무비/경비만 있는 라인은 skip)
         if (line.materialUnitPrice > 0 || hasMaterialIntent(template)) {
           try {

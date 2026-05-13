@@ -59,6 +59,10 @@ export interface BuildSnapshotInput {
   bidOverrides?: BidPriceOverrides;
   /** 출시 후 입찰서 V02 등 */
   version?: number;
+  // P13-1: v2 ConstructionEstimate 직접 전달 — PDF 자재집계표/산출근거서용
+  //   있으면 buildEstimateResult.estimates 대신 이 lines 사용 (manufacturer/supplier/source 포함)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructionEstimate?: any;
 }
 
 /**
@@ -154,35 +158,78 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
     version,
   });
 
-  // 1. lines 변환 (buildEstimateResult.estimates → EstimateDocumentLine[])
+  // 1. lines 변환
   const lines: EstimateDocumentLine[] = [];
   let lineIdCounter = 1;
-  const roomEstimates = input.buildEstimateResult?.estimates || [];
-  for (const room of roomEstimates) {
-    for (const item of room.items) {
-      const tradeCode = surfaceToTradeCode(item.surface, item.materialName);
-      const isMain = item.category === "main";
-      const isLabor = item.category === "labor";
-      const isAux = item.category === "aux";
 
+  // P13-1: v2 ConstructionEstimate가 있으면 그 lines 우선 사용 (manufacturer/supplier/priceSource 포함)
+  if (input.constructionEstimate?.lines && Array.isArray(input.constructionEstimate.lines)) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const l of input.constructionEstimate.lines as any[]) {
       lines.push({
         id: `L${String(lineIdCounter++).padStart(4, "0")}`,
-        tradeCode,
-        tradeName: TRADE_NAMES_FALLBACK[tradeCode] || "기타공사",
-        roomName: room.roomName,
-        itemName: item.materialName,
-        spec: item.spec,
-        unit: item.unit,
-        quantity: item.quantity,
-        materialUnitPrice: isMain || isAux ? item.unitPriceWon : undefined,
-        materialAmount: isMain || isAux ? item.subtotalWon : undefined,
-        laborUnitPrice: isLabor ? item.unitPriceWon : undefined,
-        laborAmount: isLabor ? item.subtotalWon : undefined,
-        totalAmount: item.subtotalWon,
-        brand: item.brand,
-        sku: item.sku,
-        priceSource: item.priceSource,
+        tradeCode: String(l.tradeCode || "17"),
+        tradeName: String(l.tradeNameKo || "기타공사"),
+        roomName: l.roomName,
+        itemName: String(l.itemNameKo || l.productName || "자재"),
+        spec: l.spec || l.productSpec,
+        unit: String(l.unit || "EA"),
+        quantity: Number(l.quantity) || 0,
+        materialUnitPrice: Number(l.materialUnitPrice) || 0,
+        materialAmount: Number(l.materialAmount) || 0,
+        laborUnitPrice: Number(l.laborUnitPrice) || 0,
+        laborAmount: Number(l.laborAmount) || 0,
+        expenseUnitPrice: Number(l.expenseUnitPrice) || 0,
+        expenseAmount: Number(l.expenseAmount) || 0,
+        totalAmount: Number(l.totalAmount) || 0,
+        // P13: product/price meta — PDF 자재집계표용
+        brand: l.brand,
+        productName: l.productName,
+        sku: l.sku,
+        materialProductId: l.materialProductId,
+        priceSource: l.materialPriceSource,
+        confidence: l.priceConfidence,
+        manufacturer: l.manufacturer,
+        supplierName: l.supplierName,
+        vendorName: l.vendorName,
+        modelNo: l.modelNo,
+        productSpec: l.productSpec,
+        materialCategoryName: l.materialCategoryName,
+        matchStatus: l.productMatchStatus,
+        fallbackReason: l.fallbackReason,
+        appliedAt: l.materialPriceAppliedAt,
+        calculationBasis: l.quantityFormulaKo,
       });
+    }
+  } else {
+    // legacy 경로 — buildEstimateResult.estimates 사용
+    const roomEstimates = input.buildEstimateResult?.estimates || [];
+    for (const room of roomEstimates) {
+      for (const item of room.items) {
+        const tradeCode = surfaceToTradeCode(item.surface, item.materialName);
+        const isMain = item.category === "main";
+        const isLabor = item.category === "labor";
+        const isAux = item.category === "aux";
+
+        lines.push({
+          id: `L${String(lineIdCounter++).padStart(4, "0")}`,
+          tradeCode,
+          tradeName: TRADE_NAMES_FALLBACK[tradeCode] || "기타공사",
+          roomName: room.roomName,
+          itemName: item.materialName,
+          spec: item.spec,
+          unit: item.unit,
+          quantity: item.quantity,
+          materialUnitPrice: isMain || isAux ? item.unitPriceWon : undefined,
+          materialAmount: isMain || isAux ? item.subtotalWon : undefined,
+          laborUnitPrice: isLabor ? item.unitPriceWon : undefined,
+          laborAmount: isLabor ? item.subtotalWon : undefined,
+          totalAmount: item.subtotalWon,
+          brand: item.brand,
+          sku: item.sku,
+          priceSource: item.priceSource,
+        });
+      }
     }
   }
 

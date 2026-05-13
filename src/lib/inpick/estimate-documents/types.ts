@@ -100,6 +100,16 @@ export interface EstimateDocumentLine {
   priceSource?: string;
   confidence?: number;
   notes?: string;
+  // P13: 자재집계표용 — manufacturer/supplier/spec 확장
+  manufacturer?: string;
+  supplierName?: string;
+  vendorName?: string;
+  modelNo?: string;
+  productSpec?: string;
+  materialCategoryName?: string;
+  matchStatus?: string;
+  fallbackReason?: string;
+  appliedAt?: string;
 }
 
 /**

@@ -36,6 +36,9 @@ interface BodyInput {
   contractorId?: string;
   /** build-estimate 응답 직접 전달 (호출자가 합쳐서 전송) */
   buildEstimateResult?: Parameters<typeof buildEstimateDocumentPackage>[0]["buildEstimateResult"];
+  // P13-1: v2 ConstructionEstimate 전달 — PDF 자재집계표/산출근거서용
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructionEstimate?: any;
   /** scope summary 보강 — 호출자 입력 */
   projectName?: string;
   addressText?: string;
@@ -150,6 +153,7 @@ export async function POST(req: NextRequest) {
     contractor: contractor || undefined,
     inpick,
     buildEstimateResult: body.buildEstimateResult,
+    constructionEstimate: body.constructionEstimate,
   });
 
   // DB insert — preview 모드는 실패해도 200 (anonymous 사용자 PDF 다운로드 지원)
