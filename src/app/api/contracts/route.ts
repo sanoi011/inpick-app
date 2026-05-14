@@ -1,7 +1,87 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 import { buildProgressPayments } from "@/lib/inpick/bid-pipeline";
+
+/**
+ * P16-4: AI 견적 vs 사업자 입찰 vs 최종 계약 금액 비교 기록.
+ * 가이드: inpick-material-category-taxonomy-base-20260513.md §16-4
+ *
+ * 계약 체결 시점에 자동 호출. construction_estimates에서 공종별 합계를 가져와 trade_variances 작성.
+ */
+async function recordAccuracyOutcome(input: {
+  consumerProjectId: string | null;
+  estimateId: string | null;
+  bidId: string | null;
+  contractId: string;
+  aiEstimateAmount: number;
+  contractorBidAmount: number;
+  contractAmount: number;
+}): Promise<void> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    console.warn("[accuracy-outcome] service role not configured");
+    return;
+  }
+  const admin = createServiceClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const aiAmt = input.aiEstimateAmount;
+  const bidAmt = input.contractorBidAmount;
+  const contractAmt = input.contractAmount;
+  const varianceAiToBid = aiAmt > 0 ? (bidAmt - aiAmt) / aiAmt : null;
+  const varianceAiToContract = aiAmt > 0 ? (contractAmt - aiAmt) / aiAmt : null;
+
+  if (!input.consumerProjectId) {
+    // project_id NOT NULL 제약 — consumer_project_id 없으면 outcome 기록 skip
+    console.info("[accuracy-outcome] skipped (no consumer_project_id)");
+    return;
+  }
+  const tradeVariances: Record<string, { ai: number; lineCount: number }> = {};
+  const projectId: string = input.consumerProjectId;
+  {
+    const { data: ce } = await admin
+      .from("construction_estimates")
+      .select("id")
+      .eq("consumer_project_id", input.consumerProjectId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (ce?.id) {
+      const { data: lines } = await admin
+        .from("construction_estimate_lines")
+        .select("trade_code, trade_name_ko, total_amount")
+        .eq("estimate_id", ce.id);
+      if (lines) {
+        for (const l of lines as Array<{ trade_code: string; total_amount: number | string }>) {
+          const code = l.trade_code;
+          const amt = Number(l.total_amount) || 0;
+          const cur = tradeVariances[code] ?? { ai: 0, lineCount: 0 };
+          cur.ai += amt;
+          cur.lineCount += 1;
+          tradeVariances[code] = cur;
+        }
+      }
+    }
+  }
+
+  await admin.from("estimate_accuracy_outcomes").insert({
+    project_id: projectId,
+    estimate_id: input.estimateId,
+    contractor_bid_id: input.bidId,
+    contract_id: input.contractId,
+    ai_estimate_amount: aiAmt,
+    contractor_bid_amount: bidAmt,
+    contract_amount: contractAmt,
+    variance_ai_to_bid: varianceAiToBid,
+    variance_ai_to_contract: varianceAiToContract,
+    trade_variances: tradeVariances,
+    line_overrides: [],
+  });
+}
 
 // GET: 계약 조회
 export async function GET(request: NextRequest) {
@@ -325,6 +405,21 @@ export async function POST(request: NextRequest) {
       .from("estimates")
       .update({ status: "completed" })
       .eq("id", estimate.id);
+
+    // P16-4: estimate_accuracy_outcomes 자동 기록 — AI vs bid vs contract 학습 데이터
+    try {
+      await recordAccuracyOutcome({
+        consumerProjectId: estimate?.consumer_project_id ?? null,
+        estimateId: estimate?.id ?? null,
+        bidId: contract.bid_id,
+        contractId: contract.id,
+        aiEstimateAmount: Number(estimate?.grand_total ?? estimate?.total_amount ?? 0),
+        contractorBidAmount: Number(bid.bid_amount),
+        contractAmount: Number(contract.total_amount),
+      });
+    } catch (outcomeErr) {
+      console.error("[contract POST] accuracy outcome record failed:", outcomeErr);
+    }
 
     return NextResponse.json({ contract, projectCreated }, { status: 201 });
   } catch (err) {

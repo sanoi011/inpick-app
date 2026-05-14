@@ -18,6 +18,8 @@ import { ALL_WORK_PACKAGE_RULES } from "./work-package-rules";
 import { getTradeSortOrder } from "./trades";
 import { resolveMaterialProductForLine } from "./product-resolver";
 import { resolveMaterialPriceForLine } from "./price-resolver";
+// P17-4: 단가 sanity check
+import { validatePriceBand } from "@/lib/inpick/estimate-precision/price-sanity-check";
 // P13-2: KitchenPlan으로 주방 라인 수량 정밀화
 import {
   buildKitchenPlan,
@@ -233,6 +235,18 @@ function applyResolvedProductPriceToLine(
         product.matchStatus === "standard_fallback" ? "표준 fallback" : "카테고리 기본"
       }으로 산정됨 — 사업자 입찰 시 변동 가능.`,
     );
+  }
+
+  // P17-4: 단가 sanity check — band 벗어나면 warning
+  if (line.materialUnitPrice > 0 && line.materialCategoryCode) {
+    const sanity = validatePriceBand({
+      categoryCode: line.materialCategoryCode,
+      unitPrice: line.materialUnitPrice,
+      unit: line.unit,
+    });
+    if (sanity.status === "below_min" || sanity.status === "above_max") {
+      line.warnings.push(sanity.warning!);
+    }
   }
 }
 

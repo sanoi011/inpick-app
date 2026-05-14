@@ -17,6 +17,11 @@ const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-blue-500" /></div>,
 });
 
+const ConstructionEstimateV2Panel = dynamic(
+  () => import("@/components/contractor/ConstructionEstimateV2Panel"),
+  { loading: () => null },
+);
+
 interface RfqData {
   specialNotes?: string;
   preferredStartDate?: string;
@@ -488,6 +493,10 @@ export default function BidsPage() {
                       <Eye className="w-4 h-4" />
                       AI 디자인 시안 보기
                     </button>
+
+                    {est.consumer_project_id && (
+                      <ConstructionEstimateV2Panel consumerProjectId={est.consumer_project_id} />
+                    )}
 
                     {showEstimateDetail === est.id && (estimateItems.has(est.id) || editedEstimates.has(est.id)) && (
                       <div className="mt-3">

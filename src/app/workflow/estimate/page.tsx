@@ -43,6 +43,8 @@ import {
 // P7: 공종별 견적 v2 타입 + 클라이언트 빌더 (인증 없어도 17공종 견적 생성)
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/client-builder";
+// P17-1: 견적 정확도 레벨 L0~L5
+import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision-level";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -1397,6 +1399,52 @@ function EstimatePage() {
                     </div>
                   </div>
                 )}
+
+                {/* P17-1: 견적 정확도 레벨 (L0~L5) 배지 + 추천사항 */}
+                {!loading && !error && constructionEstimate && (() => {
+                  const precision = computePrecisionLevel(constructionEstimate);
+                  return (
+                    <div className={`mb-3 rounded-2xl border-2 ${precision.info.colorClass} p-4`}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-2xl">{precision.info.emoji}</span>
+                            <p className="text-sm font-extrabold">{precision.info.label}</p>
+                            <span className="ml-2 text-xs font-bold opacity-70">
+                              정밀도 {precision.score}점
+                            </span>
+                          </div>
+                          <p className="text-[0.72rem] opacity-80 leading-snug">
+                            {precision.info.description}
+                          </p>
+                          {precision.recommendations.length > 0 && (
+                            <ul className="mt-2 space-y-0.5">
+                              {precision.recommendations.map((r, i) => (
+                                <li key={i} className="text-[0.7rem] opacity-90">
+                                  • {r}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                        <div className="text-right text-[0.7rem] opacity-70 tabular shrink-0">
+                          <p>
+                            DB 확정 <b>{precision.lineStats.productLocked}</b>
+                          </p>
+                          <p>
+                            Vision <b>{precision.lineStats.visionConfirmed + precision.lineStats.visionRecommended}</b>
+                          </p>
+                          <p>
+                            사용자 <b>{precision.lineStats.userSelected}</b>
+                          </p>
+                          <p>
+                            Fallback <b>{precision.lineStats.standardFallback}</b>
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* P7-4: 공종별/공간별/부위별/자재별 보기 탭 — 항상 표시 (loading/error 제외) */}
                 {!loading && !error && (
