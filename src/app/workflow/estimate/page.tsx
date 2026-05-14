@@ -26,6 +26,7 @@ import {
   Layers,
   ChevronDown,
   FileText,
+  Share2,
 } from "lucide-react";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
@@ -47,6 +48,8 @@ import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/cl
 import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision-level";
 // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
 import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseModal";
+// community v2 (2026-05-14): 커뮤니티 견적 공유
+import EstimateShareModal from "@/components/community/EstimateShareModal";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -367,6 +370,8 @@ function EstimatePage() {
   // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
   const [pdfPurchaseOpen, setPdfPurchaseOpen] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  // community v2 (2026-05-14): 커뮤니티 공유 모달
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   const toggleV2LineIncluded = (lineId: string) => {
     setExcludedV2Lines((prev) => {
@@ -2293,6 +2298,17 @@ function EstimatePage() {
                     <p className="mt-2 text-[0.65rem] text-primary-900/50 text-center">
                       건축공사 업체용 형식 (갑지 / 총괄표 / 총괄내역 / 공종별)
                     </p>
+                    <button
+                      type="button"
+                      onClick={() => setShareModalOpen(true)}
+                      className="mt-2 inline-flex items-center justify-center gap-2 w-full rounded-xl border border-[#E5E2DD] bg-white px-4 py-2 text-[0.78rem] font-semibold text-[#202123] transition hover:bg-[#F7F7F5]"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                      커뮤니티에 견적 공유 (무료)
+                    </button>
+                    <p className="mt-1 text-[0.65rem] text-[#9A9A9A] text-center">
+                      개인정보 자동 제거 · 검증 사업자 의견 받기
+                    </p>
                   </div>
 
                   {/* P5: 산정 근거를 실제 라인 source 통계로 동적 표시 (사기 표시 방지) */}
@@ -2448,6 +2464,25 @@ function EstimatePage() {
           </div>
         </div>
       </main>
+      <EstimateShareModal
+        open={shareModalOpen}
+        projectId={
+          (typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("projectId")
+            : null) ||
+          getOrCreateWorkflowProjectId() ||
+          ""
+        }
+        estimateContextId={contextId ?? undefined}
+        hints={{
+          areaLabel: step1?.basicInfo?.selectedPyeong?.exclusiveArea
+            ? `${Math.round((step1.basicInfo.selectedPyeong.exclusiveArea / 3.3058) / 10) * 10}평대`
+            : undefined,
+          regionLabel: step1?.basicInfo?.selectedAddress?.roadAddress?.split(/\s+/).slice(0, 2).join(" "),
+          buildingType: "아파트",
+        }}
+        onClose={() => setShareModalOpen(false)}
+      />
       <EstimatePdfPurchaseModal
         open={pdfPurchaseOpen}
         consumerProjectId={
