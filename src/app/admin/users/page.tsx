@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle } from "lucide-react";
+import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle, FileText, Crown } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -53,6 +53,12 @@ export default function AdminUsersPage() {
   const [grantAmount, setGrantAmount] = useState("100");
   const [grantDescription, setGrantDescription] = useState("");
   const [granting, setGranting] = useState(false);
+
+  // pricing v2: PDF 무제한 entitlement 부여 상태 (userId → { has, entitlementId })
+  const [pdfUnlimitedMap, setPdfUnlimitedMap] = useState<
+    Record<string, { has: boolean; entitlementId?: string }>
+  >({});
+  const [pdfBusyUserId, setPdfBusyUserId] = useState<string | null>(null);
 
   // 테스트 계정 생성 상태
   const [seeding, setSeeding] = useState(false);
@@ -133,6 +139,86 @@ export default function AdminUsersPage() {
     } catch { toast({ type: "error", title: "오류", message: "크레딧 부여에 실패했습니다" }); }
     setGranting(false);
   }
+
+  // pricing v2: PDF 무제한 권한 조회/부여/해제
+  const adminAuth = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("admin_token") ?? ""}`,
+  });
+
+  async function loadPdfUnlimited(userId: string): Promise<void> {
+    try {
+      const res = await fetch(`/api/admin/entitlements?userId=${userId}`, { headers: adminAuth() });
+      if (!res.ok) return;
+      const data = await res.json();
+      const active = (data.entitlements ?? []).find(
+        (e: { entitlement_type: string; revoked_at: string | null; consumed_at: string | null; id: string }) =>
+          e.entitlement_type === "pdf_unlimited" && !e.revoked_at,
+      );
+      setPdfUnlimitedMap((prev) => ({
+        ...prev,
+        [userId]: { has: !!active, entitlementId: active?.id },
+      }));
+    } catch (e) {
+      console.warn("[admin/users] load pdf unlimited failed:", e);
+    }
+  }
+
+  async function togglePdfUnlimited(userId: string) {
+    setPdfBusyUserId(userId);
+    try {
+      const cur = pdfUnlimitedMap[userId];
+      if (cur?.has && cur.entitlementId) {
+        const res = await fetch(
+          `/api/admin/entitlements?entitlementId=${cur.entitlementId}&reason=관리자 해제`,
+          { method: "DELETE", headers: adminAuth() },
+        );
+        if (res.ok) {
+          setPdfUnlimitedMap((prev) => ({ ...prev, [userId]: { has: false } }));
+          toast({ type: "success", title: "해제 완료", message: "PDF 무제한 권한이 해제되었습니다" });
+        } else {
+          toast({ type: "error", title: "오류", message: "해제 실패" });
+        }
+      } else {
+        const res = await fetch("/api/admin/entitlements", {
+          method: "POST",
+          headers: adminAuth(),
+          body: JSON.stringify({
+            userId,
+            type: "pdf_unlimited",
+            reason: "관리자 PDF 무제한 부여 (구독시스템 사전 적용)",
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.entitlementId) {
+          setPdfUnlimitedMap((prev) => ({
+            ...prev,
+            [userId]: { has: true, entitlementId: data.entitlementId },
+          }));
+          toast({
+            type: "success",
+            title: data.alreadyGranted ? "이미 부여됨" : "부여 완료",
+            message: "PDF 무제한 권한이 부여되었습니다",
+          });
+        } else {
+          toast({ type: "error", title: "오류", message: data.hint || "부여 실패" });
+        }
+      }
+    } catch {
+      toast({ type: "error", title: "오류", message: "PDF 권한 처리 실패" });
+    } finally {
+      setPdfBusyUserId(null);
+    }
+  }
+
+  // 사용자 목록 로딩 후 일괄 PDF 권한 조회
+  useEffect(() => {
+    if (consumers.length === 0) return;
+    consumers.forEach((u) => {
+      if (pdfUnlimitedMap[u.id] === undefined) void loadPdfUnlimited(u.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consumers]);
 
   function formatPhone(raw: string): string {
     const d = raw.replace(/[^0-9]/g, "");
@@ -367,7 +453,7 @@ export default function AdminUsersPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center gap-1">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
                           <button onClick={() => openGrant(u.id, "add")}
                             className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors">
                             <Coins className="w-3 h-3" /> 부여
@@ -375,6 +461,25 @@ export default function AdminUsersPage() {
                           <button onClick={() => openGrant(u.id, "subtract")}
                             className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-red-500 hover:bg-red-50 rounded transition-colors">
                             <Minus className="w-3 h-3" /> 차감
+                          </button>
+                          <button
+                            onClick={() => togglePdfUnlimited(u.id)}
+                            disabled={pdfBusyUserId === u.id}
+                            title="PDF 다운로드 무제한 권한 (구독시스템 사전 적용)"
+                            className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50 ${
+                              pdfUnlimitedMap[u.id]?.has
+                                ? "bg-amber-100 text-amber-800 hover:bg-amber-200"
+                                : "text-amber-600 hover:bg-amber-50"
+                            }`}
+                          >
+                            {pdfBusyUserId === u.id ? (
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                            ) : pdfUnlimitedMap[u.id]?.has ? (
+                              <Crown className="w-3 h-3" />
+                            ) : (
+                              <FileText className="w-3 h-3" />
+                            )}
+                            {pdfUnlimitedMap[u.id]?.has ? "PDF무제한" : "PDF부여"}
                           </button>
                         </div>
                       )}

@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { creditTokensAfterPayment } from "@/lib/inpick/tokens/ledger";
+import { grantEstimatePdfSingleAfterPayment } from "@/lib/inpick/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -83,9 +84,24 @@ export async function POST(req: NextRequest) {
     user_id: string;
     amount_krw: number;
     status: string;
+    product_type?: string;
+    metadata?: Record<string, unknown>;
+    project_id?: string | null;
     product:
-      | { code: string; credit_amount: number; bonus_credit_amount: number; name_ko: string }
-      | Array<{ code: string; credit_amount: number; bonus_credit_amount: number; name_ko: string }>
+      | {
+          code: string;
+          product_type: string;
+          credit_amount: number;
+          bonus_credit_amount: number;
+          name_ko: string;
+        }
+      | Array<{
+          code: string;
+          product_type: string;
+          credit_amount: number;
+          bonus_credit_amount: number;
+          name_ko: string;
+        }>
       | null;
   };
   const productObj = Array.isArray(rawIntent.product)
@@ -268,6 +284,25 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // 상품 타입 분기: PDF 단발 결제는 크레딧 대신 entitlement 부여
+    if (intentRow.product.product_type === "pdf_estimate_single") {
+      const meta = (intentRow.metadata ?? {}) as { estimateId?: string; consumerProjectId?: string };
+      const grant = await grantEstimatePdfSingleAfterPayment({
+        userId: user.id,
+        paymentId: paymentId!,
+        estimateId: meta.estimateId ?? null,
+        consumerProjectId: meta.consumerProjectId ?? intentRow.project_id ?? null,
+      });
+      return NextResponse.json({
+        success: true,
+        paymentId,
+        orderId,
+        entitlementId: grant.entitlementId,
+        productType: "pdf_estimate_single",
+      });
+    }
+
+    // 기본: AI 크레딧 충전
     const credit = await creditTokensAfterPayment({
       userId: user.id,
       paymentId: paymentId!,

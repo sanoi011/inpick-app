@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { creditTokensAfterPayment } from "@/lib/inpick/tokens/ledger";
+import { grantEstimatePdfSingleAfterPayment } from "@/lib/inpick/entitlements";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,15 +36,24 @@ interface CheckoutBody {
   packageId?: string;
   projectId?: string;
   returnPath?: string;
+  // PDF 단발 결제 시 scope (estimateId 또는 consumerProjectId)
+  estimateId?: string;
+  consumerProjectId?: string;
 }
 
 // legacy packageId → 새 productCode 매핑 (호환)
+// v2 (2026-05-14): CREDIT_PACKAGES.id가 이미 productCode와 동일하므로 legacy만 유지
 const LEGACY_PACKAGE_MAP: Record<string, string> = {
   "pkg-10": "ai_credit_10",
   "pkg-30": "ai_credit_30",
   "pkg-50": "ai_credit_30",
   "pkg-100": "ai_credit_100",
-  "pkg-300": "ai_credit_100",
+  "pkg-300": "ai_credit_300",
+  // v2 신규 id는 그대로 productCode로 사용 가능 (자동 매핑)
+  ai_credit_10: "ai_credit_10",
+  ai_credit_30: "ai_credit_30",
+  ai_credit_100: "ai_credit_100",
+  ai_credit_300: "ai_credit_300",
 };
 
 export async function POST(req: NextRequest) {
@@ -142,7 +152,12 @@ export async function POST(req: NextRequest) {
       customer_key: user.id,
       success_url: successUrl,
       fail_url: failUrl,
-      metadata: { productCode: prod.code, returnPath: body.returnPath },
+      metadata: {
+        productCode: prod.code,
+        returnPath: body.returnPath,
+        estimateId: body.estimateId,
+        consumerProjectId: body.consumerProjectId,
+      },
     })
     .select("id, order_id")
     .single();
@@ -182,9 +197,27 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
 
-    // 크레딧 충전
+    // 크레딧 충전 또는 entitlement 부여
     if (mockPayment) {
       try {
+        // PDF 단발 결제는 entitlement 발급
+        if (prod.product_type === "pdf_estimate_single") {
+          const grant = await grantEstimatePdfSingleAfterPayment({
+            userId: user.id,
+            paymentId: (mockPayment as { id: string }).id,
+            estimateId: body.estimateId ?? null,
+            consumerProjectId: body.consumerProjectId ?? null,
+          });
+          return NextResponse.json({
+            mockMode: true,
+            orderId,
+            paymentIntentId: (intent as { id: string }).id,
+            entitlementId: grant.entitlementId,
+            productType: "pdf_estimate_single",
+          });
+        }
+
+        // 기본: AI 크레딧 충전
         const credit = await creditTokensAfterPayment({
           userId: user.id,
           paymentId: (mockPayment as { id: string }).id,

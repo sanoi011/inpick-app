@@ -45,6 +45,8 @@ import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/client-builder";
 // P17-1: 견적 정확도 레벨 L0~L5
 import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision-level";
+// pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
+import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseModal";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -221,6 +223,82 @@ const ROOM_ICONS: Record<string, typeof Home> = {
 type FilterCategory = "all" | "main" | "aux" | "labor";
 type SortBy = "default" | "price-desc" | "price-asc" | "name";
 
+/**
+ * PDF 발행 + 다운로드 + entitlement consume.
+ * 권한 체크는 호출하는 쪽에서 미리 수행.
+ */
+async function downloadEstimatePdf(input: {
+  projectId: string;
+  entitlementId?: string;
+  step1: Step1Data | null;
+  estimates: EstimateRoom[];
+  grandTotal: { main: number; aux: number; labor: number; total: number };
+  matchMetaByRoom: Record<string, Array<{ matchStatus?: "confirmed" | "recommended" | "fallback"; confidence?: number; surface?: string }>>;
+  constructionEstimate: ConstructionEstimate | null;
+}) {
+  const res = await fetch("/api/inpick/estimate-documents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      projectId: input.projectId,
+      mode: "consumer_preview",
+      addressText: input.step1?.basicInfo.selectedAddress?.roadAddress,
+      apartmentName: input.step1?.basicInfo.selectedAddress?.buildingName,
+      exclusiveAreaM2: input.step1?.basicInfo.selectedPyeong?.exclusiveArea,
+      expansionOption:
+        input.step1?.basicInfo.expansionType === "extended" ? "expanded" : "basic",
+      buildEstimateResult: {
+        estimates: input.estimates,
+        grandTotal: {
+          mainTotal: input.grandTotal.main,
+          auxTotal: input.grandTotal.aux,
+          laborTotal: input.grandTotal.labor,
+          totalWon: input.grandTotal.total,
+        },
+        matchMetaByRoom: input.matchMetaByRoom,
+      },
+      constructionEstimate: input.constructionEstimate || undefined,
+    }),
+  });
+  let data: { package?: unknown; documentNo?: string; error?: string; hint?: string };
+  try {
+    data = (await res.json()) as typeof data;
+  } catch {
+    alert(`PDF API 응답 파싱 실패 (HTTP ${res.status})`);
+    return;
+  }
+  if (!data.package) {
+    alert(`견적서 발행 실패: ${data.error || "unknown"}${data.hint ? `\n${data.hint}` : ""}`);
+    return;
+  }
+  const { renderEstimatePackagePdf } = await import("@/lib/inpick/estimate-documents/pdf/estimate-pdf");
+  const { pdfBlob } = await renderEstimatePackagePdf({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    package: data.package as any,
+  });
+  const url = URL.createObjectURL(pdfBlob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `INPICK_견적서_${data.documentNo || "draft"}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  // 단발 entitlement이면 consume (무제한은 NOOP)
+  if (input.entitlementId) {
+    try {
+      await fetch("/api/estimate-pdf/consume", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entitlementId: input.entitlementId }),
+      });
+    } catch (e) {
+      console.warn("[estimate] entitlement consume failed:", e);
+    }
+  }
+}
+
 // P11-FIX: useSearchParams 사용 페이지는 Suspense로 감싸야 prerender 통과 (Vercel 빌드 에러 4회 원인)
 // 가이드: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
 export default function EstimatePageWithSuspense() {
@@ -286,6 +364,9 @@ function EstimatePage() {
   const [viewMode, setViewMode] = useState<"trade" | "room" | "surface" | "material">("trade");
   // P14-4: 사용자가 제외한 v2 line ID 집합 — 토글 시 총액 재계산
   const [excludedV2Lines, setExcludedV2Lines] = useState<Set<string>>(new Set());
+  // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
+  const [pdfPurchaseOpen, setPdfPurchaseOpen] = useState(false);
+  const [pdfDownloading, setPdfDownloading] = useState(false);
 
   const toggleV2LineIncluded = (lineId: string) => {
     setExcludedV2Lines((prev) => {
@@ -2154,9 +2235,11 @@ function EstimatePage() {
                     </p>
                     <button
                       type="button"
+                      disabled={pdfDownloading}
                       onClick={async () => {
+                        // pricing v2: 다운로드 직전 권한 체크
                         try {
-                          // P6: 견적서 PDF 발행 — workflow projectId 사용 (sessionStorage 기반)
+                          setPdfDownloading(true);
                           const queryProjectId =
                             typeof window !== "undefined"
                               ? new URLSearchParams(window.location.search).get("projectId")
@@ -2165,70 +2248,47 @@ function EstimatePage() {
                             queryProjectId ||
                             getOrCreateWorkflowProjectId() ||
                             "preview";
-                          // 1. estimate document 발행
-                          const res = await fetch("/api/inpick/estimate-documents", {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              projectId,
-                              mode: "consumer_preview",
-                              addressText: step1?.basicInfo.selectedAddress?.roadAddress,
-                              apartmentName: step1?.basicInfo.selectedAddress?.buildingName,
-                              exclusiveAreaM2: step1?.basicInfo.selectedPyeong?.exclusiveArea,
-                              expansionOption:
-                                step1?.basicInfo.expansionType === "extended"
-                                  ? "expanded"
-                                  : "basic",
-                              buildEstimateResult: {
-                                estimates,
-                                grandTotal: { mainTotal: grandTotal.main, auxTotal: grandTotal.aux, laborTotal: grandTotal.labor, totalWon: grandTotal.total },
-                                matchMetaByRoom,
-                              },
-                              // P13-1: v2 견적 lines 전달 — PDF 자재집계표/산출근거서에서 활용
-                              constructionEstimate: constructionEstimate || undefined,
-                            }),
-                          });
-                          let data: { package?: unknown; documentNo?: string; error?: string; hint?: string };
-                          try {
-                            data = (await res.json()) as typeof data;
-                          } catch {
-                            alert(`PDF API 응답 파싱 실패 (HTTP ${res.status})`);
-                            return;
-                          }
-                          if (!data.package) {
-                            alert(
-                              `견적서 발행 실패: ${data.error || "unknown"}${
-                                data.hint ? `\n${data.hint}` : ""
-                              }`,
-                            );
-                            return;
-                          }
-                          // 2. 클라이언트 측 jsPDF 렌더
-                          const { renderEstimatePackagePdf } = await import(
-                            "@/lib/inpick/estimate-documents/pdf/estimate-pdf"
+                          // 권한 체크
+                          const accessRes = await fetch(
+                            `/api/estimate-pdf/check-access?consumerProjectId=${encodeURIComponent(projectId)}`,
                           );
-                          const { pdfBlob } = await renderEstimatePackagePdf({
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            package: data.package as any,
+                          if (accessRes.status === 401) {
+                            alert("PDF 다운로드는 로그인 후 가능합니다.");
+                            return;
+                          }
+                          const access = (await accessRes.json()) as {
+                            granted: boolean;
+                            entitlementId?: string;
+                            reason?: string;
+                          };
+                          if (!access.granted) {
+                            setPdfPurchaseOpen(true);
+                            return;
+                          }
+                          await downloadEstimatePdf({
+                            projectId,
+                            entitlementId: access.entitlementId,
+                            step1,
+                            estimates,
+                            grandTotal,
+                            matchMetaByRoom,
+                            constructionEstimate,
                           });
-                          // 3. 다운로드
-                          const url = URL.createObjectURL(pdfBlob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `INPICK_견적서_${data.documentNo || "draft"}.pdf`;
-                          document.body.appendChild(a);
-                          a.click();
-                          document.body.removeChild(a);
-                          URL.revokeObjectURL(url);
                         } catch (e) {
                           console.error("[estimate] PDF download failed:", e);
                           alert("PDF 생성 실패: " + (e instanceof Error ? e.message : String(e)));
+                        } finally {
+                          setPdfDownloading(false);
                         }
                       }}
-                      className="mt-3 inline-flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-95 transition"
+                      className="mt-3 inline-flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-95 transition disabled:opacity-50"
                     >
-                      <Download className="h-3.5 w-3.5" />
-                      견적서 PDF 다운로드
+                      {pdfDownloading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                      견적서 PDF 다운로드 (9,900원)
                     </button>
                     <p className="mt-2 text-[0.65rem] text-primary-900/50 text-center">
                       건축공사 업체용 형식 (갑지 / 총괄표 / 총괄내역 / 공종별)
@@ -2388,6 +2448,41 @@ function EstimatePage() {
           </div>
         </div>
       </main>
+      <EstimatePdfPurchaseModal
+        open={pdfPurchaseOpen}
+        consumerProjectId={
+          typeof window !== "undefined"
+            ? new URLSearchParams(window.location.search).get("projectId") ||
+              getOrCreateWorkflowProjectId() ||
+              null
+            : null
+        }
+        onClose={() => setPdfPurchaseOpen(false)}
+        onPaid={async ({ entitlementId }) => {
+          setPdfPurchaseOpen(false);
+          // 결제 완료 → 즉시 다운로드
+          const projectId =
+            (typeof window !== "undefined"
+              ? new URLSearchParams(window.location.search).get("projectId")
+              : null) ||
+            getOrCreateWorkflowProjectId() ||
+            "preview";
+          setPdfDownloading(true);
+          try {
+            await downloadEstimatePdf({
+              projectId,
+              entitlementId,
+              step1,
+              estimates,
+              grandTotal,
+              matchMetaByRoom,
+              constructionEstimate,
+            });
+          } finally {
+            setPdfDownloading(false);
+          }
+        }}
+      />
     </LenisProvider>
   );
 }

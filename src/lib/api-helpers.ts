@@ -48,10 +48,20 @@ export function getEnvStatus() {
     RUNPOD_FLUX_ENDPOINT: !!process.env.RUNPOD_FLUX_ENDPOINT,
     TOSS_PAYMENTS_CLIENT_KEY: !!process.env.TOSS_PAYMENTS_CLIENT_KEY,
     TOSS_PAYMENTS_SECRET_KEY: !!process.env.TOSS_PAYMENTS_SECRET_KEY,
+    NEXT_PUBLIC_TOSS_CLIENT_KEY: !!process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY,
+    TOSS_WEBHOOK_SECRET: !!process.env.TOSS_WEBHOOK_SECRET,
     JUSO_API_KEY: !!process.env.JUSO_API_KEY,
     AI_PROVIDER_POLICY: !!process.env.AI_PROVIDER_POLICY,
     IMAGE_GEN_BACKEND: !!process.env.IMAGE_GEN_BACKEND,
   };
+
+  // Toss 모드 진단
+  const clientKey = process.env.TOSS_PAYMENTS_CLIENT_KEY ?? "";
+  const tossMode: "live" | "test" | "mock" = clientKey.startsWith("live_")
+    ? "live"
+    : clientKey.startsWith("test_")
+      ? "test"
+      : "mock";
   const deprecated = {
     // 정책상 사용 중지 — 이 키가 set 되어 있으면 경고
     GOOGLE_GEMINI_API_KEY: !!process.env.GOOGLE_GEMINI_API_KEY,
@@ -72,5 +82,17 @@ export function getEnvStatus() {
       : [],
     allConfigured: Object.values(required).every(Boolean),
     missingCount: Object.values(required).filter((v) => !v).length,
+    payments: {
+      tossMode,
+      tossModeLabelKo:
+        tossMode === "live"
+          ? "라이브 (실결제)"
+          : tossMode === "test"
+            ? "테스트 (Toss 위젯 호출, 실결제 없음)"
+            : "Mock (즉시 부여, 결제 없음)",
+      clientKeyPrefix: clientKey ? clientKey.slice(0, 8) + "…" : null,
+      secretKeyConfigured: !!process.env.TOSS_PAYMENTS_SECRET_KEY,
+      webhookConfigured: !!process.env.TOSS_WEBHOOK_SECRET,
+    },
   };
 }
