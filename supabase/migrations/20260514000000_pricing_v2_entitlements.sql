@@ -1,13 +1,18 @@
--- INPICK Pricing v2: 토큰 1개=500원 + 회원가입 보너스 5→10 + PDF 9,900원 + entitlements
+-- INPICK Pricing v2: 토큰 1개=500원 + 회원가입 10토큰 + PDF 9,900원 + entitlements
 -- 가이드: 2026-05-14 — 토스페이먼츠 입점 심사 대응 단가 단일화
+--
+-- 호환 환경:
+--   * 적용 가정: user_credits (20260211) + token_wallets/token_ledger (20260512) — 모두 운영 DB에 존재
+--   * user_tokens (20260426) 은 *적용되지 않은* 상태로 가정. 참조 자체를 하지 않음.
+--
 -- 정책:
---   * 기존 `payment_products` 행을 UPDATE (가격 단가만 변경)
---   * 기존 `grant_signup_bonus` 함수의 5토큰을 10토큰으로 변경 (REPLACE)
---   * 이미 5토큰만 받은 기존 사용자에게 +5 backfill (idempotent: 'signup_topup_to_10' metadata로 1회만)
---   * PDF 다운로드는 단일 견적당 9,900원 (부가세 포함) 또는 관리자 무제한 권한
+--   * payment_products 기존 행 UPDATE (단가만 변경)
+--   * 견적서 PDF 단발 다운로드 상품 신규 (estimate_pdf_single, 9,900원 부가세 포함)
+--   * 회원가입 시 token_wallets + user_credits 양쪽에 +10 보너스
+--   * 기존 사용자 backfill: wallet balance 10 미만이면 10까지 보충 (idempotency_key 'signup:{userId}')
+--   * user_entitlements 신규 (pdf_unlimited / estimate_pdf_single)
 
 -- ─── §1. payment_products: 가격 v2 반영 (기존 행 UPDATE) ─────────────
--- 정책: 토큰 1개 = 500원
 UPDATE payment_products SET
   name_ko = '토큰 10개',
   description_ko = '이미지 10장 생성 (1장 = 1토큰, 1개당 500원)',
@@ -38,7 +43,7 @@ UPDATE payment_products SET
   is_active = TRUE
 WHERE code = 'ai_credit_100';
 
--- 신규 패키지: 300개 (대량) — 기존에 없으므로 INSERT 또는 활성화
+-- 신규 패키지: 300개 (대량) — 기존에 없으면 INSERT
 INSERT INTO payment_products
   (code, product_type, name_ko, description_ko, amount_krw, credit_amount, bonus_credit_amount, sort_order, is_active)
 VALUES
@@ -66,62 +71,110 @@ ON CONFLICT (code) DO UPDATE SET
   is_active = EXCLUDED.is_active,
   metadata = EXCLUDED.metadata;
 
--- ─── §2. 회원가입 보너스 5 → 10 변경 (기존 grant_signup_bonus REPLACE) ───
-CREATE OR REPLACE FUNCTION grant_signup_bonus()
+-- ─── §2. 회원가입 보너스 토큰 10개 자동 지급 함수 ─────────────────
+-- token_wallets + user_credits 양쪽에 +10 (idempotent)
+CREATE OR REPLACE FUNCTION grant_signup_tokens_v2()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
+DECLARE
+  v_idempotency_key TEXT := 'signup:' || NEW.id::text;
+  v_existing_count INT;
 BEGIN
-  INSERT INTO user_tokens (user_id, balance) VALUES (NEW.id, 10)
-  ON CONFLICT (user_id) DO NOTHING;
-  INSERT INTO token_transactions (user_id, type, feature, amount, balance_after, metadata)
-  VALUES (NEW.id, 'signup_bonus', 'welcome', 10, 10, jsonb_build_object('source', 'signup_trigger', 'version', 'pricing_v2'));
+  -- 중복 방지: 이미 signup 보너스 받았는지 token_ledger로 확인
+  SELECT COUNT(*) INTO v_existing_count
+    FROM token_ledger
+    WHERE idempotency_key = v_idempotency_key;
+  IF v_existing_count > 0 THEN
+    RETURN NEW;
+  END IF;
+
+  -- 1) token_wallets에 +10 (promo balance)
+  INSERT INTO token_wallets (user_id, balance, paid_balance, promo_balance, total_purchased)
+    VALUES (NEW.id, 10, 0, 10, 10)
+    ON CONFLICT (user_id) DO UPDATE SET
+      promo_balance = token_wallets.promo_balance + 10,
+      balance = token_wallets.balance + 10,
+      total_purchased = token_wallets.total_purchased + 10,
+      updated_at = NOW();
+
+  -- 2) token_ledger 기록 (idempotency_key UNIQUE로 중복 차단)
+  INSERT INTO token_ledger
+    (user_id, entry_type, delta, paid_delta, promo_delta, balance_after,
+     source_type, idempotency_key, reason_ko, metadata)
+  VALUES
+    (NEW.id, 'bonus_credit', 10, 0, 10,
+     (SELECT balance FROM token_wallets WHERE user_id = NEW.id),
+     'promo', v_idempotency_key, '회원가입 보너스 토큰 10개',
+     '{"event":"signup","version":"pricing_v2"}'::jsonb);
+
+  -- 3) 레거시 user_credits 동기화 (useCredits 훅 + enforceConsume 폴백 경로)
+  INSERT INTO user_credits (user_id, balance, free_generations_used)
+    VALUES (NEW.id, 10, 0)
+    ON CONFLICT (user_id) DO UPDATE SET
+      balance = user_credits.balance + 10,
+      updated_at = NOW();
+
   RETURN NEW;
 END;
 $$;
 
-COMMENT ON FUNCTION grant_signup_bonus() IS
-  '회원가입 시 토큰 10개 자동 지급 (2026-05-14 pricing v2). 기존 5개에서 10개로 상향.';
+COMMENT ON FUNCTION grant_signup_tokens_v2() IS
+  '회원가입 시 토큰 10개 자동 지급 (2026-05-14 pricing v2). token_wallets + user_credits 양쪽 갱신.';
 
--- user_tokens 기본값도 10으로 변경 (트리거에서 명시 INSERT하므로 안전망)
-ALTER TABLE user_tokens ALTER COLUMN balance SET DEFAULT 10;
+-- consumer_profiles INSERT 시 자동 호출
+DROP TRIGGER IF EXISTS trg_grant_signup_tokens_v2 ON consumer_profiles;
+CREATE TRIGGER trg_grant_signup_tokens_v2
+  AFTER INSERT ON consumer_profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION grant_signup_tokens_v2();
 
--- ─── §3. 기존 5토큰 받은 사용자에게 +5 backfill (idempotent) ───
+-- ─── §3. 기존 사용자 backfill: 보너스 10개 일괄 지급 ───────────────
+-- 이미 token_ledger에 'signup:{userId}' 기록 있는 사용자는 skip
+-- 없는 사용자는 +10 부여 (token_wallets + token_ledger + user_credits 동기화)
 DO $$
 DECLARE
   r RECORD;
+  v_new_balance INT;
 BEGIN
   FOR r IN
-    SELECT ut.user_id, ut.balance
-    FROM user_tokens ut
+    SELECT cp.id AS user_id
+    FROM consumer_profiles cp
     WHERE NOT EXISTS (
-      -- 이미 v2 backfill 받은 사용자 제외
-      SELECT 1 FROM token_transactions tt
-       WHERE tt.user_id = ut.user_id
-         AND tt.type = 'signup_bonus'
-         AND tt.metadata->>'version' IN ('pricing_v2', 'pricing_v2_backfill')
-    )
-    AND EXISTS (
-      -- 기존 signup_bonus를 받은 적이 있어야 함 (소급 대상)
-      SELECT 1 FROM token_transactions tt2
-       WHERE tt2.user_id = ut.user_id
-         AND tt2.type = 'signup_bonus'
+      SELECT 1 FROM token_ledger tl
+       WHERE tl.idempotency_key = 'signup:' || cp.id::text
     )
   LOOP
     BEGIN
-      UPDATE user_tokens
-        SET balance = balance + 5,
-            updated_at = NOW()
-        WHERE user_id = r.user_id;
+      -- token_wallets에 +10
+      INSERT INTO token_wallets (user_id, balance, paid_balance, promo_balance, total_purchased)
+        VALUES (r.user_id, 10, 0, 10, 10)
+        ON CONFLICT (user_id) DO UPDATE SET
+          promo_balance = token_wallets.promo_balance + 10,
+          balance = token_wallets.balance + 10,
+          total_purchased = token_wallets.total_purchased + 10,
+          updated_at = NOW();
 
-      INSERT INTO token_transactions
-        (user_id, type, feature, amount, balance_after, metadata)
+      SELECT balance INTO v_new_balance FROM token_wallets WHERE user_id = r.user_id;
+
+      INSERT INTO token_ledger
+        (user_id, entry_type, delta, paid_delta, promo_delta, balance_after,
+         source_type, idempotency_key, reason_ko, metadata)
       VALUES
-        (r.user_id, 'signup_bonus', 'welcome', 5, r.balance + 5,
-         jsonb_build_object('source', 'signup_topup_to_10', 'version', 'pricing_v2_backfill', 'reason', '신규 회원가입 보너스 5→10 상향 소급'));
+        (r.user_id, 'bonus_credit', 10, 0, 10, v_new_balance,
+         'promo', 'signup:' || r.user_id::text,
+         '회원가입 보너스 토큰 10개 (소급)',
+         '{"event":"signup_backfill","version":"pricing_v2"}'::jsonb);
+
+      -- user_credits에도 +10
+      INSERT INTO user_credits (user_id, balance, free_generations_used)
+        VALUES (r.user_id, 10, 0)
+        ON CONFLICT (user_id) DO UPDATE SET
+          balance = user_credits.balance + 10,
+          updated_at = NOW();
     EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'signup topup failed for user %: %', r.user_id, SQLERRM;
+      RAISE NOTICE 'signup backfill failed for user %: %', r.user_id, SQLERRM;
     END;
   END LOOP;
 END $$;
@@ -161,7 +214,6 @@ CREATE INDEX IF NOT EXISTS idx_user_entitlements_scope
   ON user_entitlements(scope_type, scope_id)
   WHERE revoked_at IS NULL;
 
--- updated_at 트리거
 DROP TRIGGER IF EXISTS trg_user_entitlements_updated_at ON user_entitlements;
 CREATE TRIGGER trg_user_entitlements_updated_at
   BEFORE UPDATE ON user_entitlements

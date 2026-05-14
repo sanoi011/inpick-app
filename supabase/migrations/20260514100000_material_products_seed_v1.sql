@@ -3,6 +3,60 @@
 -- 가격: 2025년 평균 시세 (소매 기준, 원/단위). 시공비 별도(labor_price).
 -- idempotent: source_url UNIQUE 활용 (ux_mp_source_url)
 
+-- ─── §0. category_taxonomy 선등록 ──────────────────────────
+-- material_products.category_code는 category_taxonomy(code)를 FK 참조하므로
+-- seed에서 사용하는 모든 카테고리 코드를 먼저 등록해둔다.
+-- parent_code: 도메인 L1 루트 (ARCH/ELEC/MECH), level=2 — 트리거 ct_validate_parent 통과
+INSERT INTO category_taxonomy (code, parent_code, level, domain, name_ko, name_en, typical_unit) VALUES
+  ('MAT-FLR-ENGINEERED', 'ARCH', 2, 'architecture', '강마루', 'Engineered Wood Flooring', 'm²'),
+  ('MAT-FLR-PORCELAIN',  'ARCH', 2, 'architecture', '포세린 타일', 'Porcelain Tile', 'm²'),
+  ('MAT-WAL-WALLPAPER-SILK', 'ARCH', 2, 'architecture', '실크벽지', 'Silk Wallpaper', 'm²'),
+  ('MAT-WAL-PAINT',      'ARCH', 2, 'architecture', '친환경 도장', 'Eco Paint', 'L'),
+  ('MAT-WDW-PVC',        'ARCH', 2, 'architecture', 'PVC 창호', 'PVC Window', 'm²'),
+  ('MAT-DOOR-ABS',       'ARCH', 2, 'architecture', 'ABS 도어', 'ABS Door', 'EA'),
+  ('MAT-CEI-SMC',        'ARCH', 2, 'architecture', '욕실 SMC 천장', 'Bath SMC Ceiling', 'm²'),
+  ('FUR-KIT-LOWER-CAB',  'ARCH', 2, 'architecture', '주방 하부장', 'Kitchen Lower Cabinet', 'm'),
+  ('FUR-KIT-COUNTERTOP', 'ARCH', 2, 'architecture', '주방 상판', 'Kitchen Countertop', 'm'),
+  ('FUR-KIT-HOOD',       'ARCH', 2, 'architecture', '주방 후드', 'Range Hood', 'EA'),
+  ('FUR-KIT-COOKTOP',    'ARCH', 2, 'architecture', '쿡탑/인덕션', 'Cooktop', 'EA'),
+  ('ELE-LGT-DOWNLIGHT',  'ELEC', 2, 'electrical', '다운라이트', 'LED Downlight', 'EA'),
+  ('ELE-LGT-CEILING',    'ELEC', 2, 'electrical', '방등/거실등', 'Ceiling Light', 'EA'),
+  ('ELE-SEC-DOORLOCK',   'ELEC', 2, 'electrical', '도어락', 'Digital Door Lock', 'EA'),
+  ('MEC-SAN-TOILET',     'MECH', 2, 'mechanical', '양변기', 'Toilet', 'EA'),
+  ('MEC-SAN-BASIN',      'MECH', 2, 'mechanical', '세면대', 'Basin', 'EA'),
+  ('MEC-SAN-BATHTUB',    'MECH', 2, 'mechanical', '욕조', 'Bathtub', 'EA'),
+  ('MEC-FAU-BASIN',      'MECH', 2, 'mechanical', '세면수전', 'Basin Faucet', 'EA'),
+  ('MEC-FAU-KITCHEN',    'MECH', 2, 'mechanical', '주방수전', 'Kitchen Faucet', 'EA'),
+  ('MEC-HEAT-BOILER',    'MECH', 2, 'mechanical', '보일러', 'Boiler', 'EA')
+ON CONFLICT (code) DO NOTHING;
+
+-- §0-B: material_category_taxonomy 에도 같은 코드 등록 (P15 taxonomy seed의 일부)
+-- discipline은 카테고리 코드 prefix 기반: MAT/ARC/MEC/ELE/FUR
+INSERT INTO material_category_taxonomy
+  (category_code, discipline, major_name_ko, middle_name_ko, minor_name_ko, display_name_ko, default_unit, trade_codes, requires_product_match, high_value)
+VALUES
+  ('MAT-FLR-ENGINEERED',       'MAT', '건자재', '바닥재',   '강마루',         '강마루',           'm2', ARRAY['10'], TRUE, FALSE),
+  ('MAT-FLR-PORCELAIN',        'MAT', '건자재', '바닥재',   '포세린타일',     '포세린 타일',      'm2', ARRAY['07','10'], TRUE, FALSE),
+  ('MAT-WAL-WALLPAPER-SILK',   'MAT', '건자재', '벽마감',   '실크벽지',       '실크벽지',         'm2', ARRAY['09'], TRUE, FALSE),
+  ('MAT-WAL-PAINT',            'MAT', '건자재', '벽마감',   '도장',           '친환경 도장',      'L',  ARRAY['08'], TRUE, FALSE),
+  ('MAT-WDW-PVC',              'MAT', '건자재', '창호',     'PVC창호',        'PVC 창호',         'm2', ARRAY['11'], TRUE, TRUE),
+  ('MAT-DOOR-ABS',             'MAT', '건자재', '도어',     'ABS도어',        'ABS 도어',         'ea', ARRAY['11'], TRUE, FALSE),
+  ('MAT-CEI-SMC',              'MAT', '건자재', '천장재',   '욕실SMC',        '욕실 SMC 천장',    'm2', ARRAY['13'], TRUE, FALSE),
+  ('FUR-KIT-LOWER-CAB',        'FUR', '가구',   '주방가구', '하부장',         '주방 하부장',      'm',  ARRAY['12','14'], TRUE, TRUE),
+  ('FUR-KIT-COUNTERTOP',       'FUR', '가구',   '주방상판', '상판',           '주방 상판',        'm',  ARRAY['12','14'], TRUE, TRUE),
+  ('FUR-KIT-HOOD',             'FUR', '가구',   '주방기기', '후드',           '주방 후드',        'ea', ARRAY['14','20'], TRUE, TRUE),
+  ('FUR-KIT-COOKTOP',          'FUR', '가구',   '주방기기', '쿡탑',           '쿡탑/인덕션',      'ea', ARRAY['14','04'], TRUE, TRUE),
+  ('ELE-LGT-DOWNLIGHT',        'ELE', '전기',   '조명',     '다운라이트',     '다운라이트',       'ea', ARRAY['04'], TRUE, FALSE),
+  ('ELE-LGT-CEILING',          'ELE', '전기',   '조명',     '방등',           '방등/거실등',      'ea', ARRAY['04'], TRUE, FALSE),
+  ('ELE-SEC-DOORLOCK',         'ELE', '전기',   '보안',     '도어락',         '도어락',           'ea', ARRAY['21'], TRUE, TRUE),
+  ('MEC-SAN-TOILET',           'MEC', '기계설비', '위생기구', '양변기',       '양변기',           'ea', ARRAY['05','13'], TRUE, TRUE),
+  ('MEC-SAN-BASIN',            'MEC', '기계설비', '위생기구', '세면대',       '세면대',           'ea', ARRAY['05','13'], TRUE, TRUE),
+  ('MEC-SAN-BATHTUB',          'MEC', '기계설비', '위생기구', '욕조',         '욕조',             'ea', ARRAY['13'], TRUE, TRUE),
+  ('MEC-FAU-BASIN',            'MEC', '기계설비', '수전',     '세면수전',     '세면수전',         'ea', ARRAY['05','13'], TRUE, TRUE),
+  ('MEC-FAU-KITCHEN',          'MEC', '기계설비', '수전',     '주방수전',     '주방수전',         'ea', ARRAY['05','14'], TRUE, FALSE),
+  ('MEC-HEAT-BOILER',          'MEC', '기계설비', '난방',     '보일러',       '보일러',           'ea', ARRAY['05','22'], TRUE, TRUE)
+ON CONFLICT (category_code) DO NOTHING;
+
 -- ─── §1. 바닥재 — 강마루 ──────────────────────────────────
 INSERT INTO material_products
   (category_code, sub_category, brand, product_name, specification,
@@ -18,7 +72,7 @@ VALUES
   ('MAT-FLR-ENGINEERED', '강마루', '구정마루', 'NaturalLuxury 고급', '12T x 220 x 1820mm 헤링본',
     120000, 100000, 48000, 'm2', 'premium',
     'seed_v1', 'inpick://seed/MAT-FLR-ENGINEERED/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -39,7 +93,7 @@ VALUES
   ('MAT-FLR-PORCELAIN', '대형타일', '이탈리아 직수입', 'Calacatta Gold', '900x1800x9.8T 광택',
     98000, 85000, 55000, 'm2', 'premium',
     'seed_v1', 'inpick://seed/MAT-FLR-PORCELAIN/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -60,7 +114,7 @@ VALUES
   ('MAT-WAL-WALLPAPER-SILK', '실크', '디아이디', 'Premium Silk', '폭 1062mm, 항균/방염',
     28000, 23000, 11000, 'm2', 'premium',
     'seed_v1', 'inpick://seed/MAT-WAL-WALLPAPER-SILK/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -81,7 +135,7 @@ VALUES
   ('MAT-WAL-PAINT', '수성도장', 'Benjamin Moore', 'Aura Interior', '3.78L, 친환경 프리미엄',
     140000, 120000, 22000, 'L', 'premium',
     'seed_v1', 'inpick://seed/MAT-WAL-PAINT/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -102,7 +156,7 @@ VALUES
   ('ELE-LGT-DOWNLIGHT', '매입형', 'Philips', 'CoreLine 12W Tunable', 'Φ100, dim2warm',
     35000, 28000, 9000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/ELE-LGT-DOWNLIGHT/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -123,7 +177,7 @@ VALUES
   ('ELE-LGT-CEILING', '거실등', '필립스 Hue', 'Aurelle Tunable', '60W, 색온도가변, 앱연동',
     420000, 360000, 25000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/ELE-LGT-CEILING/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -144,7 +198,7 @@ VALUES
   ('MEC-SAN-TOILET', '비데일체', 'TOTO', 'CES980 비데일체', '리모컨식, 자동개폐',
     1200000, 1000000, 80000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-SAN-TOILET/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -165,7 +219,7 @@ VALUES
   ('MEC-SAN-BASIN', '탑볼', 'Duravit', 'Vero Air 600', '탑볼 디자인 600',
     520000, 440000, 55000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-SAN-BASIN/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -186,7 +240,7 @@ VALUES
   ('MEC-FAU-BASIN', '냉온수', 'GROHE', 'Eurosmart Cosmo', '독일 직수입',
     280000, 230000, 28000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-FAU-BASIN/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -207,7 +261,7 @@ VALUES
   ('MEC-FAU-KITCHEN', '풀아웃', 'GROHE', 'Minta Pull-out', '풀아웃 + 듀얼스프레이',
     420000, 360000, 30000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-FAU-KITCHEN/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -228,7 +282,7 @@ VALUES
   ('MEC-SAN-BATHTUB', '독립형', 'Duravit', 'DuraStyle 독립형', '1700x800 자립형',
     1500000, 1280000, 120000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-SAN-BATHTUB/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -249,7 +303,7 @@ VALUES
   ('FUR-KIT-LOWER-CAB', '원목/세라믹', '에넥스', 'Bellagio Premium', '원목 도어, 통합 손잡이',
     1450000, 1240000, 100000, 'm', 'premium',
     'seed_v1', 'inpick://seed/FUR-KIT-LOWER-CAB/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -270,7 +324,7 @@ VALUES
   ('FUR-KIT-COUNTERTOP', '세라믹/대리석', 'Dekton', '12T 세라믹', '12T x 600, 무이음',
     680000, 580000, 80000, 'm', 'premium',
     'seed_v1', 'inpick://seed/FUR-KIT-COUNTERTOP/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -291,7 +345,7 @@ VALUES
   ('FUR-KIT-HOOD', '아일랜드', 'BOSCH', 'DIB97IM50', 'Island, 1300CMH',
     1850000, 1580000, 80000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/FUR-KIT-HOOD/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -312,7 +366,7 @@ VALUES
   ('FUR-KIT-COOKTOP', '인덕션', 'Miele', 'KM 7464 FL', '4구 인덕션 7.4kW',
     2800000, 2400000, 80000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/FUR-KIT-COOKTOP/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -333,7 +387,7 @@ VALUES
   ('MAT-WDW-PVC', '시스템', 'EAGON', 'Premium PVC', '시스템 창호, 패시브하우스',
     780000, 660000, 100000, 'm2', 'premium',
     'seed_v1', 'inpick://seed/MAT-WDW-PVC/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -354,7 +408,7 @@ VALUES
   ('MAT-DOOR-ABS', 'ABS', '우딘', 'Premium Loft', '900x2400, 히든프레임',
     480000, 410000, 70000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MAT-DOOR-ABS/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -372,7 +426,7 @@ VALUES
   ('MAT-CEI-SMC', 'SMC', '대림B&Co', 'BathTop Premium', '600x600, 무광 마감',
     55000, 46000, 22000, 'm2', 'standard',
     'seed_v1', 'inpick://seed/MAT-CEI-SMC/standard', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -393,7 +447,7 @@ VALUES
   ('ELE-SEC-DOORLOCK', '얼굴인식', '삼성SDS', 'SHP-DR708', '얼굴인식 + IoT',
     580000, 490000, 60000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/ELE-SEC-DOORLOCK/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
@@ -414,7 +468,7 @@ VALUES
   ('MEC-HEAT-BOILER', '콘덴싱+IoT', '귀뚜라미', 'CRH-30FUW', '30kW 콘덴싱 + 스마트',
     1980000, 1680000, 160000, 'ea', 'premium',
     'seed_v1', 'inpick://seed/MEC-HEAT-BOILER/premium', TRUE)
-ON CONFLICT (source_url) DO UPDATE SET
+ON CONFLICT (source_url) WHERE source_url IS NOT NULL DO UPDATE SET
   retail_price = EXCLUDED.retail_price,
   contractor_price = EXCLUDED.contractor_price,
   labor_price = EXCLUDED.labor_price,
