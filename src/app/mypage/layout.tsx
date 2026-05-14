@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   Hexagon,
+  Receipt,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTokens } from "@/hooks/useTokens";
@@ -23,6 +24,7 @@ const NAV_ITEMS = [
   { label: "내 프로젝트", href: "/mypage/projects", icon: FolderKanban },
   { label: "계약 진행", href: "/mypage/contracts/progress", icon: FileSignature },
   { label: "알림", href: "/mypage/notifications", icon: Bell },
+  { label: "결제·토큰", href: "/mypage/billing", icon: Receipt },
   { label: "내 계정", href: "/mypage/account", icon: UserCircle },
   { label: "고객센터", href: "/mypage/support", icon: HelpCircle },
 ];

@@ -135,6 +135,10 @@ export default function AdminReconciliationPage() {
         </div>
       )}
 
+      {/* 신규: reconciliation_cases 워크플로우 분쟁 (pricing-saas-flow §9-3) */}
+      <ReconciliationCasesSection />
+
+
       <div className="flex gap-1.5">
         {(["open", "resolved", "wontfix", "all"] as const).map((s) => (
           <button
@@ -239,6 +243,162 @@ export default function AdminReconciliationPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ─── 신규 reconciliation_cases 섹션 (pricing-saas-flow §9-3) ─────────
+interface CaseRow {
+  id: string;
+  case_type: string;
+  severity: "low" | "medium" | "high" | "critical";
+  status: "open" | "resolved" | "dismissed";
+  user_id: string | null;
+  project_id: string | null;
+  payment_intent_id: string | null;
+  generation_job_id: string | null;
+  token_charge_intent_id: string | null;
+  description: string;
+  detected_payload: Record<string, unknown>;
+  created_at: string;
+}
+
+const CASE_TYPE_LABELS: Record<string, string> = {
+  payment_paid_no_tokens: "결제 완료 / 토큰 미지급",
+  payment_paid_provision_failed: "결제 완료 / provisioning 실패",
+  token_charged_no_output: "토큰 차감 / 결과물 없음",
+  output_saved_no_token_commit: "결과물 있음 / 토큰 commit 없음",
+  pdf_entitlement_consumed_no_asset: "PDF 권한 소비 / asset 없음",
+  generation_timeout_pending: "이미지 생성 timeout",
+  estimate_context_missing: "견적 context 누락",
+  amount_mismatch_blocked: "amount 위조 차단",
+};
+
+function ReconciliationCasesSection() {
+  const [cases, setCases] = useState<CaseRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
+  const [counts, setCounts] = useState<Record<string, number> | null>(null);
+
+  const auth = () => ({
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${typeof window !== "undefined" ? localStorage.getItem("admin_token") ?? "" : ""}`,
+  });
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    const res = await fetch("/api/admin/reconciliation/cases?status=open&limit=100", { headers: auth() });
+    if (res.ok) {
+      const d = await res.json();
+      setCases(d.cases ?? []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    reload();
+  }, [reload]);
+
+  const runScan = async () => {
+    setScanning(true);
+    const res = await fetch("/api/admin/reconciliation/scan", { method: "POST", headers: auth() });
+    if (res.ok) {
+      const d = await res.json();
+      setCounts(d.caseCounts ?? null);
+      await reload();
+    }
+    setScanning(false);
+  };
+
+  const handleAction = async (caseId: string, action: "resolve" | "dismiss") => {
+    const res = await fetch("/api/admin/reconciliation/cases", {
+      method: "PATCH",
+      headers: auth(),
+      body: JSON.stringify({ caseId, action }),
+    });
+    if (res.ok) reload();
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h3 className="font-semibold text-gray-900">워크플로우 분쟁 case (v2 reconciliation_cases)</h3>
+          <p className="text-xs text-gray-500 mt-0.5">결제·토큰·이미지·PDF 통합 분쟁 감지</p>
+        </div>
+        <button
+          onClick={runScan}
+          disabled={scanning}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50"
+        >
+          {scanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+          전수 스캔 실행
+        </button>
+      </div>
+
+      {/* 8개 case 카운트 카드 */}
+      {counts && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-4">
+          {Object.entries(counts).map(([ct, n]) => (
+            <div key={ct} className="rounded-lg border border-gray-200 px-2.5 py-2 text-xs">
+              <p className="text-gray-500 truncate">{CASE_TYPE_LABELS[ct] ?? ct}</p>
+              <p className={`mt-0.5 text-base font-bold ${n > 0 ? "text-amber-700" : "text-gray-400"}`}>{n}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* open case 리스트 */}
+      {loading ? (
+        <div className="flex items-center justify-center py-8 text-gray-400">
+          <Loader2 className="w-4 h-4 animate-spin" />
+        </div>
+      ) : cases.length === 0 ? (
+        <div className="rounded-lg bg-emerald-50 border border-emerald-200 px-3 py-4 text-center text-sm text-emerald-700">
+          <CheckCircle2 className="w-5 h-5 mx-auto mb-1" />
+          처리 대기 case 없음
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          {cases.map((c) => (
+            <div key={c.id} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`rounded px-1.5 py-0.5 text-[0.65rem] font-semibold ${SEVERITY_COLORS[c.severity]}`}
+                    >
+                      {c.severity}
+                    </span>
+                    <span className="text-xs font-semibold text-gray-900">
+                      {CASE_TYPE_LABELS[c.case_type] ?? c.case_type}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">{c.description}</p>
+                  <p className="text-[0.65rem] text-gray-400 mt-0.5">
+                    user {c.user_id?.slice(0, 8) ?? "-"} ·{" "}
+                    {new Date(c.created_at).toLocaleString("ko-KR")}
+                  </p>
+                </div>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => handleAction(c.id, "resolve")}
+                    className="rounded bg-emerald-600 px-2 py-1 text-[0.65rem] font-semibold text-white"
+                  >
+                    해결
+                  </button>
+                  <button
+                    onClick={() => handleAction(c.id, "dismiss")}
+                    className="rounded bg-gray-300 px-2 py-1 text-[0.65rem] text-gray-700"
+                  >
+                    무시
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

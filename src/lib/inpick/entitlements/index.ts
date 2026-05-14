@@ -49,19 +49,33 @@ export interface EntitlementRow {
 /**
  * PDF 견적서 다운로드 권한 확인.
  *
+ * v2 정책 (2026-05-14, pricing-saas-flow):
+ *   "1회 다운로드권" → "견적서 1건 발급권"
+ *
  * 우선순위:
  *   1) pdf_unlimited (관리자/구독 무제한 — 영구 사용)
- *   2) estimate_pdf_single 중 미사용 + scope 일치
- *   3) 없음 → 결제 필요
+ *   2) estimate_pdf_single 중 같은 estimate_id + estimate_version, asset_url 채워진 것
+ *      → 재다운로드 무료 (reissue_of_same_version)
+ *   3) estimate_pdf_single 중 미사용(asset_url null + consumed_at null) + scope 일치
+ *      → 새 발급 사용 가능 (single_available)
+ *   4) 없음 → 결제 필요
  */
 export async function checkEstimatePdfAccess(input: {
   userId: string;
   estimateId?: string | null;
   consumerProjectId?: string | null;
+  /** 새 정책: 같은 version은 재다운로드 무료. 미제공 시 v3 기본 사용 */
+  estimateVersion?: string | null;
 }): Promise<{
   granted: boolean;
-  reason: "pdf_unlimited" | "single_available" | "payment_required";
+  reason:
+    | "pdf_unlimited"
+    | "reissue_of_same_version"
+    | "single_available"
+    | "payment_required";
   entitlementId?: string;
+  /** 재다운로드 가능 시 기존 asset URL */
+  assetUrl?: string | null;
 }> {
   const admin = getAdmin();
   if (!admin) return { granted: false, reason: "payment_required" };
@@ -83,7 +97,30 @@ export async function checkEstimatePdfAccess(input: {
     }
   }
 
-  // 2) estimate_pdf_single — scope 일치 (estimate_id 또는 consumer_project_id)
+  // 2) 같은 estimate_id + estimate_version 발급 이력 → 재다운로드 무료
+  if (input.estimateId && input.estimateVersion) {
+    const { data: reissue } = await admin
+      .from("user_entitlements")
+      .select("id, asset_url, estimate_version")
+      .eq("user_id", input.userId)
+      .eq("entitlement_type", "estimate_pdf_single")
+      .eq("estimate_id", input.estimateId)
+      .eq("estimate_version", input.estimateVersion)
+      .not("asset_url", "is", null)
+      .is("revoked_at", null)
+      .limit(1)
+      .maybeSingle();
+    if (reissue) {
+      return {
+        granted: true,
+        reason: "reissue_of_same_version",
+        entitlementId: (reissue as { id: string }).id,
+        assetUrl: (reissue as { asset_url: string }).asset_url,
+      };
+    }
+  }
+
+  // 3) estimate_pdf_single — 미사용 (asset_url null + consumed_at null) + scope 일치
   if (input.estimateId || input.consumerProjectId) {
     const orFilters: string[] = [];
     if (input.estimateId) orFilters.push(`and(scope_type.eq.estimate,scope_id.eq.${input.estimateId})`);
@@ -91,10 +128,11 @@ export async function checkEstimatePdfAccess(input: {
       orFilters.push(`and(scope_type.eq.project,scope_id.eq.${input.consumerProjectId})`);
     const { data: single } = await admin
       .from("user_entitlements")
-      .select("id, scope_type, scope_id, consumed_at, revoked_at")
+      .select("id, scope_type, scope_id, consumed_at, revoked_at, asset_url")
       .eq("user_id", input.userId)
       .eq("entitlement_type", "estimate_pdf_single")
       .is("consumed_at", null)
+      .is("asset_url", null)
       .is("revoked_at", null)
       .or(orFilters.join(","))
       .limit(1)
@@ -133,6 +171,82 @@ export async function consumeEntitlement(entitlementId: string): Promise<{ consu
     return { consumed: false };
   }
   return { consumed: !!data };
+}
+
+/**
+ * PDF 발급 성공 후 entitlement에 asset 정보 등록.
+ * 가이드: §3-3, §11 P5
+ *
+ * 정책:
+ *   * PDF asset 생성 성공 후 호출 → 같은 estimateVersion 재다운로드 가능
+ *   * estimate_id + estimate_version 추적 (없으면 단발권 fallback)
+ *   * 이미 issued된 entitlement는 idempotent
+ *
+ * 호출 위치: PDF 생성 라우트에서 PDF asset이 Storage에 저장된 직후.
+ */
+export async function markPdfEntitlementIssued(input: {
+  entitlementId: string;
+  estimateId: string;
+  estimateVersion: string;
+  assetUrl: string;
+  assetPath?: string;
+}): Promise<{ issued: boolean; alreadyIssued: boolean }> {
+  const admin = getAdmin();
+  if (!admin) return { issued: false, alreadyIssued: false };
+
+  // 1) 현재 상태 확인
+  const { data: cur } = await admin
+    .from("user_entitlements")
+    .select("id, asset_url, consumed_at")
+    .eq("id", input.entitlementId)
+    .maybeSingle();
+  if (!cur) return { issued: false, alreadyIssued: false };
+  if ((cur as { asset_url: string | null }).asset_url) {
+    return { issued: true, alreadyIssued: true };
+  }
+
+  // 2) asset_url 등록 + estimate_version 추적
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from("user_entitlements")
+    .update({
+      estimate_id: input.estimateId,
+      estimate_version: input.estimateVersion,
+      asset_url: input.assetUrl,
+      asset_path: input.assetPath ?? null,
+      issued_at: now,
+      consumed_at: now, // asset 발급 = 권한 사용 확정
+    })
+    .eq("id", input.entitlementId)
+    .is("asset_url", null);
+  if (error) {
+    console.error("[entitlements] markPdfEntitlementIssued error:", error.message);
+    return { issued: false, alreadyIssued: false };
+  }
+  return { issued: true, alreadyIssued: false };
+}
+
+/**
+ * PDF asset 부재 자동 감지 (관리자 reconciliation 스캐너용).
+ *
+ * 조건: consumed_at 있지만 asset_url 없는 estimate_pdf_single entitlement
+ *       → 사용자가 권한은 썼는데 PDF는 못 받은 상태
+ */
+export async function detectMissingPdfAssets(): Promise<
+  Array<{ id: string; user_id: string; consumed_at: string }>
+> {
+  const admin = getAdmin();
+  if (!admin) return [];
+  const { data } = await admin
+    .from("user_entitlements")
+    .select("id, user_id, consumed_at")
+    .eq("entitlement_type", "estimate_pdf_single")
+    .not("consumed_at", "is", null)
+    .is("asset_url", null)
+    .is("revoked_at", null)
+    .order("consumed_at", { ascending: false })
+    .limit(100);
+  return (data as Array<{ id: string; user_id: string; consumed_at: string }> | null) ?? [];
 }
 
 /**

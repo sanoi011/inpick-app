@@ -23,6 +23,11 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { creditTokensAfterPayment } from "@/lib/inpick/tokens/ledger";
 import { grantEstimatePdfSingleAfterPayment } from "@/lib/inpick/entitlements";
+// P3 (2026-05-14): 단일 finalizer + amount mismatch reconciliation
+import {
+  finalizePaymentProvisioning,
+  recordAmountMismatch,
+} from "@/lib/inpick/payments/finalize-provisioning";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -113,7 +118,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "user_mismatch" }, { status: 403 });
   }
   if (intentRow.amount_krw !== amountNum) {
-    // 결제 위조 시도 가능성 → reconciliation job
+    // 결제 위조 시도 가능성 → 양쪽 reconciliation 시스템에 기록
     await admin.from("payment_reconciliation_jobs").insert({
       payment_intent_id: intentRow.id,
       order_id: orderId,
@@ -121,6 +126,15 @@ export async function POST(req: NextRequest) {
       issue_type: "amount_mismatch",
       severity: "high",
       description_ko: `클라이언트 amount=${amountNum} vs 서버 amount=${intentRow.amount_krw}`,
+    });
+    // P3: 신규 reconciliation_cases 시스템에도 기록
+    await recordAmountMismatch({
+      paymentIntentId: intentRow.id,
+      userId: user.id,
+      serverAmount: intentRow.amount_krw,
+      clientAmount: amountNum,
+      orderId,
+      paymentKey,
     });
     return NextResponse.json(
       { error: "amount_mismatch", hint: "서버 금액과 일치하지 않습니다." },

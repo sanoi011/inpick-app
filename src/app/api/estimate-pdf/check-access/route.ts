@@ -1,12 +1,16 @@
 /**
- * GET /api/estimate-pdf/check-access?estimateId=xxx|consumerProjectId=xxx
+ * GET /api/estimate-pdf/check-access?estimateId=&consumerProjectId=&estimateVersion=
  *
  * PDF 다운로드 직전 권한 체크.
- * 가이드: 2026-05-14 pricing v2
+ * 가이드: pricing v2 → pricing-saas-flow §3-3 발급권 모델
  *
- * 응답:
- *  - { granted: true, reason: "pdf_unlimited" | "single_available", entitlementId }
- *  - { granted: false, reason: "payment_required", priceKrw: 9900, productCode: "estimate_pdf_single" }
+ * 응답 (granted):
+ *  - reason: "pdf_unlimited" — 관리자/구독 무제한
+ *  - reason: "reissue_of_same_version" — 같은 estimate_version 재다운로드 (assetUrl 포함)
+ *  - reason: "single_available" — 미사용 단발권 보유, 새 발급 가능
+ *
+ * 응답 (denied):
+ *  - reason: "payment_required" + priceKrw, productCode, includesVat
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
@@ -25,11 +29,13 @@ export async function GET(req: NextRequest) {
 
   const estimateId = req.nextUrl.searchParams.get("estimateId");
   const consumerProjectId = req.nextUrl.searchParams.get("consumerProjectId");
+  const estimateVersion = req.nextUrl.searchParams.get("estimateVersion");
 
   const access = await checkEstimatePdfAccess({
     userId: user.id,
     estimateId,
     consumerProjectId,
+    estimateVersion,
   });
 
   if (access.granted) {
@@ -37,6 +43,7 @@ export async function GET(req: NextRequest) {
       granted: true,
       reason: access.reason,
       entitlementId: access.entitlementId,
+      assetUrl: access.assetUrl ?? null,
     });
   }
 

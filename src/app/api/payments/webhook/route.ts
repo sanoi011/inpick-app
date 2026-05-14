@@ -17,7 +17,9 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { creditTokensAfterPayment } from "@/lib/inpick/tokens/ledger";
+// P3 (2026-05-14): 단일 finalizer — PDF entitlement 분기 포함
+// (기존 creditTokensAfterPayment 호출은 finalizer 내부에서 처리됨)
+import { finalizePaymentProvisioning } from "@/lib/inpick/payments/finalize-provisioning";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -155,27 +157,19 @@ export async function POST(req: NextRequest) {
       paymentId = (inserted as { id: string } | null)?.id;
     }
 
-    // 크레딧 보정 (idempotency_key로 중복 차단됨)
-    if (paymentId && intentRow.product) {
-      try {
-        await creditTokensAfterPayment({
-          userId: intentRow.user_id,
-          paymentId,
-          productCode: intentRow.product.code,
-          paidCredits: intentRow.product.credit_amount,
-          bonusCredits: intentRow.product.bonus_credit_amount,
-          reasonKo: `${intentRow.product.name_ko} 구매 (webhook 보정)`,
-        });
-      } catch (err) {
-        console.error("[webhook] credit fail:", err);
+    // P3: 단일 finalizer로 token_pack / pdf_entitlement 분기 처리
+    // (idempotency_key로 중복 차단됨 — 이미 confirm 라우트에서 처리됐으면 no-op)
+    if (paymentId) {
+      const result = await finalizePaymentProvisioning(intentRow.id, paymentId);
+      if (result.status === "failed" || result.status === "missing_product") {
         await admin.from("payment_reconciliation_jobs").insert({
           payment_intent_id: intentRow.id,
           payment_id: paymentId,
           order_id: data.orderId,
           payment_key: data.paymentKey,
-          issue_type: "webhook_credit_failed",
+          issue_type: "webhook_provisioning_failed",
           severity: "high",
-          description_ko: err instanceof Error ? err.message : "webhook credit 보정 실패",
+          description_ko: result.errorMessage || "webhook provisioning 실패",
         });
       }
     }
