@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle, FileText, Crown, KeyRound, X } from "lucide-react";
+import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle, FileText, Crown, KeyRound, X, Trash2, AlertTriangle } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -64,6 +64,13 @@ export default function AdminUsersPage() {
   const [pwResetUser, setPwResetUser] = useState<{ id: string; email: string } | null>(null);
   const [pwResetNew, setPwResetNew] = useState("");
   const [pwResetBusy, setPwResetBusy] = useState(false);
+
+  // 계정 삭제
+  const [deleteUser, setDeleteUser] = useState<{ id: string; email: string } | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<Record<string, number> | null>(null);
+  const [deleteCanWithoutForce, setDeleteCanWithoutForce] = useState(true);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // 테스트 계정 생성 상태
   const [seeding, setSeeding] = useState(false);
@@ -213,6 +220,54 @@ export default function AdminUsersPage() {
       toast({ type: "error", title: "오류", message: "PDF 권한 처리 실패" });
     } finally {
       setPdfBusyUserId(null);
+    }
+  }
+
+  async function openDeleteUser(userId: string, email: string) {
+    setDeleteUser({ id: userId, email });
+    setDeleteImpact(null);
+    setDeleteCanWithoutForce(true);
+    setDeleteConfirmText("");
+    try {
+      const res = await fetch(`/api/admin/users/${userId}`, { headers: adminAuth() });
+      if (res.ok) {
+        const data = await res.json();
+        setDeleteImpact(data.impact ?? {});
+        setDeleteCanWithoutForce(!!data.canDeleteWithoutForce);
+      }
+    } catch {
+      // 영향도 조회 실패해도 모달은 열림
+    }
+  }
+
+  async function handleDeleteUser() {
+    if (!deleteUser) return;
+    if (deleteConfirmText !== deleteUser.email) {
+      toast({ type: "error", title: "확인 실패", message: "이메일을 정확히 입력하세요" });
+      return;
+    }
+    setDeleteBusy(true);
+    try {
+      const force = !deleteCanWithoutForce;
+      const url = `/api/admin/users/${deleteUser.id}${force ? "?force=true" : ""}`;
+      const res = await fetch(url, { method: "DELETE", headers: adminAuth() });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          type: "success",
+          title: "삭제 완료",
+          message: `${deleteUser.email}${force ? " (자식 데이터 정리 포함)" : ""}`,
+        });
+        setDeleteUser(null);
+        setDeleteConfirmText("");
+        await load();
+      } else {
+        toast({ type: "error", title: "삭제 실패", message: data.hint || data.error });
+      }
+    } catch {
+      toast({ type: "error", title: "오류", message: "서버 오류" });
+    } finally {
+      setDeleteBusy(false);
     }
   }
 
@@ -525,6 +580,13 @@ export default function AdminUsersPage() {
                           >
                             <KeyRound className="w-3 h-3" /> 비번재설정
                           </button>
+                          <button
+                            onClick={() => openDeleteUser(u.id, u.email)}
+                            title="계정 영구 삭제"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> 삭제
+                          </button>
                         </div>
                       )}
                     </td>
@@ -568,6 +630,82 @@ export default function AdminUsersPage() {
           </table>
         )}
       </div>
+
+      {/* 계정 삭제 모달 */}
+      {deleteUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !deleteBusy && setDeleteUser(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">계정 영구 삭제</h3>
+                  <p className="mt-1 text-sm text-gray-500 font-mono">{deleteUser.email}</p>
+                </div>
+              </div>
+              <button onClick={() => setDeleteUser(null)} disabled={deleteBusy} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              <p className="font-semibold">⚠️ 이 작업은 되돌릴 수 없습니다.</p>
+              <p className="mt-1">CASCADE 적용 자식 데이터(프로필, 토큰, 결제, 견적, 디자인 등)는 자동 삭제됩니다.</p>
+            </div>
+
+            {deleteImpact === null ? (
+              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
+                <Loader2 className="h-3 w-3 animate-spin" /> 영향도 조회 중...
+              </div>
+            ) : Object.entries(deleteImpact).some(([, c]) => c > 0) ? (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
+                <p className="font-semibold text-amber-900">⚙️ 추가 정리 필요 데이터 (force 모드):</p>
+                <ul className="mt-1 space-y-0.5 text-amber-800">
+                  {Object.entries(deleteImpact)
+                    .filter(([, c]) => c > 0)
+                    .map(([table, count]) => (
+                      <li key={table} className="font-mono">
+                        • {table}: {count}건
+                      </li>
+                    ))}
+                </ul>
+                <p className="mt-2 text-amber-700">위 데이터를 함께 삭제하고 계정을 제거합니다.</p>
+              </div>
+            ) : (
+              <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs text-green-800">
+                추가 정리할 자식 데이터 없음 — 깨끗하게 삭제됩니다.
+              </div>
+            )}
+
+            <label className="mt-4 block text-sm font-medium text-gray-700">
+              확인: 위 이메일을 정확히 입력하세요
+            </label>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder={deleteUser.email}
+              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
+              autoFocus
+            />
+
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setDeleteUser(null)} disabled={deleteBusy}
+                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                취소
+              </button>
+              <button
+                onClick={handleDeleteUser}
+                disabled={deleteBusy || deleteConfirmText !== deleteUser.email}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:bg-gray-300"
+              >
+                {deleteBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                영구 삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 비밀번호 재설정 모달 */}
       {pwResetUser && (
