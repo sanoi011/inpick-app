@@ -27,14 +27,22 @@ function getAdmin() {
   });
 }
 
-// NO ACTION FK를 가진 테이블 — force 모드에서 사전 정리해야 auth.users 삭제 가능
-const NO_ACTION_TABLES = [
-  "chat_rooms",
-  "consumer_projects",
-  "drawing_parse_logs",
-  "payment_reconciliation_jobs",
-  "payment_refunds",
-] as const;
+// NO ACTION FK 자식 테이블 — force 모드 사전 정리.
+// FK 컬럼명이 테이블마다 달라 명시적 매핑 필요 (단순 user_id 가정 X).
+// action: "delete" — 사용자 본인 데이터 (프로젝트/채팅/로그)
+// action: "set_null" — 관리/결제 흔적 (분쟁 처리·환불 승인 기록 보존)
+const NO_ACTION_CLEANUP: Array<{
+  table: string;
+  column: string;
+  action: "delete" | "set_null";
+}> = [
+  { table: "consumer_projects", column: "user_id", action: "delete" },
+  { table: "chat_rooms", column: "consumer_id", action: "delete" },
+  { table: "drawing_parse_logs", column: "user_id", action: "delete" },
+  { table: "payment_reconciliation_jobs", column: "resolved_by", action: "set_null" },
+  { table: "payment_refunds", column: "requested_by", action: "set_null" },
+  { table: "payment_refunds", column: "approved_by", action: "set_null" },
+];
 
 export async function GET(
   req: NextRequest,
@@ -51,11 +59,12 @@ export async function GET(
     return NextResponse.json({ error: "user_not_found" }, { status: 404 });
   }
 
-  // 삭제 영향 카운트 (NO ACTION 테이블만)
+  // 삭제 영향 카운트 (NO ACTION 테이블별 정확한 컬럼 사용)
   const impact: Record<string, number> = {};
-  for (const table of NO_ACTION_TABLES) {
-    const { count } = await admin.from(table).select("*", { count: "exact", head: true }).eq("user_id", params.userId);
-    impact[table] = count ?? 0;
+  for (const c of NO_ACTION_CLEANUP) {
+    const { count } = await admin.from(c.table).select("*", { count: "exact", head: true }).eq(c.column, params.userId);
+    const key = `${c.table}.${c.column}`;
+    impact[key] = (impact[key] ?? 0) + (count ?? 0);
   }
 
   // consumer_profiles
@@ -103,19 +112,33 @@ export async function DELETE(
   }
   const email = target.user.email;
 
-  // force 모드: NO ACTION 자식 테이블 사전 정리
+  // force 모드: NO ACTION 자식 데이터 사전 정리 (delete 또는 set_null)
   const cleaned: Record<string, number> = {};
   if (force) {
-    for (const table of NO_ACTION_TABLES) {
-      const { count, error } = await admin.from(table).delete({ count: "exact" }).eq("user_id", userId);
-      if (error) {
-        console.error(`[admin/users DELETE force] ${table} 정리 실패:`, error.message);
-        return NextResponse.json(
-          { error: `cleanup_failed:${table}`, hint: error.message },
-          { status: 500 }
-        );
+    for (const c of NO_ACTION_CLEANUP) {
+      const key = `${c.table}.${c.column}`;
+      if (c.action === "delete") {
+        const { count, error } = await admin.from(c.table).delete({ count: "exact" }).eq(c.column, userId);
+        if (error) {
+          console.error(`[admin/users DELETE force] ${key} delete 실패:`, error.message);
+          return NextResponse.json(
+            { error: `cleanup_failed:${key}`, hint: error.message },
+            { status: 500 }
+          );
+        }
+        cleaned[key] = count ?? 0;
+      } else {
+        // set_null
+        const { count, error } = await admin.from(c.table).update({ [c.column]: null }, { count: "exact" }).eq(c.column, userId);
+        if (error) {
+          console.error(`[admin/users DELETE force] ${key} set_null 실패:`, error.message);
+          return NextResponse.json(
+            { error: `cleanup_failed:${key}`, hint: error.message },
+            { status: 500 }
+          );
+        }
+        cleaned[key] = count ?? 0;
       }
-      cleaned[table] = count ?? 0;
     }
   }
 
