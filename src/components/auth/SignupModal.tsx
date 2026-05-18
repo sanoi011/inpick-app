@@ -285,12 +285,10 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
           />
         ) : (
           <form onSubmit={handleProceedToConfirm} className="px-7 pb-7 pt-4">
-            {/* OAuth */}
+            {/* OAuth — 카카오/Apple 임시 비활성 (2026-05-18). 추후 복구 시 git history 참조 */}
             <div className="grid grid-cols-2 gap-2">
               <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
-              <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
               <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
-              <OAuthBtn provider="apple" onClick={() => handleOAuth("apple")} />
             </div>
 
             <div className="relative my-4">
