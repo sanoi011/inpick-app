@@ -127,30 +127,44 @@ export async function POST(req: NextRequest) {
   }
   const userId = signUpData.user.id;
 
-  // 4) consumer_profiles INSERT — phone UNIQUE 위반 시 race condition 안전망
-  const { error: profileErr } = await admin.from("consumer_profiles").insert({
-    id: userId,
-    email,
-    name,
-    phone,
-    agreed_terms_at: body.agreeTerms ? now : null,
-    agreed_privacy_at: body.agreePrivacy ? now : null,
-    agreed_age14_at: body.agreeAge14 ? now : null,
-    agreed_marketing_at: body.agreeMarketing ? now : null,
-  });
+  // 4) consumer_profiles UPSERT — handle_new_consumer_user 트리거(20260518)와 공존 가능하게
+  //    트리거가 먼저 row를 만들었어도 약관 동의 시각을 정확하게 UPDATE.
+  //    phone UNIQUE 위반 시 race condition만 별도 처리.
+  const { error: profileErr } = await admin
+    .from("consumer_profiles")
+    .upsert(
+      {
+        id: userId,
+        email,
+        name,
+        phone,
+        agreed_terms_at: body.agreeTerms ? now : null,
+        agreed_privacy_at: body.agreePrivacy ? now : null,
+        agreed_age14_at: body.agreeAge14 ? now : null,
+        agreed_marketing_at: body.agreeMarketing ? now : null,
+      },
+      { onConflict: "id" }
+    );
   if (profileErr) {
-    // race condition으로 phone 중복이 잡힌 경우 사용자 정리
-    await admin.auth.admin.deleteUser(userId).catch((err) => {
-      console.error("[signup] cleanup deleteUser error:", err);
-    });
-    if (profileErr.message.includes("uq_consumer_profiles_phone")) {
+    // phone UNIQUE 충돌이면 사용자 정리 + 409 (다른 계정이 같은 phone 점유 중)
+    if (
+      profileErr.message.includes("uq_consumer_profiles_phone") ||
+      profileErr.message.includes("consumer_profiles_phone")
+    ) {
+      await admin.auth.admin.deleteUser(userId).catch((err) => {
+        console.error("[signup] cleanup deleteUser error:", err);
+      });
       return NextResponse.json(
         { error: "이미 가입된 휴대폰번호입니다." },
         { status: 409 }
       );
     }
-    console.error("[signup] profile insert error:", profileErr.message);
-    return NextResponse.json({ error: "프로필 저장에 실패했습니다." }, { status: 500 });
+    // 기타 에러는 auth.users 살려두고 진단 가능하게 (다음 로그인 시도에서 자동 복구 시도)
+    console.error("[signup] profile upsert error:", profileErr.message, profileErr);
+    return NextResponse.json(
+      { error: "프로필 저장에 실패했습니다.", hint: profileErr.message },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({

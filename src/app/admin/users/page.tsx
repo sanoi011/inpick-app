@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle, FileText, Crown } from "lucide-react";
+import { Users, Search, Loader2, ChevronLeft, ChevronRight, UserPlus, Coins, Plus, Minus, Download, CheckCircle2, XCircle, FileText, Crown, KeyRound, X } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
 
@@ -59,6 +59,11 @@ export default function AdminUsersPage() {
     Record<string, { has: boolean; entitlementId?: string }>
   >({});
   const [pdfBusyUserId, setPdfBusyUserId] = useState<string | null>(null);
+
+  // 비밀번호 재설정 (Supabase SMTP 제한 대안)
+  const [pwResetUser, setPwResetUser] = useState<{ id: string; email: string } | null>(null);
+  const [pwResetNew, setPwResetNew] = useState("");
+  const [pwResetBusy, setPwResetBusy] = useState(false);
 
   // 테스트 계정 생성 상태
   const [seeding, setSeeding] = useState(false);
@@ -208,6 +213,38 @@ export default function AdminUsersPage() {
       toast({ type: "error", title: "오류", message: "PDF 권한 처리 실패" });
     } finally {
       setPdfBusyUserId(null);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (!pwResetUser) return;
+    if (pwResetNew.length < 8 || !/[A-Za-z]/.test(pwResetNew) || !/\d/.test(pwResetNew)) {
+      toast({ type: "error", title: "오류", message: "비밀번호는 영문+숫자 포함 8자 이상" });
+      return;
+    }
+    setPwResetBusy(true);
+    try {
+      const res = await fetch(`/api/admin/users/${pwResetUser.id}/reset-password`, {
+        method: "POST",
+        headers: adminAuth(),
+        body: JSON.stringify({ newPassword: pwResetNew }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({
+          type: "success",
+          title: "비번 재설정 완료",
+          message: `${pwResetUser.email} — 새 비밀번호로 로그인 가능합니다`,
+        });
+        setPwResetUser(null);
+        setPwResetNew("");
+      } else {
+        toast({ type: "error", title: "실패", message: data.error || "재설정 실패" });
+      }
+    } catch {
+      toast({ type: "error", title: "오류", message: "서버 오류" });
+    } finally {
+      setPwResetBusy(false);
     }
   }
 
@@ -481,6 +518,13 @@ export default function AdminUsersPage() {
                             )}
                             {pdfUnlimitedMap[u.id]?.has ? "PDF무제한" : "PDF부여"}
                           </button>
+                          <button
+                            onClick={() => { setPwResetUser({ id: u.id, email: u.email }); setPwResetNew(""); }}
+                            title="비밀번호 직접 재설정 (SMTP 미가용 시 대안)"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <KeyRound className="w-3 h-3" /> 비번재설정
+                          </button>
                         </div>
                       )}
                     </td>
@@ -524,6 +568,52 @@ export default function AdminUsersPage() {
           </table>
         )}
       </div>
+
+      {/* 비밀번호 재설정 모달 */}
+      {pwResetUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !pwResetBusy && setPwResetUser(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">비밀번호 직접 재설정</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  대상: <span className="font-mono">{pwResetUser.email}</span>
+                </p>
+              </div>
+              <button onClick={() => setPwResetUser(null)} disabled={pwResetBusy} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              SMTP 미설정 시 비번 찾기 메일이 발송되지 않으므로 관리자가 직접 변경합니다. 변경 후 사용자에게 안전한 채널(SMS/대면)로 새 비번을 전달하세요.
+            </div>
+
+            <label className="mt-4 block text-sm font-medium text-gray-700">새 비밀번호</label>
+            <input
+              type="text"
+              value={pwResetNew}
+              onChange={(e) => setPwResetNew(e.target.value)}
+              placeholder="영문+숫자 포함 8자 이상"
+              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              autoFocus
+            />
+            <p className="mt-1 text-xs text-gray-400">텍스트 표시로 오타 방지. 화면 공유 중에는 주의.</p>
+
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setPwResetUser(null)} disabled={pwResetBusy}
+                className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+                취소
+              </button>
+              <button onClick={handleResetPassword} disabled={pwResetBusy || pwResetNew.length < 8}
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:bg-gray-300">
+                {pwResetBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                재설정 실행
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 페이지네이션 */}
       {totalPages > 1 && (

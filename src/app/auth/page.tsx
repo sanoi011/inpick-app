@@ -148,7 +148,9 @@ function ConsumerAuthForm() {
     setNeedsConfirm(false);
     setLoading(true);
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      // signup API가 lowercase+trim으로 저장하므로 로그인도 동일하게 정규화
+      const normalizedEmail = email.toLowerCase().trim();
+      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (error) {
         const msg = error.message || "";
         if (msg.toLowerCase().includes("email not confirmed")) {
@@ -242,7 +244,8 @@ function ConsumerAuthForm() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const normalizedEmail = email.toLowerCase().trim();
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
       });
       if (error) setError(error.message);
