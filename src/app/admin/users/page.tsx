@@ -72,6 +72,16 @@ export default function AdminUsersPage() {
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
 
+  // 사업자 관리
+  const [contractorBusyId, setContractorBusyId] = useState<string | null>(null);
+  const [contractorPwReset, setContractorPwReset] = useState<{ id: string; companyName: string } | null>(null);
+  const [contractorPwNew, setContractorPwNew] = useState("");
+  const [contractorPwBusy, setContractorPwBusy] = useState(false);
+  const [contractorDelete, setContractorDelete] = useState<{ id: string; companyName: string } | null>(null);
+  const [contractorDeleteImpact, setContractorDeleteImpact] = useState<Record<string, number> | null>(null);
+  const [contractorDeleteBusy, setContractorDeleteBusy] = useState(false);
+  const [contractorCommunityMap, setContractorCommunityMap] = useState<Record<string, { available: boolean; verified: boolean }>>({});
+
   // 테스트 계정 생성 상태
   const [seeding, setSeeding] = useState(false);
   const [seedResult, setSeedResult] = useState<{
@@ -266,6 +276,130 @@ export default function AdminUsersPage() {
       setDeleteBusy(false);
     }
   }
+
+  async function toggleContractor(id: string, field: "is_active" | "is_verified", current: boolean) {
+    setContractorBusyId(id);
+    try {
+      const res = await fetch(`/api/admin/contractors/${id}`, {
+        method: "PATCH",
+        headers: adminAuth(),
+        body: JSON.stringify({ [field]: !current }),
+      });
+      if (res.ok) {
+        toast({ type: "success", title: "변경 완료", message: `${field === "is_active" ? (current ? "비활성화" : "활성화") : (current ? "검증 해제" : "검증 완료")}` });
+        await load();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ type: "error", title: "변경 실패", message: data.hint || data.error });
+      }
+    } finally {
+      setContractorBusyId(null);
+    }
+  }
+
+  async function toggleContractorCommunity(id: string) {
+    setContractorBusyId(id);
+    try {
+      const cur = contractorCommunityMap[id]?.verified ?? false;
+      const res = await fetch(`/api/admin/contractors/${id}`, {
+        method: "PATCH",
+        headers: adminAuth(),
+        body: JSON.stringify({ community_verified: !cur }),
+      });
+      const data = await res.json();
+      if (res.ok && data.communityResult?.applied) {
+        setContractorCommunityMap((m) => ({ ...m, [id]: { available: true, verified: !cur } }));
+        toast({ type: "success", title: "커뮤니티 검증", message: !cur ? "검증 사업자로 지정" : "검증 해제" });
+      } else {
+        toast({ type: "error", title: "처리 실패", message: data.communityResult?.hint || data.hint || "사업자 INPICK 계정 가입 필요" });
+      }
+    } finally {
+      setContractorBusyId(null);
+    }
+  }
+
+  async function loadContractorCommunity(id: string) {
+    try {
+      const res = await fetch(`/api/admin/contractors/${id}`, { headers: adminAuth() });
+      if (!res.ok) return;
+      const data = await res.json();
+      setContractorCommunityMap((m) => ({
+        ...m,
+        [id]: {
+          available: !!data.community,
+          verified: !!data.community?.is_verified_contractor,
+        },
+      }));
+    } catch {}
+  }
+
+  async function openContractorDelete(id: string, companyName: string) {
+    setContractorDelete({ id, companyName });
+    setContractorDeleteImpact(null);
+    try {
+      const res = await fetch(`/api/admin/contractors/${id}`, { headers: adminAuth() });
+      if (res.ok) {
+        const data = await res.json();
+        setContractorDeleteImpact(data.impact ?? {});
+      }
+    } catch {}
+  }
+
+  async function handleContractorDelete() {
+    if (!contractorDelete) return;
+    setContractorDeleteBusy(true);
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractorDelete.id}?force=true`, {
+        method: "DELETE",
+        headers: adminAuth(),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        toast({ type: "success", title: "사업자 삭제", message: contractorDelete.companyName });
+        setContractorDelete(null);
+        await load();
+      } else {
+        toast({ type: "error", title: "삭제 실패", message: data.hint || data.error });
+      }
+    } finally {
+      setContractorDeleteBusy(false);
+    }
+  }
+
+  async function handleContractorPwReset() {
+    if (!contractorPwReset) return;
+    if (contractorPwNew.length < 8 || !/[A-Za-z]/.test(contractorPwNew) || !/\d/.test(contractorPwNew)) {
+      toast({ type: "error", title: "오류", message: "영문+숫자 포함 8자 이상" });
+      return;
+    }
+    setContractorPwBusy(true);
+    try {
+      const res = await fetch(`/api/admin/contractors/${contractorPwReset.id}/reset-password`, {
+        method: "POST",
+        headers: adminAuth(),
+        body: JSON.stringify({ newPassword: contractorPwNew }),
+      });
+      if (res.ok) {
+        toast({ type: "success", title: "비번 재설정", message: contractorPwReset.companyName });
+        setContractorPwReset(null);
+        setContractorPwNew("");
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast({ type: "error", title: "실패", message: data.error });
+      }
+    } finally {
+      setContractorPwBusy(false);
+    }
+  }
+
+  // 사업자 목록 로딩 후 community 검증 상태 조회
+  useEffect(() => {
+    if (contractors.length === 0) return;
+    contractors.forEach((c) => {
+      if (contractorCommunityMap[c.id] === undefined) void loadContractorCommunity(c.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contractors]);
 
   async function handleResetPassword() {
     if (!pwResetUser) return;
@@ -592,40 +726,177 @@ export default function AdminUsersPage() {
             </table>
           </div>
         ) : (
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">회사명</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이메일</th>
-                <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">지역</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">평점</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">상태</th>
-                <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">등록일</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {contractors.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">
-                  <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />등록된 업체가 없습니다
-                </td></tr>
-              ) : contractors.map((c) => (
-                <tr key={c.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{c.company_name || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{c.email || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{c.region || "-"}</td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-500">{c.rating?.toFixed(1) || "-"}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`text-xs px-2 py-0.5 rounded-full ${c.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
-                      {c.is_active ? "활성" : "비활성"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-sm text-right text-gray-400">{new Date(c.created_at).toLocaleDateString("ko-KR")}</td>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">회사명</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">이메일</th>
+                  <th className="text-left px-4 py-3 text-xs font-medium text-gray-500">지역</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">평점</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">상태</th>
+                  <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">등록일</th>
+                  <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">관리</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {contractors.length === 0 ? (
+                  <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">
+                    <Users className="w-8 h-8 mx-auto mb-2 text-gray-300" />등록된 업체가 없습니다
+                  </td></tr>
+                ) : contractors.map((c) => {
+                  const busy = contractorBusyId === c.id;
+                  const community = contractorCommunityMap[c.id];
+                  return (
+                    <tr key={c.id} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{c.company_name || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{c.email || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">{c.region || "-"}</td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-500">{c.rating?.toFixed(1) || "-"}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${c.is_active ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}>
+                            {c.is_active ? "활성" : "비활성"}
+                          </span>
+                          {c.is_verified && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700">검증</span>
+                          )}
+                          {community?.verified && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700">커뮤검증</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right text-gray-400 whitespace-nowrap">{new Date(c.created_at).toLocaleDateString("ko-KR")}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-center gap-1 flex-wrap">
+                          <button
+                            disabled={busy}
+                            onClick={() => toggleContractor(c.id, "is_active", c.is_active)}
+                            title={c.is_active ? "비활성화 (영업 정지)" : "활성화"}
+                            className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50 ${c.is_active ? "text-gray-600 hover:bg-gray-100" : "text-green-600 hover:bg-green-50"}`}
+                          >
+                            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : c.is_active ? <XCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+                            {c.is_active ? "비활성" : "활성화"}
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => toggleContractor(c.id, "is_verified", c.is_verified)}
+                            title="사업자등록증 검증 토글"
+                            className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded transition-colors disabled:opacity-50 ${c.is_verified ? "bg-blue-100 text-blue-700 hover:bg-blue-200" : "text-blue-600 hover:bg-blue-50"}`}
+                          >
+                            <CheckCircle2 className="w-3 h-3" />
+                            {c.is_verified ? "검증중" : "검증"}
+                          </button>
+                          <button
+                            disabled={busy || !community?.available}
+                            onClick={() => toggleContractorCommunity(c.id)}
+                            title={community?.available ? "커뮤니티 검증 사업자 토글 (quote_offer 권한)" : "사업자 INPICK 계정 가입 필요"}
+                            className={`inline-flex items-center gap-0.5 px-2 py-1 text-xs rounded transition-colors disabled:opacity-30 ${community?.verified ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "text-amber-600 hover:bg-amber-50"}`}
+                          >
+                            <Crown className="w-3 h-3" />
+                            {community?.verified ? "커뮤검증중" : "커뮤검증"}
+                          </button>
+                          <button
+                            onClick={() => { setContractorPwReset({ id: c.id, companyName: c.company_name }); setContractorPwNew(""); }}
+                            title="비밀번호 직접 재설정"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                          >
+                            <KeyRound className="w-3 h-3" /> 비번재설정
+                          </button>
+                          <button
+                            onClick={() => openContractorDelete(c.id, c.company_name)}
+                            title="사업자 영구 삭제"
+                            className="inline-flex items-center gap-0.5 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                          >
+                            <Trash2 className="w-3 h-3" /> 삭제
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
+
+      {/* 사업자 비밀번호 재설정 모달 */}
+      {contractorPwReset && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !contractorPwBusy && setContractorPwReset(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">사업자 비밀번호 재설정</h3>
+                <p className="mt-1 text-sm text-gray-500">{contractorPwReset.companyName}</p>
+              </div>
+              <button onClick={() => setContractorPwReset(null)} disabled={contractorPwBusy} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              안내: 현재 사업자 로그인은 비밀번호 검증을 하지 않습니다. password_hash는 추후 보안 강화 인프라로 저장됩니다.
+            </div>
+            <label className="mt-4 block text-sm font-medium text-gray-700">새 비밀번호</label>
+            <input
+              type="text"
+              value={contractorPwNew}
+              onChange={(e) => setContractorPwNew(e.target.value)}
+              placeholder="영문+숫자 포함 8자 이상"
+              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+              autoFocus
+            />
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setContractorPwReset(null)} disabled={contractorPwBusy} className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">취소</button>
+              <button onClick={handleContractorPwReset} disabled={contractorPwBusy || contractorPwNew.length < 8} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-gray-900 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:bg-gray-300">
+                {contractorPwBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                재설정
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 사업자 삭제 모달 */}
+      {contractorDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => !contractorDeleteBusy && setContractorDelete(null)}>
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 flex-shrink-0 text-red-500 mt-0.5" />
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">사업자 영구 삭제</h3>
+                  <p className="mt-1 text-sm text-gray-500">{contractorDelete.companyName}</p>
+                </div>
+              </div>
+              <button onClick={() => setContractorDelete(null)} disabled={contractorDeleteBusy} className="rounded-full p-1 text-gray-400 hover:bg-gray-100">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              <p className="font-semibold">⚠️ 이 작업은 되돌릴 수 없습니다.</p>
+              <p className="mt-1">사업자의 입찰·계약·프로젝트·리뷰·포트폴리오·일정·청구서·결제기록 등 모든 데이터가 함께 삭제됩니다.</p>
+            </div>
+            {contractorDeleteImpact && Object.entries(contractorDeleteImpact).some(([, c]) => c > 0) && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs">
+                <p className="font-semibold text-amber-900">함께 정리될 데이터:</p>
+                <ul className="mt-1 space-y-0.5 text-amber-800">
+                  {Object.entries(contractorDeleteImpact).filter(([, c]) => c > 0).map(([table, count]) => (
+                    <li key={table} className="font-mono">• {table}: {count}건</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="mt-5 flex gap-2">
+              <button onClick={() => setContractorDelete(null)} disabled={contractorDeleteBusy} className="flex-1 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50">취소</button>
+              <button onClick={handleContractorDelete} disabled={contractorDeleteBusy} className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:bg-gray-300">
+                {contractorDeleteBusy && <Loader2 className="h-4 w-4 animate-spin" />}
+                영구 삭제
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 계정 삭제 모달 */}
       {deleteUser && (
