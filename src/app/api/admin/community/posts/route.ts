@@ -9,10 +9,9 @@ import { mapDbPost } from "@/types/community-v2";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+import { isAdminAuthorized } from "@/lib/admin-auth";
 function checkAdmin(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const expected = process.env.ADMIN_PASSWORD;
-  return !!auth && !!expected && auth === `Bearer ${expected}`;
+  return isAdminAuthorized(req);
 }
 
 function getAdmin() {

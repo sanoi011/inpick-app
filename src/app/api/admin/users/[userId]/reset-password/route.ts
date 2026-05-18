@@ -16,16 +16,10 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { isAdminAuthorized as checkAdmin } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function checkAdmin(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const expected = process.env.ADMIN_PASSWORD || process.env.ADMIN_API_KEY;
-  if (!auth || !expected) return false;
-  return auth === `Bearer ${expected}`;
-}
 
 function getAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

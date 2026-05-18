@@ -10,11 +10,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+import { isAdminAuthorized } from "@/lib/admin-auth";
 function checkAdmin(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) return false;
-  // 운영 단순화: admin token 형식만 체크 (실제 검증은 별도 admin 세션 시스템에서)
-  return auth.length > 10;
+  return isAdminAuthorized(req);
 }
 
 export async function GET(req: NextRequest) {

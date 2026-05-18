@@ -13,17 +13,17 @@ import {
   revokeEntitlement,
   listUserEntitlements,
 } from "@/lib/inpick/entitlements";
+import { isAdminAuthorized, getAdminIdFromRequest } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function checkAdmin(req: NextRequest): { ok: boolean; adminId?: string } {
-  const auth = req.headers.get("authorization");
-  const expected = process.env.ADMIN_PASSWORD || process.env.ADMIN_API_KEY;
-  if (!auth || !expected) return { ok: false };
-  if (auth !== `Bearer ${expected}`) return { ok: false };
-  // adminId: 헤더로도 받을 수 있게
-  return { ok: true, adminId: req.headers.get("x-admin-id") || "admin" };
+  if (!isAdminAuthorized(req)) return { ok: false };
+  return {
+    ok: true,
+    adminId: getAdminIdFromRequest(req) || req.headers.get("x-admin-id") || "admin",
+  };
 }
 
 export async function GET(req: NextRequest) {

@@ -16,11 +16,9 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 
+import { isAdminAuthorized } from "@/lib/admin-auth";
 function checkAdmin(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  const expected = process.env.ADMIN_PASSWORD || process.env.ADMIN_API_KEY;
-  if (!auth || !expected) return false;
-  return auth === `Bearer ${expected}`;
+  return isAdminAuthorized(req);
 }
 
 interface CategoryCoverage {

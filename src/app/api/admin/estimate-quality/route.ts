@@ -24,11 +24,9 @@ function getAdmin() {
   });
 }
 
+import { isAdminAuthorized } from "@/lib/admin-auth";
 function checkAdminAuth(req: NextRequest): boolean {
-  const auth = req.headers.get("authorization");
-  if (!auth?.startsWith("Bearer ")) return false;
-  const token = auth.slice(7);
-  return token === process.env.ADMIN_PASSWORD;
+  return isAdminAuthorized(req);
 }
 
 interface QualityResponse {

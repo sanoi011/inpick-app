@@ -242,24 +242,20 @@ export default function AdminUsersPage() {
 
   async function handleDeleteUser() {
     if (!deleteUser) return;
-    if (deleteConfirmText !== deleteUser.email) {
-      toast({ type: "error", title: "확인 실패", message: "이메일을 정확히 입력하세요" });
-      return;
-    }
     setDeleteBusy(true);
     try {
-      const force = !deleteCanWithoutForce;
-      const url = `/api/admin/users/${deleteUser.id}${force ? "?force=true" : ""}`;
+      // 조건 없이 force 모드로 — NO ACTION 자식 데이터까지 일괄 정리
+      const url = `/api/admin/users/${deleteUser.id}?force=true`;
       const res = await fetch(url, { method: "DELETE", headers: adminAuth() });
       const data = await res.json();
       if (res.ok) {
+        const cleaned = data.cleanedTables ? Object.entries(data.cleanedTables).filter(([, c]) => (c as number) > 0).map(([t, c]) => `${t}:${c}`).join(", ") : "";
         toast({
           type: "success",
           title: "삭제 완료",
-          message: `${deleteUser.email}${force ? " (자식 데이터 정리 포함)" : ""}`,
+          message: `${deleteUser.email}${cleaned ? ` — 정리: ${cleaned}` : ""}`,
         });
         setDeleteUser(null);
-        setDeleteConfirmText("");
         await load();
       } else {
         toast({ type: "error", title: "삭제 실패", message: data.hint || data.error });
@@ -650,16 +646,12 @@ export default function AdminUsersPage() {
 
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800">
               <p className="font-semibold">⚠️ 이 작업은 되돌릴 수 없습니다.</p>
-              <p className="mt-1">CASCADE 적용 자식 데이터(프로필, 토큰, 결제, 견적, 디자인 등)는 자동 삭제됩니다.</p>
+              <p className="mt-1">사용자의 프로필·토큰·결제·견적·디자인·프로젝트 등 모든 데이터가 함께 삭제됩니다.</p>
             </div>
 
-            {deleteImpact === null ? (
-              <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
-                <Loader2 className="h-3 w-3 animate-spin" /> 영향도 조회 중...
-              </div>
-            ) : Object.entries(deleteImpact).some(([, c]) => c > 0) ? (
-              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs">
-                <p className="font-semibold text-amber-900">⚙️ 추가 정리 필요 데이터 (force 모드):</p>
+            {deleteImpact && Object.entries(deleteImpact).some(([, c]) => c > 0) && (
+              <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs">
+                <p className="font-semibold text-amber-900">함께 정리될 데이터:</p>
                 <ul className="mt-1 space-y-0.5 text-amber-800">
                   {Object.entries(deleteImpact)
                     .filter(([, c]) => c > 0)
@@ -669,25 +661,8 @@ export default function AdminUsersPage() {
                       </li>
                     ))}
                 </ul>
-                <p className="mt-2 text-amber-700">위 데이터를 함께 삭제하고 계정을 제거합니다.</p>
-              </div>
-            ) : (
-              <div className="mt-3 rounded-lg border border-green-200 bg-green-50 p-2.5 text-xs text-green-800">
-                추가 정리할 자식 데이터 없음 — 깨끗하게 삭제됩니다.
               </div>
             )}
-
-            <label className="mt-4 block text-sm font-medium text-gray-700">
-              확인: 위 이메일을 정확히 입력하세요
-            </label>
-            <input
-              type="text"
-              value={deleteConfirmText}
-              onChange={(e) => setDeleteConfirmText(e.target.value)}
-              placeholder={deleteUser.email}
-              className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
-              autoFocus
-            />
 
             <div className="mt-5 flex gap-2">
               <button onClick={() => setDeleteUser(null)} disabled={deleteBusy}
@@ -696,7 +671,7 @@ export default function AdminUsersPage() {
               </button>
               <button
                 onClick={handleDeleteUser}
-                disabled={deleteBusy || deleteConfirmText !== deleteUser.email}
+                disabled={deleteBusy}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 py-2.5 text-sm font-medium text-white hover:bg-red-700 disabled:bg-gray-300"
               >
                 {deleteBusy && <Loader2 className="h-4 w-4 animate-spin" />}
