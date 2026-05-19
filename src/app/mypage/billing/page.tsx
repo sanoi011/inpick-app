@@ -18,8 +18,10 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Plus,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { TokenPurchaseDrawer } from "@/components/billing/TokenPurchaseDrawer";
 
 interface BillingData {
   wallet: {
@@ -89,6 +91,7 @@ export default function MyBillingPage() {
   const [data, setData] = useState<BillingData | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<Tab>("payments");
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -100,6 +103,13 @@ export default function MyBillingPage() {
       })
       .catch(() => setLoading(false));
   }, [authLoading, user]);
+
+  const reload = () => {
+    fetch("/api/mypage/billing")
+      .then((r) => r.json())
+      .then((d) => setData(d))
+      .catch(() => undefined);
+  };
 
   if (!user && !authLoading) {
     return (
@@ -127,10 +137,20 @@ export default function MyBillingPage() {
   return (
     <main className="min-h-screen bg-[#F7F7F5]">
       <div className="mx-auto max-w-5xl px-4 py-6 md:py-10">
-        <h1 className="text-2xl font-bold text-[#202123] mb-1">결제·토큰 관리</h1>
-        <p className="text-sm text-[#6B6B6B] mb-6">
-          토큰 잔액, 결제 내역, PDF 발급권, 이미지 생성 작업을 한 화면에서 확인합니다.
-        </p>
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-[#202123] mb-1">결제·토큰 관리</h1>
+            <p className="text-sm text-[#6B6B6B]">
+              토큰 잔액, 결제 내역, PDF 발급권, 이미지 생성 작업을 한 화면에서 확인합니다.
+            </p>
+          </div>
+          <button
+            onClick={() => setDrawerOpen(true)}
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-orange-500 text-white text-sm font-bold rounded-full shadow-cta hover:bg-orange-600 whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" /> 토큰 충전
+          </button>
+        </div>
 
         {/* 상단 요약 카드 */}
         <div className="grid gap-3 md:grid-cols-3 mb-6">
@@ -223,6 +243,13 @@ export default function MyBillingPage() {
           {tab === "recovery" && <RecoveryTab cases={data.recoveryCases} />}
         </div>
       </div>
+      <TokenPurchaseDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        reason="manual_topup"
+        currentTokens={totalAvailable}
+        onProvisioned={() => { reload(); }}
+      />
     </main>
   );
 }
