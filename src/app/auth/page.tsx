@@ -213,33 +213,66 @@ function ConsumerAuthForm() {
     }
   };
 
-  // 자체 비번 재설정 (이메일+휴대폰+이름 3종 매칭 → 즉시 변경)
+  // 자체 비번 복구 — 2-step flow (verify → reset)
+  const [forgotStep, setForgotStep] = useState<"verify" | "reset" | "done">("verify");
   const [forgotPhone, setForgotPhone] = useState("");
   const [forgotName, setForgotName] = useState("");
   const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotNewPasswordConfirm, setForgotNewPasswordConfirm] = useState("");
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleForgotVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setMessage("");
-    if (!email || !forgotPhone || !forgotName || !forgotNewPassword) {
+    if (!email || !forgotPhone || !forgotName) {
       setError("모든 항목을 입력해주세요.");
-      return;
-    }
-    if (forgotNewPassword.length < 8 || !/[A-Za-z]/.test(forgotNewPassword) || !/\d/.test(forgotNewPassword)) {
-      setError("비밀번호는 영문+숫자 포함 8자 이상이어야 합니다.");
       return;
     }
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/reset-password-self", {
+      const res = await fetch("/api/auth/self/recovery/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.toLowerCase().trim(),
           phone: forgotPhone.replace(/[^0-9]/g, ""),
           name: forgotName.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "본인 정보가 일치하지 않습니다.");
+        return;
+      }
+      setMessage("본인 확인 완료. 새 비밀번호를 입력하세요.");
+      setForgotStep("reset");
+    } catch {
+      setError("서버 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setMessage("");
+    if (forgotNewPassword.length < 8 || !/[A-Za-z]/.test(forgotNewPassword) || !/\d/.test(forgotNewPassword)) {
+      setError("비밀번호는 영문+숫자 포함 8자 이상이어야 합니다.");
+      return;
+    }
+    if (forgotNewPassword !== forgotNewPasswordConfirm) {
+      setError("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await fetch("/api/auth/self/recovery/reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           newPassword: forgotNewPassword,
+          newPasswordConfirm: forgotNewPasswordConfirm,
         }),
       });
       const data = await res.json();
@@ -249,12 +282,14 @@ function ConsumerAuthForm() {
       }
       setMessage("비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.");
       setPassword(forgotNewPassword);
-      setForgotPhone("");
-      setForgotName("");
-      setForgotNewPassword("");
-      // 2초 뒤 로그인 모드로 자동 복귀
+      setForgotStep("done");
       setTimeout(() => {
         setForgotMode(false);
+        setForgotStep("verify");
+        setForgotPhone("");
+        setForgotName("");
+        setForgotNewPassword("");
+        setForgotNewPasswordConfirm("");
         setMessage("");
       }, 2500);
     } catch {
@@ -270,58 +305,93 @@ function ConsumerAuthForm() {
         {error && <Alert kind="danger">{error}</Alert>}
         {message && <Alert kind="success">{message}</Alert>}
         <h3 className="text-lg font-extrabold tracking-tight text-ink">비밀번호 재설정</h3>
-        <p className="mt-1 text-[13px] text-ink-60">
-          가입 시 입력한 이메일·휴대폰·이름이 모두 일치하면 즉시 비밀번호를 변경합니다.
-        </p>
-        <form onSubmit={handleForgotPassword} className="mt-5 flex flex-col gap-3">
-          <Field label="이메일">
-            <Input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="이메일"
-              required
-              autoFocus
-            />
-          </Field>
-          <Field label="휴대폰번호">
-            <Input
-              type="tel"
-              value={forgotPhone}
-              onChange={(e) => setForgotPhone(e.target.value)}
-              placeholder="010-XXXX-XXXX"
-              required
-            />
-          </Field>
-          <Field label="이름">
-            <Input
-              type="text"
-              value={forgotName}
-              onChange={(e) => setForgotName(e.target.value)}
-              placeholder="가입 시 입력한 이름"
-              required
-            />
-          </Field>
-          <Field label="새 비밀번호">
-            <Input
-              type="password"
-              value={forgotNewPassword}
-              onChange={(e) => setForgotNewPassword(e.target.value)}
-              placeholder="영문+숫자 포함 8자 이상"
-              required
-              minLength={8}
-            />
-          </Field>
-          <PrimaryButton type="submit" loading={loading}>
-            비밀번호 변경
-          </PrimaryButton>
-        </form>
-        <p className="mt-3 text-[11px] text-ink-40 text-center">
-          이메일·휴대폰·이름 3종이 모두 일치해야 변경됩니다. 5분 내 5회 시도 제한.
-        </p>
+        {forgotStep === "verify" && (
+          <>
+            <p className="mt-1 text-[13px] text-ink-60">
+              가입 시 입력한 이메일·휴대폰·이름을 확인합니다.
+            </p>
+            <form onSubmit={handleForgotVerify} className="mt-5 flex flex-col gap-3">
+              <Field label="이메일">
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="이메일"
+                  required
+                  autoFocus
+                />
+              </Field>
+              <Field label="휴대폰번호">
+                <Input
+                  type="tel"
+                  value={forgotPhone}
+                  onChange={(e) => setForgotPhone(e.target.value)}
+                  placeholder="010-XXXX-XXXX"
+                  required
+                />
+              </Field>
+              <Field label="이름">
+                <Input
+                  type="text"
+                  value={forgotName}
+                  onChange={(e) => setForgotName(e.target.value)}
+                  placeholder="가입 시 입력한 이름"
+                  required
+                />
+              </Field>
+              <PrimaryButton type="submit" loading={loading}>
+                본인 확인
+              </PrimaryButton>
+            </form>
+            <p className="mt-3 text-[11px] text-ink-40 text-center">
+              본인 확인 성공 시 다음 단계에서 새 비밀번호를 설정합니다. 10분 내 5회 시도 제한.
+            </p>
+          </>
+        )}
+        {forgotStep === "reset" && (
+          <>
+            <p className="mt-1 text-[13px] text-ink-60">
+              본인 확인 완료. 새 비밀번호를 입력하세요. (10분 내 미설정 시 무효)
+            </p>
+            <form onSubmit={handleForgotReset} className="mt-5 flex flex-col gap-3">
+              <Field label="새 비밀번호">
+                <Input
+                  type="password"
+                  value={forgotNewPassword}
+                  onChange={(e) => setForgotNewPassword(e.target.value)}
+                  placeholder="영문+숫자 포함 8자 이상"
+                  required
+                  minLength={8}
+                  autoFocus
+                />
+              </Field>
+              <Field label="비밀번호 확인">
+                <Input
+                  type="password"
+                  value={forgotNewPasswordConfirm}
+                  onChange={(e) => setForgotNewPasswordConfirm(e.target.value)}
+                  placeholder="비밀번호 재입력"
+                  required
+                  minLength={8}
+                />
+              </Field>
+              <PrimaryButton type="submit" loading={loading}>
+                비밀번호 변경
+              </PrimaryButton>
+            </form>
+          </>
+        )}
+        {forgotStep === "done" && (
+          <p className="mt-4 text-[13px] text-ink-60 text-center">로그인 화면으로 이동합니다...</p>
+        )}
         <button
           onClick={() => {
             setForgotMode(false);
+            setForgotStep("verify");
+            setForgotPhone("");
+            setForgotName("");
+            setForgotNewPassword("");
+            setForgotNewPasswordConfirm("");
             setError("");
             setMessage("");
           }}

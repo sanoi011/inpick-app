@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { label: "대시보드", href: "/admin", icon: BarChart3 },
   { label: "행동 분석", href: "/admin/analytics", icon: Activity },
   { label: "사용자 관리", href: "/admin/users", icon: Users },
+  { label: "회원 정합성·감사", href: "/admin/members", icon: Shield },
   { label: "프로젝트", href: "/admin/projects", icon: FolderKanban },
   { label: "계약·입찰", href: "/admin/contracts", icon: FileText },
   { label: "결제 관리", href: "/admin/payments", icon: CreditCard },
