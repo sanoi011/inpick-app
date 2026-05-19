@@ -107,12 +107,16 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 2) product 조회 (서버 amount 기준)
+  // 2) product 조회 (서버 amount 기준) — is_visible + effective 기간도 검증
+  const nowIso = new Date().toISOString();
   const { data: product, error: pErr } = await admin
     .from("payment_products")
     .select("*")
     .eq("code", productCode)
     .eq("is_active", true)
+    .or(`is_visible.is.null,is_visible.eq.true`)
+    .or(`effective_from.is.null,effective_from.lte.${nowIso}`)
+    .or(`effective_to.is.null,effective_to.gte.${nowIso}`)
     .maybeSingle();
   if (pErr || !product) {
     return NextResponse.json(
@@ -125,10 +129,19 @@ export async function POST(req: NextRequest) {
     code: string;
     product_type: string;
     name_ko: string;
+    description_ko?: string;
     amount_krw: number;
     credit_amount: number;
     bonus_credit_amount: number;
+    pricing_version_id?: string | null;
   };
+
+  // 2-1) active pricing version (snapshot에 같이 박아 finalize/감사용)
+  const { data: activeVer } = await admin
+    .from("pricing_versions")
+    .select("id, version_name, base_token_unit_price_krw, image_generation_token_cost, pdf_single_price_krw")
+    .eq("status", "active")
+    .maybeSingle();
 
   // 3) orderId 생성 (UUID 기반, UNIQUE 보장)
   const orderId = `INPICK_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
@@ -136,7 +149,25 @@ export async function POST(req: NextRequest) {
   const successUrl = `${origin}/payments/success?orderId=${orderId}`;
   const failUrl = `${origin}/payments/fail?orderId=${orderId}`;
 
-  // 4) payment_intents INSERT
+  // 4) payment_intents INSERT — product_snapshot/pricing_version_id 고정
+  //    finalize는 이 snapshot 기준 지급 — 가격 변경이 과거 결제에 영향 X
+  const productSnapshot = {
+    productId: prod.code,
+    productDbId: prod.id,
+    productType: prod.product_type,
+    displayName: prod.name_ko,
+    description: prod.description_ko ?? null,
+    amountKrw: prod.amount_krw,
+    currency: "KRW",
+    tokenAmount: prod.credit_amount ?? null,
+    bonusTokenAmount: prod.bonus_credit_amount ?? null,
+    totalTokenAmount: (prod.credit_amount ?? 0) + (prod.bonus_credit_amount ?? 0),
+    pricingVersionId: activeVer?.id ?? prod.pricing_version_id ?? null,
+    pricingVersionName: activeVer?.version_name ?? null,
+    baseTokenUnitPriceKrw: activeVer?.base_token_unit_price_krw ?? null,
+    capturedAt: nowIso,
+  };
+
   const { data: intent, error: intentErr } = await admin
     .from("payment_intents")
     .insert({
@@ -152,6 +183,11 @@ export async function POST(req: NextRequest) {
       customer_key: user.id,
       success_url: successUrl,
       fail_url: failUrl,
+      // snapshot 컬럼들 (20260519 migration)
+      pricing_version_id: activeVer?.id ?? null,
+      product_snapshot: productSnapshot,
+      token_amount: prod.credit_amount ?? null,
+      bonus_token_amount: prod.bonus_credit_amount ?? null,
       metadata: {
         productCode: prod.code,
         returnPath: body.returnPath,

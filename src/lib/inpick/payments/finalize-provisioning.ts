@@ -49,6 +49,22 @@ interface IntentRow {
   project_id: string | null;
   metadata: Record<string, unknown>;
   product_type?: string;
+  // 20260519: checkout 시점의 고정 snapshot — finalize는 이 값 우선 사용
+  product_snapshot?: {
+    productId: string;
+    productDbId?: string;
+    productType: string;
+    displayName: string;
+    amountKrw: number;
+    tokenAmount?: number | null;
+    bonusTokenAmount?: number | null;
+    totalTokenAmount?: number | null;
+    pricingVersionId?: string | null;
+    capturedAt?: string;
+  } | null;
+  pricing_version_id?: string | null;
+  token_amount?: number | null;
+  bonus_token_amount?: number | null;
   product:
     | {
         code: string;
@@ -107,21 +123,44 @@ export async function finalizePaymentProvisioning(
   }
 
   const raw = intentData as IntentRow;
-  const product = Array.isArray(raw.product) ? raw.product[0] ?? null : raw.product;
+  // 20260519: snapshot 우선 (가격 변경이 과거 결제에 영향 X)
+  //   - product_snapshot 있으면 그 값을 신뢰
+  //   - 없으면 payment_products 현재값 fallback (legacy intent)
+  const snapshot = raw.product_snapshot ?? null;
+  const productJoin = Array.isArray(raw.product) ? raw.product[0] ?? null : raw.product;
+
+  // 통합 view — snapshot 우선, 없으면 join 값
+  const product: {
+    code: string;
+    product_type: string;
+    credit_amount: number;
+    bonus_credit_amount: number;
+    name_ko: string;
+    amount_krw: number;
+  } | null = snapshot
+    ? {
+        code: snapshot.productId,
+        product_type: snapshot.productType,
+        credit_amount: snapshot.tokenAmount ?? 0,
+        bonus_credit_amount: snapshot.bonusTokenAmount ?? 0,
+        name_ko: snapshot.displayName,
+        amount_krw: snapshot.amountKrw,
+      }
+    : productJoin;
+
   if (!product) {
-    // product missing reconciliation
     await admin.from("reconciliation_cases").insert({
       case_type: "payment_paid_provision_failed",
       severity: "critical",
       user_id: raw.user_id,
       payment_intent_id: raw.id,
-      description: "payment_intent에 product가 연결되지 않음 — 수동 확인 필요",
+      description: "payment_intent에 product snapshot도 join도 없음 — 수동 확인 필요",
       detected_payload: { intent: raw },
     });
     return {
       status: "missing_product",
       paymentIntentId,
-      errorMessage: "product missing on intent",
+      errorMessage: "product missing on intent (no snapshot, no join)",
     };
   }
 
