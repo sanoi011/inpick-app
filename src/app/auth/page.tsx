@@ -213,24 +213,52 @@ function ConsumerAuthForm() {
     }
   };
 
+  // 자체 비번 재설정 (이메일+휴대폰+이름 3종 매칭 → 즉시 변경)
+  const [forgotPhone, setForgotPhone] = useState("");
+  const [forgotName, setForgotName] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setMessage("");
-    if (!email) {
-      setError("이메일을 입력해주세요.");
+    if (!email || !forgotPhone || !forgotName || !forgotNewPassword) {
+      setError("모든 항목을 입력해주세요.");
+      return;
+    }
+    if (forgotNewPassword.length < 8 || !/[A-Za-z]/.test(forgotNewPassword) || !/\d/.test(forgotNewPassword)) {
+      setError("비밀번호는 영문+숫자 포함 8자 이상이어야 합니다.");
       return;
     }
     setLoading(true);
     try {
-      const normalizedEmail = email.toLowerCase().trim();
-      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+      const res = await fetch("/api/auth/reset-password-self", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: email.toLowerCase().trim(),
+          phone: forgotPhone.replace(/[^0-9]/g, ""),
+          name: forgotName.trim(),
+          newPassword: forgotNewPassword,
+        }),
       });
-      if (error) setError(error.message);
-      else setMessage("비밀번호 재설정 이메일을 발송했습니다. 이메일을 확인해주세요.");
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "비밀번호 변경에 실패했습니다.");
+        return;
+      }
+      setMessage("비밀번호가 변경되었습니다. 새 비밀번호로 로그인해주세요.");
+      setPassword(forgotNewPassword);
+      setForgotPhone("");
+      setForgotName("");
+      setForgotNewPassword("");
+      // 2초 뒤 로그인 모드로 자동 복귀
+      setTimeout(() => {
+        setForgotMode(false);
+        setMessage("");
+      }, 2500);
     } catch {
-      setError("이메일 발송 중 오류가 발생했습니다.");
+      setError("서버 오류가 발생했습니다.");
     } finally {
       setLoading(false);
     }
@@ -241,25 +269,56 @@ function ConsumerAuthForm() {
       <FormFrame>
         {error && <Alert kind="danger">{error}</Alert>}
         {message && <Alert kind="success">{message}</Alert>}
-        <h3 className="text-lg font-extrabold tracking-tight text-ink">비밀번호 찾기</h3>
+        <h3 className="text-lg font-extrabold tracking-tight text-ink">비밀번호 재설정</h3>
         <p className="mt-1 text-[13px] text-ink-60">
-          가입한 이메일을 입력하시면 비밀번호 재설정 링크를 보내드립니다.
+          가입 시 입력한 이메일·휴대폰·이름이 모두 일치하면 즉시 비밀번호를 변경합니다.
         </p>
-        <form onSubmit={handleForgotPassword} className="mt-5 flex flex-col gap-4">
+        <form onSubmit={handleForgotPassword} className="mt-5 flex flex-col gap-3">
           <Field label="이메일">
             <Input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="이메일을 입력하세요"
+              placeholder="이메일"
               required
               autoFocus
             />
           </Field>
+          <Field label="휴대폰번호">
+            <Input
+              type="tel"
+              value={forgotPhone}
+              onChange={(e) => setForgotPhone(e.target.value)}
+              placeholder="010-XXXX-XXXX"
+              required
+            />
+          </Field>
+          <Field label="이름">
+            <Input
+              type="text"
+              value={forgotName}
+              onChange={(e) => setForgotName(e.target.value)}
+              placeholder="가입 시 입력한 이름"
+              required
+            />
+          </Field>
+          <Field label="새 비밀번호">
+            <Input
+              type="password"
+              value={forgotNewPassword}
+              onChange={(e) => setForgotNewPassword(e.target.value)}
+              placeholder="영문+숫자 포함 8자 이상"
+              required
+              minLength={8}
+            />
+          </Field>
           <PrimaryButton type="submit" loading={loading}>
-            재설정 이메일 보내기
+            비밀번호 변경
           </PrimaryButton>
         </form>
+        <p className="mt-3 text-[11px] text-ink-40 text-center">
+          이메일·휴대폰·이름 3종이 모두 일치해야 변경됩니다. 5분 내 5회 시도 제한.
+        </p>
         <button
           onClick={() => {
             setForgotMode(false);
