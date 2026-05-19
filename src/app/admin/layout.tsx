@@ -17,6 +17,7 @@ const NAV_ITEMS = [
   { label: "프로젝트", href: "/admin/projects", icon: FolderKanban },
   { label: "계약·입찰", href: "/admin/contracts", icon: FileText },
   { label: "결제 관리", href: "/admin/payments", icon: CreditCard },
+  { label: "결제 센트럴타워", href: "/admin/payment-center", icon: Activity },
   { label: "가격 정책", href: "/admin/pricing", icon: Hexagon },
   { label: "결제 보정 큐", href: "/admin/reconciliation", icon: AlertTriangle },
   { label: "토큰 충전·환급", href: "/admin/credits", icon: Hexagon },
