@@ -131,18 +131,28 @@ function ConsumerAuthForm() {
       const normalizedEmail = email.toLowerCase().trim();
       const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
       if (error) {
-        const msg = error.message || "";
-        if (msg.toLowerCase().includes("email not confirmed")) {
+        const msg = (error.message || "").toLowerCase();
+        // 로그인 실패 사유를 명확히 분리 — "없는 이메일"로 뭉뚱그리지 않는다.
+        if (msg.includes("email not confirmed")) {
           setNeedsConfirm(true);
           setError("이메일 인증이 완료되지 않았습니다. 받은 메일함에서 인증 링크를 눌러주세요.");
-        } else if (msg.toLowerCase().includes("invalid login")) {
-          setError("이메일 또는 비밀번호가 올바르지 않습니다.");
-        } else if (msg.toLowerCase().includes("too many") || msg.toLowerCase().includes("rate limit")) {
+        } else if (msg.includes("invalid login") || msg.includes("invalid credentials")) {
+          // Supabase는 보안상 미가입/비번오류를 동일 메시지로 반환 → 둘 다 안내
+          setError("이메일 또는 비밀번호가 올바르지 않습니다. 가입하지 않은 이메일이라면 회원가입을 진행해주세요.");
+        } else if (msg.includes("too many") || msg.includes("rate limit")) {
           setError("잠시 후 다시 시도해주세요. 너무 많은 시도가 감지되었습니다.");
+        } else if (msg.includes("network") || msg.includes("fetch")) {
+          setError("네트워크 오류로 로그인에 실패했습니다. 연결을 확인하고 다시 시도해주세요.");
         } else {
-          setError(msg || "로그인에 실패했습니다.");
+          setError(error.message || "로그인에 실패했습니다. 잠시 후 다시 시도해주세요.");
         }
         return;
+      }
+      // 프로필 자동 보강(orphan self-heal) + 로그인 audit 기록. 실패해도 로그인은 진행.
+      try {
+        await fetch("/api/auth/post-login", { method: "POST" });
+      } catch {
+        /* non-blocking: 후처리 실패는 로그인 흐름을 막지 않음 */
       }
       // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
       const returnUrl = searchParams.get("returnUrl");

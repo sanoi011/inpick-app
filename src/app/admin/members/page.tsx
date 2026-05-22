@@ -110,6 +110,21 @@ export default function AdminMembersPage() {
     if (authChecked) void load();
   }, [authChecked, load]);
 
+  async function recoverProfile(userId: string) {
+    const res = await fetch("/api/admin/members/recover", {
+      method: "POST",
+      headers: adminAuth(),
+      body: JSON.stringify({ userId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.ok) {
+      toast({ type: "success", title: "복구 완료", message: data.message });
+      await load();
+    } else {
+      toast({ type: "error", title: "복구 불가", message: data.message || data.error || "실패" });
+    }
+  }
+
   async function resolveCase(caseId: string, status: "resolved" | "dismissed") {
     const res = await fetch(`/api/admin/members/cases/${caseId}`, {
       method: "PATCH",
@@ -201,6 +216,7 @@ export default function AdminMembersPage() {
         <MemberTable
           members={tab === "self" ? selfMembers : tab === "oauth" ? oauthMembers : orphanMembers}
           showPii={showPii}
+          onRecover={tab === "orphan" ? recoverProfile : undefined}
         />
       )}
 
@@ -247,7 +263,9 @@ function SummaryCard({ icon: Icon, label, value, color }: { icon: typeof Users; 
   );
 }
 
-function MemberTable({ members, showPii }: { members: Member[]; showPii: boolean }) {
+function MemberTable({ members, showPii, onRecover }: { members: Member[]; showPii: boolean; onRecover?: (userId: string) => void }) {
+  const [recovering, setRecovering] = useState<string | null>(null);
+  const colCount = onRecover ? 8 : 7;
   return (
     <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto">
       <table className="w-full text-sm">
@@ -260,11 +278,12 @@ function MemberTable({ members, showPii }: { members: Member[]; showPii: boolean
             <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">인증/프로필</th>
             <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">마지막 로그인</th>
             <th className="text-right px-4 py-3 text-xs font-medium text-gray-500">가입일</th>
+            {onRecover && <th className="text-center px-4 py-3 text-xs font-medium text-gray-500">복구</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
           {members.length === 0 ? (
-            <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">데이터 없음</td></tr>
+            <tr><td colSpan={colCount} className="px-4 py-8 text-center text-sm text-gray-400">데이터 없음</td></tr>
           ) : members.map((m) => (
             <tr key={m.id} className="hover:bg-gray-50">
               <td className="px-4 py-3 text-xs text-gray-600">{showPii ? m.email : maskEmail(m.email)}</td>
@@ -280,6 +299,18 @@ function MemberTable({ members, showPii }: { members: Member[]; showPii: boolean
               </td>
               <td className="px-4 py-3 text-xs text-right text-gray-500 whitespace-nowrap">{m.lastSignInAt ? new Date(m.lastSignInAt).toLocaleDateString("ko-KR") : "-"}</td>
               <td className="px-4 py-3 text-xs text-right text-gray-400 whitespace-nowrap">{new Date(m.createdAt).toLocaleDateString("ko-KR")}</td>
+              {onRecover && (
+                <td className="px-4 py-3 text-center">
+                  <button
+                    onClick={async () => { setRecovering(m.id); try { await onRecover(m.id); } finally { setRecovering(null); } }}
+                    disabled={recovering === m.id}
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                  >
+                    {recovering === m.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                    프로필 복구
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
