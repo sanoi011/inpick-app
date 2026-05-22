@@ -205,10 +205,14 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 5) Mock 모드 (Toss 키 미설정 시) — 즉시 충전 + paid 상태
-  const clientKey = process.env.TOSS_PAYMENTS_CLIENT_KEY;
-  if (!clientKey || clientKey.includes("test_gck_") === false && clientKey.length < 20) {
-    // 키 없거나 dummy면 mock
+  const intentId = (intent as { id: string }).id;
+
+  // 5) Mock 모드 — 개발 환경 + 명시적 플래그에서만. (production 자동 무료지급 차단)
+  //    이전에는 Toss 키가 없으면 자동 mock 충전이었으나, 키 미설정 상태로 프로덕션 배포 시
+  //    실결제 없이 토큰이 지급되는 구멍이 있었다. 이제 NODE_ENV!=production && ALLOW_MOCK_PAYMENT=true 필요.
+  const mockAllowed =
+    process.env.NODE_ENV !== "production" && process.env.ALLOW_MOCK_PAYMENT === "true";
+  if (mockAllowed) {
     await admin
       .from("payment_intents")
       .update({ status: "paid" })
@@ -279,17 +283,33 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 6) Production 모드 — Toss widget 호출 필요한 정보 반환
-  return NextResponse.json({
-    mockMode: false,
-    paymentIntentId: (intent as { id: string }).id,
-    orderId,
-    orderName: `INPICK ${prod.name_ko}`,
-    amount: prod.amount_krw,
-    customerKey: user.id,
-    customerName: (profile as { name: string }).name,
-    successUrl,
-    failUrl,
-    clientKey,
-  });
+  // 6) Toss 위젯 — Toss 키가 설정돼 있을 때만 결제 진행
+  const clientKey = process.env.TOSS_PAYMENTS_CLIENT_KEY;
+  if (clientKey && clientKey.length >= 20) {
+    return NextResponse.json({
+      mockMode: false,
+      provider: "toss",
+      paymentIntentId: intentId,
+      orderId,
+      orderName: `INPICK ${prod.name_ko}`,
+      amount: prod.amount_krw,
+      customerKey: user.id,
+      customerName: (profile as { name: string }).name,
+      successUrl,
+      failUrl,
+      clientKey,
+    });
+  }
+
+  // 7) 활성 결제수단 없음 — intent는 created로 남겨두고 명확히 안내.
+  //    (Toss 입점 심사 대기 중 상태. 무료지급은 5)의 mockAllowed 게이팅으로 차단됨)
+  return NextResponse.json(
+    {
+      error: "no_active_payment_provider",
+      hint: "현재 결제수단 준비 중입니다(토스페이먼츠 심사 대기). 곧 이용하실 수 있습니다.",
+      paymentIntentId: intentId,
+      orderId,
+    },
+    { status: 503 },
+  );
 }
