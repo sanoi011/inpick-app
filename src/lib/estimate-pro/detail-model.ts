@@ -1,0 +1,347 @@
+// src/lib/estimate-pro/detail-model.ts
+//
+// 종합건설사 표준 「수량내역서」 모델 (단가·금액 분리) + 아파트 누락항목 보강.
+// 카테고리(주택/상가)별로 내역이 갈리며, 본 파일은 주택(아파트) 내역을 담당.
+// 현재 17공종 엔진 결과(EstimateLine[]) → DetailLine[]로 변환 + 실제 올수리 견적에서
+// 빠져있던 공종(샷시/중문/단열/필름/주방벽타일/발코니/조명기구/환풍기/도어락/목공보강) 보강.
+
+import type { EstimateResult, EstimateLine } from '@/lib/floor-plan/quantity/estimate-calculator';
+import { TRADE_NAMES } from '@/lib/floor-plan/quantity/types';
+import { resolveMaterialMeta, LABOR_CALIBRATION, type PartCode } from './material-meta';
+
+const UNIT_LABELS: Record<string, string> = {
+  SQM: 'm²', LM: 'm', EA: '개', SET: '세트', LOT: '식',
+  M3: 'm³', KG: 'kg', ROLL: '롤', CAN: '캔', BAG: '포',
+};
+
+// ─── 내역 라인 (단가·금액 분리) ───
+
+export interface DetailLine {
+  id: string;           // 편집 식별자
+  trade: string;        // 공종명 (그룹 키)
+  order: number;        // 공종 시공 순서
+  itemCode: string;     // 엔진 itemCode (보강은 빈 문자열)
+  itemName: string;     // 품명
+  part: PartCode;       // 공사부위 (바닥/벽/천장/욕실/주방/창호·문/설비/전기/단열/공통)
+  spec: string;         // 규격
+  brand: string;        // 추천 브랜드
+  product: string;      // 추천 제품(SKU 성격)
+  priceBand?: string;   // 금액대 가이드 (hover)
+  imageHint?: string;   // 이미지/스타일 키워드 (hover)
+  unit: string;         // 단위
+  quantity: number;     // 수량(면적 등)
+  matUnit: number;      // 재료비 단가
+  labUnit: number;      // 노무비 단가
+  labWas?: number;      // 보정 전 노무단가 (있으면 보정됨)
+  labNote?: string;     // 노무 보정 사유
+  matAmount: number;    // 재료비 금액
+  labAmount: number;    // 노무비 금액
+  amount: number;       // 합계 금액
+  room: string;         // 실(室)
+  source: string;       // 단가 근거
+  optional: boolean;    // 옵션 항목(샷시/확장단열 등)
+  added: boolean;       // 보강(신규 추가) 항목 여부 — UI 강조용
+}
+
+export interface DetailGroup {
+  trade: string;
+  order: number;
+  lines: DetailLine[];
+  matSum: number;
+  labSum: number;
+  sum: number;
+}
+
+export interface DetailSheet {
+  groups: DetailGroup[];
+  directMaterial: number;
+  directLabor: number;
+  directTotal: number;
+  lineCount: number;
+}
+
+// ─── 공종 시공 순서 (아파트 내역서 표준 순서) ───
+
+const TRADE_ORDER: Record<string, number> = {
+  '가설': 1,
+  '철거': 2,
+  '샷시': 3,
+  '단열': 4,
+  '조적': 5,
+  '미장': 6,
+  '방수': 7,
+  '기계설비(배관)': 8,
+  '전기': 9,
+  '목공': 10,
+  '타일': 11,
+  '창호/문': 12,
+  '중문': 13,
+  '필름': 14,
+  '도배/페인트': 15,
+  '바닥재': 16,
+  '천장': 17,
+  '고정설비': 18,   // 주방·붙박이 가구
+  '위생도기': 19,
+  '조명': 20,
+  '잡철/하드웨어': 21,
+  '걸레받이/몰딩': 22,
+  '정리/청소': 23,
+  // ── 상가 전용 공종 ──
+  '냉난방공사': 24,
+  '환기·후드공사': 25,
+  '소방공사': 26,
+  '네트워크·통신공사': 27,
+  '간판·파사드공사': 28,
+  '상업주방': 29,
+};
+
+function orderOf(trade: string): number {
+  return TRADE_ORDER[trade] ?? 99;
+}
+
+function round(n: number): number {
+  return Math.round(n);
+}
+
+let _seq = 0;
+function nextId(): string { _seq += 1; return `dl-${_seq}`; }
+
+// 엔진 EstimateLine → DetailLine (부위/브랜드 메타 + 노무 시장가 보정 적용)
+function fromEngine(line: EstimateLine): DetailLine {
+  const trade = TRADE_NAMES[line.tradeCode] || line.tradeCode;
+  const meta = resolveMaterialMeta(line.itemName);
+  const qty = round(line.quantity * 100) / 100;
+
+  // 노무 시장가 보정 (itemCode 기준)
+  const calib = LABOR_CALIBRATION[line.itemCode];
+  const labUnit = calib ? calib.labor : line.laborCost;
+  const matUnit = line.materialCost;
+  const matAmount = round(qty * matUnit);
+  const labAmount = round(qty * labUnit);
+
+  return {
+    id: nextId(),
+    trade,
+    order: orderOf(trade),
+    itemCode: line.itemCode,
+    itemName: line.itemName,
+    part: meta.part,
+    spec: line.specification || '-',
+    brand: meta.brand,
+    product: meta.product,
+    priceBand: meta.priceBand,
+    imageHint: meta.imageHint,
+    unit: UNIT_LABELS[line.unit] || line.unit,
+    quantity: qty,
+    matUnit,
+    labUnit,
+    labWas: calib ? calib.was : undefined,
+    labNote: calib ? calib.note : undefined,
+    matAmount,
+    labAmount,
+    amount: matAmount + labAmount,
+    room: line.roomName || '공통',
+    source: line.priceSource || '',
+    optional: false,
+    added: false,
+  };
+}
+
+// 보강 라인 생성 헬퍼
+function add(
+  trade: string, itemName: string, spec: string, unit: string,
+  qty: number, matUnit: number, labUnit: number,
+  opts: { room?: string; source?: string; optional?: boolean } = {}
+): DetailLine {
+  const meta = resolveMaterialMeta(itemName);
+  const matAmount = round(qty * matUnit);
+  const labAmount = round(qty * labUnit);
+  return {
+    id: nextId(),
+    trade, order: orderOf(trade), itemCode: '',
+    itemName, part: meta.part, spec,
+    brand: meta.brand, product: meta.product, priceBand: meta.priceBand, imageHint: meta.imageHint,
+    unit, quantity: qty, matUnit, labUnit, matAmount, labAmount,
+    amount: matAmount + labAmount,
+    room: opts.room || '공통',
+    source: opts.source || '2025 서울 실거래 기준(보강)',
+    optional: opts.optional || false,
+    added: true,
+  };
+}
+
+export interface ResidentialOptions {
+  sash: boolean;            // 샷시(발코니 이중창) 교체
+  expansionInsulation: boolean; // 발코니 확장부 단열
+  doorCount?: number;       // 문 개수 (필름)
+  bathCount?: number;       // 욕실 수 (환풍기/샤워부스)
+  area?: number;            // 전용면적 m²
+}
+
+// 아파트 누락항목 보강 (실제 올수리 견적 대조 결과)
+export function residentialSupplement(opts: ResidentialOptions): DetailLine[] {
+  const doors = opts.doorCount ?? 9;
+  const baths = opts.bathCount ?? 2;
+  const lines: DetailLine[] = [];
+
+  // 가설
+  lines.push(add('가설', '세대 양중·운반', '엘리베이터 양생 + 자재 양중', '식', 1, 0, 300000));
+
+  // 샷시 (옵션)
+  lines.push(add('샷시', '발코니 하이샷시 교체', '시스템 이중창(로이유리) 전면', '식', 1, 8000000, 1800000, { optional: true, source: 'KCC/LX 하이샷시 2025' }));
+
+  // 단열 (옵션)
+  lines.push(add('단열', '발코니 확장부 단열', '아이소핑크 30T + 열반사 단열', 'm²', 25, 18000, 22000, { optional: true }));
+
+  // 목공 보강
+  lines.push(add('목공', '아트월 제작', '거실 TV벽 아트월 (석고+무늬목/타일 하지)', '식', 1, 400000, 600000));
+  lines.push(add('목공', '우물천장/간접조명 박스', '거실 우물천장 + 커튼박스 하지', '식', 1, 300000, 500000));
+  lines.push(add('목공', '가벽·문선 하지 보강', '석고 가벽 + 문선 보강 목공', '식', 1, 200000, 300000));
+
+  // 타일 보강 (주방벽/발코니/현관)
+  lines.push(add('타일', '주방 벽타일', '주방 후드벽·싱크벽 포세린 300×600', 'm²', 8, 35000, 45000, { room: '주방/식당' }));
+  lines.push(add('타일', '발코니 바닥타일', '자기질 타일 300×300', 'm²', 10, 30000, 40000, { room: '발코니' }));
+  lines.push(add('타일', '현관 바닥타일', '포세린 600×600 (현관 강마루 대체)', 'm²', 4, 40000, 45000, { room: '현관' }));
+
+  // 방수 보강 (발코니)
+  lines.push(add('방수', '발코니 바닥 방수', '액체방수 2회 (배수구 주변 포함)', 'm²', 10, 15000, 20000, { room: '발코니' }));
+
+  // 도배/페인트 보강 (발코니 탄성코트)
+  lines.push(add('도배/페인트', '발코니 벽·천장 탄성코트', '결로방지 탄성코트 2회', 'm²', 25, 6000, 9000, { room: '발코니' }));
+
+  // 창호/문 — 중문
+  lines.push(add('중문', '3연동 중문', '슬라이딩 3연동 + 유리 (현관)', '세트', 1, 1200000, 300000, { room: '현관' }));
+
+  // 필름
+  lines.push(add('필름', '도어/문틀 필름 래핑', '인테리어 필름 (문짝+문틀)', '개', doors, 30000, 50000));
+  lines.push(add('필름', '창틀·문선 필름', '창틀·걸레받이 상부 문선 필름', 'm²', 45, 8000, 12000));
+
+  // 위생도기 보강
+  lines.push(add('위생도기', '욕실 환풍기', '저소음 환풍기 (덕트 연결)', '개', baths, 60000, 40000));
+  lines.push(add('위생도기', '샤워부스/유리파티션', '강화유리 파티션 (욕실당 1)', '개', baths, 350000, 100000));
+
+  // ── 전기 보강 (아파트 전기 내역 기준) ──
+  lines.push(add('전기', '세대 배선 전면 교체', 'HIV 전선 + CD관 재배선', '식', 1, 350000, 450000));
+  lines.push(add('전기', '추가 콘센트 증설', '매립 콘센트 2구 (가전 증설 대응)', '개', 8, 12000, 35000));
+  lines.push(add('전기', '4구/USB 콘센트', '멀티 4구·USB 매립 콘센트', '개', 4, 25000, 35000));
+  lines.push(add('전기', '인덕션 전용회로', '단상 220V 전용회로 + 차단기', '개', 1, 60000, 90000, { room: '주방/식당' }));
+  lines.push(add('전기', '에어컨 전용회로', '에어컨 전용 콘센트 + 회로', '개', 2, 45000, 70000));
+  lines.push(add('전기', '욕실 방수 콘센트', '방수형 콘센트 + 면도기 단자', '개', baths, 18000, 35000, { room: '욕실' }));
+  lines.push(add('전기', '디머/3로 스위치', '디밍·3로 스위치 (거실/침실)', '개', 6, 18000, 30000));
+  lines.push(add('전기', '통신·TV 단자', '인터넷·TV·전화 단자 재배선', '개', 5, 20000, 35000));
+  lines.push(add('전기', '누전차단기 증설', 'ELB 분기 차단기 증설', '식', 1, 120000, 80000));
+  lines.push(add('전기', '디지털 도어락', '번호+카드 디지털 도어락', '개', 1, 180000, 50000, { room: '현관' }));
+
+  // ── 조명기구 보강 (등기구 제품 — 현재 전기는 배선만) ──
+  lines.push(add('조명', '거실 평판등 (LED)', '640각/슬림 평판등', '개', 1, 180000, 30000, { room: '거실' }));
+  lines.push(add('조명', '방 LED등', '방등 (침실/안방)', '개', 3, 90000, 25000));
+  lines.push(add('조명', '주방·식탁 조명', '주방 직부등 + 식탁 펜던트', '개', 2, 120000, 30000, { room: '주방/식당' }));
+  lines.push(add('조명', '욕실 방습등', '방습형 욕실등', '개', baths, 70000, 25000, { room: '욕실' }));
+  lines.push(add('조명', '현관·복도 센서등', '인체감지 센서등', '개', 2, 45000, 25000));
+  lines.push(add('조명', '다운라이트(매입등)', 'LED 4인치 매입 다운라이트', '개', 12, 18000, 12000));
+  lines.push(add('조명', '간접조명 LED바', '우물천장/아트월 간접조명', 'm', 12, 15000, 12000));
+
+  return lines;
+}
+
+// 주택(아파트) 상세내역서 빌드
+export function buildResidentialDetail(
+  engine: EstimateResult,
+  opts: ResidentialOptions
+): DetailSheet {
+  // 엔진 라인 (현관 강마루는 현관 타일로 대체하므로 제외)
+  const engineLines = engine.lines
+    .filter((l) => !(TRADE_NAMES[l.tradeCode] === '바닥재' && l.roomName === '현관'))
+    .map(fromEngine);
+
+  // 보강 라인 (옵션 미선택 시 해당 라인 제외)
+  const supp = residentialSupplement(opts).filter((l) => {
+    if (l.trade === '샷시' && !opts.sash) return false;
+    if (l.trade === '단열' && !opts.expansionInsulation) return false;
+    return true;
+  });
+
+  return assembleSheet([...engineLines, ...supp]);
+}
+
+// 평탄 라인 (엔진 매핑 + 보강 전체) — 마스터 생성기/검증용
+export function residentialDetailLines(engine: EstimateResult, opts: ResidentialOptions): DetailLine[] {
+  const engineLines = engine.lines
+    .filter((l) => !(TRADE_NAMES[l.tradeCode] === '바닥재' && l.roomName === '현관'))
+    .map(fromEngine);
+  const supp = residentialSupplement(opts); // 마스터는 옵션 포함 전체
+  return [...engineLines, ...supp];
+}
+
+// 공통: 라인 → 공종 그룹 + 합계
+export function assembleSheet(all: DetailLine[]): DetailSheet {
+  const byTrade = new Map<string, DetailLine[]>();
+  for (const l of all) {
+    if (!byTrade.has(l.trade)) byTrade.set(l.trade, []);
+    byTrade.get(l.trade)!.push(l);
+  }
+
+  const groups: DetailGroup[] = Array.from(byTrade.entries())
+    .map(([trade, lines]) => {
+      const matSum = lines.reduce((s, x) => s + x.matAmount, 0);
+      const labSum = lines.reduce((s, x) => s + x.labAmount, 0);
+      return { trade, order: orderOf(trade), lines, matSum, labSum, sum: matSum + labSum };
+    })
+    .sort((a, b) => a.order - b.order);
+
+  const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
+  const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
+
+  return {
+    groups,
+    directMaterial,
+    directLabor,
+    directTotal: directMaterial + directLabor,
+    lineCount: all.length,
+  };
+}
+
+// ─── 고정 마스터 내역 (모든 견적서 공통 항목셋) ───
+// 프로젝트별로 수량 0 또는 삭제로 운용. 단가/규격/브랜드는 표준 기본값(편집 가능).
+
+export interface MasterItem {
+  trade: string;
+  order: number;
+  itemName: string;
+  part: PartCode;
+  spec: string;
+  brand: string;
+  product: string;
+  priceBand?: string;
+  imageHint?: string;
+  unit: string;
+  quantity: number;   // 84㎡(34평) 표준 기본 수량
+  matUnit: number;
+  labUnit: number;
+  labWas?: number;
+  labNote?: string;
+  optional: boolean;
+  source: string;
+}
+
+// 마스터 → DetailSheet (수량 0 항목은 옵션으로 숨김 가능)
+export function masterToSheet(items: MasterItem[], opts: { dropZeroQty?: boolean } = {}): DetailSheet {
+  let i = 0;
+  const lines: DetailLine[] = items
+    .filter((m) => !(opts.dropZeroQty && m.quantity <= 0))
+    .map((m) => {
+      const matAmount = round(m.quantity * m.matUnit);
+      const labAmount = round(m.quantity * m.labUnit);
+      return {
+        id: `m-${i++}`,
+        trade: m.trade, order: m.order, itemCode: '', itemName: m.itemName,
+        part: m.part, spec: m.spec, brand: m.brand, product: m.product,
+        priceBand: m.priceBand, imageHint: m.imageHint,
+        unit: m.unit, quantity: m.quantity, matUnit: m.matUnit, labUnit: m.labUnit,
+        labWas: m.labWas, labNote: m.labNote,
+        matAmount, labAmount, amount: matAmount + labAmount,
+        room: '전체', source: m.source, optional: m.optional, added: false,
+      };
+    });
+  return assembleSheet(lines);
+}
