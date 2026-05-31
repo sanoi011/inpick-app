@@ -303,6 +303,32 @@ export function assembleSheet(all: DetailLine[]): DetailSheet {
   };
 }
 
+// 실(室)별 × 부위별 그룹 — 안방/거실/부엌 등 실 단위로 묶고, 실 내부는 부위(바닥/벽/천장…) 순.
+const PART_ORDER: Record<string, number> = {
+  '바닥': 1, '벽': 2, '천장': 3, '걸레받이/몰딩': 4, '창호/문': 5,
+  '욕실': 6, '주방': 7, '설비': 8, '전기': 9, '단열': 10, '공통': 11,
+};
+
+export function assembleByRoom(all: DetailLine[]): DetailSheet {
+  const byRoom = new Map<string, DetailLine[]>();
+  for (const l of all) {
+    const k = l.room || '공통';
+    if (!byRoom.has(k)) byRoom.set(k, []);
+    byRoom.get(k)!.push(l);
+  }
+  let idx = 0;
+  const groups: DetailGroup[] = Array.from(byRoom.entries()).map(([room, lines]) => {
+    const sorted = lines.slice().sort((a, b) => (PART_ORDER[a.part] ?? 99) - (PART_ORDER[b.part] ?? 99));
+    const matSum = sorted.reduce((s, x) => s + x.matAmount, 0);
+    const labSum = sorted.reduce((s, x) => s + x.labAmount, 0);
+    return { trade: room, order: ++idx, lines: sorted, matSum, labSum, sum: matSum + labSum };
+  });
+  groups.sort((a, b) => (a.trade === '공통' ? 1 : 0) - (b.trade === '공통' ? 1 : 0)); // 공통 맨 뒤
+  const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
+  const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
+  return { groups, directMaterial, directLabor, directTotal: directMaterial + directLabor, lineCount: all.length };
+}
+
 // ─── 고정 마스터 내역 (모든 견적서 공통 항목셋) ───
 // 프로젝트별로 수량 0 또는 삭제로 운용. 단가/규격/브랜드는 표준 기본값(편집 가능).
 

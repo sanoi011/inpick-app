@@ -1479,8 +1479,8 @@ function EstimatePage() {
                   </div>
                 )}
 
-                {/* P0: 폴백/표준자재 적용 경고 배너 */}
-                {!loading && !error && warnings.length > 0 && (
+                {/* P0: 폴백/표준자재 적용 경고 배너 — 소비자 화면에서는 숨김(내부 진단용) */}
+                {false && !loading && !error && warnings.length > 0 && (
                   <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
                     <div className="flex items-start gap-2">
                       <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
@@ -1500,8 +1500,8 @@ function EstimatePage() {
                   </div>
                 )}
 
-                {/* P17-1: 견적 정확도 레벨 (L0~L5) 배지 + 추천사항 */}
-                {!loading && !error && constructionEstimate && (() => {
+                {/* P17-1: 견적 정확도 레벨 (L0~L5) — 소비자 화면에서는 숨김(내부 진단용) */}
+                {false && !loading && !error && constructionEstimate && (() => {
                   const precision = computePrecisionLevel(constructionEstimate);
                   return (
                     <div className={`mb-3 rounded-2xl border-2 ${precision.info.colorClass} p-4`}>

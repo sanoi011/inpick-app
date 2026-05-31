@@ -9,7 +9,7 @@ import {
   ChevronDown, ChevronRight, TrendingDown, ImageIcon, Trash2,
   FileText, Receipt, CalendarRange, MessageSquare, FileSignature, Layers,
 } from "lucide-react";
-import { assembleSheet, type DetailLine } from "@/lib/estimate-pro/detail-model";
+import { assembleSheet, assembleByRoom, type DetailLine } from "@/lib/estimate-pro/detail-model";
 import {
   computeCostSheet, defaultJebiItems, defaultMarginRates,
   type JebiItem, type MarginRates,
@@ -55,12 +55,16 @@ export default function EstimateProForm({ lines, category = "residential", proje
   const [rows, setRows] = useState<Row[]>(lines);
   const [jebi, setJebi] = useState<JebiItem[]>(() => defaultJebiItems());
   const [margins, setMargins] = useState<MarginRates>(() => defaultMarginRates());
+  const [groupBy, setGroupBy] = useState<"room" | "trade">("room"); // 세부내역서: 기본 실별×부위별
 
   // 견적(lines) 갱신 시 편집행 동기화
   useEffect(() => { setRows(lines); }, [lines]);
   useEffect(() => { if (projectName) setMeta((m) => ({ ...m, projectName })); }, [projectName]);
 
-  const sheet = useMemo(() => assembleSheet(rows), [rows]);
+  // 공종별 집계(총괄내역서·공정표·원가용) + 세부내역서 표시 그룹(실별/공종별)
+  const tradeSheet = useMemo(() => assembleSheet(rows), [rows]);
+  const detailSheet = useMemo(() => (groupBy === "room" ? assembleByRoom(rows) : tradeSheet), [groupBy, rows, tradeSheet]);
+  const sheet = tradeSheet;
   const cost = useMemo(
     () => computeCostSheet({ directMaterial: sheet.directMaterial, directLabor: sheet.directLabor, jebi, margins, includeJebi }),
     [sheet.directMaterial, sheet.directLabor, jebi, margins, includeJebi]
@@ -101,7 +105,7 @@ export default function EstimateProForm({ lines, category = "residential", proje
         {tab === "cover" && <CoverTab meta={meta} setMeta={setMeta} cost={cost} category={category} areaLabel={areaLabel} lineCount={sheet.lineCount} tradeCount={sheet.groups.length} />}
         {tab === "summary" && <CostTab cost={cost} jebi={jebi} margins={margins} role={role} includeJebi={includeJebi} setIncludeJebi={setIncludeJebi} updateJebi={updateJebi} setMargins={setMargins} />}
         {tab === "rollup" && <RollupTab sheet={sheet} cost={cost} />}
-        {tab === "detail" && <DetailTab sheet={sheet} collapsed={collapsed} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} />}
+        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} collapsed={collapsed} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} />}
         {tab === "schedule" && <ScheduleTab schedule={schedule} targetDays={targetDays} setTargetDays={setTargetDays} />}
       </div>
     </div>
@@ -262,10 +266,19 @@ function RollupTab({ sheet, cost }: any) {
 }
 
 /* 4. 세부내역서 (편집) */
-function DetailTab({ sheet, collapsed, toggleGroup, updateRow, deleteRow }: any) {
+function DetailTab({ sheet, groupBy, setGroupBy, collapsed, toggleGroup, updateRow, deleteRow }: any) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between"><h2 className="text-sm font-bold text-gray-900">세부내역서 — 공종별 (편집 가능)</h2><span className="text-[11px] text-gray-400">수량·단가 수정 · 자재 hover · 🗑 삭제</span></div>
+      <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2 flex-wrap">
+        <h2 className="text-sm font-bold text-gray-900">세부내역서 — {groupBy === "room" ? "실별 × 부위별" : "공종별"} (편집 가능)</h2>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+            <button onClick={() => setGroupBy("room")} className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${groupBy === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>실별</button>
+            <button onClick={() => setGroupBy("trade")} className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
+          </div>
+          <span className="text-[11px] text-gray-400 hidden sm:inline">수량·단가 수정 · 자재 hover · 🗑 삭제</span>
+        </div>
+      </div>
       {sheet.groups.map((g: any) => {
         const open = !collapsed.has(g.trade);
         return (
