@@ -7,7 +7,9 @@
 
 import type { EstimateResult, EstimateLine } from '@/lib/floor-plan/quantity/estimate-calculator';
 import { TRADE_NAMES } from '@/lib/floor-plan/quantity/types';
-import { resolveMaterialMeta, LABOR_CALIBRATION, type PartCode } from './material-meta';
+import { resolveMaterialMeta, resolvePart, type PartCode } from './material-meta';
+import { LABOR_CALIBRATION } from './material-meta';
+import type { ConstructionEstimate } from '@/lib/inpick/estimate-v2/types';
 
 const UNIT_LABELS: Record<string, string> = {
   SQM: 'm²', LM: 'm', EA: '개', SET: '세트', LOT: '식',
@@ -322,6 +324,65 @@ export interface MasterItem {
   labNote?: string;
   optional: boolean;
   source: string;
+}
+
+// ─── Vision 분석 견적(v2) → DetailLine[] 어댑터 ───
+// 파이프라인: 디자인 이미지 → Vision 분석 → build-estimate(ConstructionEstimate) → 본 어댑터 → 우리 4문서 폼.
+
+const V2_UNIT: Record<string, string> = {
+  m2: 'm²', sqm: 'm²', m: 'm', lm: 'm', ea: '개', set: '세트', lot: '식', kg: 'kg', roll: '롤',
+};
+const SURFACE_PART: Record<string, PartCode> = {
+  floor: '바닥', wall: '벽', ceiling: '천장', door: '창호/문', window: '창호/문',
+  baseboard: '걸레받이/몰딩', fixture: '욕실', sink: '주방', cabinet: '주방', counter: '주방', lighting: '전기',
+};
+
+export function constructionEstimateToDetailLines(est: ConstructionEstimate): DetailLine[] {
+  const lines = (est.lines || []).filter((l) => l.included !== false);
+  let i = 0;
+  return lines.map((l) => {
+    const trade = l.tradeNameKo || l.tradeCode || '기타';
+    const itemName = l.itemNameKo || l.taskNameKo || l.subTradeNameKo || '항목';
+    const meta = resolveMaterialMeta(itemName);
+    const part: PartCode =
+      (l.surfaceType && SURFACE_PART[l.surfaceType]) || resolvePart(itemName) || meta.part;
+    const brand = l.brand || l.manufacturer || l.productName || meta.brand;
+    const product = l.productName || l.modelNo || l.sku || meta.product;
+    const spec = l.spec || l.productSpec || meta.priceBand || '-';
+    const qty = Math.round((l.quantity || 0) * 100) / 100;
+    const matUnit = Math.round(l.materialUnitPrice || 0);
+    // v2의 경비(expense)는 우리 모델의 노무 측에 합산 (총액 일치 보존)
+    const labUnit = Math.round((l.laborUnitPrice || 0) + (l.expenseUnitPrice || 0));
+    const matAmount = Math.round(l.materialAmount || 0);
+    const labAmount = Math.round((l.laborAmount || 0) + (l.expenseAmount || 0));
+    return {
+      id: `ce-${i++}`,
+      trade,
+      order: orderOf(trade),
+      itemCode: l.tradeCode || '',
+      itemName,
+      part,
+      spec,
+      brand,
+      product,
+      priceBand: meta.priceBand,
+      imageHint: meta.imageHint,
+      unit: V2_UNIT[(l.unit || '').toLowerCase()] || l.unit || '식',
+      quantity: qty,
+      matUnit,
+      labUnit,
+      matAmount,
+      labAmount,
+      amount: matAmount + labAmount,
+      room: l.roomName || '공통',
+      source:
+        l.materialPriceSource ||
+        (l.source ? String(l.source) : '') ||
+        'Vision 분석 견적',
+      optional: false,
+      added: false,
+    };
+  });
 }
 
 // 마스터 → DetailSheet (수량 0 항목은 옵션으로 숨김 가능)

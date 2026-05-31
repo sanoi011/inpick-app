@@ -1376,6 +1376,9 @@ export default function Step2Designer({
             {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
             <ChevronRight className="h-3 w-3" />
           </a>
+          <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-primary-900/45">
+            클릭 후 견적서를 불러오는 데 몇 초 걸릴 수 있어요. 잠시만 기다려주세요.
+          </p>
         </div>
       </aside>
 

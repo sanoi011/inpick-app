@@ -50,6 +50,9 @@ import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision
 import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseModal";
 // community v2 (2026-05-14): 커뮤니티 견적 공유
 import EstimateShareModal from "@/components/community/EstimateShareModal";
+// 2026-05-31: 오늘 만든 견적서 4문서 폼으로 교체 (Vision 분석 견적 → 우리 양식)
+import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
+import { constructionEstimateToDetailLines } from "@/lib/estimate-pro/detail-model";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -365,6 +368,8 @@ function EstimatePage() {
   // P7: 공종별 견적 v2 — contextId 경로에서 받음
   const [constructionEstimate, setConstructionEstimate] = useState<ConstructionEstimate | null>(null);
   const [viewMode, setViewMode] = useState<"trade" | "room" | "surface" | "material">("trade");
+  // 2026-05-31: 기본은 새 4문서 폼. 기존 상세표는 토글로만 노출.
+  const [showLegacy, setShowLegacy] = useState(false);
   // P14-4: 사용자가 제외한 v2 line ID 집합 — 토글 시 총액 재계산
   const [excludedV2Lines, setExcludedV2Lines] = useState<Set<string>>(new Set());
   // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
@@ -451,6 +456,8 @@ function EstimatePage() {
     if (!projectId) return;
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    let ticks = 0;
+    const MAX_ANALYSIS_TICKS = 15; // 약 60초 (4초 × 15) — 무한 '진행 중' 방지
 
     const tick = async () => {
       const outputs = await fetchDesignOutputs(projectId);
@@ -464,6 +471,13 @@ function EstimatePage() {
         if (o.status === "analysis_pending" || o.status === "generated") counts.pending++;
         else if (o.status === "analysis_done") counts.done++;
         else if (o.status === "analysis_failed") counts.failed++;
+      }
+      ticks++;
+      // 일정 시간 내 정밀 분석이 끝나지 않으면 남은 항목을 표준값으로 확정(폴링 종료).
+      // 견적은 이미 디자인 기반으로 산출되어 있으므로 '진행 중'이 영원히 멈추는 것을 방지.
+      if (ticks >= MAX_ANALYSIS_TICKS && counts.pending > 0) {
+        counts.done += counts.pending;
+        counts.pending = 0;
       }
       setAnalysisStatus(counts);
       // P5: 갤러리 보강 — design_outputs DB의 이미지도 함께 표시
@@ -1532,8 +1546,27 @@ function EstimatePage() {
                   );
                 })()}
 
-                {/* P7-4: 공종별/공간별/부위별/자재별 보기 탭 — 항상 표시 (loading/error 제외) */}
-                {!loading && !error && (
+                {/* 2026-05-31: 생성 디자인 Vision 분석 견적 → 오늘 만든 4문서 폼으로 표시 */}
+                {!loading && !error && constructionEstimate && (
+                  <button
+                    onClick={() => setShowLegacy((v) => !v)}
+                    className="mb-2 text-[0.72rem] font-semibold text-primary-700/70 hover:text-primary-700 underline"
+                  >
+                    {showLegacy ? "← 새 견적서 폼으로" : "기존 상세표(공종/공간/부위/자재별) 보기"}
+                  </button>
+                )}
+                {!loading && !error && constructionEstimate && !showLegacy && (
+                  <div className="mb-3">
+                    <EstimateProForm
+                      lines={constructionEstimateToDetailLines(constructionEstimate)}
+                      category="residential"
+                      visionBadge="생성 디자인 Vision 분석 기반 견적"
+                    />
+                  </div>
+                )}
+
+                {/* P7-4: 공종별/공간별/부위별/자재별 보기 탭 (기존 상세표 — 토글 시) */}
+                {(showLegacy || !constructionEstimate) && !loading && !error && (
                   <div className="mb-3 flex items-center gap-1 rounded-2xl border border-primary-100 bg-white p-1.5 shadow-sm">
                     {(
                       [
@@ -1581,7 +1614,7 @@ function EstimatePage() {
                 )}
 
                 {/* P7-4: 공종별 견적 v2 — constructionEstimate가 있을 때 표시 */}
-                {!loading && !error && viewMode === "trade" && constructionEstimate && (
+                {showLegacy && !loading && !error && viewMode === "trade" && constructionEstimate && (
                   <div className="mb-3 space-y-2">
                     {constructionEstimate.tradeSummaries.map((trade) => {
                       const lines = constructionEstimate.lines.filter(
@@ -1689,7 +1722,7 @@ function EstimatePage() {
                 )}
 
                 {/* P7-4: 공간별 보기 — constructionEstimate.roomSummaries */}
-                {!loading && !error && viewMode === "room" && constructionEstimate && (
+                {showLegacy && !loading && !error && viewMode === "room" && constructionEstimate && (
                   <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
                     <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
                       공간별 합계
@@ -1728,7 +1761,7 @@ function EstimatePage() {
                 )}
 
                 {/* P7-4 + P12: 자재집계표 — 제조사/브랜드/SKU/단가출처 표시 */}
-                {!loading && !error && viewMode === "material" && constructionEstimate && (
+                {showLegacy && !loading && !error && viewMode === "material" && constructionEstimate && (
                   <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card overflow-x-auto">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
@@ -1939,7 +1972,7 @@ function EstimatePage() {
                   {!loading &&
                     !error &&
                     tradeGroups.length > 0 &&
-                    (viewMode === "surface" || !constructionEstimate) && (
+                    ((viewMode === "surface" && showLegacy) || !constructionEstimate) && (
                     <div className="overflow-x-auto">
                       <table className="w-full text-[0.82rem] tabular">
                         <thead>
@@ -2236,7 +2269,7 @@ function EstimatePage() {
                       </p>
                     </div>
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-primary-900/60">
-                      A4 가로 4페이지 (갑지 + 총괄표 + 총괄내역서 + 공종별내역서)
+                      베타테스트 — 현재 자체 검증 업체를 선별 중에 있습니다. 해당 견적서를 다운받아 진행 가능한 업체에 세부 견적 의뢰를 맡기세요.
                     </p>
                     <button
                       type="button"
