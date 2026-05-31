@@ -18,22 +18,60 @@ import type {
 const PROJECT_ID_KEY = "workflow_project_id";
 
 /**
- * 세션 단위 workflow projectId — sessionStorage에 UUID로 보관.
+ * workflow projectId — localStorage에 UUID로 보관.
+ * (sessionStorage였으나 재로그인/새 세션 시 projectId가 소실되어 계정의 DB 프로젝트와
+ *  매칭이 끊기는 문제로 localStorage로 변경 — 같은 브라우저에서 재로그인 시 그대로 복원.)
  * 견적 페이지/입찰 페이지에서도 같은 키로 읽어 일관성 유지.
  */
 export function getOrCreateWorkflowProjectId(): string {
   if (typeof window === "undefined") return "";
   try {
-    const existing = sessionStorage.getItem(PROJECT_ID_KEY);
-    if (existing) return existing;
+    // 기존 sessionStorage 값이 있으면 1회 마이그레이션
+    const legacy = sessionStorage.getItem(PROJECT_ID_KEY);
+    const existing = localStorage.getItem(PROJECT_ID_KEY) || legacy;
+    if (existing) {
+      localStorage.setItem(PROJECT_ID_KEY, existing);
+      return existing;
+    }
     const id =
       typeof crypto !== "undefined" && "randomUUID" in crypto
         ? crypto.randomUUID()
         : fallbackUuid();
-    sessionStorage.setItem(PROJECT_ID_KEY, id);
+    localStorage.setItem(PROJECT_ID_KEY, id);
     return id;
   } catch {
     return fallbackUuid();
+  }
+}
+
+/**
+ * 영속 저장용 step2 경량화 — rendersByRoom 각 항목의 순수 base64/dataUrl 제거.
+ * (base64는 활성 세션의 Anthropic 편집 전송용일 뿐, 표시는 imageUrl[스토리지 URL]로 충분.
+ *  이게 sessionStorage/DB에 들어가면 수 MB로 비대해져 QuotaExceeded/413으로 저장이 실패하고
+ *  → 견적요청 네비게이션 무산 / 견적 페이지 공백 / 재로그인 소실의 근본 원인이 됨.)
+ * 메모리상의 state는 그대로 두고, 저장하는 복사본만 경량화한다.
+ */
+export function lightenWorkflowStep2<T>(step2: T): T {
+  const s = step2 as unknown as { rendersByRoom?: Record<string, Array<Record<string, unknown>>> };
+  if (!s || typeof s !== "object" || !s.rendersByRoom) return step2;
+  const lightened: Record<string, Array<Record<string, unknown>>> = {};
+  for (const key of Object.keys(s.rendersByRoom)) {
+    lightened[key] = (s.rendersByRoom[key] || []).map((item) => {
+      const { base64, dataUrl, ...rest } = item as Record<string, unknown> & { base64?: unknown; dataUrl?: unknown };
+      void base64; void dataUrl;
+      return rest;
+    });
+  }
+  return { ...(s as object), rendersByRoom: lightened } as unknown as T;
+}
+
+/** 계정 복원 등으로 활성 projectId를 교체. */
+export function setWorkflowProjectId(id: string) {
+  if (typeof window === "undefined" || !id) return;
+  try {
+    localStorage.setItem(PROJECT_ID_KEY, id);
+  } catch {
+    /* ignore */
   }
 }
 
@@ -48,6 +86,7 @@ function fallbackUuid(): string {
 export function clearWorkflowProjectId() {
   if (typeof window === "undefined") return;
   try {
+    localStorage.removeItem(PROJECT_ID_KEY);
     sessionStorage.removeItem(PROJECT_ID_KEY);
   } catch {
     /* ignore */

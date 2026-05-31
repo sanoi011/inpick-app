@@ -36,7 +36,7 @@ import VisionMaterialPicker from "./VisionMaterialPicker";
 import type { VisionMaterialAnalyzeRequest } from "@/lib/vision-materials/types";
 import type { SegmentationData } from "@/types/segmentation";
 // P1: 이미지 생성 결과를 견적 evidence로 DB 저장 — workflow blocking 제거 핵심
-import { saveDesignOutputAfterRender } from "@/lib/inpick/estimate-context/client";
+import { saveDesignOutputAfterRender, lightenWorkflowStep2 } from "@/lib/inpick/estimate-context/client";
 import type { ProjectMode } from "@/lib/inpick/estimate-context/types";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
@@ -1361,7 +1361,7 @@ export default function Step2Designer({
                   roomFurnishings,
                   normalizedFloorplan,
                 }));
-                sessionStorage.setItem("workflow_step2", JSON.stringify(value));
+                sessionStorage.setItem("workflow_step2", JSON.stringify(lightenWorkflowStep2(value)));
               } catch {
                 /* private mode */
               }

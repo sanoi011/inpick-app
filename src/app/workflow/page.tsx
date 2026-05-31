@@ -19,8 +19,11 @@ import LenisProvider from "@/components/landing-v4/LenisProvider";
 import {
   fetchDesignOutputs,
   fetchWorkflowState,
+  fetchWorkflowProjects,
   getOrCreateWorkflowProjectId,
+  setWorkflowProjectId,
   saveWorkflowState,
+  lightenWorkflowStep2,
 } from "@/lib/inpick/estimate-context/client";
 
 // 빠른 진입 모드 — 평수 프리셋
@@ -121,11 +124,26 @@ export default function WorkflowPage() {
       }
 
       // Step 2: DB workflow_state — sessionStorage가 비어있거나 더 오래된 경우 우선
-      const projectId = getOrCreateWorkflowProjectId();
+      let projectId = getOrCreateWorkflowProjectId();
       if (projectId) {
         try {
-          const dbRow = await fetchWorkflowState(projectId);
+          let dbRow = await fetchWorkflowState(projectId);
           if (cancelled) return;
+          // 계정 복원: 로컬 projectId가 DB에 없고 로컬 세션 상태도 없으면
+          // (재로그인 / 스토리지 초기화 / 다른 기기) 계정의 최신 프로젝트를 채택해 그대로 복원.
+          if ((!dbRow?.exists || !dbRow.workflowState) && !s2) {
+            const projects = await fetchWorkflowProjects();
+            if (cancelled) return;
+            const latest = projects
+              .slice()
+              .sort((a, b) => (b.updatedAt || "").localeCompare(a.updatedAt || ""))[0];
+            if (latest?.id && latest.id !== projectId) {
+              projectId = latest.id;
+              setWorkflowProjectId(projectId);
+              dbRow = await fetchWorkflowState(projectId);
+              if (cancelled) return;
+            }
+          }
           if (dbRow?.exists && dbRow.workflowState) {
             const ws = dbRow.workflowState;
             // sessionStorage가 비어있으면 DB 사용 / 있으면 둘 다 활용
@@ -216,9 +234,10 @@ export default function WorkflowPage() {
   const dbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (!hydratedRef.current) return;
+    const lightStep2 = lightenWorkflowStep2(step2);
     try {
       sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
-      sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
+      sessionStorage.setItem("workflow_step2", JSON.stringify(lightStep2));
       sessionStorage.setItem("workflow_step", String(step));
     } catch {
       /* quota / private mode */
@@ -231,7 +250,7 @@ export default function WorkflowPage() {
       void saveWorkflowState({
         projectId,
         step1: step1 as unknown as Record<string, unknown>,
-        step2: step2 as unknown as Record<string, unknown>,
+        step2: lightStep2 as unknown as Record<string, unknown>,
         lastStep: step,
       });
     }, 1200);
@@ -302,9 +321,15 @@ export default function WorkflowPage() {
   };
   const goPrev = () => setStep(1);
   const goBranch = async () => {
+    // sessionStorage 저장 실패(Quota/프라이빗 모드)가 네비게이션을 막지 않도록 보호.
+    // (step2에 base64 렌더 이미지가 많으면 QuotaExceeded로 throw → 견적요청 클릭이 먹통이 되던 버그)
     if (typeof window !== "undefined") {
-      sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
-      sessionStorage.setItem("workflow_step2", JSON.stringify(step2));
+      try {
+        sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
+        sessionStorage.setItem("workflow_step2", JSON.stringify(lightenWorkflowStep2(step2)));
+      } catch (e) {
+        console.warn("[workflow] goBranch sessionStorage save skipped (non-fatal):", e);
+      }
     }
     // P2: estimate_contexts finalize 시도 — contextId 받으면 그 ID로 견적 페이지 이동.
     //     실패해도 견적 페이지로는 무조건 이동 (sessionStorage 폴백 사용)
