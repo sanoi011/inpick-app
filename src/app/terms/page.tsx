@@ -22,7 +22,7 @@ export default function TermsPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제1조 (목적)</h2>
             <p>
-              본 약관은 AIOD(이하 &quot;회사&quot;)가 제공하는 INPICK 인테리어 견적 플랫폼 서비스(이하 &quot;서비스&quot;)의
+              본 약관은 주식회사 아이오드(AIOD, 이하 &quot;회사&quot;)가 제공하는 INPICK 인테리어 견적 플랫폼 서비스(이하 &quot;서비스&quot;)의
               이용조건 및 절차, 회사와 이용자의 권리·의무 및 책임사항 등을 규정함을 목적으로 합니다.
             </p>
           </section>

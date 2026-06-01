@@ -505,7 +505,7 @@ export default function BiddingPage() {
 
       <footer className="border-t border-zinc-200 bg-white py-4">
         <div className="max-w-6xl mx-auto px-6 text-center text-[0.7rem] text-zinc-500">
-          ⓒ 주식회사 인픽 · 사업자등록번호 884-87-02391 · 대전광역시
+          ⓒ 주식회사 아이오드 · 사업자등록번호 384-81-04107 · 대전광역시
         </div>
       </footer>
     </main>

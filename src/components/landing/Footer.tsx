@@ -14,8 +14,8 @@ const COMPANY_INFO = {
   ceo: "운영사: 주식회사 아이오드 (AIOD) | 서비스명: INPICK",
   businessNumber: "사업자등록번호: 384-81-04107",
   phone: "대표: 김선본",
-  address: "소재지: 대전광역시 유성구 대학로 82, 539-2호",
-  email: "이메일: tjsqhs011@naver.com",
+  address: "소재지: 대전광역시 유성구 대덕512번길20, 대전정보문화산업진흥원 B동 2층 1인창조기업지원센터",
+  email: "이메일: lookingseon@aiod.kr",
 };
 
 const LEGAL_LINKS = [

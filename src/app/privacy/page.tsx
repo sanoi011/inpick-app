@@ -22,7 +22,7 @@ export default function PrivacyPage() {
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제1조 (목적)</h2>
             <p>
-              AIOD(이하 &quot;회사&quot;)는 INPICK 서비스(이하 &quot;서비스&quot;) 이용자의 개인정보를 중요시하며,
+              주식회사 아이오드(AIOD, 이하 &quot;회사&quot;)가 운영하는 INPICK 서비스(이하 &quot;서비스&quot;)는 이용자의 개인정보를 중요시하며,
               「개인정보 보호법」, 「정보통신망 이용촉진 및 정보보호 등에 관한 법률」 등 관련 법률을 준수합니다.
               본 개인정보처리방침은 이용자가 제공하는 개인정보가 어떠한 용도와 방식으로 이용되고 있으며,
               개인정보 보호를 위해 어떠한 조치가 취해지고 있는지 알려드립니다.
@@ -90,16 +90,16 @@ export default function PrivacyPage() {
             <ul className="list-disc pl-6 space-y-1">
               <li>개인정보 열람, 정정, 삭제, 처리 정지 요구 가능</li>
               <li>내 계정 페이지에서 직접 정보 수정 및 탈퇴 가능</li>
-              <li>이메일(tjsqhs011@naver.com)을 통한 요청 가능</li>
+              <li>이메일(lookingseon@aiod.kr)을 통한 요청 가능</li>
             </ul>
           </section>
 
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제8조 (개인정보 보호책임자)</h2>
             <ul className="list-none space-y-1">
-              <li>성명: 선우빈</li>
+              <li>성명: 김선본</li>
               <li>직위: 대표</li>
-              <li>이메일: tjsqhs011@naver.com</li>
+              <li>이메일: lookingseon@aiod.kr</li>
             </ul>
           </section>
 

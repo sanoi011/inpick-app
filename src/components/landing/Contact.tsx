@@ -45,8 +45,8 @@ export default function Contact() {
             </motion.p>
             <motion.div variants={fadeUpVariants} transition={{ duration: 0.5 }} className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-xl bg-gray-100">
-                <div className="flex items-center gap-4"><Mail className="w-6 h-6 text-gray-900" /><span className="text-base font-medium text-gray-900">tjsqhs011@naver.com</span></div>
-                <a href="mailto:tjsqhs011@naver.com" className="px-5 py-3 rounded-lg text-sm font-medium bg-gray-900 text-white hover:scale-105 transition-transform">메일 전송</a>
+                <div className="flex items-center gap-4"><Mail className="w-6 h-6 text-gray-900" /><span className="text-base font-medium text-gray-900">lookingseon@aiod.kr</span></div>
+                <a href="mailto:lookingseon@aiod.kr" className="px-5 py-3 rounded-lg text-sm font-medium bg-gray-900 text-white hover:scale-105 transition-transform">메일 전송</a>
               </div>
               <div className="flex items-center justify-between p-4 rounded-xl bg-gray-100">
                 <div className="flex items-center gap-4"><MapPin className="w-6 h-6 flex-shrink-0 text-gray-900" /><span className="text-base font-medium whitespace-pre-line text-gray-900">{"예비창업 예정"}</span></div>

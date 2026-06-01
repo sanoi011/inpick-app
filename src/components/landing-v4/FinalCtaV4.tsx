@@ -86,11 +86,15 @@ export default function FinalCtaV4() {
               <span className="font-en text-[18px] font-extrabold tracking-tightest">inpick</span>
             </div>
             <div className="mt-3.5 text-[12px] leading-[1.6] text-apricot-300/55">
-              주식회사 인픽 · 대표 김선본
+              주식회사 아이오드 · 대표 김선본
               <br />
-              사업자등록번호 884-87-02391
+              INPICK은 주식회사 아이오드의 서비스입니다
               <br />
-              대전광역시 · tjsqhs011@naver.com
+              사업자등록번호 384-81-04107
+              <br />
+              대전광역시 유성구 대덕512번길20, 대전정보문화산업진흥원 B동 2층 1인창조기업지원센터
+              <br />
+              lookingseon@aiod.kr
             </div>
             {/* 운영자 진입점 */}
             <div className="mt-4 flex flex-wrap gap-1.5">
