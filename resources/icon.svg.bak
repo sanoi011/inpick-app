@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  InPick 앱 아이콘 — 1024×1024 (iOS App Store + Android source)
+  다홍색 6각형 + InPick 워드마크
+  배경: 화이트 (Apple은 투명/round-rect 자동 처리)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- 배경 — 흰색 (iOS는 둥근 모서리 자동 적용) -->
+  <rect width="1024" height="1024" fill="#FFFFFF"/>
+
+  <!-- 다홍색 6각형 — InPick 메인 컬러 #F73B20 -->
+  <!-- viewBox 1024 기준: 좌표 6각형 polygon points='25,6.7 75,6.7 100,50 75,93.3 25,93.3 0,50' (in 100x100) -->
+  <!-- × 5.12 + offset 256 (가운데 정렬, 크기 ~512px) -->
+  <g transform="translate(256, 256)">
+    <polygon
+      points="128,34 384,34 512,256 384,478 128,478 0,256"
+      fill="#F73B20"
+    />
+  </g>
+
+  <!-- 워드마크 'inpick' — 다홍색 6각형 아래 -->
+  <text
+    x="512"
+    y="820"
+    text-anchor="middle"
+    font-family="Inter, -apple-system, BlinkMacSystemFont, sans-serif"
+    font-weight="900"
+    font-size="120"
+    fill="#1A1A1A"
+    letter-spacing="-4"
+  >inpick</text>
+</svg>

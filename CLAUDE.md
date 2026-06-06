@@ -1,8 +1,17 @@
 # INPICK 프로젝트 컨텍스트
 
+## 2026-06-06 현재 로컬/운영 기준
+- **현재 macOS 경로**: `/Users/seonbonkim/Desktop/AIOD/개발/InPick/inpick-app`
+- **운영 도메인**: `https://interiorpick.co.kr`
+- **Vercel 프로젝트**: `inpick-app` (`.vercel/repo.json` 기준, `.vercel/`은 커밋 금지)
+- **검증 상태**: `npm install` 후 `npm run build` 통과
+- **주의**: 현재 작업트리는 줄끝 변환 노이즈가 큼. 실제 변경 확인은 `git diff --ignore-space-at-eol --stat` 사용.
+- **최근 작업 축**: Capacitor 운영 도메인, PWA theme color, 모바일 safe-area viewport/CSS, 소셜 로그인 OAuth helper(`src/lib/auth/oauth-start.ts`).
+
 ## 프로젝트 개요
 - **이름**: INPICK (인픽) - AI 기반 인테리어 견적 플랫폼
-- **경로**: `C:/Users/User/Desktop/inpick-app`
+- **기존 Windows 경로**: `C:/Users/User/Desktop/inpick-app`
+- **현재 macOS 경로**: `/Users/seonbonkim/Desktop/AIOD/개발/InPick/inpick-app`
 - **스택**: Next.js 14, TypeScript, Tailwind CSS, Supabase, Vercel
 - **GitHub**: `https://github.com/sanoi011/inpick-app.git` (main 브랜치)
 - **Vercel**: GitHub 연동 자동 배포

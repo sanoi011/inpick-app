@@ -185,8 +185,7 @@ export default function EstimateLiveV4() {
               </span>
             </div>
             <div
-              className="font-en mt-[18px] font-black leading-none tracking-[-0.05em]"
-              style={{ fontSize: "clamp(56px, 9vw, 110px)" }}
+              className="font-en mt-[18px] font-black leading-none tracking-[-0.05em] text-[8vw] md:text-[clamp(56px,9vw,110px)]"
             >
               ₩{shown.toLocaleString("ko-KR")}
             </div>

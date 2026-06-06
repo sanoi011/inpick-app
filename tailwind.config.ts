@@ -8,6 +8,19 @@ const config: Config = {
   ],
   theme: {
     extend: {
+      // 기본 Tailwind 브레이크포인트(sm 640~) 사이 빈 구간 보완:
+      // 실제 폰(375px)과 sm(640px) 사이를 다룰 수 있는 xs 추가.
+      screens: {
+        xs: "375px",
+      },
+      // 노치/홈바 안전영역을 Tailwind 클래스로도 사용 가능하게:
+      // 예) className="pt-[env(safe-area-inset-top)]" 대신 "pt-safe-top"
+      spacing: {
+        "safe-top": "env(safe-area-inset-top, 0px)",
+        "safe-bottom": "env(safe-area-inset-bottom, 0px)",
+        "safe-left": "env(safe-area-inset-left, 0px)",
+        "safe-right": "env(safe-area-inset-right, 0px)",
+      },
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",

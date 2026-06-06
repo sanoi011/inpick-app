@@ -1,7 +1,7 @@
 # InPick 모바일 앱 (iOS + Android) 빌드 + 배포 가이드
 
 > 베이스: Capacitor 7 + Next.js (Vercel 배포 사이트 그대로 사용)
-> 전략: Native shell + WebView가 `https://inpick-app.vercel.app` 로드 + Camera/Push 등 Capacitor plugin
+> 전략: Native shell + WebView가 `https://interiorpick.co.kr` 로드 + Camera/Push 등 Capacitor plugin
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### 0-3. npm 의존성 설치 (1회)
 ```bash
-cd E:\InPick\inpick-app
+cd /Users/seonbonkim/Desktop/AIOD/개발/InPick/inpick-app
 npm install
 ```
 새로 추가된 Capacitor 패키지가 자동 설치됩니다 (`@capacitor/core`, `cli`, `ios`, `android`, plugin들).
@@ -58,8 +58,7 @@ npm run mobile:add:android
 
 ### 자동 생성 도구 — `@capacitor/assets`
 ```bash
-npm i -D @capacitor/assets
-npx capacitor-assets generate --iconBackgroundColor "#FFFFFF" --iconBackgroundColorDark "#1A1A1A" --splashBackgroundColor "#F73B20" --splashBackgroundColorDark "#F73B20"
+npm run mobile:assets
 ```
 → iOS/Android 모든 사이즈 자동 생성:
 - `ios/App/App/Assets.xcassets/AppIcon.appiconset/*` (29~1024px 30+ 사이즈)
@@ -124,8 +123,8 @@ https://appstoreconnect.apple.com → My Apps → +
 | **부제** | AI 인테리어 견적 플랫폼 |
 | **키워드** | 인테리어,견적,AI,설계,리모델링,홈인테리어 |
 | **카테고리 (1차)** | Lifestyle (또는 Productivity) |
-| **개인정보 처리방침 URL** | https://inpick-app.vercel.app/privacy |
-| **지원 URL** | https://inpick-app.vercel.app/mypage/support |
+| **개인정보 처리방침 URL** | https://interiorpick.co.kr/privacy |
+| **지원 URL** | https://interiorpick.co.kr/mypage/support |
 
 ### 5-3. 스크린샷
 - 6.7" iPhone (1290×2796) — 필수
@@ -162,7 +161,7 @@ https://play.google.com/console → 앱 만들기
 |---|---|
 | **간단 설명** (80자) | AI가 만드는 인테리어 디자인 + 정확한 견적 한 번에 |
 | **자세한 설명** (4000자) | 사용자 도면 → AI 디자인 생성 → 자재 영역 클릭만으로 자재 교체 → 면적 × 단가 정확한 견적 → 사업자 매칭. (자세한 본문은 별도 작성) |
-| **개인정보 처리방침 URL** | https://inpick-app.vercel.app/privacy |
+| **개인정보 처리방침 URL** | https://interiorpick.co.kr/privacy |
 | **콘텐츠 등급** | 모든 사용자 |
 
 ### 6-3. 자산

@@ -6,8 +6,8 @@
  */
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { Search, PenSquare } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { Search, PenSquare, ChevronLeft, ChevronRight } from "lucide-react";
 import type { CommunityBoardV2 } from "@/types/community-v2";
 
 interface Props {
@@ -16,6 +16,7 @@ interface Props {
 
 export default function CommunityShell({ children }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [boards, setBoards] = useState<CommunityBoardV2[]>([]);
   const [search, setSearch] = useState("");
 
@@ -30,6 +31,24 @@ export default function CommunityShell({ children }: Props) {
     ? pathname.split("/")[3]
     : null;
 
+  // 게시판을 소비자/사업자 2그룹으로 구분 (공지는 공통, 상단)
+  const BUSINESS_SLUGS = new Set(["pro-lounge", "pro-knowhow", "pro-materials", "pro-jobs"]);
+  const NOTICE_SLUGS = new Set(["notice"]);
+  const noticeBoards = boards.filter((b) => NOTICE_SLUGS.has(b.slug));
+  const businessBoards = boards.filter((b) => BUSINESS_SLUGS.has(b.slug));
+  const consumerBoards = boards.filter(
+    (b) => !BUSINESS_SLUGS.has(b.slug) && !NOTICE_SLUGS.has(b.slug)
+  );
+
+  const linkCls = (active: boolean) =>
+    `block rounded-lg px-3 py-2 text-sm transition ${
+      active
+        ? "bg-[#F0EFEC] text-[#202123] font-semibold"
+        : "text-[#3F3F46] hover:bg-[#F0EFEC]"
+    }`;
+  const groupLabelCls =
+    "mt-3 px-3 pb-1 text-[0.65rem] font-semibold uppercase tracking-wider text-[#9A9A9A]";
+
   return (
     <div className="mx-auto max-w-[1440px] px-4 py-6 md:py-8">
       <div className="grid gap-6 lg:grid-cols-[200px_1fr_280px]">
@@ -41,29 +60,36 @@ export default function CommunityShell({ children }: Props) {
                 게시판
               </div>
               <nav className="space-y-0.5">
-                <Link
-                  href="/community"
-                  className={`block rounded-lg px-3 py-2 text-sm transition ${
-                    pathname === "/community"
-                      ? "bg-[#F0EFEC] text-[#202123] font-semibold"
-                      : "text-[#3F3F46] hover:bg-[#F0EFEC]"
-                  }`}
-                >
+                <Link href="/community" className={linkCls(pathname === "/community")}>
                   전체
                 </Link>
-                {boards.map((b) => (
-                  <Link
-                    key={b.id}
-                    href={`/community/boards/${b.slug}`}
-                    className={`block rounded-lg px-3 py-2 text-sm transition ${
-                      activeSlug === b.slug
-                        ? "bg-[#F0EFEC] text-[#202123] font-semibold"
-                        : "text-[#3F3F46] hover:bg-[#F0EFEC]"
-                    }`}
-                  >
+                {noticeBoards.map((b) => (
+                  <Link key={b.id} href={`/community/boards/${b.slug}`} className={linkCls(activeSlug === b.slug)}>
                     {b.name}
                   </Link>
                 ))}
+
+                {consumerBoards.length > 0 && (
+                  <>
+                    <div className={groupLabelCls}>소비자 게시판</div>
+                    {consumerBoards.map((b) => (
+                      <Link key={b.id} href={`/community/boards/${b.slug}`} className={linkCls(activeSlug === b.slug)}>
+                        {b.name}
+                      </Link>
+                    ))}
+                  </>
+                )}
+
+                {businessBoards.length > 0 && (
+                  <>
+                    <div className={groupLabelCls}>사업자 게시판</div>
+                    {businessBoards.map((b) => (
+                      <Link key={b.id} href={`/community/boards/${b.slug}`} className={linkCls(activeSlug === b.slug)}>
+                        {b.name}
+                      </Link>
+                    ))}
+                  </>
+                )}
               </nav>
             </div>
 
@@ -79,6 +105,26 @@ export default function CommunityShell({ children }: Props) {
 
         {/* 중앙: 메인 */}
         <div className="min-w-0">
+          {/* 좌측 상단 뒤로/앞으로 네비게이션 */}
+          <div className="mb-3 flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              aria-label="뒤로 가기"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E2DD] bg-white text-[#3F3F46] transition hover:bg-[#F0EFEC]"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => window.history.forward()}
+              aria-label="앞으로 가기"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E2DD] bg-white text-[#3F3F46] transition hover:bg-[#F0EFEC]"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </div>
+
           {/* 검색 + 모바일 글쓰기 */}
           <div className="mb-5 flex items-center gap-2">
             <div className="flex flex-1 items-center gap-2 rounded-full border border-[#E5E2DD] bg-white px-4 py-2.5">
@@ -105,31 +151,42 @@ export default function CommunityShell({ children }: Props) {
             </Link>
           </div>
 
-          {/* 모바일 게시판 chip */}
-          <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 lg:hidden">
-            <Link
-              href="/community"
-              className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs ${
-                pathname === "/community"
-                  ? "border-[#202123] bg-[#202123] text-white"
-                  : "border-[#E5E2DD] bg-white text-[#3F3F46]"
-              }`}
-            >
-              전체
-            </Link>
-            {boards.map((b) => (
-              <Link
-                key={b.id}
-                href={`/community/boards/${b.slug}`}
-                className={`whitespace-nowrap rounded-full border px-3 py-1.5 text-xs ${
-                  activeSlug === b.slug
+          {/* 모바일 게시판 chip — 소비자/사업자 그룹 라벨 포함 */}
+          <div className="mb-4 flex items-center gap-1.5 overflow-x-auto pb-1 lg:hidden">
+            {(() => {
+              const chipCls = (active: boolean) =>
+                `whitespace-nowrap rounded-full border px-3 py-1.5 text-xs ${
+                  active
                     ? "border-[#202123] bg-[#202123] text-white"
                     : "border-[#E5E2DD] bg-white text-[#3F3F46]"
-                }`}
-              >
-                {b.name}
-              </Link>
-            ))}
+                }`;
+              const grpCls =
+                "whitespace-nowrap pl-2 pr-0.5 text-[0.65rem] font-semibold uppercase tracking-wider text-[#9A9A9A]";
+              return (
+                <>
+                  <Link href="/community" className={chipCls(pathname === "/community")}>
+                    전체
+                  </Link>
+                  {noticeBoards.map((b) => (
+                    <Link key={b.id} href={`/community/boards/${b.slug}`} className={chipCls(activeSlug === b.slug)}>
+                      {b.name}
+                    </Link>
+                  ))}
+                  {consumerBoards.length > 0 && <span className={grpCls}>소비자</span>}
+                  {consumerBoards.map((b) => (
+                    <Link key={b.id} href={`/community/boards/${b.slug}`} className={chipCls(activeSlug === b.slug)}>
+                      {b.name}
+                    </Link>
+                  ))}
+                  {businessBoards.length > 0 && <span className={grpCls}>사업자</span>}
+                  {businessBoards.map((b) => (
+                    <Link key={b.id} href={`/community/boards/${b.slug}`} className={chipCls(activeSlug === b.slug)}>
+                      {b.name}
+                    </Link>
+                  ))}
+                </>
+              );
+            })()}
           </div>
 
           {children}

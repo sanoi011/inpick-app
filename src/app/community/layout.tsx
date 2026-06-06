@@ -1,5 +1,5 @@
 import { Metadata } from "next";
-import Header from "@/components/landing/Header";
+import HeaderV4 from "@/components/landing-v4/HeaderV4";
 import LandingFooter from "@/components/landing/Footer";
 
 export const metadata: Metadata = {
@@ -15,8 +15,13 @@ export default function CommunityLayout({
 }) {
   return (
     <>
-      <Header />
-      <main className="min-h-screen bg-[#F7F7F5]">{children}</main>
+      <HeaderV4 variant="solid" />
+      <main
+        className="min-h-screen bg-[#F7F7F5]"
+        style={{ paddingTop: "calc(72px + env(safe-area-inset-top))" }}
+      >
+        {children}
+      </main>
       <LandingFooter />
     </>
   );

@@ -73,7 +73,7 @@ export default function TestimonialsV4() {
           ))}
         </div>
 
-        <div className="absolute inset-x-10 bottom-[60px] grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <div className="absolute inset-x-10 bottom-[60px] hidden grid-cols-2 gap-4 sm:grid-cols-4 md:grid">
           {STATS.map((s) => (
             <div
               key={s.l}

@@ -188,3 +188,43 @@ body {
 .tabular {
   font-variant-numeric: tabular-nums;
 }
+
+/* ─────────────────────────────────────────────
+   모바일 / Capacitor WebView 기본기
+   ───────────────────────────────────────────── */
+
+/* 탭 시 파란 하이라이트 박스 제거 (네이티브 앱 느낌) */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  /* iOS 가로/세로 전환 시 폰트 자동 확대 방지 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  /* 당겨서 새로고침/바운스 스크롤 억제 (앱처럼 동작) */
+  overscroll-behavior-y: none;
+}
+
+/* 노치·홈인디케이터 안전영역 유틸리티.
+   viewport-fit=cover 일 때만 값이 생기며, 일반 브라우저에선 0 → 영향 없음.
+   사용 예: 상단 고정 헤더 className에 "pt-safe", 하단 고정바에 "pb-safe" */
+.pt-safe { padding-top: env(safe-area-inset-top, 0px); }
+.pb-safe { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.pl-safe { padding-left: env(safe-area-inset-left, 0px); }
+.pr-safe { padding-right: env(safe-area-inset-right, 0px); }
+.px-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+/* 기존 패딩에 안전영역만큼 더해주는 변형 (헤더에 유용) */
+.pt-safe-4 { padding-top: calc(env(safe-area-inset-top, 0px) + 1rem); }
+.pb-safe-4 { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem); }
+/* 안전영역까지 고려한 최소 전체 높이 */
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh; /* 모바일 주소창 동적 높이 대응 */
+}

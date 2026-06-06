@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { Bodoni_Moda, Manrope } from "next/font/google";
 import { ToastContainer } from "@/components/ui/Toast";
@@ -64,6 +64,19 @@ export const metadata: Metadata = {
   },
 };
 
+// 모바일/Capacitor WebView 필수 viewport.
+//  - viewportFit: "cover" → 노치/홈 인디케이터 영역까지 그려 env(safe-area-inset-*) 활성화
+//  - maximumScale 1 + userScalable false → 입력 포커스 시 iOS 자동 확대(zoom) 방지 (앱 느낌)
+//  - themeColor → Android 상태바/주소창 색 (primary-500)
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#F73B20",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -73,7 +86,6 @@ export default function RootLayout({
     <html lang="ko">
       <head>
         <link rel="manifest" href="/manifest.json" />
-        <meta name="theme-color" content="#FF6B35" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
       </head>
       <body

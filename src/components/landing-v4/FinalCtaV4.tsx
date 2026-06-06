@@ -22,11 +22,11 @@ export default function FinalCtaV4() {
     <section
       id="final"
       ref={ref}
-      className="relative min-h-screen overflow-hidden bg-burgundy text-offwhite"
+      className="relative overflow-hidden bg-burgundy text-offwhite md:min-h-screen"
     >
       <motion.div
         style={{ scale: glowScale, x: "-50%" }}
-        className="pointer-events-none absolute left-1/2 top-[10%] h-[1100px] w-[1100px] rounded-full"
+        className="pointer-events-none absolute left-1/2 top-[10%] hidden h-[1100px] w-[1100px] rounded-full md:block"
       >
         <div
           className="h-full w-full rounded-full"
@@ -38,7 +38,7 @@ export default function FinalCtaV4() {
         />
       </motion.div>
 
-      <div className="relative z-[2] px-10 pt-[120px] text-center">
+      <div className="relative z-[2] hidden px-10 pt-[120px] text-center md:block">
         <div className="font-mono mb-[22px] text-[12px] tracking-[0.18em] text-apricot-300">
           ◇ START NOW · 무료
         </div>
@@ -78,7 +78,7 @@ export default function FinalCtaV4() {
         </div>
       </div>
 
-      <footer className="relative mt-[100px] border-t border-apricot-300/[0.12] bg-black/[0.18] px-10 py-[60px] text-left">
+      <footer className="relative mt-[100px] border-t border-apricot-300/[0.12] bg-black/[0.18] px-6 py-12 text-left sm:px-10 sm:py-[60px]">
         <div className="mx-auto grid max-w-[1280px] gap-9 lg:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
           <div>
             <div className="mb-3 flex items-center gap-2">
@@ -118,18 +118,21 @@ export default function FinalCtaV4() {
               </a>
             </div>
           </div>
-          {FOOTER_COLS.map((c) => (
-            <div key={c.title}>
-              <div className="font-mono mb-3 text-[11px] tracking-[0.14em] text-primary-500">
-                {c.title}
+          {/* 모바일: 링크 그룹을 가로 3단으로(세로로 길어지지 않게). 데스크탑(lg+): contents로 기존 5단 그리드 유지 */}
+          <div className="grid grid-cols-3 gap-x-4 gap-y-6 lg:contents">
+            {FOOTER_COLS.map((c) => (
+              <div key={c.title}>
+                <div className="font-mono mb-3 text-[11px] tracking-[0.14em] text-primary-500">
+                  {c.title}
+                </div>
+                <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px] text-apricot-300/70">
+                  {c.links.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
               </div>
-              <ul className="m-0 flex list-none flex-col gap-2 p-0 text-[13px] text-apricot-300/70">
-                {c.links.map((l) => (
-                  <li key={l}>{l}</li>
-                ))}
-              </ul>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
         <div className="font-mono mx-auto mt-8 flex max-w-[1280px] justify-between border-t border-apricot-300/10 pt-[18px] text-[11px] tracking-[0.08em] text-apricot-300/40">
           <span>© 2026 INPICK INC. ALL RIGHTS RESERVED.</span>

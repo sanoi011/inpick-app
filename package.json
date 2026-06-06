@@ -17,6 +17,7 @@
     "mobile:add:ios": "npx cap add ios",
     "mobile:add:android": "npx cap add android",
     "mobile:sync": "npx cap sync",
+    "mobile:assets": "npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1A1F2E' --splashBackgroundColor '#F73B20' --splashBackgroundColorDark '#F73B20'",
     "mobile:open:ios": "npx cap open ios",
     "mobile:open:android": "npx cap open android"
   },
@@ -48,6 +49,7 @@
   "devDependencies": {
     "@capacitor/android": "^7.0.0",
     "@capacitor/app": "^7.0.0",
+    "@capacitor/assets": "^3.0.5",
     "@capacitor/browser": "^7.0.0",
     "@capacitor/camera": "^7.0.0",
     "@capacitor/cli": "^7.0.0",

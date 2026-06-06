@@ -20,10 +20,14 @@ const config: CapacitorConfig = {
   // Vercel 사이트를 직접 로드하므로 placeholder만 두면 됨 (public/ 자체 사용).
   webDir: "public",
 
-  // 운영 — Vercel 배포 사이트를 WebView가 로드
+  // 운영 — 운영 도메인을 WebView가 로드 (server.url 방식 → 웹 배포만 하면 앱도 자동 갱신)
   // 개발 시 server.url을 로컬로 바꿔서 핫리로드 가능 (예: http://192.168.x.x:3000)
   server: {
-    url: "https://inpick-app.vercel.app",
+    // canonical(www)로 직접 로드 — 사이트가 non-www→www(307)로 리다이렉트하기 때문.
+    // server.url과 호스트가 다른 내비게이션을 Capacitor가 "외부"로 보고 Safari로 던지는 문제 방지.
+    url: "https://www.interiorpick.co.kr",
+    // 두 호스트 모두 인앱 WebView 내비게이션으로 허용(외부 Safari 전환 방지).
+    allowNavigation: ["interiorpick.co.kr", "www.interiorpick.co.kr"],
     cleartext: false,           // HTTPS 강제
     androidScheme: "https",
   },
@@ -45,9 +49,9 @@ const config: CapacitorConfig = {
 
   plugins: {
     SplashScreen: {
-      launchShowDuration: 1500,
+      launchShowDuration: 2000,
       launchAutoHide: true,
-      backgroundColor: "#F73B20",
+      backgroundColor: "#FFFFFF",   // 인스타 스타일 흰 로딩화면 (아이콘 중앙 + 하단 AIOD)
       androidScaleType: "CENTER_CROP",
       showSpinner: false,
       splashFullScreen: true,

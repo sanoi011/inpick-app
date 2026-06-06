@@ -17,7 +17,10 @@ export default function Home() {
       <WalkthroughV4 />
       <EstimateLiveV4 />
       <MobileMockV4 />
-      <TestimonialsV4 />
+      {/* 리뷰(시공사 견적과는 다른 경험) 섹션 — 모바일에서는 숨김, 데스크탑 웹은 유지 */}
+      <div className="hidden md:block">
+        <TestimonialsV4 />
+      </div>
       <FinalCtaV4 />
     </LenisProvider>
   );

@@ -94,9 +94,8 @@ export default function HeroV4Bird() {
         className="pointer-events-none absolute inset-x-0 top-[28%] z-[2] flex justify-center"
       >
         <span
-          className="font-wordmark select-none whitespace-nowrap text-center uppercase"
+          className="font-wordmark select-none whitespace-nowrap text-center uppercase text-[23vw] md:text-[clamp(240px,28vw,520px)]"
           style={{
-            fontSize: "clamp(240px, 28vw, 520px)",
             fontWeight: 400,
             lineHeight: 1,
             letterSpacing: "-0.045em",
