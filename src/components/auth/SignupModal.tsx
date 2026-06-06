@@ -14,6 +14,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { startOAuth } from "@/lib/auth/oauth-start";
 
 interface SignupModalProps {
   open: boolean;
@@ -213,11 +214,10 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
       return;
     }
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo: `${window.location.origin}/auth/callback` },
+      const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+        redirectTo: `${window.location.origin}/auth/callback`,
       });
-      if (error) setError(`${provider} 로그인 실패: ${error.message}`);
+      if (error) setError(`${provider} 로그인 실패: ${error}`);
     } catch (err) {
       console.error("[signup-modal] oauth error", err);
       setError("소셜 로그인 중 오류가 발생했습니다.");
@@ -285,9 +285,10 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
           />
         ) : (
           <form onSubmit={handleProceedToConfirm} className="px-7 pb-7 pt-4">
-            {/* OAuth — 카카오/Apple 임시 비활성 (2026-05-18). 추후 복구 시 git history 참조 */}
-            <div className="grid grid-cols-2 gap-2">
+            {/* OAuth — 카카오 활성화 완료(2026-06). 애플은 심사 통과 후 복구 */}
+            <div className="flex flex-col gap-2.5">
               <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
+              <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
               <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
             </div>
 
@@ -691,6 +692,32 @@ function FinalConsentStep({
   );
 }
 
+const OAUTH_ICONS: Record<"google" | "kakao" | "naver" | "apple", React.ReactNode> = {
+  google: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24">
+      <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
+      <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+      <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+      <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+    </svg>
+  ),
+  kakao: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 3C6.48 3 2 6.58 2 10.96c0 2.83 1.9 5.31 4.74 6.7-.16.57-.6 2.16-.69 2.5-.1.42.16.42.33.31.13-.09 2.1-1.43 2.96-2.01.54.08 1.1.12 1.66.12 5.52 0 10-3.58 10-7.62C21 6.58 17.52 3 12 3z" />
+    </svg>
+  ),
+  naver: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M16.273 12.845L7.376 0H0v24h7.726V11.155L16.624 24H24V0h-7.727v12.845z" />
+    </svg>
+  ),
+  apple: (
+    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M17.05 12.04c-.03-2.07 1.69-3.06 1.77-3.11-.97-1.41-2.47-1.6-3-1.62-1.27-.13-2.49.75-3.13.75-.65 0-1.64-.73-2.7-.71-1.39.02-2.67.81-3.39 2.05-1.45 2.51-.37 6.22 1.04 8.26.69.99 1.51 2.1 2.58 2.06 1.04-.04 1.43-.67 2.69-.67 1.25 0 1.6.67 2.7.65 1.12-.02 1.82-1.01 2.5-2.01.79-1.15 1.11-2.27 1.13-2.33-.02-.01-2.17-.83-2.2-3.3zM15.0 5.38c.57-.69.96-1.65.85-2.61-.83.03-1.83.55-2.42 1.24-.53.61-.99 1.59-.87 2.53.92.07 1.87-.47 2.44-1.16z" />
+    </svg>
+  ),
+};
+
 function OAuthBtn({
   provider,
   onClick,
@@ -708,9 +735,10 @@ function OAuthBtn({
     <button
       type="button"
       onClick={onClick}
-      className={`h-10 rounded-full text-[13px] font-semibold transition-colors ${config.bg}`}
+      className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors ${config.bg}`}
     >
-      {config.label}
+      {OAUTH_ICONS[provider]}
+      <span>{config.label}</span>
     </button>
   );
 }
