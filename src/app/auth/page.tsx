@@ -13,6 +13,7 @@ import {
   Hexagon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { startOAuth } from "@/lib/auth/oauth-start";
 import { SignupModal } from "@/components/auth/SignupModal";
 
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
@@ -61,7 +62,18 @@ function OAuthRow({
         </svg>
       ),
     },
-    // 카카오/Apple 임시 비활성 (2026-05-18) — Kakao Developer 등록 대기 + Apple 미설정. 추후 복구 시 git history 참조.
+    // 카카오: Supabase provider 활성화 완료(2026-06). 애플은 심사 통과 후 복구.
+    {
+      key: "kakao",
+      label: "카카오",
+      bg: "bg-[#FEE500]",
+      fg: "text-[#3C1E1E]",
+      icon: (
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 3C6.48 3 2 6.58 2 10.96c0 2.83 1.9 5.31 4.74 6.7-.16.57-.6 2.16-.69 2.5-.1.42.16.42.33.31.13-.09 2.1-1.43 2.96-2.01.54.08 1.1.12 1.66.12 5.52 0 10-3.58 10-7.62C21 6.58 17.52 3 12 3z" />
+        </svg>
+      ),
+    },
     {
       key: "naver",
       label: "네이버",
@@ -76,7 +88,7 @@ function OAuthRow({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-2.5">
+    <div className="flex flex-col gap-2.5">
       {items.map((it) => {
         const loading = loadingProvider === it.key;
         return (
@@ -85,7 +97,7 @@ function OAuthRow({
             type="button"
             onClick={() => !it.disabled && !loadingProvider && onProvider(it.key)}
             disabled={!!loadingProvider || it.disabled}
-            className={`inline-flex h-11 items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-all ${it.bg} ${it.fg} ${it.border ?? ""} disabled:opacity-50`}
+            className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-all ${it.bg} ${it.fg} ${it.border ?? ""} disabled:opacity-50`}
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : it.icon}
             <span>{it.label}</span>
@@ -208,12 +220,11 @@ function ConsumerAuthForm() {
       const callbackUrl = returnUrl
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
         : `${window.location.origin}/auth/callback`;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as "google" | "kakao" | "apple",
-        options: { redirectTo: callbackUrl },
+      const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+        redirectTo: callbackUrl,
       });
       if (error) {
-        setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
+        setError(`${provider} 로그인에 실패했습니다: ${error}`);
         setOauthLoading(null);
       }
     } catch (err) {
@@ -569,15 +580,12 @@ function ContractorAuthForm() {
       }
       // 사업자도 supabase OAuth 사용 — callback에서 contractor 등록 페이지로 분기
       const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/contractor")}`;
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: provider as "google" | "kakao" | "apple",
-        options: {
-          redirectTo: callbackUrl,
-          queryParams: { account_type: "contractor" },
-        },
+      const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+        redirectTo: callbackUrl,
+        queryParams: { account_type: "contractor" },
       });
       if (error) {
-        setError(`${provider} 로그인에 실패했습니다: ${error.message}`);
+        setError(`${provider} 로그인에 실패했습니다: ${error}`);
         setOauthLoading(null);
       }
     } catch (err) {
