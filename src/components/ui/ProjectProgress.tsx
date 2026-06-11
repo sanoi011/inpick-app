@@ -5,6 +5,7 @@ import type { ConsumerProjectStatus } from "@/types/consumer-project";
 
 const STATUS_TO_STEP: Record<ConsumerProjectStatus, number> = {
   ADDRESS_SELECTION: 1,
+  WORKFLOW_IN_PROGRESS: 3,
   FLOOR_PLAN: 2,
   AI_DESIGN: 3,
   RENDERING: 4,

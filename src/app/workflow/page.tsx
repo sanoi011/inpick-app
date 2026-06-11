@@ -108,6 +108,20 @@ export default function WorkflowPage() {
     if (typeof window === "undefined") return;
     let cancelled = false;
     const run = async () => {
+      // 내 프로젝트에서 "이어하기" — ?projectId= 가 있으면 그 프로젝트로 전환하고
+      // 다른 프로젝트의 세션 잔여 상태를 비워 DB에서 해당 프로젝트 상태를 불러온다.
+      try {
+        const urlPid = new URLSearchParams(window.location.search).get("projectId");
+        if (urlPid && urlPid !== getOrCreateWorkflowProjectId()) {
+          setWorkflowProjectId(urlPid);
+          sessionStorage.removeItem("workflow_step1");
+          sessionStorage.removeItem("workflow_step2");
+          sessionStorage.removeItem("workflow_step");
+        }
+      } catch {
+        /* ignore */
+      }
+
       // Step 1: sessionStorage 먼저 복원 (즉시 표시)
       let s1: Step1Data | null = null;
       let s2: Step2Data | null = null;

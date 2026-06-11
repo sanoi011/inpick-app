@@ -19,6 +19,7 @@ const TABS = [
 
 const STATUS_TO_STEP: Record<ConsumerProjectStatus, number> = {
   ADDRESS_SELECTION: 1,
+  WORKFLOW_IN_PROGRESS: 1,
   FLOOR_PLAN: 1,
   AI_DESIGN: 2,
   RENDERING: 2,

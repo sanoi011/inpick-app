@@ -191,7 +191,7 @@ export default function MyPageProjects() {
   const filtered = useMemo(() => {
     let list = projects;
     if (statusFilter === "active") {
-      list = list.filter((p) => ["ADDRESS_SELECTION", "FLOOR_PLAN", "AI_DESIGN", "RENDERING", "ESTIMATING"].includes(p.status));
+      list = list.filter((p) => ["WORKFLOW_IN_PROGRESS", "ADDRESS_SELECTION", "FLOOR_PLAN", "AI_DESIGN", "RENDERING", "ESTIMATING"].includes(p.status));
     } else if (statusFilter === "rfq") {
       list = list.filter((p) => ["RFQ", "CONTRACTED"].includes(p.status));
     } else if (statusFilter === "done") {
@@ -350,11 +350,11 @@ export default function MyPageProjects() {
             const isRfqComplete = status === "RFQ" || status === "CONTRACTED";
             const isContracted = status === "CONTRACTED";
             const getTargetUrl = () => {
-              if (isContracted) return `/contracts`;
+              if (isContracted) return `/mypage/contracts`;
               if (status === "RFQ") return `/project/${p.id}/rfq`;
-              if (status === "ESTIMATING") return `/project/${p.id}/estimate`;
-              if (status === "RENDERING") return `/project/${p.id}/rendering`;
-              return `/project/${p.id}/design`;
+              if (status === "ESTIMATING") return `/workflow/estimate?projectId=${p.id}`;
+              // 신규 워크플로우 — 진행 중 프로젝트는 현재 워크플로우에서 이어서 진행
+              return `/workflow?projectId=${p.id}`;
             };
             const displayName = p.address?.buildingName || p.address?.roadAddress || "새 프로젝트";
             const isSelected = selectedIds.has(p.id);

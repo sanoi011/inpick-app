@@ -238,7 +238,7 @@ export default function HeroV4Bird() {
               <br />
               표준계약서 보호
             </p>
-            <CardArrow href="/contract" />
+            <CardArrow href="/workflow" />
           </GlassCard>
           {/* 3D 글래스 자물쇠 PNG (다홍 변환본) — 카드 좌측 외곽으로 돌출 */}
           <img
@@ -302,7 +302,7 @@ export default function HeroV4Bird() {
           <p className="font-host absolute bottom-5 left-6 w-[200px] text-[12px] leading-[1.4] text-offwhite/85">
             표준 단가 기반 평균 절감
           </p>
-          <CardArrow href="/estimate" />
+          <CardArrow href="/workflow" />
         </GlassCard>
         </div>
       </motion.div>

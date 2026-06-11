@@ -2,6 +2,7 @@
 
 export type ConsumerProjectStatus =
   | "ADDRESS_SELECTION"
+  | "WORKFLOW_IN_PROGRESS"
   | "FLOOR_PLAN"
   | "AI_DESIGN"
   | "RENDERING"
@@ -11,6 +12,7 @@ export type ConsumerProjectStatus =
 
 export const CONSUMER_PROJECT_STATUS_LABELS: Record<ConsumerProjectStatus, string> = {
   ADDRESS_SELECTION: "주소 선택",
+  WORKFLOW_IN_PROGRESS: "진행 중",
   FLOOR_PLAN: "도면/3D 매스",
   AI_DESIGN: "AI 디자인",
   RENDERING: "자재 선택",
@@ -21,6 +23,7 @@ export const CONSUMER_PROJECT_STATUS_LABELS: Record<ConsumerProjectStatus, strin
 
 export const CONSUMER_PROJECT_STATUS_COLORS: Record<ConsumerProjectStatus, string> = {
   ADDRESS_SELECTION: "bg-gray-100 text-gray-700",
+  WORKFLOW_IN_PROGRESS: "bg-blue-100 text-blue-700",
   FLOOR_PLAN: "bg-cyan-100 text-cyan-700",
   AI_DESIGN: "bg-blue-100 text-blue-700",
   RENDERING: "bg-indigo-100 text-indigo-700",
@@ -31,6 +34,7 @@ export const CONSUMER_PROJECT_STATUS_COLORS: Record<ConsumerProjectStatus, strin
 
 export const STATUS_ORDER: Record<ConsumerProjectStatus, number> = {
   ADDRESS_SELECTION: 0,
+  WORKFLOW_IN_PROGRESS: 1,
   FLOOR_PLAN: 1,
   AI_DESIGN: 2,
   RENDERING: 3,

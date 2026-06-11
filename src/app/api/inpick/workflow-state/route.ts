@@ -92,17 +92,31 @@ export async function POST(req: NextRequest) {
     updatedAt: new Date().toISOString(),
   };
 
+  // 내 프로젝트 목록 표시용 — step1 주소를 address 컬럼에도 기록 (있을 때만; 없으면 기존값 유지)
+  const step1Obj = (cleanedStep1 ?? {}) as {
+    basicInfo?: {
+      selectedAddress?: Record<string, unknown>;
+      selectedPyeong?: { exclusiveArea?: number; pyeongName?: string };
+    };
+  };
+  const sel = step1Obj.basicInfo?.selectedAddress;
+  const pyeong = step1Obj.basicInfo?.selectedPyeong;
+  const addressForList = sel
+    ? { ...sel, ...(pyeong?.exclusiveArea ? { exclusiveArea: pyeong.exclusiveArea } : {}) }
+    : null;
+
+  const upsertRow: Record<string, unknown> = {
+    id: body.projectId,
+    user_id: userId,
+    workflow_state: workflowState,
+    status: "WORKFLOW_IN_PROGRESS",
+    updated_at: new Date().toISOString(),
+  };
+  // address는 있을 때만 포함 (upsert는 미포함 컬럼을 덮어쓰지 않으므로 기존 주소 보존)
+  if (addressForList) upsertRow.address = addressForList;
+
   // upsert
-  const { error } = await admin.from("consumer_projects").upsert(
-    {
-      id: body.projectId,
-      user_id: userId,
-      workflow_state: workflowState,
-      status: "WORKFLOW_IN_PROGRESS",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" },
-  );
+  const { error } = await admin.from("consumer_projects").upsert(upsertRow, { onConflict: "id" });
 
   if (error) {
     console.error("[workflow-state] upsert failed:", error);
