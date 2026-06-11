@@ -7,6 +7,7 @@ import MobileMockV4 from "@/components/landing-v4/MobileMockV4";
 import TestimonialsV4 from "@/components/landing-v4/TestimonialsV4";
 import FinalCtaV4 from "@/components/landing-v4/FinalCtaV4";
 import ProgressBarV4 from "@/components/landing-v4/ProgressBarV4";
+import StoreFloatingBadges from "@/components/landing-v4/StoreFloatingBadges";
 
 export default function Home() {
   return (
@@ -22,6 +23,7 @@ export default function Home() {
         <TestimonialsV4 />
       </div>
       <FinalCtaV4 />
+      <StoreFloatingBadges />
     </LenisProvider>
   );
 }
