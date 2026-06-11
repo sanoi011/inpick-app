@@ -1,10 +1,12 @@
 /**
  * GET /api/product-search?query=&display=
- * 자재 상품 검색 — 서버에서 네이버 쇼핑 API 호출(키 있을 때), 응답은 쇼핑몰명/가격/이미지/구매링크만 정규화.
- * 클라이언트에는 "네이버 쇼핑" 브랜딩을 노출하지 않고 상품 카드(사진+가격+쇼핑몰별)로만 표시한다.
- * 키(NAVER_CLIENT_ID/SECRET) 미설정 또는 오류 시 mock 폴백.
+ * 자재 상품 검색 — 두 소스 병합:
+ *   1) 내부 자재 DB(material_products) — 브랜드/SKU/카탈로그가 + 우리 소유 자산 이미지 (우선 노출)
+ *   2) 쇼핑몰(네이버 쇼핑 API, 검색 전용 키) — 실시간 실구매 상품 (사진·가격·구매링크)
+ * 키/DB 미설정 또는 오류 시 각각 graceful (네이버 없으면 mock, 내부 없으면 생략).
  */
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,9 +19,14 @@ interface ProductResult {
   mallName: string;
   link: string;
   brand?: string;
+  sku?: string;
+  spec?: string;
+  source: "internal" | "naver" | "mock";
 }
 
 const stripTags = (s: string) => s.replace(/<[^>]*>/g, "").replace(/&[a-z]+;/g, " ").trim();
+const shopSearchUrl = (q: string) =>
+  `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(q)}`;
 
 const MOCK_MALLS = ["스마트스토어", "쿠팡", "11번가", "G마켓", "오늘의집", "롯데ON"];
 
@@ -31,38 +38,69 @@ function mockProducts(query: string): ProductResult[] {
     image: null,
     price: base + i * 14500 + (i % 3) * 5200,
     mallName: MOCK_MALLS[i % MOCK_MALLS.length],
-    link: `https://search.shopping.naver.com/search/all?query=${encodeURIComponent(query)}`,
+    link: shopSearchUrl(query),
     brand: ["대림바스", "이누스", "아메리칸스탠다드", "로얄앤컴퍼니"][i % 4],
+    source: "mock" as const,
   }));
 }
 
-export async function GET(req: NextRequest) {
-  const query = (req.nextUrl.searchParams.get("query") ?? "").trim();
-  const display = Math.min(20, Math.max(1, Number(req.nextUrl.searchParams.get("display") ?? 12)));
-  if (!query) {
-    return NextResponse.json({ products: [], source: "empty" });
+// ─── 1) 내부 자재 DB (material_products) ───
+async function fetchInternal(query: string, limit: number): Promise<ProductResult[]> {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) return [];
+  try {
+    const admin = createServiceClient(url, key, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const like = `%${query}%`;
+    const { data, error } = await admin
+      .from("material_products")
+      .select("id, brand, product_name, model_number, specification, retail_price, thumbnail_url, sub_category, is_verified, popularity_score")
+      .or(`product_name.ilike.${like},brand.ilike.${like},sub_category.ilike.${like}`)
+      .not("thumbnail_url", "is", null)
+      .order("is_verified", { ascending: false, nullsFirst: false })
+      .order("popularity_score", { ascending: false, nullsFirst: false })
+      .limit(limit);
+    if (error) throw error;
+    return ((data ?? []) as Array<Record<string, unknown>>).map((r) => {
+      const brand = (r.brand as string) || "";
+      const name = (r.product_name as string) || `${brand} 자재`;
+      return {
+        productId: `int-${r.id as string}`,
+        title: [brand, name].filter(Boolean).join(" ").trim() || name,
+        image: (r.thumbnail_url as string) ?? null,
+        price: Number(r.retail_price) > 0 ? Number(r.retail_price) : 0,
+        mallName: "인픽 카탈로그",
+        link: shopSearchUrl([brand, name].filter(Boolean).join(" ")),
+        brand: brand || undefined,
+        sku: (r.model_number as string) || undefined,
+        spec: (r.specification as string) || undefined,
+        source: "internal" as const,
+      };
+    });
+  } catch (err) {
+    console.warn("[product-search] internal skip:", err);
+    return [];
   }
+}
 
-  // 검색(쇼핑) 전용 키 — 네이버 소셜 로그인용 NAVER_CLIENT_ID와 분리(다른 앱일 수 있음)
+// ─── 2) 네이버 쇼핑 (실구매) ───
+async function fetchNaver(query: string, display: number): Promise<ProductResult[] | null> {
   const id = process.env.NAVER_SEARCH_CLIENT_ID || process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_SEARCH_CLIENT_SECRET || process.env.NAVER_CLIENT_SECRET;
-
-  if (!id || !secret) {
-    return NextResponse.json({ products: mockProducts(query).slice(0, display), source: "mock" });
-  }
-
+  if (!id || !secret) return null;
   try {
-    const url = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(
+    const apiUrl = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(
       query
     )}&display=${display}&sort=asc&exclude=used:rental:cbshop`;
-    const res = await fetch(url, {
+    const res = await fetch(apiUrl, {
       headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret },
-      // 12시간 캐시
       next: { revalidate: 60 * 60 * 12 },
     });
     if (!res.ok) throw new Error(`shop api ${res.status}`);
     const data = await res.json();
-    const products: ProductResult[] = (data.items ?? [])
+    return (data.items ?? [])
       .filter((it: { lprice?: string; image?: string }) => Number(it.lprice) > 0 && it.image)
       .map((it: Record<string, string>) => ({
         productId: it.productId ?? it.link,
@@ -72,10 +110,34 @@ export async function GET(req: NextRequest) {
         mallName: it.mallName || "스마트스토어",
         link: it.link,
         brand: it.brand || it.maker || undefined,
+        source: "naver" as const,
       }));
-    return NextResponse.json({ products, source: "naver" });
   } catch (err) {
-    console.error("[product-search] fallback to mock:", err);
-    return NextResponse.json({ products: mockProducts(query).slice(0, display), source: "mock" });
+    console.error("[product-search] naver fallback to mock:", err);
+    return null;
   }
+}
+
+export async function GET(req: NextRequest) {
+  const query = (req.nextUrl.searchParams.get("query") ?? "").trim();
+  const display = Math.min(20, Math.max(1, Number(req.nextUrl.searchParams.get("display") ?? 12)));
+  if (!query) return NextResponse.json({ products: [], source: "empty" });
+
+  const [internal, naver] = await Promise.all([
+    fetchInternal(query, 4),
+    fetchNaver(query, display),
+  ]);
+
+  const shop = naver ?? mockProducts(query).slice(0, display);
+  // 내부 카탈로그 우선 + 쇼핑몰, 중복(동일 링크) 제거
+  const seen = new Set<string>();
+  const products = [...internal, ...shop].filter((p) => {
+    const dedupeKey = p.link || p.productId;
+    if (seen.has(dedupeKey)) return false;
+    seen.add(dedupeKey);
+    return true;
+  });
+
+  const source = naver ? (internal.length ? "internal+naver" : "naver") : internal.length ? "internal+mock" : "mock";
+  return NextResponse.json({ products, source, internalCount: internal.length });
 }

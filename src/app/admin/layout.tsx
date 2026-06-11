@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, Users, FolderKanban, FileText, Hexagon,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
-  Library, ExternalLink, Rocket, Heart, Activity, CreditCard, AlertTriangle, MessagesSquare,
+  Library, ExternalLink, Rocket, Heart, Activity, CreditCard, AlertTriangle, MessagesSquare, Wrench,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -26,6 +26,8 @@ const NAV_ITEMS = [
   { label: "도면 인식 로그", href: "/admin/drawing-logs", icon: FileImage },
   { label: "평면도 라이브러리", href: "/admin/floor-plans", icon: Library },
   { label: "자재 / 단가 DB", href: "/admin/materials", icon: Package },
+  { label: "부분 적산 단가", href: "/admin/partial-rates", icon: Hexagon },
+  { label: "부분시공 리드", href: "/admin/partial-leads", icon: Wrench },
   { label: "견적 품질 진단", href: "/admin/estimate-quality", icon: AlertTriangle },
   { label: "커뮤니티 관리", href: "/admin/community", icon: MessagesSquare },
   { label: "크롤러 운영", href: "/admin/crawlers", icon: RefreshCw },

@@ -27,6 +27,7 @@ import {
   ChevronDown,
   FileText,
   Share2,
+  ShoppingBag,
 } from "lucide-react";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
@@ -50,6 +51,7 @@ import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision
 import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseModal";
 // community v2 (2026-05-14): 커뮤니티 견적 공유
 import EstimateShareModal from "@/components/community/EstimateShareModal";
+import MaterialShopDrawer from "@/components/workflow/MaterialShopDrawer";
 // 2026-05-31: 오늘 만든 견적서 4문서 폼으로 교체 (Vision 분석 견적 → 우리 양식)
 import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
 import { constructionEstimateToDetailLines } from "@/lib/estimate-pro/detail-model";
@@ -377,6 +379,8 @@ function EstimatePage() {
   const [pdfDownloading, setPdfDownloading] = useState(false);
   // community v2 (2026-05-14): 커뮤니티 공유 모달
   const [shareModalOpen, setShareModalOpen] = useState(false);
+  // 자재 라인 → 실구매/카탈로그/미리보기 드로어
+  const [shopMaterial, setShopMaterial] = useState<string | null>(null);
 
   const toggleV2LineIncluded = (lineId: string) => {
     setExcludedV2Lines((prev) => {
@@ -1999,6 +2003,7 @@ function EstimatePage() {
                               groupTotal={g.groupTotal}
                               excluded={excluded}
                               onToggle={toggleExcluded}
+                              onShop={setShopMaterial}
                             />
                           ))}
                         </tbody>
@@ -2516,6 +2521,7 @@ function EstimatePage() {
         }}
         onClose={() => setShareModalOpen(false)}
       />
+      <MaterialShopDrawer materialName={shopMaterial} onClose={() => setShopMaterial(null)} />
       <EstimatePdfPurchaseModal
         open={pdfPurchaseOpen}
         consumerProjectId={
@@ -2561,12 +2567,14 @@ function TradeGroup({
   groupTotal,
   excluded,
   onToggle,
+  onShop,
 }: {
   trade: string;
   rows: ConsolidatedRow[];
   groupTotal: number;
   excluded: Set<string>;
   onToggle: (key: string) => void;
+  onShop?: (materialName: string) => void;
 }) {
   const [open, setOpen] = useState(true);
   const visibleTotal = rows
@@ -2624,6 +2632,13 @@ function TradeGroup({
                 >
                   {r.materialName}
                 </p>
+                <button
+                  type="button"
+                  onClick={() => onShop?.(r.materialName)}
+                  className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-bold text-primary-600 hover:text-primary-700"
+                >
+                  <ShoppingBag className="h-3 w-3" /> 자재·구매 보기
+                </button>
                 <p className="text-[0.65rem] mt-0.5 flex items-center gap-1.5 flex-wrap text-primary-900/50">
                   {r.brand && (
                     <span className="inline-flex items-center rounded bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-primary-700">

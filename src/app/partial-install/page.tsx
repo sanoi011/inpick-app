@@ -2,185 +2,41 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { calcPartialEstimate, type PartialSurface } from "@/lib/partial/partial-estimate";
+import {
+  calcPartialEstimate,
+  surfaceUnitLabel,
+  type PartialSurface,
+  type PartialRates,
+} from "@/lib/partial/partial-estimate";
+import {
+  MATERIAL_GROUPS,
+  HOT_CATEGORIES,
+  ALL_CATEGORIES,
+  type MaterialCategory,
+} from "@/lib/materials/catalog";
 import {
   ArrowRight,
   Bath,
+  Blinds,
   CheckCircle2,
+  DoorOpen,
   Droplet,
+  Hammer,
+  Layers,
+  Lightbulb,
   Loader2,
   MapPin,
+  Paintbrush,
   Search,
   ShoppingBag,
   SlidersHorizontal,
+  Sofa,
   Sparkles,
-  Toilet,
+  Star,
+  Utensils,
   Wrench,
 } from "lucide-react";
 import HeaderV4 from "@/components/landing-v4/HeaderV4";
-
-type ProductPart = {
-  id: string;
-  room: string;
-  part: string;
-  icon: typeof Toilet;
-  title: string;
-  summary: string;
-  trend: string;
-  installScope: string;
-  budget: string;
-  searchTerms: string[];
-  picks: Array<{
-    name: string;
-    tag: string;
-    reason: string;
-    price: string;
-    query: string;
-  }>;
-};
-
-const PRODUCT_PARTS: ProductPart[] = [
-  {
-    id: "toilet",
-    room: "욕실",
-    part: "양변기",
-    icon: Toilet,
-    title: "양변기 교체",
-    summary: "물내림 성능, 청소 편의, 절수 등급을 기준으로 제품과 설치 범위를 같이 비교합니다.",
-    trend: "림리스, 치마형, 절수형",
-    installScope: "기존 철거, 폐기, 플랜지 보수, 백시멘트 마감",
-    budget: "제품+시공 25만~70만원대",
-    searchTerms: ["치마형 양변기", "림리스 양변기", "대림바스 양변기", "아메리칸스탠다드 양변기"],
-    picks: [
-      {
-        name: "치마형 원피스 양변기",
-        tag: "청소 쉬움",
-        reason: "측면 배관 굴곡이 적어 욕실을 깔끔하게 보이게 합니다.",
-        price: "중가",
-        query: "치마형 원피스 양변기 설치",
-      },
-      {
-        name: "림리스 절수 양변기",
-        tag: "최근 선호",
-        reason: "테두리 오염이 적고 물 사용량을 줄이기 좋습니다.",
-        price: "중가",
-        query: "림리스 절수 양변기",
-      },
-      {
-        name: "비데 일체형 양변기",
-        tag: "프리미엄",
-        reason: "콘센트와 방수 상태가 맞는 욕실에서 만족도가 높습니다.",
-        price: "고가",
-        query: "비데 일체형 양변기",
-      },
-    ],
-  },
-  {
-    id: "basin",
-    room: "욕실",
-    part: "세면대",
-    icon: Droplet,
-    title: "세면대 교체",
-    summary: "하부장 유무, 수전 위치, 배수관 노출 여부까지 보고 제품을 추천합니다.",
-    trend: "탑볼, 하부장형, 무광 화이트",
-    installScope: "기존 세면기 철거, 앵글밸브 점검, 배수 트랩 교체",
-    budget: "제품+시공 20만~90만원대",
-    searchTerms: ["욕실 세면대 하부장", "탑볼 세면대", "반다리 세면대", "무광 세면대"],
-    picks: [
-      {
-        name: "하부장 일체형 세면대",
-        tag: "수납 강화",
-        reason: "좁은 욕실에서 청소용품과 수건을 숨기기 좋습니다.",
-        price: "중가",
-        query: "욕실 세면대 하부장 설치",
-      },
-      {
-        name: "탑볼 세면대",
-        tag: "호텔 무드",
-        reason: "상판과 수전을 같이 고르면 작은 욕실도 디자인 포인트가 됩니다.",
-        price: "중고가",
-        query: "탑볼 세면대 수전 세트",
-      },
-      {
-        name: "반다리 세면대",
-        tag: "가성비",
-        reason: "배관을 가리면서도 시공 변수가 적어 교체가 빠릅니다.",
-        price: "저중가",
-        query: "반다리 세면대 교체",
-      },
-    ],
-  },
-  {
-    id: "shower",
-    room: "욕실",
-    part: "수전/샤워기",
-    icon: Bath,
-    title: "수전·샤워기 교체",
-    summary: "수압, 배관 간격, 욕실 톤에 맞춰 무광 니켈부터 크롬까지 추천합니다.",
-    trend: "무광 니켈, 매립형 느낌, 절수 샤워기",
-    installScope: "수전 탈거, 편심 교체, 누수 테스트, 실리콘 마감",
-    budget: "제품+시공 12만~45만원대",
-    searchTerms: ["욕실 샤워수전", "무광 니켈 샤워기", "해바라기 샤워기", "세면 수전"],
-    picks: [
-      {
-        name: "무광 니켈 샤워수전",
-        tag: "트렌드",
-        reason: "웜톤 타일, 호텔식 욕실과 잘 맞고 지문이 덜 보입니다.",
-        price: "중고가",
-        query: "무광 니켈 샤워수전",
-      },
-      {
-        name: "절수형 샤워헤드 세트",
-        tag: "실속",
-        reason: "큰 공사 없이 체감 변화를 만들 수 있는 교체 항목입니다.",
-        price: "저가",
-        query: "절수 샤워헤드 세트",
-      },
-      {
-        name: "해바라기 샤워기",
-        tag: "만족도",
-        reason: "천장 높이와 급수 위치가 맞으면 샤워 경험이 크게 좋아집니다.",
-        price: "중가",
-        query: "해바라기 샤워기 설치",
-      },
-    ],
-  },
-  {
-    id: "sink",
-    room: "주방",
-    part: "싱크볼/수전",
-    icon: Wrench,
-    title: "싱크볼·주방수전 교체",
-    summary: "상판 타공 사이즈와 배수 구조를 기준으로 교체 가능한 제품만 좁혀 추천합니다.",
-    trend: "사각 싱크볼, 거위목 수전, 무광 스테인리스",
-    installScope: "싱크볼 탈거, 상판 실링, 배수구·트랩 교체",
-    budget: "제품+시공 25만~85만원대",
-    searchTerms: ["사각 싱크볼", "거위목 주방수전", "백조 싱크볼", "무광 싱크볼"],
-    picks: [
-      {
-        name: "사각 언더 싱크볼",
-        tag: "인기",
-        reason: "상판과 일체감이 좋고 큰 냄비 세척이 편합니다.",
-        price: "중가",
-        query: "사각 언더 싱크볼",
-      },
-      {
-        name: "거위목 주방수전",
-        tag: "교체 효과",
-        reason: "기존 싱크대도 수전만 바꾸면 사용성이 크게 좋아집니다.",
-        price: "저중가",
-        query: "거위목 주방수전",
-      },
-      {
-        name: "무광 스테인리스 싱크볼",
-        tag: "프리미엄",
-        reason: "스크래치가 덜 도드라지고 모던 주방과 잘 맞습니다.",
-        price: "중고가",
-        query: "무광 스테인리스 싱크볼",
-      },
-    ],
-  },
-];
 
 type ProductResult = {
   productId: string;
@@ -190,16 +46,24 @@ type ProductResult = {
   mallName: string;
   link: string;
   brand?: string;
+  sku?: string;
+  spec?: string;
+  source?: "internal" | "naver" | "mock";
 };
 
-const EXTRA_SEARCHES = [
-  "비데", "욕실장", "주방 후드", "쿡탑", "주방 상판", "싱크대 하부장",
-  "벽 타일", "바닥 타일", "강마루", "장판", "벽지", "도어록", "문고리",
-  "붙박이장", "신발장", "조명", "콘센트 스위치", "블라인드", "커튼",
-];
-const POPULAR_SEARCHES = Array.from(
-  new Set([...PRODUCT_PARTS.flatMap((p) => p.searchTerms), ...EXTRA_SEARCHES])
-);
+// 그룹 키 → 아이콘
+const GROUP_ICONS: Record<string, typeof Bath> = {
+  bath: Bath,
+  kitchen: Utensils,
+  door: DoorOpen,
+  furniture: Sofa,
+  floor: Layers,
+  wall: Paintbrush,
+  electric: Lightbulb,
+  window: Blinds,
+  plumbing: Droplet,
+  repair: Hammer,
+};
 
 export default function PartialInstallPage() {
   const [region, setRegion] = useState("대전 유성구");
@@ -207,11 +71,21 @@ export default function PartialInstallPage() {
   const [products, setProducts] = useState<ProductResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeQuery, setActiveQuery] = useState("");
+  const [scaleInput, setScaleInput] = useState(""); // 시공 규모(면적㎡/수량EA), 빈 값=기본
+  const [activeGroupKey, setActiveGroupKey] = useState(MATERIAL_GROUPS[0]?.key ?? "bath");
+  const [surfaceOverride, setSurfaceOverride] = useState<PartialSurface | null>(null);
+  const [rates, setRates] = useState<Partial<Record<PartialSurface, Partial<PartialRates>>>>();
 
-  const searchProducts = async (q: string) => {
+  const activeGroup = useMemo(
+    () => MATERIAL_GROUPS.find((g) => g.key === activeGroupKey) ?? MATERIAL_GROUPS[0],
+    [activeGroupKey]
+  );
+
+  const searchProducts = async (q: string, surface?: PartialSurface) => {
     const term = q.trim();
     if (!term) return;
     setActiveQuery(term);
+    setSurfaceOverride(surface ?? null);
     setSearching(true);
     try {
       const res = await fetch(`/api/product-search?query=${encodeURIComponent(term)}`);
@@ -227,6 +101,9 @@ export default function PartialInstallPage() {
     }
   };
 
+  // 카탈로그 카테고리 클릭 → 실구매 상품 검색 + 적산 부위 지정
+  const pickCategory = (cat: MaterialCategory) => searchProducts(cat.query, cat.surface);
+
   // URL ?q= 자동 검색 (딥링크/검증용)
   useEffect(() => {
     const q = new URLSearchParams(window.location.search).get("q");
@@ -234,27 +111,48 @@ export default function PartialInstallPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 검색어 → 부위 추정 (적산 노무 단가용)
+  // 관리자 단가DB 로드 (없으면 적산 엔진 내장 기본값 사용)
+  useEffect(() => {
+    fetch("/api/partial/rates")
+      .then((r) => r.json())
+      .then((d) => {
+        if (d?.rates && Object.keys(d.rates).length > 0) setRates(d.rates);
+      })
+      .catch(() => {});
+  }, []);
+
+  // 자유 검색어 → 부위 추정 (카탈로그 클릭 시엔 명시 부위 우선)
   const inferSurface = (q: string): PartialSurface => {
-    if (/마루|바닥|장판|데코타일|폴리싱|LVT|타일.*바닥|바닥.*타일/i.test(q)) return "floor";
-    if (/벽지|도배|타일|아트월|템바|스타코|월패널|포세린/i.test(q)) return "wall";
+    if (/마루|바닥|장판|데코타일|폴리싱|LVT|SPC|타일.*바닥|바닥.*타일/i.test(q)) return "floor";
+    if (/벽지|도배|타일|아트월|템바|스타코|월패널|포세린|필름|페인트|도장/i.test(q)) return "wall";
     if (/천장|천정|몰딩|루버|우물/i.test(q)) return "ceiling";
     return "etc";
   };
 
-  // 검색 결과 대표가(중앙값)로 예상 시공 견적 산출
+  const activeSurface = useMemo(
+    () => surfaceOverride ?? inferSurface(activeQuery),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [surfaceOverride, activeQuery]
+  );
+  const scaleUnit = surfaceUnitLabel(activeSurface);
+
+  // 검색 결과 대표가(중앙값) + 시공규모(면적/수량)로 예상 시공 견적 산출
   const estimate = useMemo(() => {
     if (!activeQuery || products.length === 0) return null;
     const prices = products.map((p) => p.price).filter((n) => n > 0).sort((a, b) => a - b);
     if (prices.length === 0) return null;
     const median = prices[Math.floor(prices.length / 2)];
+    const parsed = Number(scaleInput);
+    const quantity = scaleInput.trim() && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
     return calcPartialEstimate({
-      surface: inferSurface(activeQuery),
+      surface: activeSurface,
       materialName: activeQuery,
       unitPrice: median,
+      quantity,
       region,
+      rates,
     });
-  }, [activeQuery, products, region]);
+  }, [activeQuery, activeSurface, products, region, scaleInput, rates]);
 
   const [installContact, setInstallContact] = useState("");
   const [installNote, setInstallNote] = useState("");
@@ -271,7 +169,7 @@ export default function PartialInstallPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          surface: inferSurface(activeQuery),
+          surface: activeSurface,
           materialQuery: activeQuery,
           productTitle: cheapest?.title,
           productPrice: cheapest?.price,
@@ -313,14 +211,15 @@ export default function PartialInstallPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-primary-300">부분 자재·시공</p>
             <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">
-              변기 하나, 세면대 하나도 제품 추천부터 설치업체까지
+              건축 자재·기구 전부, 제품 추천부터 실구매·설치까지
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-7 text-zinc-200">
-              교체하고 싶은 부위를 고르면 인기 자재 유형, 실시간 상품 추천,
-              예상 시공 범위, 근처 설치업체 연결까지 한 화면에서 정리합니다.
+              욕실·주방·문·가구·바닥·벽·조명·창호·설비까지 {ALL_CATEGORIES.length}개 카테고리.
+              원하는 자재를 고르면 실시간 상품(실제 구매 가능), 예상 시공 견적,
+              근처 설치업체 연결까지 한 화면에서 정리합니다.
             </p>
             <div className="mt-7 flex flex-wrap gap-2 text-sm">
-              {["자재 추천", "실시간 상품 검색", "근처 설치업체", "부분 견적"].map((label) => (
+              {["전 카테고리 자재", "실제 구매 링크", "예상 시공 견적", "근처 설치업체"].map((label) => (
                 <span key={label} className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-2 font-semibold">
                   <CheckCircle2 className="h-4 w-4 text-primary-300" />
                   {label}
@@ -343,7 +242,7 @@ export default function PartialInstallPage() {
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && query.trim()) searchProducts(query);
                   }}
-                  placeholder="예: 변기, 세면대, 싱크볼 (Enter로 상품 검색)"
+                  placeholder="예: 변기, 강마루, 도어록 (Enter로 상품 검색)"
                   className="h-11 w-full border border-white/20 bg-white/95 pl-10 pr-3 text-sm font-semibold text-zinc-950 outline-none focus:border-primary-400"
                 />
               </label>
@@ -356,33 +255,91 @@ export default function PartialInstallPage() {
                 />
               </label>
             </div>
+            <div className="mt-3 flex flex-wrap gap-1.5">
+              {HOT_CATEGORIES.slice(0, 8).map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => pickCategory(c)}
+                  className="inline-flex items-center gap-1 rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white hover:bg-primary-500"
+                >
+                  <Star className="h-3 w-3 text-primary-300" />
+                  {c.name}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* 자재 검색 — 모든 건축 자재·도기·가구를 빠른검색 또는 인기 카테고리로 */}
+      {/* 전체 자재 카탈로그 — 그룹 탭 → 카테고리 (클릭 시 실구매 상품 검색 + 적산) */}
       <section className="border-b border-zinc-200 bg-white">
         <div className="mx-auto max-w-7xl px-5 py-8 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">인기 자재 검색</p>
-          <p className="mt-1 max-w-2xl text-sm text-zinc-600">
-            위 빠른검색에 자재명을 입력하거나 아래 카테고리를 누르면 상품을 찾아드립니다. 도기·수전·주방가구·마감재·타일·바닥재·조명·철물·수납가구 등 인테리어에 필요한 모든 자재를 검색할 수 있어요.
-          </p>
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">전체 자재 카탈로그</p>
+              <p className="mt-1 max-w-2xl text-sm text-zinc-600">
+                건축·인테리어에 들어가는 모든 자재·기구를 {MATERIAL_GROUPS.length}개 그룹 · {ALL_CATEGORIES.length}개 카테고리로 정리했어요.
+                카테고리를 누르면 실제 구매 가능한 상품과 예상 시공 견적을 바로 보여드립니다.
+              </p>
+            </div>
+            <Link
+              href={`/find-contractors?region=${encodeURIComponent(region)}`}
+              className="hidden shrink-0 items-center gap-2 bg-zinc-950 px-4 py-3 text-sm font-black text-white hover:bg-primary-600 sm:inline-flex"
+            >
+              {region} 설치업체 찾기
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+
+          {/* 그룹 탭 */}
+          <div className="mt-5 flex gap-2 overflow-x-auto pb-1">
+            {MATERIAL_GROUPS.map((g) => {
+              const Icon = GROUP_ICONS[g.key] ?? ShoppingBag;
+              const active = g.key === activeGroupKey;
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => setActiveGroupKey(g.key)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 border px-3.5 py-2 text-sm font-bold transition ${
+                    active
+                      ? "border-primary-500 bg-primary-500 text-white"
+                      : "border-zinc-200 bg-white text-zinc-700 hover:border-primary-300"
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  {g.title}
+                  <span className={`ml-0.5 text-[11px] font-bold ${active ? "text-white/70" : "text-zinc-400"}`}>
+                    {g.items.length}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* 활성 그룹의 카테고리 칩 */}
           <div className="mt-4 flex flex-wrap gap-2">
-            {POPULAR_SEARCHES.map((term) => (
+            {activeGroup?.items.map((c) => (
               <button
-                key={term}
+                key={c.code}
                 type="button"
-                onClick={() => searchProducts(term)}
-                className="inline-flex items-center gap-1 border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs font-bold text-zinc-700 hover:border-primary-300 hover:text-primary-600"
+                onClick={() => pickCategory(c)}
+                className={`inline-flex items-center gap-1 border px-3 py-2 text-xs font-bold transition ${
+                  activeQuery === c.query
+                    ? "border-primary-500 bg-primary-50 text-primary-700"
+                    : "border-zinc-200 bg-zinc-50 text-zinc-700 hover:border-primary-300 hover:text-primary-600"
+                }`}
               >
-                <Search className="h-3 w-3" />
-                {term}
+                {c.hot && <Star className="h-3 w-3 text-amber-400" />}
+                {c.name}
               </button>
             ))}
           </div>
+
           <Link
             href={`/find-contractors?region=${encodeURIComponent(region)}`}
-            className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-4 py-3 text-sm font-black text-white hover:bg-primary-600"
+            className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-4 py-3 text-sm font-black text-white hover:bg-primary-600 sm:hidden"
           >
             {region} 설치업체 찾기
             <ArrowRight className="h-4 w-4" />
@@ -390,13 +347,13 @@ export default function PartialInstallPage() {
         </div>
       </section>
 
-      {/* 상품 검색 결과 — 사진 + 가격 + 쇼핑몰별 (클릭 시 해당 쇼핑몰에서 구매) */}
+      {/* 상품 검색 결과 — 사진 + 가격 + 쇼핑몰별 (클릭 시 해당 쇼핑몰에서 실제 구매) */}
       {(searching || products.length > 0 || activeQuery) && (
         <section id="product-results" className="border-t border-zinc-200 bg-white">
           <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
             <div className="flex items-end justify-between gap-3">
               <div>
-                <p className="text-xs font-bold uppercase tracking-widest text-primary-600">상품 검색</p>
+                <p className="text-xs font-bold uppercase tracking-widest text-primary-600">상품 검색 · 실구매</p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight">
                   {activeQuery ? `‘${activeQuery}’ 추천 상품` : "추천 상품"}
                 </h2>
@@ -435,14 +392,34 @@ export default function PartialInstallPage() {
                       )}
                     </div>
                     <div className="flex flex-1 flex-col p-3">
-                      <span className="inline-flex w-fit items-center rounded bg-zinc-100 px-1.5 py-0.5 text-[11px] font-bold text-zinc-500">
+                      <span
+                        className={`inline-flex w-fit items-center rounded px-1.5 py-0.5 text-[11px] font-bold ${
+                          p.source === "internal" ? "bg-primary-100 text-primary-700" : "bg-zinc-100 text-zinc-500"
+                        }`}
+                      >
                         {p.mallName}
                       </span>
                       <p className="mt-1.5 line-clamp-2 text-[13px] leading-snug text-zinc-700">{p.title}</p>
+                      {(p.brand || p.sku) && (
+                        <p className="mt-0.5 truncate text-[11px] text-zinc-400">
+                          {p.brand}
+                          {p.brand && p.sku ? " · " : ""}
+                          {p.sku}
+                        </p>
+                      )}
                       <p className="mt-auto pt-2 text-base font-black text-zinc-950">
-                        {p.price.toLocaleString()}
-                        <span className="text-xs font-bold text-zinc-500">원~</span>
+                        {p.price > 0 ? (
+                          <>
+                            {p.price.toLocaleString()}
+                            <span className="text-xs font-bold text-zinc-500">원~</span>
+                          </>
+                        ) : (
+                          <span className="text-sm font-bold text-zinc-500">가격 문의</span>
+                        )}
                       </p>
+                      <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-bold text-primary-600">
+                        {p.source === "internal" ? "상품 보러가기" : "구매하러 가기"} <ArrowRight className="h-3 w-3" />
+                      </span>
                     </div>
                   </a>
                 ))}
@@ -456,6 +433,23 @@ export default function PartialInstallPage() {
                   <div className="flex items-center justify-between">
                     <h3 className="text-lg font-black tracking-tight">예상 시공 견적</h3>
                     <span className="bg-primary-50 px-2 py-1 text-[11px] font-black text-primary-700">{activeQuery}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded bg-zinc-50 p-3 text-sm">
+                    <label className="font-bold text-zinc-600">시공 규모</label>
+                    <input
+                      type="number"
+                      min={1}
+                      inputMode="numeric"
+                      value={scaleInput}
+                      onChange={(e) => setScaleInput(e.target.value)}
+                      placeholder={String(estimate.effectiveQty)}
+                      className="h-9 w-24 border border-zinc-300 px-2 text-right font-bold outline-none focus:border-primary-500"
+                    />
+                    <span className="font-bold text-zinc-500">{scaleUnit}</span>
+                    <span className="text-[12px] text-zinc-400">
+                      {estimate.basis === "area" ? "바닥·벽·천정은 면적(㎡) 기준" : "도기·설비는 수량(개) 기준"}
+                      {estimate.regionMultiplier > 1 && ` · 지역 노무 ×${estimate.regionMultiplier.toFixed(2)}`}
+                    </span>
                   </div>
                   <table className="mt-4 w-full text-sm">
                     <thead>
@@ -472,7 +466,7 @@ export default function PartialInstallPage() {
                             <span className="block font-bold text-zinc-800">{l.item}</span>
                             <span className="text-[11px] text-zinc-400">
                               {l.trade}
-                              {l.source === "product" && " · 네이버 참고가"}
+                              {l.source === "product" && " · 상품 참고가"}
                             </span>
                           </td>
                           <td className="py-2 text-right text-zinc-500">{l.qty}{l.unit}</td>
@@ -494,6 +488,15 @@ export default function PartialInstallPage() {
                   {estimate.warnings.map((w, i) => (
                     <p key={i} className="mt-2 text-[12px] leading-5 text-zinc-400">· {w}</p>
                   ))}
+                  {estimate.basis === "area" && (
+                    <Link
+                      href={`/material-preview?surface=${activeSurface}&mat=${encodeURIComponent(activeQuery)}`}
+                      className="mt-4 inline-flex w-full items-center justify-center gap-2 border border-primary-500 px-4 py-2.5 text-sm font-black text-primary-600 hover:bg-primary-50"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      이 자재 내 공간에 미리보기
+                    </Link>
+                  )}
                 </div>
 
                 {/* 설치업체 연결 (리드) */}
@@ -544,8 +547,8 @@ export default function PartialInstallPage() {
         <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
           <div className="grid gap-4 md:grid-cols-3">
             {[
-              ["1", "교체 부위 선택", "욕실, 주방 등 원하는 부분만 고릅니다."],
-              ["2", "제품 후보 비교", "인기 검색어와 자재 선택 기준을 확인합니다."],
+              ["1", "자재·기구 선택", "전 카테고리에서 교체할 자재를 고릅니다."],
+              ["2", "실구매 상품 비교", "사진·가격·쇼핑몰을 비교하고 바로 구매합니다."],
               ["3", "근처 시공 연결", "지역 기반 설치 파트너에게 부분 시공 상담을 보냅니다."],
             ].map(([step, title, desc]) => (
               <div key={step} className="border border-zinc-200 p-5">
@@ -557,11 +560,11 @@ export default function PartialInstallPage() {
           </div>
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border border-zinc-200 bg-zinc-50 p-5">
             <div>
-              <p className="text-sm font-bold text-zinc-500">운영 확장 포인트</p>
-              <p className="mt-1 text-lg font-black">실시간 상품 검색·가격 비교, 설치업체 지역 재고, 실측 예약까지 붙일 수 있습니다.</p>
+              <p className="text-sm font-bold text-zinc-500">전체 인테리어가 필요하신가요?</p>
+              <p className="mt-1 text-lg font-black">주소만 입력하면 AI가 도면·디자인·17공종 견적까지 한 번에 만들어 드립니다.</p>
             </div>
             <Link href="/workflow" className="inline-flex items-center gap-2 bg-primary-500 px-4 py-3 text-sm font-black text-white hover:bg-primary-600">
-              전체 인테리어도 보기
+              전체 인테리어 시작
               <Sparkles className="h-4 w-4" />
             </Link>
           </div>

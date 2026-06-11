@@ -111,6 +111,29 @@ export default function MaterialPreviewPage() {
   const [surface, setSurface] = useState<SurfaceKey>("floor");
   const [materialIdx, setMaterialIdx] = useState(0);
 
+  // 카탈로그/부분시공에서 ?surface=&mat= 으로 진입 시 자재 자동 선택
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    const s = sp.get("surface");
+    const mat = sp.get("mat");
+    if (s === "floor" || s === "wall" || s === "ceiling") {
+      setSurface(s);
+      if (mat) {
+        const t = mat.toLowerCase();
+        const idx = MATERIALS[s].findIndex(
+          (m) =>
+            t.includes(m.query.toLowerCase()) ||
+            m.query.toLowerCase().includes(t) ||
+            t.includes(m.name.toLowerCase()) ||
+            m.name.toLowerCase().includes(t)
+        );
+        if (idx >= 0) setMaterialIdx(idx);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const roomMeta = ROOMS.find((item) => item.key === room) || ROOMS[0];
   const materials = MATERIALS[surface];
   const selected = materials[materialIdx] || materials[0];
