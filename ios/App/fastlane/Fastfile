@@ -1,0 +1,88 @@
+# fastlane Fastfile — InPick iOS (Capacitor)
+#
+# 사용 (다음 주 유료 등록 후):
+#   cd ios/App
+#   cp fastlane/.env.example fastlane/.env   # 값 채우기
+#   bundle install                            # 또는 brew install fastlane
+#   bundle exec fastlane beta                 # TestFlight 업로드
+#   bundle exec fastlane release              # App Store 심사 제출(메타데이터 확인 후)
+#
+# 인증: App Store Connect API Key(.p8) 방식 — 2FA 없이 자동화. (.env 에 ASC_* 설정)
+
+default_platform(:ios)
+
+WORKSPACE = "App.xcworkspace"
+SCHEME    = "App"
+
+platform :ios do
+  before_all do
+    # App Store Connect API Key 로드 (env 다 있으면)
+    if ENV["ASC_KEY_ID"].to_s.length > 0 &&
+       ENV["ASC_ISSUER_ID"].to_s.length > 0 &&
+       ENV["ASC_KEY_FILEPATH"].to_s.length > 0
+      app_store_connect_api_key(
+        key_id:        ENV["ASC_KEY_ID"],
+        issuer_id:     ENV["ASC_ISSUER_ID"],
+        key_filepath:  ENV["ASC_KEY_FILEPATH"],
+        in_house:      false
+      )
+    else
+      UI.important("⚠️  App Store Connect API Key 미설정 — fastlane/.env 채우세요 (다음 주 유료등록 후).")
+    end
+  end
+
+  desc "웹/네이티브 동기화 (repo 루트에서 npx cap sync ios)"
+  private_lane :sync_web do
+    sh("cd ../.. && npx cap sync ios")
+  end
+
+  desc "다음 빌드 번호 계산 (TestFlight 최신 + 1, 실패 시 ENV 또는 1)"
+  private_lane :next_build do
+    n = (latest_testflight_build_number(initial_build_number: 0) rescue nil)
+    n = (ENV["BUILD_NUMBER"] || "0").to_i if n.nil?
+    n + 1
+  end
+
+  desc "TestFlight 업로드 (베타 배포)"
+  lane :beta do
+    sync_web
+    bn = next_build
+    UI.message("➡️  빌드 번호: #{bn}")
+    build_app(
+      workspace:      WORKSPACE,
+      scheme:         SCHEME,
+      export_method:  "app-store",
+      # 자동 서명(Xcode 관리). team_id 는 .env(DEVELOPER_TEAM_ID)에서.
+      xcargs:         "-allowProvisioningUpdates CURRENT_PROJECT_VERSION=#{bn}",
+      output_directory: "build",
+      clean:          true
+    )
+    upload_to_testflight(
+      skip_waiting_for_build_processing: true,
+      distribute_external: false
+    )
+    UI.success("✅ TestFlight 업로드 완료 (빌드 #{bn})")
+  end
+
+  desc "App Store 제출용 빌드 업로드 (심사 자동제출은 OFF — 콘솔에서 확인 후 수동 제출 권장)"
+  lane :release do
+    sync_web
+    bn = next_build
+    build_app(
+      workspace:      WORKSPACE,
+      scheme:         SCHEME,
+      export_method:  "app-store",
+      xcargs:         "-allowProvisioningUpdates CURRENT_PROJECT_VERSION=#{bn}",
+      output_directory: "build",
+      clean:          true
+    )
+    upload_to_app_store(
+      submit_for_review: false,   # true 로 바꾸면 자동 심사제출
+      force:             true,    # HTML 미리보기 확인 생략
+      skip_screenshots:  true,    # 스크린샷은 App Store Connect 에서 관리
+      skip_metadata:     false,
+      precheck_include_in_app_purchases: false
+    )
+    UI.success("✅ App Store Connect 업로드 완료 (빌드 #{bn}) — 콘솔에서 심사 제출하세요.")
+  end
+end

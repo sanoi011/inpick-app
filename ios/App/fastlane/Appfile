@@ -1,0 +1,10 @@
+# fastlane Appfile — InPick iOS
+# 값은 ./fastlane/.env 에서 환경변수로 주입 (다음 주 유료 등록 후 채움)
+
+app_identifier("kr.inpick.app")        # 번들 ID (영구 고정)
+
+# App Store Connect API Key 인증을 쓰면 apple_id/팀ID 없이도 대부분 동작.
+# 아래는 비워둬도 됨(있으면 사용).
+apple_id(ENV["APPLE_ID"]) unless ENV["APPLE_ID"].to_s.empty?
+itc_team_id(ENV["ASC_TEAM_ID"]) unless ENV["ASC_TEAM_ID"].to_s.empty?
+team_id(ENV["DEVELOPER_TEAM_ID"]) unless ENV["DEVELOPER_TEAM_ID"].to_s.empty?
