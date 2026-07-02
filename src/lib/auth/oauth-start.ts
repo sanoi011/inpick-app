@@ -17,6 +17,14 @@ import { detectPlatform, openOAuthExternal } from "@/lib/mobile/platform";
 
 export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
 
+/**
+ * 네이티브 앱 OAuth 복귀용 딥링크.
+ * - 외부 브라우저에서 로그인 완료 후 이 스킴으로 앱에 되돌아옴 → appUrlOpen 리스너가 code 교환.
+ * - Supabase 대시보드 Auth → URL Configuration → Redirect URLs 에 이 값 등록 필요.
+ * - Android: AndroidManifest intent-filter(scheme kr.inpick.app, host auth) / iOS: Info.plist CFBundleURLTypes
+ */
+export const NATIVE_OAUTH_REDIRECT = "kr.inpick.app://auth/callback";
+
 export async function startOAuth(
   supabase: SupabaseClient,
   provider: SupabaseOAuthProvider,
@@ -28,7 +36,8 @@ export async function startOAuth(
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      redirectTo: opts.redirectTo,
+      // 네이티브: 딥링크로 복귀(appUrlOpen 리스너가 처리) / 웹·PWA: 기존 콜백 URL
+      redirectTo: isNative ? NATIVE_OAUTH_REDIRECT : opts.redirectTo,
       queryParams: opts.queryParams,
       // 네이티브: 자동 redirect 막고 우리가 외부 브라우저로 직접 오픈
       skipBrowserRedirect: isNative,
