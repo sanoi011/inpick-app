@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+import { isNativeApp } from "@/lib/mobile/platform";
 
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL || "https://www.apple.com/app-store/";
@@ -37,6 +38,9 @@ export default function StoreFloatingBadges() {
   const [hidden, setHidden] = useState(true);
 
   useEffect(() => {
+    // 네이티브 앱(iOS/Android) 안에서는 스토어 설치 배지 숨김
+    // (App Store 3.1.1 — 앱 내 외부 다운로드 유도 금지 / 앱 안에서 설치 배너는 무의미)
+    if (isNativeApp()) return;
     try {
       if (sessionStorage.getItem("inpick_store_badges_dismissed") === "1") return;
     } catch {

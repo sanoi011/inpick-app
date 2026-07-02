@@ -1,5 +1,10 @@
 # INPICK 프로젝트 컨텍스트
 
+> ⚠️ **새 세션 시작 시 먼저 읽기 — 최신 진행상황/다음작업/마이그레이션·env 체크리스트**
+> `~/Desktop/AIOD/개발/INPICK_HANDOFF_20260607.md`
+> (카카오 로그인·모바일 Capacitor·서비스/커뮤니티 메뉴·후기·자재 미리보기 P1·부분인테리어 P2·3D P3·네이버 키 분리)
+> 로컬 개발: `npm run dev`(포트 3000) · 커밋 후 `git push`로 Vercel 자동배포
+
 ## 2026-06-06 현재 로컬/운영 기준
 - **현재 macOS 경로**: `/Users/seonbonkim/Desktop/AIOD/개발/InPick/inpick-app`
 - **운영 도메인**: `https://interiorpick.co.kr`

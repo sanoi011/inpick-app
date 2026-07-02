@@ -19,3 +19,7 @@ App/fastlane/report.xml
 App/fastlane/Preview.html
 App/fastlane/test_output/
 App/vendor/bundle/
+
+# fastlane local gems
+App/vendor/bundle/
+App/.bundle/

@@ -33,7 +33,9 @@ platform :ios do
 
   desc "웹/네이티브 동기화 (repo 루트에서 npx cap sync ios)"
   private_lane :sync_web do
-    sh("cd ../.. && npx cap sync ios")
+    root = File.expand_path("../../..", __dir__)
+    # fastlane(자체 Ruby)의 gem/bundler 환경변수를 비워서 CocoaPods(pod install)가 정상 Ruby를 쓰게 함
+    sh("cd #{root} && env -u GEM_HOME -u GEM_PATH -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH -u BUNDLE_PATH -u RUBYLIB -u RUBYOPT npx cap sync ios")
   end
 
   desc "다음 빌드 번호 계산 (TestFlight 최신 + 1, 실패 시 ENV 또는 1)"
@@ -52,10 +54,14 @@ platform :ios do
       workspace:      WORKSPACE,
       scheme:         SCHEME,
       export_method:  "app-store",
-      # 자동 서명(Xcode 관리). team_id 는 .env(DEVELOPER_TEAM_ID)에서.
-      xcargs:         "-allowProvisioningUpdates CURRENT_PROJECT_VERSION=#{bn}",
       output_directory: "build",
-      clean:          true
+      clean:          true,
+      # 수동 서명 — API 키로 생성한 배포 인증서 + 'kr.inpick.app AppStore' 프로파일 사용(기기 불필요)
+      xcargs:         "CURRENT_PROJECT_VERSION=#{bn}",
+      export_options: {
+        signingStyle: "manual",
+        provisioningProfiles: { "kr.inpick.app" => "kr.inpick.app AppStore" }
+      }
     )
     upload_to_testflight(
       skip_waiting_for_build_processing: true,
@@ -72,7 +78,7 @@ platform :ios do
       workspace:      WORKSPACE,
       scheme:         SCHEME,
       export_method:  "app-store",
-      xcargs:         "-allowProvisioningUpdates CURRENT_PROJECT_VERSION=#{bn}",
+      xcargs:         "-allowProvisioningUpdates -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']} -authenticationKeyPath #{File.expand_path(ENV['ASC_KEY_FILEPATH'], File.expand_path('..', __dir__))} CURRENT_PROJECT_VERSION=#{bn}",
       output_directory: "build",
       clean:          true
     )
