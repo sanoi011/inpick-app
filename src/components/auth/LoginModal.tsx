@@ -176,6 +176,7 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
             <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
             <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
             <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
+            <OAuthBtn provider="apple" onClick={() => handleOAuth("apple")} />
           </div>
 
           <div className="relative my-4">
