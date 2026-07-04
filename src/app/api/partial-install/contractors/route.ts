@@ -69,7 +69,9 @@ export async function GET(req: NextRequest) {
       const name = stripTags(it.title ?? "");
       if (!name) continue;
       const address = it.roadAddress || it.address || "";
-      const dedupeKey = `${name}::${address}`;
+      // 상호명 기준 중복 제거 — 같은 업체가 지점 주소만 바꿔 도배하는 노출 방지
+      // (프랜차이즈는 상호에 지점명이 붙어 구분됨: "창안애 포항북구점" 등)
+      const dedupeKey = name;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
       contractors.push({
