@@ -41,7 +41,7 @@ export async function GET() {
   // 2) visible + active + effective 상품
   const { data: products, error: prodErr } = await admin
     .from("payment_products")
-    .select("code, product_type, name_ko, description_ko, amount_krw, credit_amount, bonus_credit_amount, is_popular, is_visible, sort_order, effective_from, effective_to")
+    .select("code, product_type, name_ko, description_ko, amount_krw, credit_amount, bonus_credit_amount, is_popular, is_visible, sort_order, effective_from, effective_to, app_store_product_id, google_play_product_id")
     .eq("is_active", true)
     .order("sort_order", { ascending: true });
   if (prodErr) {
@@ -61,6 +61,8 @@ export async function GET() {
     sort_order?: number;
     effective_from?: string | null;
     effective_to?: string | null;
+    app_store_product_id?: string | null;
+    google_play_product_id?: string | null;
   };
 
   const visibleProducts = ((products ?? []) as ProductRow[]).filter((p) => {
@@ -84,6 +86,9 @@ export async function GET() {
       totalTokenAmount: total > 0 ? total : null,
       effectiveUnitPriceKrw: total > 0 ? Math.round(p.amount_krw / total) : null,
       isPopular: !!p.is_popular,
+      // 네이티브 앱 IAP 매핑 (App Store / Google Play consumable product id)
+      appStoreProductId: p.app_store_product_id ?? null,
+      googlePlayProductId: p.google_play_product_id ?? null,
     };
   });
 
@@ -110,6 +115,16 @@ export async function GET() {
             imageGenerationTokenCost: activeVer.image_generation_token_cost,
             signupBonusTokens: activeVer.signup_bonus_tokens,
             pdfSinglePriceKrw: activeVer.pdf_single_price_krw,
+            // 앱 IAP 경로 — PDF 발급 토큰가 (issue-pdf-with-tokens와 동일 산식)
+            pdfTokenCost:
+              activeVer.pdf_single_price_krw && activeVer.base_token_unit_price_krw > 0
+                ? Math.max(
+                    1,
+                    Math.ceil(
+                      activeVer.pdf_single_price_krw / activeVer.base_token_unit_price_krw,
+                    ),
+                  )
+                : null,
           }
         : null,
       products: mapped,

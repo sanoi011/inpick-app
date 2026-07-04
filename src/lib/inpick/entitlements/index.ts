@@ -297,6 +297,52 @@ export async function grantEstimatePdfSingleAfterPayment(input: {
 }
 
 /**
+ * 토큰 차감으로 PDF 단건 발급 (앱 IAP 경로 — 피드백 2026-07-02 #6 "보유 토큰 우선 차감").
+ * 중복 방지: 같은 ledgerId(토큰 차감 건)에 이미 발급된 entitlement 재사용.
+ */
+export async function grantEstimatePdfSingleWithTokens(input: {
+  userId: string;
+  ledgerId: string;
+  estimateId?: string | null;
+  consumerProjectId?: string | null;
+}): Promise<{ entitlementId: string }> {
+  const admin = getAdmin();
+  if (!admin) throw new Error("service role not configured");
+
+  const { data: existing } = await admin
+    .from("user_entitlements")
+    .select("id")
+    .eq("source", "token_spend")
+    .eq("source_id", input.ledgerId)
+    .eq("entitlement_type", "estimate_pdf_single")
+    .maybeSingle();
+  if (existing) return { entitlementId: (existing as { id: string }).id };
+
+  const scopeType: "estimate" | "project" | null = input.estimateId
+    ? "estimate"
+    : input.consumerProjectId
+      ? "project"
+      : null;
+  const scopeId = input.estimateId ?? input.consumerProjectId ?? null;
+
+  const { data, error } = await admin
+    .from("user_entitlements")
+    .insert({
+      user_id: input.userId,
+      entitlement_type: "estimate_pdf_single",
+      source: "token_spend",
+      source_id: input.ledgerId,
+      scope_type: scopeType,
+      scope_id: scopeId,
+      metadata: { granted_via: "estimate_pdf_token_spend" },
+    })
+    .select("id")
+    .single();
+  if (error || !data) throw new Error(`grant failed: ${error?.message}`);
+  return { entitlementId: (data as { id: string }).id };
+}
+
+/**
  * 관리자 PDF 무제한 부여 (전역).
  */
 export async function grantPdfUnlimitedByAdmin(input: {

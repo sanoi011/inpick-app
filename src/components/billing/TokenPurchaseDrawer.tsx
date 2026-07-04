@@ -17,6 +17,8 @@
  */
 import { useEffect, useState } from "react";
 import { X, Loader2, Coins, Sparkles, AlertCircle, Star } from "lucide-react";
+import { detectPlatform, isNativeApp } from "@/lib/mobile/platform";
+import { purchaseWithIap } from "@/lib/mobile/iap";
 
 type Product = {
   productId: string;
@@ -29,6 +31,8 @@ type Product = {
   totalTokenAmount: number | null;
   effectiveUnitPriceKrw: number | null;
   isPopular: boolean;
+  appStoreProductId?: string | null;
+  googlePlayProductId?: string | null;
 };
 
 type BillingProducts = {
@@ -114,6 +118,31 @@ export function TokenPurchaseDrawer({
     setErrorMsg(null);
     setSuccessMsg(null);
     try {
+      // 네이티브 앱 — 외부 PG 금지(App Store 3.1.1) → 스토어 인앱결제 → 서버 검증·지급
+      if (isNativeApp()) {
+        const product = data?.products.find((p) => p.productId === selectedId);
+        const appProductId =
+          detectPlatform() === "ios"
+            ? product?.appStoreProductId
+            : product?.googlePlayProductId;
+        if (!product || !appProductId) {
+          setErrorMsg("앱 결제 상품이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
+          return;
+        }
+        const r = await purchaseWithIap({
+          internalCode: product.productId,
+          appProductId,
+        });
+        if (r.ok) {
+          setSuccessMsg(`충전 완료! +${r.creditsAdded ?? product.totalTokenAmount ?? 0}토큰`);
+          onProvisioned?.();
+          setTimeout(() => onOpenChange(false), 1200);
+        } else if (!r.cancelled) {
+          setErrorMsg(r.error || "인앱결제에 실패했습니다");
+        }
+        return;
+      }
+
       const res = await fetch("/api/payments/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -264,12 +293,16 @@ export function TokenPurchaseDrawer({
                 className="inline-flex items-center gap-2 px-6 py-2.5 bg-orange-500 text-white text-sm font-bold rounded-full shadow-cta hover:bg-orange-600 disabled:bg-gray-300 disabled:shadow-none"
               >
                 {purchasing && <Loader2 className="w-4 h-4 animate-spin" />}
-                {data.providerMode === "mock" ? "충전 (Mock)" : "결제하기"}
+                {isNativeApp() ? "결제하기" : data.providerMode === "mock" ? "충전 (Mock)" : "결제하기"}
               </button>
             </div>
 
             <p className="text-[11px] text-gray-400 text-center">
-              {data.providerMode === "mock"
+              {isNativeApp()
+                ? detectPlatform() === "ios"
+                  ? "App Store 인앱결제로 안전하게 충전됩니다"
+                  : "Google Play 인앱결제로 안전하게 충전됩니다"
+                : data.providerMode === "mock"
                 ? "현재 Mock 모드 — 즉시 충전됩니다 (Toss 입점 심사 중)"
                 : data.providerMode === "toss_live"
                 ? "실결제 모드 — 토스페이먼츠"
