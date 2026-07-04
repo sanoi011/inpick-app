@@ -23,3 +23,5 @@ App/vendor/bundle/
 # fastlane local gems
 App/vendor/bundle/
 App/.bundle/
+
+App/fastlane/build/

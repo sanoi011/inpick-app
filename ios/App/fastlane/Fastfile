@@ -54,7 +54,7 @@ platform :ios do
       workspace:      WORKSPACE,
       scheme:         SCHEME,
       export_method:  "app-store",
-      output_directory: "build",
+      output_directory: "fastlane/build",
       clean:          true,
       # 수동 서명 — API 키로 생성한 배포 인증서 + 'kr.inpick.app AppStore' 프로파일 사용(기기 불필요)
       xcargs:         "CURRENT_PROJECT_VERSION=#{bn}",
@@ -79,7 +79,7 @@ platform :ios do
       scheme:         SCHEME,
       export_method:  "app-store",
       xcargs:         "-allowProvisioningUpdates -authenticationKeyID #{ENV['ASC_KEY_ID']} -authenticationKeyIssuerID #{ENV['ASC_ISSUER_ID']} -authenticationKeyPath #{File.expand_path(ENV['ASC_KEY_FILEPATH'], File.expand_path('..', __dir__))} CURRENT_PROJECT_VERSION=#{bn}",
-      output_directory: "build",
+      output_directory: "fastlane/build",
       clean:          true
     )
     upload_to_app_store(
