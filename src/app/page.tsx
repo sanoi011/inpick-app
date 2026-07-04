@@ -8,6 +8,7 @@ import TestimonialsV4 from "@/components/landing-v4/TestimonialsV4";
 import FinalCtaV4 from "@/components/landing-v4/FinalCtaV4";
 import ProgressBarV4 from "@/components/landing-v4/ProgressBarV4";
 import StoreFloatingBadges from "@/components/landing-v4/StoreFloatingBadges";
+import TokenNoticeModal from "@/components/landing-v4/TokenNoticeModal";
 
 export default function Home() {
   return (
@@ -24,6 +25,7 @@ export default function Home() {
       </div>
       <FinalCtaV4 />
       <StoreFloatingBadges />
+      <TokenNoticeModal />
     </LenisProvider>
   );
 }
