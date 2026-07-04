@@ -22,6 +22,8 @@ export interface MaterialCategory {
 export interface MaterialGroup {
   key: string;
   title: string;
+  /** 지역 시공업체 검색용 공종 키워드 (네이버 지역검색 쿼리에 사용) */
+  contractorKeyword: string;
   items: MaterialCategory[];
 }
 
@@ -29,6 +31,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "bath",
     title: "욕실·화장실",
+    contractorKeyword: "욕실 리모델링",
     items: [
       { code: "toilet", name: "양변기", query: "양변기", surface: "etc", hot: true },
       { code: "bidet", name: "비데", query: "비데", surface: "etc" },
@@ -50,6 +53,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "kitchen",
     title: "주방",
+    contractorKeyword: "주방 인테리어",
     items: [
       { code: "kitchen_faucet", name: "주방수전", query: "거위목 주방수전", surface: "etc", hot: true },
       { code: "sink_bowl", name: "싱크볼", query: "사각 싱크볼", surface: "etc", hot: true },
@@ -67,6 +71,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "door",
     title: "문·철물",
+    contractorKeyword: "중문 도어",
     items: [
       { code: "door_room", name: "방문", query: "ABS 방문", surface: "etc" },
       { code: "door_mid", name: "중문", query: "중문", surface: "etc", hot: true },
@@ -82,6 +87,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "furniture",
     title: "가구·수납",
+    contractorKeyword: "가구 제작",
     items: [
       { code: "wardrobe", name: "붙박이장", query: "붙박이장", surface: "etc", hot: true },
       { code: "shoe_cabinet", name: "신발장", query: "현관 신발장", surface: "etc", hot: true },
@@ -95,6 +101,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "floor",
     title: "바닥재",
+    contractorKeyword: "바닥 마루",
     items: [
       { code: "laminate", name: "강마루", query: "강마루", surface: "floor", hot: true },
       { code: "reinforced", name: "강화마루", query: "강화마루", surface: "floor" },
@@ -110,6 +117,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "wall",
     title: "벽·천장 마감",
+    contractorKeyword: "도배 도장",
     items: [
       { code: "silk_wallpaper", name: "실크벽지", query: "실크벽지", surface: "wall", hot: true },
       { code: "combine_wallpaper", name: "합지벽지", query: "합지벽지", surface: "wall" },
@@ -125,6 +133,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "electric",
     title: "전기·조명",
+    contractorKeyword: "전기 조명",
     items: [
       { code: "switch", name: "스위치", query: "매입 스위치", surface: "etc" },
       { code: "outlet", name: "콘센트", query: "매입 콘센트", surface: "etc" },
@@ -140,6 +149,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "window",
     title: "창호·차양",
+    contractorKeyword: "샷시 창호",
     items: [
       { code: "window_frame", name: "창호(샷시)", query: "이중창 샷시", surface: "etc" },
       { code: "blind", name: "블라인드", query: "맞춤 블라인드", surface: "etc", hot: true },
@@ -152,6 +162,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "plumbing",
     title: "설비·난방",
+    contractorKeyword: "설비 배관",
     items: [
       { code: "boiler", name: "보일러", query: "가정용 보일러", surface: "etc" },
       { code: "manifold", name: "온수분배기", query: "온수분배기", surface: "etc" },
@@ -163,6 +174,7 @@ export const MATERIAL_GROUPS: MaterialGroup[] = [
   {
     key: "repair",
     title: "보수·유지관리",
+    contractorKeyword: "집수리",
     items: [
       { code: "silicone_redo", name: "곰팡이·실리콘 재시공", query: "욕실 실리콘 재시공", surface: "etc" },
       { code: "drain_clog", name: "배수 막힘", query: "배수구 뚫음 청소", surface: "etc" },

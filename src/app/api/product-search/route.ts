@@ -90,21 +90,22 @@ async function fetchNaver(
   query: string,
   display: number,
   sort: string,
-): Promise<ProductResult[] | null> {
+  start: number,
+): Promise<{ products: ProductResult[]; total: number } | null> {
   const id = process.env.NAVER_SEARCH_CLIENT_ID || process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_SEARCH_CLIENT_SECRET || process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return null;
   try {
     const apiUrl = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(
       query
-    )}&display=${display}&sort=${sort}&exclude=used:rental:cbshop`;
+    )}&display=${display}&sort=${sort}&start=${start}&exclude=used:rental:cbshop`;
     const res = await fetch(apiUrl, {
       headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret },
       next: { revalidate: 60 * 60 * 12 },
     });
     if (!res.ok) throw new Error(`shop api ${res.status}`);
     const data = await res.json();
-    return (data.items ?? [])
+    const products = (data.items ?? [])
       .filter((it: { lprice?: string; image?: string }) => Number(it.lprice) > 0 && it.image)
       .map((it: Record<string, string>) => ({
         productId: it.productId ?? it.link,
@@ -116,6 +117,7 @@ async function fetchNaver(
         brand: it.brand || it.maker || undefined,
         source: "naver" as const,
       }));
+    return { products, total: Number(data.total ?? products.length) };
   } catch (err) {
     console.error("[product-search] naver fallback to mock:", err);
     return null;
@@ -124,19 +126,27 @@ async function fetchNaver(
 
 export async function GET(req: NextRequest) {
   const query = (req.nextUrl.searchParams.get("query") ?? "").trim();
-  // 네이버 쇼핑 API 최대 100건 — 기본 40건으로 충분한 상품 폭 확보
-  const display = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get("display") ?? 40)));
-  // sim=관련도(기본, 액세서리·저가부속 도배 방지) | asc=최저가 | dsc=최고가 | date=최신
-  const sortParam = req.nextUrl.searchParams.get("sort") ?? "sim";
-  const sort = ["sim", "asc", "dsc", "date"].includes(sortParam) ? sortParam : "sim";
+  // NaN 가드 — 비숫자 파라미터가 네이버 API 400 → mock 폴백으로 이어지는 것 방지
+  const toInt = (raw: string | null, fallback: number) => {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : fallback;
+  };
+  // 기본값은 레거시 호출처(MaterialShopDrawer 등) 호환 유지 — 확장은 파라미터 명시 시에만
+  const display = Math.min(100, Math.max(1, toInt(req.nextUrl.searchParams.get("display"), 12)));
+  // asc=최저가(레거시 기본) | sim=관련도 | dsc=최고가 | date=최신
+  const sortParam = req.nextUrl.searchParams.get("sort") ?? "asc";
+  const sort = ["sim", "asc", "dsc", "date"].includes(sortParam) ? sortParam : "asc";
+  // 페이지네이션 — 네이버 start 최대 1000
+  const start = Math.min(1000, Math.max(1, toInt(req.nextUrl.searchParams.get("start"), 1)));
   if (!query) return NextResponse.json({ products: [], source: "empty" });
 
   const [internal, naver] = await Promise.all([
-    fetchInternal(query, 4),
-    fetchNaver(query, display, sort),
+    // 내부 카탈로그는 첫 페이지에만 병합 (더보기 시 중복 방지)
+    start === 1 ? fetchInternal(query, 4) : Promise.resolve([]),
+    fetchNaver(query, display, sort, start),
   ]);
 
-  const shop = naver ?? mockProducts(query).slice(0, display);
+  const shop = naver?.products ?? mockProducts(query).slice(0, display);
   // 내부 카탈로그 우선 + 쇼핑몰, 중복(동일 링크) 제거
   const seen = new Set<string>();
   const products = [...internal, ...shop].filter((p) => {
@@ -147,5 +157,12 @@ export async function GET(req: NextRequest) {
   });
 
   const source = naver ? (internal.length ? "internal+naver" : "naver") : internal.length ? "internal+mock" : "mock";
-  return NextResponse.json({ products, source, internalCount: internal.length });
+  return NextResponse.json({
+    products,
+    source,
+    internalCount: internal.length,
+    total: naver?.total ?? products.length,
+    start,
+    display,
+  });
 }

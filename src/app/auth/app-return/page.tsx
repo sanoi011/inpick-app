@@ -12,24 +12,26 @@
  * Supabase 대시보드 Auth → URL Configuration → Redirect URLs에
  * https://www.interiorpick.co.kr/auth/app-return 등록 필요.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, ArrowRight, AlertCircle } from "lucide-react";
-
-const DEEP_LINK_BASE = "kr.inpick.app://auth/callback";
+import { NATIVE_OAUTH_REDIRECT } from "@/lib/auth/oauth-start";
 
 function buildDeepLink(): { link: string; hasPayload: boolean; errorDesc: string | null } {
-  if (typeof window === "undefined") return { link: DEEP_LINK_BASE, hasPayload: false, errorDesc: null };
+  if (typeof window === "undefined") {
+    return { link: NATIVE_OAUTH_REDIRECT, hasPayload: false, errorDesc: null };
+  }
   const search = window.location.search || "";
   const hash = window.location.hash || "";
   const qs = new URLSearchParams(search);
-  const errorDesc = qs.get("error_description");
+  // error_description 없이 error 코드만 오는 케이스(동의 거부 등)도 에러로 처리
+  const errorDesc = qs.get("error_description") || (qs.get("error") ? `로그인이 완료되지 않았습니다 (${qs.get("error")})` : null);
   const hasPayload = !!(qs.get("code") || hash.includes("access_token") || qs.get("error"));
-  return { link: `${DEEP_LINK_BASE}${search}${hash}`, hasPayload, errorDesc };
+  return { link: `${NATIVE_OAUTH_REDIRECT}${search}${hash}`, hasPayload, errorDesc };
 }
 
 export default function AppReturnPage() {
   const [{ link, hasPayload, errorDesc }, setState] = useState(() => ({
-    link: DEEP_LINK_BASE,
+    link: NATIVE_OAUTH_REDIRECT,
     hasPayload: true,
     errorDesc: null as string | null,
   }));
@@ -48,9 +50,9 @@ export default function AppReturnPage() {
     setAttempted(true);
   }, []);
 
-  const openApp = useMemo(() => () => {
+  const openApp = () => {
     window.location.href = link;
-  }, [link]);
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-b from-primary-50/60 to-white px-6">

@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import type { LocalContractor } from "@/types/partial-install";
 import {
   calcPartialEstimate,
   surfaceUnitLabel,
@@ -54,29 +55,22 @@ type ProductResult = {
   source?: "internal" | "naver" | "mock";
 };
 
-type LocalContractor = {
-  id: string;
-  name: string;
-  category: string;
-  address: string;
-  telephone: string | null;
-  homepage: string | null;
-  naverMapUrl: string;
+type ProductSort = "sim" | "asc" | "dsc";
+const PAGE_SIZE = 40;
+const SORT_LABELS: Record<ProductSort, string> = {
+  sim: "관련도순",
+  asc: "낮은 가격순",
+  dsc: "높은 가격순",
 };
+// 가격대 필터 (클라이언트 사이드)
+const PRICE_BANDS: Array<{ label: string; min: number; max: number | null }> = [
+  { label: "전체", min: 0, max: null },
+  { label: "5만원 이하", min: 0, max: 50_000 },
+  { label: "5~20만원", min: 50_000, max: 200_000 },
+  { label: "20~50만원", min: 200_000, max: 500_000 },
+  { label: "50만원 이상", min: 500_000, max: null },
+];
 
-// 그룹 키 → 업체 검색 공종 키워드 (네이버 지역검색용)
-const GROUP_CONTRACTOR_KEYWORD: Record<string, string> = {
-  bath: "욕실 리모델링",
-  kitchen: "주방 인테리어",
-  door: "중문 도어",
-  furniture: "가구 제작",
-  floor: "바닥 마루",
-  wall: "도배 도장",
-  electric: "전기 조명",
-  window: "샷시 창호",
-  plumbing: "설비 배관",
-  repair: "집수리",
-};
 
 // 그룹 키 → 아이콘
 const GROUP_ICONS: Record<string, typeof Bath> = {
@@ -108,36 +102,102 @@ export default function PartialInstallPage() {
     [activeGroupKey]
   );
 
-  const searchProducts = async (q: string, surface?: PartialSurface) => {
+  const [sort, setSort] = useState<ProductSort>("sim");
+  const [bandIdx, setBandIdx] = useState(0);
+  const [naverTotal, setNaverTotal] = useState<number | null>(null);
+  const [nextStart, setNextStart] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  // 최신 요청 식별자 — 정렬 연타 등으로 늦게 도착한 이전 응답이 최신 결과를 덮어쓰는 것 방지
+  const productReqSeq = useRef(0);
+
+  const fetchProductPage = async (term: string, sortKey: ProductSort, start: number) => {
+    const res = await fetch(
+      `/api/product-search?query=${encodeURIComponent(term)}&display=${PAGE_SIZE}&sort=${sortKey}&start=${start}`
+    );
+    return res.json();
+  };
+
+  const searchProducts = async (q: string, surface?: PartialSurface, sortKey: ProductSort = sort) => {
     const term = q.trim();
     if (!term) return;
+    const seq = ++productReqSeq.current;
     setActiveQuery(term);
     setSurfaceOverride(surface ?? null);
     setSearching(true);
+    setBandIdx(0);
     try {
-      const res = await fetch(`/api/product-search?query=${encodeURIComponent(term)}&display=40`);
-      const data = await res.json();
+      const data = await fetchProductPage(term, sortKey, 1);
+      if (seq !== productReqSeq.current) return; // 더 최신 요청이 있음 — 이 응답 폐기
       setProducts(data.products ?? []);
+      setNaverTotal(typeof data.total === "number" ? data.total : null);
+      setNextStart(1 + PAGE_SIZE);
     } catch {
+      if (seq !== productReqSeq.current) return;
       setProducts([]);
+      setNaverTotal(null);
     } finally {
-      setSearching(false);
+      if (seq === productReqSeq.current) setSearching(false);
     }
     if (typeof document !== "undefined") {
       document.getElementById("product-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
+  const changeSort = (s: ProductSort) => {
+    setSort(s);
+    if (activeQuery) void searchProducts(activeQuery, surfaceOverride ?? undefined, s);
+  };
+
+  const canLoadMore =
+    products.length > 0 &&
+    nextStart <= 1000 &&
+    (naverTotal == null || nextStart <= naverTotal);
+
+  const loadMore = async () => {
+    if (!activeQuery || loadingMore || !canLoadMore) return;
+    const seq = productReqSeq.current;
+    setLoadingMore(true);
+    try {
+      const data = await fetchProductPage(activeQuery, sort, nextStart);
+      if (seq !== productReqSeq.current) return; // 사이에 새 검색이 시작됨 — 폐기
+      const seen = new Set(products.map((p) => p.productId));
+      const fresh = ((data.products ?? []) as ProductResult[]).filter((p) => !seen.has(p.productId));
+      setProducts((prev) => [...prev, ...fresh]);
+      setNextStart(nextStart + PAGE_SIZE);
+    } catch {
+      /* 더보기 실패는 조용히 — 기존 결과 유지 */
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  const visibleProducts = useMemo(() => {
+    if (bandIdx === 0) return products;
+    const band = PRICE_BANDS[bandIdx];
+    return products.filter((p) => p.price >= band.min && (band.max == null || p.price < band.max));
+  }, [products, bandIdx]);
+
   // 네이버 지역검색 기반 실제 설치업체 검색
   const [contractors, setContractors] = useState<LocalContractor[]>([]);
   const [contractorLoading, setContractorLoading] = useState(false);
   const [contractorSearched, setContractorSearched] = useState(false);
+  // region+공종이 같으면 재호출 스킵 (자동 로드가 상품 검색마다 네이버 4쿼리 낭비하는 것 방지)
+  const lastContractorKey = useRef<string | null>(null);
 
-  const searchContractors = async (opts?: { scroll?: boolean }) => {
+  const searchContractors = async (opts?: { scroll?: boolean; force?: boolean }) => {
+    const keyword = activeGroup?.contractorKeyword ?? "인테리어";
+    const key = `${region.trim()}::${keyword}`;
+    const shouldScroll = opts?.scroll !== false;
+    if (!opts?.force && lastContractorKey.current === key && contractors.length > 0) {
+      if (shouldScroll && typeof document !== "undefined") {
+        document.getElementById("contractor-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+      return;
+    }
+    lastContractorKey.current = key;
     setContractorLoading(true);
     setContractorSearched(true);
     try {
-      const keyword = GROUP_CONTRACTOR_KEYWORD[activeGroupKey] ?? "인테리어";
       const res = await fetch(
         `/api/partial-install/contractors?region=${encodeURIComponent(region)}&keyword=${encodeURIComponent(keyword)}`
       );
@@ -148,7 +208,7 @@ export default function PartialInstallPage() {
     } finally {
       setContractorLoading(false);
     }
-    if (opts?.scroll !== false && typeof document !== "undefined") {
+    if (shouldScroll && typeof document !== "undefined") {
       document.getElementById("contractor-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
@@ -417,22 +477,70 @@ export default function PartialInstallPage() {
                 <p className="text-xs font-bold uppercase tracking-widest text-primary-600">상품 검색 · 실구매</p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight">
                   {activeQuery ? `‘${activeQuery}’ 추천 상품` : "추천 상품"}
+                  {naverTotal != null && naverTotal > 0 && (
+                    <span className="ml-2 align-middle text-sm font-bold text-zinc-400">
+                      네이버쇼핑 {naverTotal.toLocaleString()}개
+                    </span>
+                  )}
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">사진·가격·쇼핑몰을 비교하고, 카드를 누르면 해당 쇼핑몰에서 바로 구매할 수 있어요.</p>
               </div>
+              <label className="hidden shrink-0 items-center gap-2 text-xs font-bold text-zinc-500 sm:inline-flex">
+                정렬
+                <select
+                  value={sort}
+                  onChange={(e) => changeSort(e.target.value as ProductSort)}
+                  className="h-9 border border-zinc-300 bg-white px-2 text-sm font-bold text-zinc-800 outline-none focus:border-primary-500"
+                >
+                  {(Object.keys(SORT_LABELS) as ProductSort[]).map((s) => (
+                    <option key={s} value={s}>{SORT_LABELS[s]}</option>
+                  ))}
+                </select>
+              </label>
             </div>
+
+            {/* 가격대 필터 + 모바일 정렬 */}
+            {products.length > 0 && !searching && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {PRICE_BANDS.map((b, i) => (
+                  <button
+                    key={b.label}
+                    type="button"
+                    onClick={() => setBandIdx(i)}
+                    className={`border px-3 py-1.5 text-xs font-bold transition ${
+                      bandIdx === i
+                        ? "border-primary-500 bg-primary-500 text-white"
+                        : "border-zinc-200 bg-white text-zinc-600 hover:border-primary-300"
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+                <select
+                  value={sort}
+                  onChange={(e) => changeSort(e.target.value as ProductSort)}
+                  className="ml-auto h-8 border border-zinc-300 bg-white px-2 text-xs font-bold text-zinc-700 outline-none focus:border-primary-500 sm:hidden"
+                >
+                  {(Object.keys(SORT_LABELS) as ProductSort[]).map((s) => (
+                    <option key={s} value={s}>{SORT_LABELS[s]}</option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {searching ? (
               <div className="flex items-center justify-center py-20 text-zinc-400">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : products.length === 0 ? (
+            ) : visibleProducts.length === 0 ? (
               <div className="mt-6 border border-dashed border-zinc-300 py-16 text-center text-sm text-zinc-400">
-                검색 결과가 없습니다. 다른 검색어로 시도해보세요.
+                {products.length > 0
+                  ? "이 가격대에 해당하는 상품이 없어요. 다른 가격대를 선택해보세요."
+                  : "검색 결과가 없습니다. 다른 검색어로 시도해보세요."}
               </div>
             ) : (
               <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-                {products.map((p) => (
+                {visibleProducts.map((p) => (
                   <a
                     key={p.productId}
                     href={p.link}
@@ -484,6 +592,26 @@ export default function PartialInstallPage() {
                     </div>
                   </a>
                 ))}
+              </div>
+            )}
+
+            {/* 더보기 — 네이버쇼핑 페이지네이션 (가격대 필터에 걸린 상품이 없어도 다음 페이지 로드 가능) */}
+            {!searching && canLoadMore && products.length > 0 && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  type="button"
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="inline-flex items-center gap-2 border border-zinc-300 bg-white px-6 py-3 text-sm font-black text-zinc-700 transition hover:border-primary-400 hover:text-primary-600 disabled:opacity-60"
+                >
+                  {loadingMore ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShoppingBag className="h-4 w-4" />}
+                  상품 더보기
+                  <span className="text-xs font-bold text-zinc-400">
+                    {bandIdx === 0
+                      ? `${products.length}개 불러옴`
+                      : `${visibleProducts.length}개 표시 / ${products.length}개 불러옴`}
+                  </span>
+                </button>
               </div>
             )}
 
@@ -612,7 +740,7 @@ export default function PartialInstallPage() {
               <div>
                 <p className="text-xs font-bold uppercase tracking-widest text-primary-600">설치업체 · 네이버 검색</p>
                 <h2 className="mt-1 text-2xl font-black tracking-tight">
-                  {region} {GROUP_CONTRACTOR_KEYWORD[activeGroupKey] ?? "인테리어"} 시공업체
+                  {region} {activeGroup?.contractorKeyword ?? "인테리어"} 시공업체
                 </h2>
                 <p className="mt-1 text-sm text-zinc-500">
                   네이버에 등록된 실제 사업장입니다. 카드를 누르면 네이버 지도에서 리뷰·사진·연락처를 확인할 수 있어요.
@@ -620,7 +748,7 @@ export default function PartialInstallPage() {
               </div>
               <button
                 type="button"
-                onClick={() => searchContractors({ scroll: false })}
+                onClick={() => searchContractors({ scroll: false, force: true })}
                 className="hidden shrink-0 items-center gap-1.5 border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:border-primary-400 sm:inline-flex"
               >
                 <Search className="h-3.5 w-3.5" />
@@ -686,17 +814,49 @@ export default function PartialInstallPage() {
       )}
 
       <section className="bg-white">
-        <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
-          <div className="grid gap-4 md:grid-cols-3">
-            {[
-              ["1", "자재·기구 선택", "전 카테고리에서 교체할 자재를 고릅니다."],
-              ["2", "실구매 상품 비교", "사진·가격·쇼핑몰을 비교하고 바로 구매합니다."],
-              ["3", "근처 시공 연결", "지역 기반 설치 파트너에게 부분 시공 상담을 보냅니다."],
-            ].map(([step, title, desc]) => (
-              <div key={step} className="border border-zinc-200 p-5">
-                <span className="text-xs font-black text-primary-600">STEP {step}</span>
-                <h3 className="mt-2 text-lg font-black">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-zinc-600">{desc}</p>
+        <div className="mx-auto max-w-7xl px-5 py-12 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-widest text-zinc-400">진행 과정</p>
+          <h2 className="mt-1 text-2xl font-black tracking-tight">상담부터 시공 완료까지, 이렇게 진행돼요</h2>
+          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            {(
+              [
+                { step: "01", title: "자재 선택·상담 접수", desc: "자재를 고르고 예상 견적과 함께 설치 요청을 보냅니다.", icon: Search },
+                { step: "02", title: "업체 연락·현장 확인", desc: "지역 시공업체가 연락해 현장 상황과 일정을 확인합니다.", icon: Phone },
+                { step: "03", title: "견적 확정", desc: "실측 결과를 반영해 자재비+시공비 최종 견적을 확정합니다.", icon: CheckCircle2 },
+                { step: "04", title: "시공 진행", desc: "확정된 일정에 맞춰 시공을 진행합니다.", icon: Hammer },
+                { step: "05", title: "완료 확인", desc: "결과를 직접 확인하고 마무리합니다.", icon: Sparkles },
+              ] satisfies Array<{ step: string; title: string; desc: string; icon: typeof Search }>
+            ).map(({ step, title, desc, icon: Icon }) => (
+              <div key={step} className="relative border border-zinc-200 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <span className="flex h-9 w-9 items-center justify-center bg-primary-50 text-primary-600">
+                    <Icon className="h-4 w-4" />
+                  </span>
+                  <span className="text-xl font-black text-zinc-200">{step}</span>
+                </div>
+                <h3 className="mt-3 text-[15px] font-black leading-tight">{title}</h3>
+                <p className="mt-1.5 text-[13px] leading-5 text-zinc-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* 신뢰 포인트 — 전부 실데이터 기반 */}
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {(
+              [
+                { title: "실시간 가격 비교", desc: "네이버쇼핑 전체 상품에서 사진·가격·판매처를 실시간으로 비교합니다.", icon: ShoppingBag },
+                { title: "표준품셈 기반 예상 견적", desc: "재료비·노무비·경비를 표준품셈 기준으로 계산해 시공 전 예산을 잡아드립니다.", icon: Layers },
+                { title: "실제 사업장 연결", desc: "네이버에 등록된 지역 실사업장 정보로 연결합니다. 리뷰와 연락처를 직접 확인하세요.", icon: Building2 },
+              ] satisfies Array<{ title: string; desc: string; icon: typeof Search }>
+            ).map(({ title, desc, icon: Icon }) => (
+              <div key={title} className="flex items-start gap-3 border border-zinc-200 bg-zinc-50 p-4">
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-white text-primary-600 border border-zinc-200">
+                  <Icon className="h-4 w-4" />
+                </span>
+                <div>
+                  <h3 className="text-sm font-black">{title}</h3>
+                  <p className="mt-1 text-[13px] leading-5 text-zinc-500">{desc}</p>
+                </div>
               </div>
             ))}
           </div>

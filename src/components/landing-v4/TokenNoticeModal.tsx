@@ -44,7 +44,8 @@ export default function TokenNoticeModal() {
 
   useEffect(() => {
     // 앱(WebView) 안에서는 절대 미표시 — Capacitor 감지 + WebView UA 이중 차단
-    if (isNativeApp() || isProbablyEmbeddedWebView()) return;
+    const hiddenInApp = () => isNativeApp() || isProbablyEmbeddedWebView();
+    if (hiddenInApp()) return;
     try {
       if (sessionStorage.getItem(SESSION_KEY) === "1") return;
       const hideUntil = Number(localStorage.getItem(HIDE_UNTIL_KEY) || 0);
@@ -54,7 +55,7 @@ export default function TokenNoticeModal() {
     }
     // 첫 페인트 직후 잠깐 여유를 두고 표시 — Capacitor 주입이 늦는 케이스 대비 표시 직전 재확인
     const t = setTimeout(() => {
-      if (isNativeApp() || isProbablyEmbeddedWebView()) return;
+      if (hiddenInApp()) return;
       setOpen(true);
     }, 600);
     return () => clearTimeout(t);

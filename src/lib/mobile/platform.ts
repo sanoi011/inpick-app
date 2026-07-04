@@ -59,7 +59,10 @@ export function isProbablyEmbeddedWebView(): boolean {
   if (typeof window === "undefined") return false;
   if ((window as unknown as { Capacitor?: unknown }).Capacitor) return true;
   const ua = navigator.userAgent;
-  // iOS WKWebView(앱 내 브라우저 포함)는 UA에 Safari 토큰이 없음
+  // 카카오톡·네이버·인스타 등 서드파티 인앱 브라우저는 '웹 방문자'다 —
+  // 설치 배지/공지를 보여줘야 하므로 억제 대상에서 제외 (우리 Capacitor 앱 UA엔 이 마커가 없음)
+  if (/KAKAOTALK|NAVER\(|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps/i.test(ua)) return false;
+  // iOS WKWebView(우리 앱 셸)는 UA에 Safari 토큰이 없음
   if (/iPhone|iPad|iPod/.test(ua) && !/Safari\//i.test(ua)) return true;
   // Android System WebView 마커
   if (/Android/.test(ua) && /; wv\)/.test(ua)) return true;
