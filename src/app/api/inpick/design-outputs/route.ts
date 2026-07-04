@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { extractMaterialHintsFromPrompt } from "@/lib/inpick/estimate-context/prompt-hints";
+import { runVisionAnalysisForOutput } from "@/lib/inpick/estimate-context/vision-analysis-runner";
 import {
   mapDbDesignOutput,
   type DesignOutput,
@@ -26,6 +27,8 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// 자재 분석을 응답 전에 완료해야 하므로 분석 시간만큼 함수 수명 필요
+export const maxDuration = 300;
 
 function getAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -159,169 +162,19 @@ export async function POST(req: NextRequest) {
 
   const output: DesignOutput = mapDbDesignOutput(data);
 
-  // P3: 자재 정밀 분석 자동 백그라운드 시작 (fire-and-forget).
-  //   - 즉시 status=analysis_pending으로 마킹
-  //   - 별도 비동기로 vision-materials/analyze 호출 → 완료 시 PATCH로 design_output 갱신
-  //   - 실패 시 status=analysis_failed로 마킹, 견적은 그래도 생성 가능
-  //   - await 안 함 — POST 응답은 즉시 반환
-  void startVisionAnalysisInBackground(admin, output, req).catch((e) =>
-    console.warn("[design-outputs] background analyze failed (non-fatal):", e),
-  );
+  // P3: 자재 정밀 분석 — 응답 전에 완료까지 대기.
+  //   Vercel 서버리스는 응답 반환 직후 함수가 동결되므로 fire-and-forget으로 돌리면
+  //   분석이 중간에 죽어 analysis_pending에 영구히 멈춤 (TestFlight 피드백 2026-07-02).
+  //   클라이언트(saveDesignOutputAfterRender)는 이 POST를 void로 호출하므로 대기해도 UX 지연 없음.
+  //   실패해도 저장 성공 응답은 유지 (runner 내부에서 analysis_failed 마킹).
+  await runVisionAnalysisForOutput({
+    admin,
+    output,
+    origin: req.nextUrl.origin,
+    cookie: req.headers.get("cookie") ?? "",
+  });
 
   return NextResponse.json({ output }, { status: 201 });
-}
-
-/**
- * 백그라운드 자재 정밀 분석 시작.
- *
- * 흐름:
- *   1. status=analysis_pending 마킹
- *   2. vision-materials/analyze 호출 (서버-내부 호출)
- *   3. 결과 surfaces → MaterialHint 변환 + status=analysis_done PATCH
- *   4. 실패 시 status=analysis_failed + analysis_error PATCH
- *
- * 어느 단계에서 실패해도 throw 하지 않음 — design_output 저장 성공을 절대 막지 않음.
- */
-async function startVisionAnalysisInBackground(
-  admin: NonNullable<ReturnType<typeof getAdmin>>,
-  output: DesignOutput,
-  req: NextRequest,
-): Promise<void> {
-  // Step 1: pending 마킹
-  await admin
-    .from("design_outputs")
-    .update({ status: "analysis_pending" })
-    .eq("id", output.id);
-
-  try {
-    const origin = req.nextUrl.origin;
-    // Step 2: vision-materials/analyze 호출
-    //   - projectId는 design_outputs.project_id 사용
-    //   - sourceImageKind는 render_kind에 따라 결정 (apt/photo render는 ai_render)
-    const targetSurfaceTypes = inferTargetSurfaceTypes(output);
-    const analyzeRes = await fetch(`${origin}/api/inpick/vision-materials/analyze`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        // 서버 내부 호출 — 인증 쿠키 그대로 전달 (RLS 통과)
-        Cookie: req.headers.get("cookie") ?? "",
-      },
-      body: JSON.stringify({
-        projectId: output.projectId,
-        roomId: output.targetId,
-        roomName: output.targetName,
-        imageUrl: output.imageUrl,
-        sourceImageKind: "ai_render",
-        targetSurfaceTypes,
-        maxCandidates: 5,
-      }),
-    });
-
-    if (!analyzeRes.ok) {
-      const errText = await analyzeRes.text().catch(() => "");
-      throw new Error(`analyze ${analyzeRes.status}: ${errText.slice(0, 200)}`);
-    }
-
-    const analyzeData = (await analyzeRes.json()) as {
-      surfaces?: Array<{
-        observation?: {
-          surfaceType?: string;
-        };
-        candidates?: Array<{
-          materialProductId?: string;
-          brand?: string;
-          productName?: string;
-          sku?: string;
-          confidence?: number;
-        }>;
-        recommendation?: {
-          status?: string;
-          confidence?: number;
-        };
-      }>;
-    };
-
-    // Step 3: 결과 → MaterialHint 변환 (기존 prompt hint와 병합)
-    const visionHints: MaterialHint[] = [];
-    for (const surface of analyzeData.surfaces ?? []) {
-      const top = surface.candidates?.[0];
-      if (!top || !top.materialProductId) continue;
-      const status = surface.recommendation?.status;
-      if (status === "fallback" || status === "rejected") continue;
-      visionHints.push({
-        surfaceType: mapSurfaceTypeForHint(surface.observation?.surfaceType),
-        materialCategory: surface.observation?.surfaceType ?? "unknown",
-        materialNameKo: top.productName,
-        brand: top.brand,
-        sku: top.sku,
-        confidence: surface.recommendation?.confidence ?? top.confidence ?? 0.5,
-        source: "vision_analysis",
-        assumptions: status === "confirmed" ? ["vision 분석 confirmed"] : [],
-      });
-    }
-
-    // 기존 prompt-extract hint와 vision hint 병합 (vision 우선)
-    const seen = new Set<string>();
-    const mergedHints: MaterialHint[] = [];
-    for (const h of [...visionHints, ...(output.materialHints ?? [])]) {
-      const key = `${h.surfaceType}::${h.materialCategory}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      mergedHints.push(h);
-    }
-
-    await admin
-      .from("design_outputs")
-      .update({
-        status: "analysis_done",
-        material_hints: mergedHints,
-      })
-      .eq("id", output.id);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.warn(`[design-outputs] vision analyze failed for ${output.id}:`, msg);
-    await admin
-      .from("design_outputs")
-      .update({
-        status: "analysis_failed",
-        analysis_error: msg.slice(0, 500),
-      })
-      .eq("id", output.id);
-  }
-}
-
-function inferTargetSurfaceTypes(output: DesignOutput): string[] {
-  // surface_render는 좁게, room_render는 floor/wall/ceiling 기본,
-  // commercial zone은 counter/signage 등 추가
-  if (output.renderKind === "surface_render") return ["floor", "wall", "ceiling", "tile"];
-  if (output.projectMode === "commercial") {
-    return ["floor", "wall", "ceiling", "counter", "signage", "partition"];
-  }
-  return ["floor", "wall", "ceiling"];
-}
-
-function mapSurfaceTypeForHint(t?: string): MaterialHint["surfaceType"] {
-  switch (t) {
-    case "floor":
-      return "floor";
-    case "wall":
-      return "wall";
-    case "ceiling":
-      return "ceiling";
-    case "door":
-      return "door";
-    case "window":
-      return "window";
-    case "cabinet":
-    case "countertop":
-      return "counter";
-    case "lighting":
-      return "lighting";
-    case "tile":
-      return "wall"; // tile은 surface가 wall이거나 floor — 기본 wall
-    default:
-      return "unknown";
-  }
 }
 
 export async function GET(req: NextRequest) {

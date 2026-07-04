@@ -461,7 +461,8 @@ function EstimatePage() {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let ticks = 0;
-    const MAX_ANALYSIS_TICKS = 15; // 약 60초 (4초 × 15) — 무한 '진행 중' 방지
+    let reanalyzeRequested = false;
+    const MAX_ANALYSIS_TICKS = 45; // 약 3분 (4초 × 45) — 재분석 시간 포함, 무한 '진행 중' 방지
 
     const tick = async () => {
       const outputs = await fetchDesignOutputs(projectId);
@@ -475,6 +476,15 @@ function EstimatePage() {
         if (o.status === "analysis_pending" || o.status === "generated") counts.pending++;
         else if (o.status === "analysis_done") counts.done++;
         else if (o.status === "analysis_failed") counts.failed++;
+      }
+      // 멈춘 분석(analysis_pending 영구 정체·실패) 자동 재실행 — 페이지 진입당 1회
+      if ((counts.pending > 0 || counts.failed > 0) && !reanalyzeRequested) {
+        reanalyzeRequested = true;
+        void fetch("/api/inpick/design-outputs/reanalyze", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ projectId }),
+        }).catch(() => {});
       }
       ticks++;
       // 일정 시간 내 정밀 분석이 끝나지 않으면 남은 항목을 표준값으로 확정(폴링 종료).
@@ -493,8 +503,10 @@ function EstimatePage() {
           status: o.status,
         })),
       );
-      // pending이 남아있으면 4초 후 재조회
-      if (counts.pending > 0 && !stopped) {
+      // pending(또는 재분석 중인 실패 건)이 남아있으면 4초 후 재조회
+      const stillWorking =
+        counts.pending > 0 || (reanalyzeRequested && counts.failed > 0 && ticks < MAX_ANALYSIS_TICKS);
+      if (stillWorking && !stopped) {
         timer = setTimeout(() => void tick(), 4000);
       }
     };
@@ -1315,14 +1327,14 @@ function EstimatePage() {
               <h1 className="mt-1 text-[2.4rem] lg:text-[3rem] font-extrabold tracking-tightest text-primary-900 leading-none">
                 견적서
               </h1>
-              <div className="mt-4 inline-flex items-center gap-3 rounded-xl border border-primary-100 bg-white px-4 py-2.5">
-                <span className="text-sm font-semibold text-primary-900/70">
+              <div className="mt-4 inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-primary-100 bg-white px-4 py-2.5 max-w-full">
+                <span className="text-sm font-semibold text-primary-900/70 break-keep">
                   {step1?.basicInfo.selectedAddress?.buildingName || "선택한 공간"}
                 </span>
-                <span className="text-[2rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
+                <span className="inline-flex items-center gap-1.5 text-[1.6rem] sm:text-[2rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
                   ₩ {finalTotal.toLocaleString()}
+                  <ChevronDown className="h-3.5 w-3.5 text-primary-900/40" />
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-primary-900/40" />
               </div>
               {step1 && (
                 <div className="mt-3 flex flex-wrap gap-2 text-[0.78rem] text-primary-900/60">

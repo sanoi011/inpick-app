@@ -16,7 +16,8 @@
  */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Hexagon, Loader2, Wand2, Sparkles, X, Edit3, Check, Crosshair, Grid3x3 } from "lucide-react";
 import type { RenderItem } from "./Step2Designer";
@@ -556,6 +557,16 @@ export default function MaterialEditor({
   );
 }
 
+/**
+ * fixed 모달을 document.body로 포털.
+ * 조상에 transform(framer-motion 애니메이션 등)이 있으면 fixed 기준이 뷰포트가 아니라
+ * 그 조상이 되어 모바일에서 팝업이 화면 밖으로 이탈함 (TestFlight 피드백 2026-07-02).
+ */
+function ModalPortal({ children }: { children: ReactNode }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(children, document.body);
+}
+
 // ──────────────── SAM 클릭 후 카테고리 + 자재 선택 모달 ────────────────
 function SamCategoryMaterialModal({
   onClose,
@@ -591,7 +602,7 @@ function SamCategoryMaterialModal({
   }, [category]);
 
   return (
-    <>
+    <ModalPortal>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -717,7 +728,7 @@ function SamCategoryMaterialModal({
           </button>
         </div>
       </motion.div>
-    </>
+    </ModalPortal>
   );
 }
 
@@ -805,7 +816,7 @@ function MaterialLibraryModal({
   }, [region.category]);
 
   return (
-    <>
+    <ModalPortal>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -903,7 +914,7 @@ function MaterialLibraryModal({
           </button>
         </div>
       </motion.div>
-    </>
+    </ModalPortal>
   );
 }
 
@@ -940,7 +951,7 @@ function EstimateModal({
   const directCost = estimate?.directCostSubtotal ?? estimate?.direct_total ?? 0;
 
   return (
-    <>
+    <ModalPortal>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -1152,7 +1163,7 @@ function EstimateModal({
           닫기
         </button>
       </motion.div>
-    </>
+    </ModalPortal>
   );
 }
 

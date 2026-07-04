@@ -17,6 +17,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, X, Check, AlertCircle } from "lucide-react";
 import { useVisionMaterials } from "@/hooks/useVisionMaterials";
@@ -66,9 +67,10 @@ export default function VisionMaterialPicker({ open, onClose, onSelect, request 
     onClose();
   };
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  // body 포털 — 조상 transform(framer-motion)이 fixed 기준을 바꿔 화면 이탈하는 것 방지
+  return createPortal(
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -187,7 +189,8 @@ export default function VisionMaterialPicker({ open, onClose, onSelect, request 
           </div>
         </motion.div>
       </motion.div>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

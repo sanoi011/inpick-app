@@ -159,6 +159,21 @@ const STYLE_PRESETS = [
 
 const RENDER_COUNT = 4;
 
+/**
+ * 내부 생성용 기술 프롬프트 감지 — 채팅 말풍선에 그대로 노출하지 않는다.
+ * (AI 상담→일괄 생성 시 extract가 만든 영어 프롬프트가 r.prompt에 저장되는 케이스 포함)
+ */
+function isInternalRenderPrompt(p: string): boolean {
+  if (!p) return false;
+  if (/STRICTLY PRESERVE|structural reference|photorealistic|floor plan/i.test(p)) return true;
+  // 길고(180자+) 대부분 ASCII면 사용자 입력이 아니라 내부 영어 프롬프트로 간주
+  if (p.length > 180) {
+    const asciiCount = p.replace(/[^\x20-\x7E]/g, "").length;
+    if (asciiCount / p.length > 0.7) return true;
+  }
+  return false;
+}
+
 export interface RenderItem {
   url: string;
   prompt: string;
@@ -1612,10 +1627,10 @@ export default function Step2Designer({
             {/* 채팅 히스토리 — 사용자 prompt + AI 이미지 응답 */}
             {renders.map((r, i) => (
               <div key={i} className="space-y-2">
-                {/* 사용자 메시지 */}
+                {/* 사용자 메시지 — 내부 기술 프롬프트는 숨기고 친화적 라벨로 대체 */}
                 <div className="flex justify-end">
                   <div className="max-w-md rounded-2xl rounded-tr-sm bg-primary-500 text-white px-4 py-2.5 text-sm shadow-sm">
-                    {r.prompt}
+                    {isInternalRenderPrompt(r.prompt) ? "AI 추천 스타일로 디자인 생성" : r.prompt}
                   </div>
                 </div>
                 {/* AI 응답 (작은 미리보기) */}
@@ -2077,7 +2092,7 @@ export default function Step2Designer({
                 className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
               >
                 <Sparkles className="h-3.5 w-3.5" />
-                자재 정밀 분석 다시 실행
+                부위별 자재 분석 재실행
               </button>
               <span className="text-[0.65rem] text-primary-900/60">
                 이미지 생성 시 자동 분석이 진행됩니다. 결과를 다시 보거나 특정 부위를 재분석할 때 사용하세요.
