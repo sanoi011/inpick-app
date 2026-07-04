@@ -161,6 +161,13 @@ const STYLE_PRESETS = [
 const RENDER_COUNT = 4;
 
 /**
+ * 부위별 자재뷰(자재 수정 + 견적 산출) 공개 여부.
+ * 2026-07-04 대표 지시 — 설계 재정비 전까지 "서비스 준비 중"으로 잠금.
+ * 재공개 시 true로만 바꾸면 기존 기능 그대로 복원됨.
+ */
+const PARTIAL_MATERIAL_VIEW_ENABLED = false;
+
+/**
  * 내부 생성용 기술 프롬프트 감지 — 채팅 말풍선에 그대로 노출하지 않는다.
  * (AI 상담→일괄 생성 시 extract가 만든 영어 프롬프트가 r.prompt에 저장되는 케이스 포함)
  */
@@ -2073,42 +2080,57 @@ export default function Step2Designer({
           )}
         </AnimatePresence>
 
-        {/* 자재 수정 (세그멘테이션) — 선택된 시안 아래 */}
+        {/* 자재 수정 (세그멘테이션) — 선택된 시안 아래. 잠금 시 준비 중 안내로 대체 */}
         {activeRender && selectedIdx != null && hasGenerated && (
-          <div className="mt-4">
-            {/* Phase 7 — Vision Material Picker trigger (이미지 전체 분석 → Top-3 후보) */}
-            <div className="mb-3 flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setVisionPickerRequest({
-                    projectId: basicInfo.floorplanPropertyId || "current-project",
-                    roomName: ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom,
-                    roomType: activeRoom,
-                    imageUrl: activeRender.url,
-                    sourceImageKind: "ai_render",
-                  });
-                  setVisionPickerOpen(true);
-                }}
-                className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                부위별 자재 분석 재실행
-              </button>
-              <span className="text-[0.65rem] text-primary-900/60">
-                이미지 생성 시 자동 분석이 진행됩니다. 결과를 다시 보거나 특정 부위를 재분석할 때 사용하세요.
-              </span>
+          PARTIAL_MATERIAL_VIEW_ENABLED ? (
+            <div className="mt-4">
+              {/* Phase 7 — Vision Material Picker trigger (이미지 전체 분석 → Top-3 후보) */}
+              <div className="mb-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setVisionPickerRequest({
+                      projectId: basicInfo.floorplanPropertyId || "current-project",
+                      roomName: ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom,
+                      roomType: activeRoom,
+                      imageUrl: activeRender.url,
+                      sourceImageKind: "ai_render",
+                    });
+                    setVisionPickerOpen(true);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  부위별 자재 분석 재실행
+                </button>
+                <span className="text-[0.65rem] text-primary-900/60">
+                  이미지 생성 시 자동 분석이 진행됩니다. 결과를 다시 보거나 특정 부위를 재분석할 때 사용하세요.
+                </span>
+              </div>
+              <MaterialEditor
+                roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
+                realWorldAreaSqm={basicInfo.selectedPyeong?.exclusiveArea}
+                styleHint={activeRender.prompt}
+                renderItem={activeRender}
+                tokenBalance={tokenBalance}
+                onConsumeToken={onConsumeToken}
+                onUpdate={(updated) => updateRender(selectedIdx, updated)}
+              />
             </div>
-            <MaterialEditor
-              roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
-              realWorldAreaSqm={basicInfo.selectedPyeong?.exclusiveArea}
-              styleHint={activeRender.prompt}
-              renderItem={activeRender}
-              tokenBalance={tokenBalance}
-              onConsumeToken={onConsumeToken}
-              onUpdate={(updated) => updateRender(selectedIdx, updated)}
-            />
-          </div>
+          ) : (
+            <div className="mt-4 rounded-2xl border border-dashed border-primary-200 bg-primary-50/40 p-5 text-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[0.65rem] font-bold tracking-widest text-primary-500 border border-primary-200">
+                <Sparkles className="h-3 w-3" />
+                서비스 준비 중
+              </span>
+              <p className="mt-3 text-sm font-bold text-primary-900">부위별 자재 수정 · 견적 산출</p>
+              <p className="mt-1 text-xs leading-relaxed text-primary-900/60">
+                더 정확한 부위 인식과 자재 매칭을 위해 개선 작업 중이에요.
+                <br />
+                준비가 끝나면 이 자리에서 바로 사용하실 수 있습니다.
+              </p>
+            </div>
+          )
         )}
       </section>
 

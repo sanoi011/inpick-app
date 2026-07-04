@@ -18,15 +18,18 @@ import {
   ArrowRight,
   Bath,
   Blinds,
+  Building2,
   CheckCircle2,
   DoorOpen,
   Droplet,
+  ExternalLink,
   Hammer,
   Layers,
   Lightbulb,
   Loader2,
   MapPin,
   Paintbrush,
+  Phone,
   Search,
   ShoppingBag,
   SlidersHorizontal,
@@ -49,6 +52,30 @@ type ProductResult = {
   sku?: string;
   spec?: string;
   source?: "internal" | "naver" | "mock";
+};
+
+type LocalContractor = {
+  id: string;
+  name: string;
+  category: string;
+  address: string;
+  telephone: string | null;
+  homepage: string | null;
+  naverMapUrl: string;
+};
+
+// 그룹 키 → 업체 검색 공종 키워드 (네이버 지역검색용)
+const GROUP_CONTRACTOR_KEYWORD: Record<string, string> = {
+  bath: "욕실 리모델링",
+  kitchen: "주방 인테리어",
+  door: "중문 도어",
+  furniture: "가구 제작",
+  floor: "바닥 마루",
+  wall: "도배 도장",
+  electric: "전기 조명",
+  window: "샷시 창호",
+  plumbing: "설비 배관",
+  repair: "집수리",
 };
 
 // 그룹 키 → 아이콘
@@ -88,7 +115,7 @@ export default function PartialInstallPage() {
     setSurfaceOverride(surface ?? null);
     setSearching(true);
     try {
-      const res = await fetch(`/api/product-search?query=${encodeURIComponent(term)}`);
+      const res = await fetch(`/api/product-search?query=${encodeURIComponent(term)}&display=40`);
       const data = await res.json();
       setProducts(data.products ?? []);
     } catch {
@@ -98,6 +125,31 @@ export default function PartialInstallPage() {
     }
     if (typeof document !== "undefined") {
       document.getElementById("product-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  // 네이버 지역검색 기반 실제 설치업체 검색
+  const [contractors, setContractors] = useState<LocalContractor[]>([]);
+  const [contractorLoading, setContractorLoading] = useState(false);
+  const [contractorSearched, setContractorSearched] = useState(false);
+
+  const searchContractors = async (opts?: { scroll?: boolean }) => {
+    setContractorLoading(true);
+    setContractorSearched(true);
+    try {
+      const keyword = GROUP_CONTRACTOR_KEYWORD[activeGroupKey] ?? "인테리어";
+      const res = await fetch(
+        `/api/partial-install/contractors?region=${encodeURIComponent(region)}&keyword=${encodeURIComponent(keyword)}`
+      );
+      const data = await res.json();
+      setContractors(data.contractors ?? []);
+    } catch {
+      setContractors([]);
+    } finally {
+      setContractorLoading(false);
+    }
+    if (opts?.scroll !== false && typeof document !== "undefined") {
+      document.getElementById("contractor-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
 
@@ -120,6 +172,13 @@ export default function PartialInstallPage() {
       })
       .catch(() => {});
   }, []);
+
+  // 상품 검색 완료 → 해당 공종 지역 업체 자동 로드 (스크롤 없이, 견적·업체 한 화면 완성)
+  useEffect(() => {
+    if (!activeQuery || searching) return;
+    void searchContractors({ scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeQuery, searching]);
 
   // 자유 검색어 → 부위 추정 (카탈로그 클릭 시엔 명시 부위 우선)
   const inferSurface = (q: string): PartialSurface => {
@@ -283,13 +342,14 @@ export default function PartialInstallPage() {
                 카테고리를 누르면 실제 구매 가능한 상품과 예상 시공 견적을 바로 보여드립니다.
               </p>
             </div>
-            <Link
-              href={`/find-contractors?region=${encodeURIComponent(region)}`}
+            <button
+              type="button"
+              onClick={() => searchContractors()}
               className="hidden shrink-0 items-center gap-2 bg-zinc-950 px-4 py-3 text-sm font-black text-white hover:bg-primary-600 sm:inline-flex"
             >
               {region} 설치업체 찾기
               <ArrowRight className="h-4 w-4" />
-            </Link>
+            </button>
           </div>
 
           {/* 그룹 탭 */}
@@ -337,13 +397,14 @@ export default function PartialInstallPage() {
             ))}
           </div>
 
-          <Link
-            href={`/find-contractors?region=${encodeURIComponent(region)}`}
+          <button
+            type="button"
+            onClick={() => searchContractors()}
             className="mt-6 inline-flex items-center gap-2 bg-zinc-950 px-4 py-3 text-sm font-black text-white hover:bg-primary-600 sm:hidden"
           >
             {region} 설치업체 찾기
             <ArrowRight className="h-4 w-4" />
-          </Link>
+          </button>
         </div>
       </section>
 
@@ -539,6 +600,87 @@ export default function PartialInstallPage() {
                 </div>
               </div>
             )}
+          </div>
+        </section>
+      )}
+
+      {/* 설치업체 검색 결과 — 네이버 지역검색 기반 실제 사업장 */}
+      {(contractorLoading || contractorSearched) && (
+        <section id="contractor-results" className="border-t border-zinc-200 bg-zinc-50">
+          <div className="mx-auto max-w-7xl px-5 py-10 lg:px-8">
+            <div className="flex items-end justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-widest text-primary-600">설치업체 · 네이버 검색</p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight">
+                  {region} {GROUP_CONTRACTOR_KEYWORD[activeGroupKey] ?? "인테리어"} 시공업체
+                </h2>
+                <p className="mt-1 text-sm text-zinc-500">
+                  네이버에 등록된 실제 사업장입니다. 카드를 누르면 네이버 지도에서 리뷰·사진·연락처를 확인할 수 있어요.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => searchContractors({ scroll: false })}
+                className="hidden shrink-0 items-center gap-1.5 border border-zinc-300 bg-white px-3 py-2 text-xs font-bold text-zinc-700 hover:border-primary-400 sm:inline-flex"
+              >
+                <Search className="h-3.5 w-3.5" />
+                다시 검색
+              </button>
+            </div>
+
+            {contractorLoading ? (
+              <div className="flex items-center justify-center py-16 text-zinc-400">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+            ) : contractors.length === 0 ? (
+              <div className="mt-6 border border-dashed border-zinc-300 bg-white py-14 text-center text-sm text-zinc-400">
+                이 지역에서 업체를 찾지 못했어요. 지역명을 조금 넓혀서(예: &ldquo;대전&rdquo;) 다시 검색해보세요.
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {contractors.map((c) => (
+                  <a
+                    key={c.id}
+                    href={c.naverMapUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group flex flex-col border border-zinc-200 bg-white p-4 transition hover:border-primary-400 hover:shadow-md"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-9 w-9 shrink-0 items-center justify-center bg-primary-50 text-primary-600">
+                          <Building2 className="h-4.5 w-4.5" />
+                        </span>
+                        <div>
+                          <p className="text-sm font-black text-zinc-900 group-hover:text-primary-600">{c.name}</p>
+                          <p className="text-[11px] font-semibold text-zinc-400">{c.category}</p>
+                        </div>
+                      </div>
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-zinc-300 group-hover:text-primary-500" />
+                    </div>
+                    <p className="mt-3 flex items-start gap-1.5 text-xs leading-5 text-zinc-500">
+                      <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-300" />
+                      {c.address || "주소 정보 없음"}
+                    </p>
+                    <div className="mt-3 flex items-center gap-3 border-t border-zinc-100 pt-2.5 text-[11px] font-bold">
+                      <span className="inline-flex items-center gap-1 text-primary-600">
+                        네이버 지도에서 보기 <ArrowRight className="h-3 w-3" />
+                      </span>
+                      {c.telephone && (
+                        <span className="inline-flex items-center gap-1 text-zinc-500">
+                          <Phone className="h-3 w-3" /> {c.telephone}
+                        </span>
+                      )}
+                    </div>
+                  </a>
+                ))}
+              </div>
+            )}
+
+            <p className="mt-4 text-[11px] text-zinc-400">
+              업체 정보 출처: 네이버 지역검색. 인픽과 제휴 관계가 아닌 업체가 포함될 수 있으며, 계약 전 조건을 직접 확인하세요.
+              시공 견적 비교를 원하시면 위의 &lsquo;설치 요청 보내기&rsquo;를 이용해주세요.
+            </p>
           </div>
         </section>
       )}

@@ -86,14 +86,18 @@ async function fetchInternal(query: string, limit: number): Promise<ProductResul
 }
 
 // ─── 2) 네이버 쇼핑 (실구매) ───
-async function fetchNaver(query: string, display: number): Promise<ProductResult[] | null> {
+async function fetchNaver(
+  query: string,
+  display: number,
+  sort: string,
+): Promise<ProductResult[] | null> {
   const id = process.env.NAVER_SEARCH_CLIENT_ID || process.env.NAVER_CLIENT_ID;
   const secret = process.env.NAVER_SEARCH_CLIENT_SECRET || process.env.NAVER_CLIENT_SECRET;
   if (!id || !secret) return null;
   try {
     const apiUrl = `https://openapi.naver.com/v1/search/shop.json?query=${encodeURIComponent(
       query
-    )}&display=${display}&sort=asc&exclude=used:rental:cbshop`;
+    )}&display=${display}&sort=${sort}&exclude=used:rental:cbshop`;
     const res = await fetch(apiUrl, {
       headers: { "X-Naver-Client-Id": id, "X-Naver-Client-Secret": secret },
       next: { revalidate: 60 * 60 * 12 },
@@ -120,12 +124,16 @@ async function fetchNaver(query: string, display: number): Promise<ProductResult
 
 export async function GET(req: NextRequest) {
   const query = (req.nextUrl.searchParams.get("query") ?? "").trim();
-  const display = Math.min(20, Math.max(1, Number(req.nextUrl.searchParams.get("display") ?? 12)));
+  // 네이버 쇼핑 API 최대 100건 — 기본 40건으로 충분한 상품 폭 확보
+  const display = Math.min(100, Math.max(1, Number(req.nextUrl.searchParams.get("display") ?? 40)));
+  // sim=관련도(기본, 액세서리·저가부속 도배 방지) | asc=최저가 | dsc=최고가 | date=최신
+  const sortParam = req.nextUrl.searchParams.get("sort") ?? "sim";
+  const sort = ["sim", "asc", "dsc", "date"].includes(sortParam) ? sortParam : "sim";
   if (!query) return NextResponse.json({ products: [], source: "empty" });
 
   const [internal, naver] = await Promise.all([
     fetchInternal(query, 4),
-    fetchNaver(query, display),
+    fetchNaver(query, display, sort),
   ]);
 
   const shop = naver ?? mockProducts(query).slice(0, display);
