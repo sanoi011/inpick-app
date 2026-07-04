@@ -48,6 +48,25 @@ export function isNativeApp(): boolean {
 }
 
 /**
+ * '표시용' WebView 감지 — 임베디드 WebView로 보이면 true (과잉 억제 허용).
+ *
+ * 용도: 앱 설치 배지·공지 팝업처럼 "앱/WebView 안에서는 안 보여야 하는" UI 억제 전용.
+ * Capacitor 주입 타이밍을 놓치거나 카카오톡 인앱브라우저 같은 서드파티 WebView까지 잡는다.
+ * ⚠️ 결제/OAuth 분기에는 절대 사용 금지 — 서드파티 WebView 오탐 시 잘못된 결제 채널을 탄다.
+ *   그쪽은 반드시 isNativeApp()(Capacitor 정밀 감지) 사용.
+ */
+export function isProbablyEmbeddedWebView(): boolean {
+  if (typeof window === "undefined") return false;
+  if ((window as unknown as { Capacitor?: unknown }).Capacitor) return true;
+  const ua = navigator.userAgent;
+  // iOS WKWebView(앱 내 브라우저 포함)는 UA에 Safari 토큰이 없음
+  if (/iPhone|iPad|iPod/.test(ua) && !/Safari\//i.test(ua)) return true;
+  // Android System WebView 마커
+  if (/Android/.test(ua) && /; wv\)/.test(ua)) return true;
+  return false;
+}
+
+/**
  * OAuth 흐름 — 네이티브 앱에서는 외부 브라우저 사용.
  *
  * iOS: SFSafariViewController (@capacitor/browser)

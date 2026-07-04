@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Hexagon, X } from "lucide-react";
-import { isNativeApp } from "@/lib/mobile/platform";
+import { isNativeApp, isProbablyEmbeddedWebView } from "@/lib/mobile/platform";
 
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL || "https://www.apple.com/app-store/";
@@ -43,7 +43,8 @@ export default function TokenNoticeModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (isNativeApp()) return;
+    // 앱(WebView) 안에서는 절대 미표시 — Capacitor 감지 + WebView UA 이중 차단
+    if (isNativeApp() || isProbablyEmbeddedWebView()) return;
     try {
       if (sessionStorage.getItem(SESSION_KEY) === "1") return;
       const hideUntil = Number(localStorage.getItem(HIDE_UNTIL_KEY) || 0);
@@ -51,8 +52,11 @@ export default function TokenNoticeModal() {
     } catch {
       /* ignore */
     }
-    // 첫 페인트 직후 잠깐 여유를 두고 표시 (레이아웃 안정 후)
-    const t = setTimeout(() => setOpen(true), 600);
+    // 첫 페인트 직후 잠깐 여유를 두고 표시 — Capacitor 주입이 늦는 케이스 대비 표시 직전 재확인
+    const t = setTimeout(() => {
+      if (isNativeApp() || isProbablyEmbeddedWebView()) return;
+      setOpen(true);
+    }, 600);
     return () => clearTimeout(t);
   }, []);
 
