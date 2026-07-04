@@ -46,6 +46,7 @@ export default function PostDetailPage({ params }: { params: { postId: string } 
   const { user } = useAuth();
   const [post, setPost] = useState<CommunityPostV2 | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
+  const [photoAttachments, setPhotoAttachments] = useState<Array<{ url: string }>>([]);
   const [comments, setComments] = useState<CommunityCommentV2[]>([]);
   const [offers, setOffers] = useState<CommunityQuoteOfferV2[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,6 +63,11 @@ export default function PostDetailPage({ params }: { params: { postId: string } 
       .then(([postRes, comRes, offRes]) => {
         setPost(postRes.post ?? null);
         setSnapshot(postRes.snapshot ?? null);
+        setPhotoAttachments(
+          ((postRes.attachments ?? []) as Array<{ attachment_type: string; url: string }>)
+            .filter((a) => a.attachment_type === "image" && a.url)
+            .map((a) => ({ url: a.url })),
+        );
         setComments(comRes.comments ?? []);
         setOffers(offRes.offers ?? []);
         setLoading(false);
@@ -152,6 +158,23 @@ export default function PostDetailPage({ params }: { params: { postId: string } 
             <span>{new Date(post.createdAt).toLocaleDateString("ko-KR")}</span>
           </div>
         </div>
+
+        {/* 업로드 사진 (community_attachments type=image) */}
+        {photoAttachments.length > 0 && (
+          <div className="rounded-xl border border-[#E5E2DD] bg-white p-4">
+            <div className={`grid gap-2 ${photoAttachments.length === 1 ? "grid-cols-1" : "grid-cols-2 md:grid-cols-3"}`}>
+              {photoAttachments.map((a, i) => (
+                <div
+                  key={`${a.url}-${i}`}
+                  className={`relative overflow-hidden rounded-lg bg-[#F0EFEC] ${photoAttachments.length === 1 ? "aspect-[4/3]" : "aspect-square"}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={a.url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 디자인 이미지 (snapshot) */}
         {snapshot?.redacted_design_outputs && snapshot.redacted_design_outputs.length > 0 && (

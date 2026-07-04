@@ -1,77 +1,11 @@
-"use client";
-
 /**
- * /community — 커뮤니티 홈 (최신 게시글 + 검색)
- * 가이드: inpick-community-naver-cafe-style-dev-plan-20260514.md
+ * /community — 커뮤니티 v2 피드 (인스타/X 스타일 단일 컬럼).
  *
- * 기존 mock-based 페이지는 v2 DB 기반으로 전면 교체.
+ * 목적(2026-07-04 재정의): ①우리 집·AI 프로젝트 자랑 ②이웃 피드백 ③서비스 피드백 수집.
+ * 구식 3단 게시판 셸 → FeedV2로 전면 교체. 게시판별 보기는 /community/boards/[slug] 유지.
  */
-import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
-import CommunityShell from "@/components/community/CommunityShell";
-import PostListItem from "@/components/community/PostListItem";
-import { Loader2 } from "lucide-react";
-import type { CommunityPostV2 } from "@/types/community-v2";
+import FeedV2 from "@/components/community/FeedV2";
 
 export default function CommunityHomePage() {
-  return (
-    <Suspense
-      fallback={
-        <CommunityShell>
-          <div className="flex items-center justify-center py-20 text-[#9A9A9A]">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        </CommunityShell>
-      }
-    >
-      <CommunityHomeContent />
-    </Suspense>
-  );
-}
-
-function CommunityHomeContent() {
-  const sp = useSearchParams();
-  const q = sp?.get("q") ?? "";
-  const [posts, setPosts] = useState<CommunityPostV2[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const params = new URLSearchParams({ page: "1", limit: "20" });
-    if (q) params.set("q", q);
-    fetch(`/api/community/posts?${params}`)
-      .then((r) => r.json())
-      .then((d) => {
-        setPosts(d.posts ?? []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [q]);
-
-  return (
-    <CommunityShell>
-      <div className="space-y-4">
-        {q && (
-          <div className="rounded-xl border border-[#E5E2DD] bg-white px-4 py-2.5 text-sm text-[#3F3F46]">
-            검색: <span className="font-semibold text-[#202123]">&ldquo;{q}&rdquo;</span> · {posts.length}건
-          </div>
-        )}
-
-        {loading ? (
-          <div className="flex items-center justify-center py-20 text-[#9A9A9A]">
-            <Loader2 className="h-5 w-5 animate-spin" />
-          </div>
-        ) : posts.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#E5E2DD] bg-white px-4 py-12 text-center text-sm text-[#6B6B6B]">
-            아직 게시글이 없습니다. 첫 번째 글을 남겨주세요.
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {posts.map((p) => (
-              <PostListItem key={p.id} post={p} />
-            ))}
-          </div>
-        )}
-      </div>
-    </CommunityShell>
-  );
+  return <FeedV2 />;
 }
