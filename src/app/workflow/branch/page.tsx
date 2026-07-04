@@ -187,7 +187,7 @@ export default function BranchPage() {
                 initial={{ opacity: 0, scale: 0.96, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                className="fixed left-1/2 top-1/2 z-[81] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
               >
                 <h3 className="text-lg font-extrabold tracking-tight text-primary-900">
                   💡 AR 확인의 장점

@@ -620,7 +620,7 @@ export default function WorkflowPage() {
                 initial={{ opacity: 0, scale: 0.96, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                className="fixed left-1/2 top-1/2 z-[86] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[86] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
               >
                 <button
                   onClick={() => setQuickOpen(false)}
@@ -808,7 +808,7 @@ export default function WorkflowPage() {
         </AnimatePresence>
 
         {/* 하단 stepper — jeton walkthrough 패턴 (활성 dot width 확장) */}
-        <footer className="sticky bottom-6 z-30 mx-auto flex max-w-md items-center justify-center px-6 pb-6">
+        <footer className="sticky bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center justify-center px-6 pb-6">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/60 bg-white/85 px-4 py-2 backdrop-blur-md">
             {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
               const idx = i + 1;

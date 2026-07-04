@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
   Hexagon,
@@ -1247,10 +1248,10 @@ export default function Step2Designer({
                         removeCustomTab(t.v);
                         if (sel) setActiveRoom(availableTabs[0]?.v ?? "living");
                       }}
-                      className="absolute -right-1 -top-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-white opacity-0 group-hover:opacity-100 hover:bg-red-600 shadow"
+                      className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-600 shadow"
                       title="실 삭제"
                     >
-                      <X className="h-2.5 w-2.5" />
+                      <X className="h-3 w-3" />
                     </button>
                   )}
                   {/* popup — 클릭 토글만, "전체" 제외 */}
@@ -1261,9 +1262,9 @@ export default function Step2Designer({
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -8 }}
-                        className="absolute left-full top-0 ml-3 z-30 min-w-[220px] rounded-xl border border-primary-200 bg-white p-3 shadow-card-hover"
+                        className="absolute left-0 top-full mt-2 sm:left-full sm:top-0 sm:ml-3 sm:mt-0 z-30 min-w-[200px] max-w-[80vw] rounded-xl border border-primary-200 bg-white p-3 shadow-card-hover"
                       >
-                        <div className="absolute left-0 top-3 -translate-x-1 h-2 w-2 rotate-45 bg-white border-l border-b border-primary-200" />
+                        <div className="hidden sm:block absolute left-0 top-3 -translate-x-1 h-2 w-2 rotate-45 bg-white border-l border-b border-primary-200" />
                         <div className="flex items-center justify-between mb-2">
                           <p className="text-xs font-bold text-primary-700">{t.label}</p>
                           <button onClick={() => setOpenRoomPopup(null)}>
@@ -2163,7 +2164,9 @@ export default function Step2Designer({
 }
 
 function Modal({ children, onClose }: { children: React.ReactNode; onClose: () => void }) {
-  return (
+  // body 포털 — 조상 transform(framer-motion)이 fixed 기준을 바꿔 화면 이탈하는 것 방지
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <>
       <motion.div
         initial={{ opacity: 0 }}
@@ -2176,10 +2179,11 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-sm max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
       >
         {children}
       </motion.div>
-    </>
+    </>,
+    document.body,
   );
 }

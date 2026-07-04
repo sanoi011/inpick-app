@@ -93,7 +93,7 @@ export default function EditableSurfaceList({
           <LayersIcon className="h-3.5 w-3.5 text-primary-500" />
           공간 부위 ({totalCount})
         </div>
-        <span className="text-[10px] text-gray-500">
+        <span className="text-[11px] text-gray-500">
           확정 {confirmedCount}/{totalCount}
         </span>
       </div>
@@ -108,7 +108,7 @@ export default function EditableSurfaceList({
         ) : (
           grouped.map(({ type, items }) => (
             <div key={type} className="space-y-1">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 px-1">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400 px-1">
                 {surfaceTypeLabelKo(type)}
               </p>
               <div className="space-y-0.5">
@@ -158,7 +158,7 @@ function LayerRow({
         </div>
         {layer.materialLabel && (
           <p
-            className={`mt-0.5 truncate text-[10px] ${
+            className={`mt-0.5 truncate text-[11px] ${
               selected ? "text-white/80" : "text-gray-500"
             }`}
             title={layer.materialLabel}
@@ -185,7 +185,7 @@ function LayerRow({
         )}
         {layer.areaM2 && (
           <span
-            className={`text-[9px] ${selected ? "text-white/70" : "text-gray-400"}`}
+            className={`text-[10px] ${selected ? "text-white/70" : "text-gray-400"}`}
           >
             {layer.areaM2.toFixed(1)}㎡
           </span>

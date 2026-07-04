@@ -182,7 +182,7 @@ export default function MaterialLibraryDrawer({
               key={g.v}
               type="button"
               onClick={() => setGrade(g.v)}
-              className={`rounded-full border px-2.5 py-0.5 text-[10px] font-semibold transition-colors ${
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
                 grade === g.v
                   ? "border-primary-500 bg-primary-500 text-white"
                   : "border-gray-200 bg-white text-gray-600 hover:border-primary-300"
@@ -255,24 +255,24 @@ export default function MaterialLibraryDrawer({
                     )}
                   </div>
                   <div className="mt-1.5">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-600 truncate">
+                    <p className="text-[11px] font-semibold uppercase tracking-wider text-primary-600 truncate">
                       {p.brand}
                     </p>
                     <p
-                      className="text-[11px] font-bold text-gray-900 truncate"
+                      className="text-xs font-bold text-gray-900 truncate"
                       title={p.productName}
                     >
                       {p.productName}
                     </p>
                     {p.modelNumber && (
-                      <p className="text-[9px] text-gray-500 truncate">
+                      <p className="text-[10px] text-gray-500 truncate">
                         {p.modelNumber}
                       </p>
                     )}
                     {p.retailPrice && (
-                      <p className="mt-0.5 text-[10px] font-semibold text-gray-700">
+                      <p className="mt-0.5 text-[11px] font-semibold text-gray-700">
                         ₩{p.retailPrice.toLocaleString()}
-                        <span className="text-[9px] font-normal text-gray-500">
+                        <span className="text-[10px] font-normal text-gray-500">
                           {" "}
                           / {p.unit || "EA"}
                         </span>
@@ -283,7 +283,7 @@ export default function MaterialLibraryDrawer({
                     type="button"
                     onClick={() => handleApply(p)}
                     disabled={isApplying || isApplied}
-                    className={`mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full py-1 text-[10px] font-semibold transition-colors ${
+                    className={`mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full py-1.5 text-xs font-semibold transition-colors ${
                       isApplied
                         ? "bg-emerald-50 text-emerald-700 cursor-default"
                         : "bg-primary-500 text-white hover:bg-primary-600 disabled:bg-gray-200 disabled:text-gray-400"

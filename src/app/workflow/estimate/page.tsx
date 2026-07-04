@@ -1743,7 +1743,8 @@ function EstimatePage() {
                     <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
                       공간별 합계
                     </p>
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[480px] text-sm">
                       <thead>
                         <tr className="border-b border-primary-100 text-primary-900/60 text-[0.7rem]">
                           <th className="py-2 text-left">공간</th>
@@ -1773,6 +1774,7 @@ function EstimatePage() {
                         ))}
                       </tbody>
                     </table>
+                    </div>
                   </div>
                 )}
 
@@ -2257,17 +2259,17 @@ function EstimatePage() {
                                 {it.label}
                               </span>
                               {it.status === "analysis_pending" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-blue-500/90 text-white text-[0.55rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-blue-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
                                   분석중
                                 </span>
                               )}
                               {it.status === "analysis_done" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-emerald-500/90 text-white text-[0.55rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-emerald-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
                                   완료
                                 </span>
                               )}
                               {it.status === "analysis_failed" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-rose-500/90 text-white text-[0.55rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-rose-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
                                   실패
                                 </span>
                               )}

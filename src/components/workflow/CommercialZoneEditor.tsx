@@ -125,8 +125,8 @@ export default function CommercialZoneEditor({
         </button>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-amber-200/60 bg-white">
-        <table className="w-full text-[0.7rem]">
+      <div className="overflow-x-auto rounded-xl border border-amber-200/60 bg-white">
+        <table className="w-full min-w-[420px] text-[0.7rem]">
           <thead className="bg-amber-50/60 text-primary-700">
             <tr>
               <th className="px-2 py-1.5 text-left font-semibold">이름</th>

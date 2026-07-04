@@ -61,7 +61,7 @@ export default function StoreFloatingBadges() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-[60] flex flex-col items-end gap-2 sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] right-4 z-[60] flex flex-col items-end gap-2 sm:bottom-[calc(1.5rem+env(safe-area-inset-bottom))] sm:right-6">
       <button
         type="button"
         onClick={dismiss}

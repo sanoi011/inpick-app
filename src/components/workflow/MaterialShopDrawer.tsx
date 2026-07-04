@@ -139,7 +139,7 @@ export default function MaterialShopDrawer({
                     </span>
                     <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-zinc-700">{p.title}</p>
                     {(p.brand || p.sku) && (
-                      <p className="mt-0.5 truncate text-[10px] text-zinc-400">
+                      <p className="mt-0.5 truncate text-[11px] text-zinc-400">
                         {p.brand}
                         {p.brand && p.sku ? " · " : ""}
                         {p.sku}
@@ -155,8 +155,8 @@ export default function MaterialShopDrawer({
                         <span className="text-xs font-bold text-zinc-500">가격 문의</span>
                       )}
                     </p>
-                    <span className="mt-0.5 inline-flex items-center gap-0.5 text-[10px] font-bold text-primary-600">
-                      {p.source === "internal" ? "상품 보러가기" : "구매하러 가기"} <ArrowRight className="h-2.5 w-2.5" />
+                    <span className="mt-1 inline-flex items-center gap-0.5 text-xs font-bold text-primary-600">
+                      {p.source === "internal" ? "상품 보러가기" : "구매하러 가기"} <ArrowRight className="h-3 w-3" />
                     </span>
                   </div>
                 </a>
