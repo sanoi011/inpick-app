@@ -38,6 +38,18 @@ export const AnalyticsEvents = {
   MaterialSearchOpened: "material_search_opened",
   MaterialApplied: "material_applied",
 
+  // 연구용 행동 데이터 (2026-07-05 연구소 요구 항목 — 자재/디자인 선택 행동)
+  //   개인식별정보는 제외, 익명 ID·세션 기준 집계만.
+  DesignConceptSelected: "design_concept_selected",   // 시안 선택(비교/변경 포함)
+  DesignConceptCompared: "design_concept_compared",   // 두 시안 비교
+  MaterialCategoryOpened: "material_category_opened",  // 자재 카테고리 진입
+  MaterialSelected: "material_selected",               // 자재 확정(최초/변경/최종)
+  MaterialCompared: "material_compared",               // 자재 비교
+  ProductClicked: "product_clicked",                   // 실구매 상품 클릭
+  ProductBookmarked: "product_bookmarked",             // 찜/저장
+  EstimateShared: "estimate_shared",                   // 공유
+  SatisfactionSubmitted: "satisfaction_submitted",     // 만족도·피드백
+
   // Scope / estimate
   CommercialScopeCreated: "commercial_scope_created",
   CommercialScopeUpdated: "commercial_scope_updated",

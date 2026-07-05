@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { LocalContractor } from "@/types/partial-install";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 import {
   calcPartialEstimate,
   surfaceUnitLabel,
@@ -126,6 +128,10 @@ export default function PartialInstallPage() {
     setSurfaceOverride(surface ?? null);
     setSearching(true);
     setBandIdx(0);
+    // 연구용 행동 데이터 — 자재 카테고리 진입 (개인정보 없음)
+    trackClientEvent(AnalyticsEvents.MaterialCategoryOpened, {
+      props: { query: term, surface: surface ?? null, group: activeGroupKey },
+    });
     try {
       const data = await fetchProductPage(term, sortKey, 1);
       if (seq !== productReqSeq.current) return; // 더 최신 요청이 있음 — 이 응답 폐기
@@ -550,6 +556,18 @@ export default function PartialInstallPage() {
                     href={p.link}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={() =>
+                      trackClientEvent(AnalyticsEvents.ProductClicked, {
+                        props: {
+                          query: activeQuery,
+                          surface: activeSurface,
+                          price: p.price,
+                          mall: p.mallName,
+                          source: p.source,
+                          brand: p.brand ?? null,
+                        },
+                      })
+                    }
                     className="group flex flex-col overflow-hidden border border-zinc-200 bg-white transition hover:shadow-md"
                   >
                     <div className="flex aspect-square items-center justify-center overflow-hidden bg-zinc-100">

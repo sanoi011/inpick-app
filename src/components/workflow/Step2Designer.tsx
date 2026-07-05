@@ -23,6 +23,7 @@ import {
   X,
   Sparkles,
   Paperclip,
+  ImagePlus,
 } from "lucide-react";
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
@@ -39,6 +40,8 @@ import type { SegmentationData } from "@/types/segmentation";
 // P1: 이미지 생성 결과를 견적 evidence로 DB 저장 — workflow blocking 제거 핵심
 import { saveDesignOutputAfterRender, lightenWorkflowStep2 } from "@/lib/inpick/estimate-context/client";
 import type { ProjectMode } from "@/lib/inpick/estimate-context/types";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
@@ -359,6 +362,7 @@ export default function Step2Designer({
   // 다음 user 메시지에 함께 보낼 첨부 이미지 (전송 후 초기화)
   const [pendingAttachments, setPendingAttachments] = useState<ChatImageAttachment[]>([]);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
@@ -1645,11 +1649,22 @@ export default function Step2Designer({
                 <div className="flex justify-start">
                   <button
                     onClick={() => {
+                      const prev = value.selectedByRoom[activeRoom];
                       onChange({
                         ...value,
                         selectedByRoom: { ...value.selectedByRoom, [activeRoom]: i },
                       });
                       setImageMinimized(false);
+                      // 연구용 행동 데이터 — 시안 선택/변경 (개인정보 없음)
+                      trackClientEvent(AnalyticsEvents.DesignConceptSelected, {
+                        props: {
+                          room_type: activeRoom,
+                          selected_index: i,
+                          total_options: renders.length,
+                          changed_from: typeof prev === "number" ? prev : null,
+                          is_change: typeof prev === "number" && prev !== i,
+                        },
+                      });
                     }}
                     className={`group relative rounded-2xl rounded-tl-sm overflow-hidden border-2 transition-all ${
                       i === selectedIdx
@@ -1800,7 +1815,30 @@ export default function Step2Designer({
                 {attachmentError}
               </p>
             )}
-            <div className="mx-auto max-w-3xl flex items-end gap-2">
+            {/* 참고 사진 첨부 안내 (chat 모드, 첨부 없을 때) — 업로드 가능함을 명확히 */}
+            {chatMode && pendingAttachments.length === 0 && (
+              <p className="mx-auto max-w-3xl mb-1.5 flex items-center gap-1.5 text-[0.7rem] text-primary-900/50">
+                <ImagePlus className="h-3.5 w-3.5 text-amber-500" />
+                마음에 드는 인테리어 사진을 첨부하면 AI가 더 정확하게 추천해요 — 클립을 누르거나 여기로 끌어다 놓으세요
+              </p>
+            )}
+            <div
+              className={`mx-auto max-w-3xl flex items-end gap-2 rounded-2xl transition ${
+                isDraggingFile && chatMode ? "ring-2 ring-amber-400 ring-offset-2 bg-amber-50/40" : ""
+              }`}
+              onDragOver={(e) => {
+                if (!chatMode) return;
+                e.preventDefault();
+                setIsDraggingFile(true);
+              }}
+              onDragLeave={() => setIsDraggingFile(false)}
+              onDrop={(e) => {
+                if (!chatMode) return;
+                e.preventDefault();
+                setIsDraggingFile(false);
+                if (e.dataTransfer.files?.length) void handlePickChatFiles(e.dataTransfer.files);
+              }}
+            >
               {/* 이미지 첨부 (chat 모드 전용) */}
               {chatMode && (
                 <>
