@@ -18,14 +18,8 @@ import { buildSchedule } from "@/lib/estimate-pro/schedule-model";
 
 const won = (n: number) => Math.round(n || 0).toLocaleString("ko-KR");
 
-const PART_COLOR: Record<string, string> = {
-  "바닥": "bg-amber-100 text-amber-700", "벽": "bg-sky-100 text-sky-700",
-  "천장": "bg-violet-100 text-violet-700", "걸레받이/몰딩": "bg-orange-100 text-orange-700",
-  "욕실": "bg-teal-100 text-teal-700", "주방": "bg-rose-100 text-rose-700",
-  "창호/문": "bg-indigo-100 text-indigo-700", "설비": "bg-cyan-100 text-cyan-700",
-  "전기": "bg-yellow-100 text-yellow-700", "단열": "bg-lime-100 text-lime-700",
-  "공통": "bg-gray-100 text-gray-600",
-};
+// 색상 규칙(2026-07-04 대표 지시): 대분류=회색 · 소계=파란색 · 총계=노란색 · 나머지 무채색
+const PART_BADGE = "bg-zinc-100 text-zinc-600";
 
 type Row = DetailLine;
 
@@ -49,7 +43,8 @@ export default function EstimateProForm({ lines, category = "residential", proje
   const [tab, setTab] = useState<"cover" | "summary" | "rollup" | "detail" | "schedule">("detail");
   const [includeJebi, setIncludeJebi] = useState(true);
   const [targetDays, setTargetDays] = useState(30);
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // 세부내역서 기본 전체 접힘 — 대분류·소계만 먼저 보이게 (모바일 시인성)
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [meta, setMeta] = useState({ projectName: projectName || "", client: "", vendor: "INPICK 제휴 시공사", date: "" });
 
   const [rows, setRows] = useState<Row[]>(lines);
@@ -77,7 +72,18 @@ export default function EstimateProForm({ lines, category = "residential", proje
   const updateJebi = (key: string, patch: Partial<JebiItem>) =>
     setJebi((js) => js.map((j) => (j.key === key ? { ...j, ...patch } : j)));
   const toggleGroup = (t: string) =>
-    setCollapsed((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n; });
+    setExpanded((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n; });
+
+  // 공종별 선행공정 (공정표 순서 기반 — 견적에 있는 공종만)
+  const precedingByTrade = useMemo(() => {
+    const map: Record<string, string> = {};
+    const phases = (schedule?.phases ?? []) as Array<{ name: string; trades: string[] }>;
+    phases.forEach((p, i) => {
+      const prior = phases.slice(0, i).map((x) => x.name);
+      for (const t of p.trades) map[t] = prior.join(" → ");
+    });
+    return map;
+  }, [schedule]);
 
   return (
     <div className="bg-gray-50 rounded-2xl">
@@ -105,7 +111,7 @@ export default function EstimateProForm({ lines, category = "residential", proje
         {tab === "cover" && <CoverTab meta={meta} setMeta={setMeta} cost={cost} category={category} areaLabel={areaLabel} lineCount={sheet.lineCount} tradeCount={sheet.groups.length} />}
         {tab === "summary" && <CostTab cost={cost} jebi={jebi} margins={margins} role={role} includeJebi={includeJebi} setIncludeJebi={setIncludeJebi} updateJebi={updateJebi} setMargins={setMargins} />}
         {tab === "rollup" && <RollupTab sheet={sheet} cost={cost} />}
-        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} collapsed={collapsed} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} />}
+        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} />}
         {tab === "schedule" && <ScheduleTab schedule={schedule} targetDays={targetDays} setTargetDays={setTargetDays} />}
       </div>
     </div>
@@ -124,7 +130,7 @@ function CoverTab({ meta, setMeta, cost, category, areaLabel, lineCount, tradeCo
       </div>
       <div className="bg-slate-800 text-white rounded-lg px-6 py-5 text-center mb-6">
         <p className="text-xs text-slate-400">견 적 금 액 (VAT 포함)</p>
-        <p className="text-4xl font-bold tabular-nums mt-1">{won(cost.contractPrice)}<span className="text-lg font-normal text-slate-400 ml-1">원</span></p>
+        <p className="text-4xl font-bold tabular-nums mt-1 text-amber-400">{won(cost.contractPrice)}<span className="text-lg font-normal text-slate-400 ml-1">원</span></p>
         <p className="text-[11px] text-slate-400 mt-1">금 {numToKorean(cost.contractPrice)}원정</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-xs">
@@ -152,7 +158,7 @@ function Field({ label, children }: any) { return (<div><p className="text-[10px
 function RowKV({ k, v, strong, sub }: { k: string; v: number; strong?: boolean; sub?: boolean }) {
   return (
     <div className={`flex justify-between px-4 py-2 border-b border-slate-100 last:border-0 ${strong ? "bg-slate-800 text-white font-bold" : sub ? "bg-slate-50/50 text-slate-500" : ""}`}>
-      <span className={sub ? "pl-3 text-[11px]" : ""}>{k}</span><span className="tabular-nums">{won(v)}원</span>
+      <span className={sub ? "pl-3 text-[11px]" : ""}>{k}</span><span className={`tabular-nums ${strong ? "text-amber-400" : ""}`}>{won(v)}원</span>
     </div>
   );
 }
@@ -220,7 +226,7 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
             <Fixed label="공급가액" amount={cost.supplyPrice} strong />
             <Margin label="부가가치세" basis="공급가액 × 요율" amount={cost.vat} rate={margins.vat} onRate={(v: number) => setMargins({ ...margins, vat: v })} rateCls={rateCls} />
           </tbody>
-          <tfoot><tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (계약금액)</td><td colSpan={3} className="px-2 py-2.5 text-right text-base font-bold tabular-nums">{won(cost.contractPrice)}원</td></tr></tfoot>
+          <tfoot><tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (계약금액)</td><td colSpan={3} className="px-2 py-2.5 text-right text-base font-bold tabular-nums text-amber-400">{won(cost.contractPrice)}원</td></tr></tfoot>
         </table>
       </div>
     </div>
@@ -266,84 +272,98 @@ function RollupTab({ sheet, cost }: any) {
 }
 
 /* 4. 세부내역서 (편집) */
-function DetailTab({ sheet, groupBy, setGroupBy, collapsed, toggleGroup, updateRow, deleteRow }: any) {
+function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRow, deleteRow, precedingByTrade }: any) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-sm font-bold text-gray-900">세부내역서 — {groupBy === "room" ? "실별 × 부위별" : "공종별"} (편집 가능)</h2>
+        <h2 className="text-sm font-bold text-gray-900">세부내역서 — {groupBy === "room" ? "실별 × 부위별" : "공종별"}</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-            <button onClick={() => setGroupBy("room")} className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${groupBy === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>실별</button>
-            <button onClick={() => setGroupBy("trade")} className={`px-2.5 py-1 rounded-md text-[11px] font-medium ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
+            <button onClick={() => setGroupBy("room")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>실별</button>
+            <button onClick={() => setGroupBy("trade")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
           </div>
-          <span className="text-[11px] text-gray-400 hidden sm:inline">수량·단가 수정 · 자재 hover · 🗑 삭제</span>
+          <span className="text-[11px] text-gray-400 hidden sm:inline">항목을 누르면 세부 내역이 펼쳐집니다</span>
         </div>
       </div>
       {sheet.groups.map((g: any) => {
-        const open = !collapsed.has(g.trade);
+        const open = expanded.has(g.trade);
+        const preceding = precedingByTrade?.[g.trade];
         return (
-          <div key={g.trade} className="border-b border-gray-100 last:border-0">
-            <button onClick={() => toggleGroup(g.trade)} className="w-full flex items-center justify-between px-4 py-2.5 bg-slate-50 hover:bg-slate-100">
-              <div className="flex items-center gap-2">{open ? <ChevronDown className="w-4 h-4 text-slate-400" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}<span className="text-xs font-bold text-slate-700">{String(g.order).padStart(2, "0")}. {g.trade}</span><span className="text-[11px] text-slate-400">{g.lines.length}건</span></div>
-              <span className="text-xs font-bold text-slate-800 tabular-nums">{won(g.sum)}원</span>
+          <div key={g.trade} className="border-b border-zinc-100 last:border-0">
+            {/* 대분류 헤더 — 회색 / 소계 금액 — 파란색 */}
+            <button onClick={() => toggleGroup(g.trade)} className="w-full flex items-center justify-between gap-2 px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200/70 transition-colors">
+              <div className="flex min-w-0 items-center gap-2">
+                {open ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-400" /> : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" />}
+                <span className="truncate text-sm font-bold text-zinc-700">{String(g.order).padStart(2, "0")}. {g.trade}</span>
+                <span className="shrink-0 text-xs text-zinc-400">{g.lines.length}건</span>
+              </div>
+              <span className="shrink-0 text-sm font-bold text-blue-600 tabular-nums">{won(g.sum)}원</span>
             </button>
             {open && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-[11px] border-collapse">
-                  <thead><tr className="bg-white border-b border-slate-200 text-slate-500">
-                    <th className="px-2 py-1.5 text-center font-semibold w-14">부위</th>
-                    <th className="px-2 py-1.5 text-left font-semibold min-w-[160px]">품명 / 자재</th>
-                    <th className="px-2 py-1.5 text-left font-semibold min-w-[110px]">규격</th>
-                    <th className="px-2 py-1.5 text-center font-semibold w-9">단위</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-16">수량</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-20 bg-blue-50/40">재료단가</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-24 bg-blue-50/40">재료금액</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-20 bg-emerald-50/40">노무단가</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-24 bg-emerald-50/40">노무금액</th>
-                    <th className="px-2 py-1.5 text-right font-semibold w-28">합계</th><th className="w-8"></th>
-                  </tr></thead>
-                  <tbody>
-                    {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} />))}
-                    <tr className="bg-slate-50 border-t border-slate-200"><td colSpan={6} className="px-2 py-1.5 text-right font-bold text-slate-500">소계</td><td className="px-2 py-1.5 text-right tabular-nums font-bold text-slate-700">{won(g.matSum)}</td><td></td><td className="px-2 py-1.5 text-right tabular-nums font-bold text-slate-700">{won(g.labSum)}</td><td className="px-2 py-1.5 text-right tabular-nums font-bold text-blue-700">{won(g.sum)}</td><td></td></tr>
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {preceding && (
+                  <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs text-zinc-500">
+                    <span className="font-bold text-zinc-600">선행 공정</span> {preceding} <span className="text-zinc-400">→ 완료 후 착수</span>
+                  </div>
+                )}
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs border-collapse">
+                    <thead><tr className="bg-white border-b border-zinc-200 text-zinc-500">
+                      <th className="px-2 py-2 text-center font-semibold w-14">부위</th>
+                      <th className="px-2 py-2 text-left font-semibold min-w-[160px]">품명 / 자재</th>
+                      <th className="px-2 py-2 text-left font-semibold min-w-[110px]">규격</th>
+                      <th className="px-2 py-2 text-center font-semibold w-9">단위</th>
+                      <th className="px-2 py-2 text-right font-semibold w-16">수량</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">재료단가</th>
+                      <th className="px-2 py-2 text-right font-semibold w-24">재료금액</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">노무단가</th>
+                      <th className="px-2 py-2 text-right font-semibold w-24">노무금액</th>
+                      <th className="px-2 py-2 text-right font-semibold w-28">합계</th><th className="w-8"></th>
+                    </tr></thead>
+                    <tbody>
+                      {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} />))}
+                      <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-blue-600">{won(g.sum)}</td><td></td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         );
       })}
-      <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between"><span className="text-sm font-bold">직접공사비 합계</span><span className="text-lg font-bold tabular-nums">{won(sheet.directTotal)}원</span></div>
+      {/* 총계 — 노란색 표기 */}
+      <div className="bg-zinc-900 text-white px-4 py-3.5 flex items-center justify-between"><span className="text-sm font-bold">직접공사비 합계</span><span className="text-lg font-bold tabular-nums text-amber-400">{won(sheet.directTotal)}원</span></div>
     </div>
   );
 }
 function EditRow({ l, updateRow, deleteRow }: { l: Row; updateRow: any; deleteRow: any }) {
   const hasMat = l.brand !== "-";
-  const numCls = "w-full text-right text-[11px] bg-transparent hover:bg-blue-50 focus:bg-white border border-transparent hover:border-slate-200 focus:border-blue-400 rounded px-1 py-0.5 focus:outline-none tabular-nums";
+  const numCls = "w-full text-right text-xs bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent hover:border-zinc-200 focus:border-zinc-400 rounded px-1 py-1 focus:outline-none tabular-nums";
   return (
-    <tr className="border-b border-slate-50 hover:bg-blue-50/20">
-      <td className="px-2 py-1 text-center"><span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${PART_COLOR[l.part] || "bg-gray-100 text-gray-600"}`}>{l.part}</span></td>
-      <td className="px-2 py-1">
-        <div className="font-medium text-slate-800">{l.itemName}</div>
+    <tr className="border-b border-zinc-50 hover:bg-zinc-50/60">
+      <td className="px-2 py-1.5 text-center"><span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium ${PART_BADGE}`}>{l.part}</span></td>
+      <td className="px-2 py-1.5">
+        <div className="font-medium text-zinc-800">{l.itemName}</div>
         {hasMat && (
           <div className="relative inline-block group mt-0.5">
-            <span className="text-[10px] text-slate-500 border-b border-dotted border-slate-300 cursor-help">{l.brand} · {l.product}</span>
-            <div className="hidden group-hover:block absolute left-0 top-full mt-1 z-40 w-64 bg-white border border-slate-200 rounded-lg shadow-xl p-3">
-              <div className="flex items-start gap-2"><div className="w-14 h-14 rounded-md bg-slate-100 flex items-center justify-center flex-shrink-0"><ImageIcon className="w-5 h-5 text-slate-300" /></div><div className="min-w-0"><p className="text-[11px] font-bold text-slate-800">{l.brand}</p><p className="text-[11px] text-slate-600 leading-tight">{l.product}</p><p className="text-[10px] text-slate-400 mt-0.5">규격 {l.spec}</p></div></div>
-              {l.priceBand && <p className="text-[10px] text-blue-600 mt-2 font-medium">금액대 · {l.priceBand}</p>}
-              {l.imageHint && <p className="text-[10px] text-slate-500 mt-0.5">이미지 구현 · {l.imageHint}</p>}
+            <span className="text-[11px] text-zinc-500 border-b border-dotted border-zinc-300 cursor-help">{l.brand} · {l.product}</span>
+            <div className="hidden group-hover:block absolute left-0 top-full mt-1 z-40 w-64 bg-white border border-zinc-200 rounded-lg shadow-xl p-3">
+              <div className="flex items-start gap-2"><div className="w-14 h-14 rounded-md bg-zinc-100 flex items-center justify-center flex-shrink-0"><ImageIcon className="w-5 h-5 text-zinc-300" /></div><div className="min-w-0"><p className="text-xs font-bold text-zinc-800">{l.brand}</p><p className="text-xs text-zinc-600 leading-tight">{l.product}</p><p className="text-[11px] text-zinc-400 mt-0.5">규격 {l.spec}</p></div></div>
+              {l.priceBand && <p className="text-[11px] text-zinc-600 mt-2 font-medium">금액대 · {l.priceBand}</p>}
+              {l.imageHint && <p className="text-[11px] text-zinc-500 mt-0.5">이미지 구현 · {l.imageHint}</p>}
             </div>
           </div>
         )}
       </td>
-      <td className="px-2 py-1 text-slate-500">{l.spec}</td>
-      <td className="px-2 py-1 text-center text-slate-500">{l.unit}</td>
-      <td className="px-1 py-1"><input type="number" value={l.quantity} onChange={(e) => updateRow(l.id, { quantity: Number(e.target.value) || 0 })} className={numCls} /></td>
-      <td className="px-1 py-1 bg-blue-50/20"><input type="number" value={l.matUnit} onChange={(e) => updateRow(l.id, { matUnit: Number(e.target.value) || 0 })} className={numCls} /></td>
-      <td className="px-2 py-1 text-right tabular-nums text-slate-700 bg-blue-50/20">{won(l.matAmount)}</td>
-      <td className="px-1 py-1 bg-emerald-50/20"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-emerald-500 flex-shrink-0" /></span>}<input type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /></div></td>
-      <td className="px-2 py-1 text-right tabular-nums text-slate-700 bg-emerald-50/20">{won(l.labAmount)}</td>
-      <td className="px-2 py-1 text-right tabular-nums font-semibold text-slate-900">{won(l.amount)}</td>
-      <td className="px-1 py-1 text-center"><button onClick={() => deleteRow(l.id)} className="text-slate-300 hover:text-red-500" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td className="px-2 py-1.5 text-zinc-500">{l.spec}</td>
+      <td className="px-2 py-1.5 text-center text-zinc-500">{l.unit}</td>
+      <td className="px-1 py-1.5"><input type="number" value={l.quantity} onChange={(e) => updateRow(l.id, { quantity: Number(e.target.value) || 0 })} className={numCls} /></td>
+      <td className="px-1 py-1.5"><input type="number" value={l.matUnit} onChange={(e) => updateRow(l.id, { matUnit: Number(e.target.value) || 0 })} className={numCls} /></td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.matAmount)}</td>
+      <td className="px-1 py-1.5"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-zinc-400 flex-shrink-0" /></span>}<input type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /></div></td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.labAmount)}</td>
+      <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-zinc-900">{won(l.amount)}</td>
+      <td className="px-1 py-1.5 text-center"><button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-red-500" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
   );
 }

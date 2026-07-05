@@ -129,13 +129,14 @@ const SOURCE_LABEL: Record<LineSourceKind, string> = {
   standard_fallback_material: "표준 기본값",
 };
 
+// 색상 규칙(2026-07-04): 출처 배지는 무채색 통일 — 색은 대분류(회색)·소계(파랑)·총계(노랑)에만 사용
 const SOURCE_COLOR: Record<LineSourceKind, string> = {
-  user_selected_material: "border-emerald-300 bg-emerald-50 text-emerald-700",
-  vision_confirmed_material: "border-blue-300 bg-blue-50 text-blue-700",
-  vision_recommended_material: "border-sky-200 bg-sky-50 text-sky-700",
-  prompt_extracted_material: "border-amber-200 bg-amber-50 text-amber-700",
-  scope_default_material: "border-stone-300 bg-stone-50 text-stone-700",
-  standard_fallback_material: "border-rose-200 bg-rose-50 text-rose-700",
+  user_selected_material: "border-zinc-300 bg-zinc-100 text-zinc-700",
+  vision_confirmed_material: "border-zinc-300 bg-zinc-100 text-zinc-700",
+  vision_recommended_material: "border-zinc-200 bg-zinc-50 text-zinc-600",
+  prompt_extracted_material: "border-zinc-200 bg-zinc-50 text-zinc-600",
+  scope_default_material: "border-zinc-200 bg-zinc-50 text-zinc-500",
+  standard_fallback_material: "border-zinc-200 bg-zinc-50 text-zinc-500",
 };
 
 function EstimateSourceBadge({
@@ -243,6 +244,8 @@ async function downloadEstimatePdf(input: {
   grandTotal: { main: number; aux: number; labor: number; total: number };
   matchMetaByRoom: Record<string, Array<{ matchStatus?: "confirmed" | "recommended" | "fallback"; confidence?: number; surface?: string }>>;
   constructionEstimate: ConstructionEstimate | null;
+  /** AI 디자인 이미지 — PDF 부록 첨부 (2026-07-04) */
+  designImages?: Array<{ url: string; label: string }>;
 }) {
   const res = await fetch("/api/inpick/estimate-documents", {
     method: "POST",
@@ -283,6 +286,7 @@ async function downloadEstimatePdf(input: {
   const { pdfBlob } = await renderEstimatePackagePdf({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     package: data.package as any,
+    designImages: input.designImages,
   });
   const url = URL.createObjectURL(pdfBlob);
   const a = document.createElement("a");
@@ -2330,6 +2334,10 @@ function EstimatePage() {
                             grandTotal,
                             matchMetaByRoom,
                             constructionEstimate,
+                            designImages: designOutputsForGallery.map((o) => ({
+                              url: o.imageUrl,
+                              label: o.targetName,
+                            })),
                           });
                         } catch (e) {
                           console.error("[estimate] PDF download failed:", e);
@@ -2565,6 +2573,10 @@ function EstimatePage() {
               grandTotal,
               matchMetaByRoom,
               constructionEstimate,
+              designImages: designOutputsForGallery.map((o) => ({
+                url: o.imageUrl,
+                label: o.targetName,
+              })),
             });
           } finally {
             setPdfDownloading(false);

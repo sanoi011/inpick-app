@@ -222,8 +222,9 @@ export default function EstimatePdfPurchaseModal({
               </div>
             )}
             <ul className="mt-3 space-y-1 text-[0.75rem] text-primary-900/70">
-              <li>· 갑지 + 총괄표 + 공종별 내역서 + 자재집계표 포함</li>
-              <li>· A4 가로 7페이지 PDF</li>
+              <li>· 갑지 + 총괄표 + 공종별 내역서 + 자재집계표</li>
+              <li>· 공정 순서(선행공정) 분석 + 공정위 표준계약서 양식</li>
+              <li>· AI 디자인 이미지 부록 포함 (A4 가로 PDF)</li>
               <li>· 1회 다운로드 권한 (재발급 가능)</li>
             </ul>
           </div>

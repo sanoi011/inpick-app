@@ -17,9 +17,17 @@
 import jsPDF from "jspdf";
 import type { EstimateDocumentPackage } from "../types";
 import { PAGE, loadNanumGothicFont, fmtWon, fmtDate, truncate, fmtQuantity } from "./format";
+import {
+  drawSchedulePage,
+  drawStandardContractPages,
+  drawDesignImagePages,
+  type DesignImageInput,
+} from "./pages-extra";
 
 export async function renderEstimatePackagePdf(input: {
   package: EstimateDocumentPackage;
+  /** 프로젝트 AI 디자인 이미지 — 부록 페이지로 첨부 (2026-07-04 확장) */
+  designImages?: DesignImageInput[];
 }): Promise<{ pdfBlob: Blob; pageCount: number }> {
   const pkg = input.package;
   const doc = new jsPDF({
@@ -60,6 +68,19 @@ export async function renderEstimatePackagePdf(input: {
 
   // ─── 7. 특기사항/제외사항 (P13-1 신규) ───
   drawAssumptionsExclusionsPage(doc, pkg);
+
+  // ─── 8. 공정 순서·선행공정 분석 (2026-07-04 확장) ───
+  doc.addPage("a4", "landscape");
+  drawSchedulePage(doc, pkg);
+
+  // ─── 9. 공정위 표준계약서 양식 (참고용 — 업체 매칭 시 상세 계약서 별도 제공) ───
+  doc.addPage("a4", "landscape");
+  drawStandardContractPages(doc, pkg);
+
+  // ─── 10+. AI 디자인 이미지 부록 ───
+  if (input.designImages && input.designImages.length > 0) {
+    await drawDesignImagePages(doc, input.designImages);
+  }
 
   // 페이지 번호 + footer
   const total = doc.getNumberOfPages();
