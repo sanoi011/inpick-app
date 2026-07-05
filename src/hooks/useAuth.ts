@@ -10,20 +10,34 @@ export function useAuth() {
   const supabase = createClient();
 
   useEffect(() => {
-    // 현재 유저 가져오기
+    let done = false;
+    // 1) getSession — 로컬 저장소에서 즉시 복원(네트워크 X) → 로그인 UI 빠르게 반영
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (done) return;
+      if (session?.user) {
+        setUser(session.user);
+        setLoading(false);
+      }
+    });
+    // 2) getUser — 서버 검증(느림)으로 세션 유효성 확정
     supabase.auth.getUser().then(({ data: { user } }) => {
+      done = true;
       setUser(user);
       setLoading(false);
     });
 
-    // 상태 변경 감지
+    // 상태 변경 감지 (로그인/로그아웃 즉시 반영)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         setUser(session?.user ?? null);
+        setLoading(false);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      done = true;
+      subscription.unsubscribe();
+    };
   }, [supabase.auth]);
 
   const signOut = async () => {

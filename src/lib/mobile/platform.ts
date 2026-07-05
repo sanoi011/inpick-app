@@ -25,12 +25,21 @@ export type InpickPaymentChannel =
 export function detectPlatform(): InpickRuntimePlatform {
   if (typeof window === "undefined") return "unknown";
 
-  // Capacitor 환경 감지
-  const w = window as unknown as { Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean } };
-  if (w.Capacitor?.isNativePlatform?.()) {
-    const platform = w.Capacitor.getPlatform?.();
+  // Capacitor 환경 감지 — isNativePlatform()가 없거나 false여도 getPlatform()으로 재확인.
+  // (server.url 원격 로드 시 브릿지 주입 타이밍/버전에 따라 isNativePlatform이 늦게 붙을 수 있음)
+  const w = window as unknown as {
+    Capacitor?: { getPlatform?: () => string; isNativePlatform?: () => boolean; platform?: string };
+  };
+  const cap = w.Capacitor;
+  if (cap) {
+    const platform = cap.getPlatform?.() ?? cap.platform;
     if (platform === "ios") return "ios";
     if (platform === "android") return "android";
+    if (cap.isNativePlatform?.()) {
+      // 플랫폼 문자열이 없어도 네이티브가 확실하면 UA로 보정
+      if (/android/i.test(navigator.userAgent)) return "android";
+      return "ios";
+    }
   }
 
   // PWA 감지 (standalone display mode)

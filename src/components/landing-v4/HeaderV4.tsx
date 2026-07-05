@@ -23,7 +23,13 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
   const [servicesOpen, setServicesOpen] = useState(false);
   const servicesRef = useRef<HTMLDivElement>(null);
   const { authenticated, balance, loading } = useTokens();
-  const { user, signOut } = useAuth();
+  const { user, loading: authLoading, signOut } = useAuth();
+
+  // 로그인 판단 — useAuth.user(빠름)가 뜨면 즉시 로그인 UI로 전환.
+  // 토큰 잔액(useTokens) 로딩을 기다리느라 로그인 버튼이 몇 초 깜빡이던 문제 해결.
+  const isLoggedIn = !!user || authenticated;
+  // 인증 확인 중(둘 다 아직 모름) — 로그인 버튼을 성급히 보여주지 않고 자리만 유지
+  const authChecking = (authLoading || loading) && !isLoggedIn;
 
   // 외부 클릭 시 dropdown 닫기
   useEffect(() => {
@@ -244,7 +250,10 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
         </div>
 
         <div className="flex items-center gap-2 text-[13px] sm:gap-2.5 sm:text-[14px]">
-          {!loading && authenticated ? (
+          {authChecking ? (
+            // 확인 중 — 로그인 버튼 대신 중립 플레이스홀더 (깜빡임 방지)
+            <div className="h-9 w-24 animate-pulse rounded-full bg-zinc-200/40" aria-hidden />
+          ) : isLoggedIn ? (
             <>
               {/* 토큰 잔액 배지 */}
               <motion.a
