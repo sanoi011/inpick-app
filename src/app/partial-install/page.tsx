@@ -105,6 +105,7 @@ export default function PartialInstallPage() {
   const [sort, setSort] = useState<ProductSort>("sim");
   const [bandIdx, setBandIdx] = useState(0);
   const [naverTotal, setNaverTotal] = useState<number | null>(null);
+  const [degraded, setDegraded] = useState(false);
   const [nextStart, setNextStart] = useState(1);
   const [loadingMore, setLoadingMore] = useState(false);
   // 최신 요청 식별자 — 정렬 연타 등으로 늦게 도착한 이전 응답이 최신 결과를 덮어쓰는 것 방지
@@ -129,6 +130,7 @@ export default function PartialInstallPage() {
       const data = await fetchProductPage(term, sortKey, 1);
       if (seq !== productReqSeq.current) return; // 더 최신 요청이 있음 — 이 응답 폐기
       setProducts(data.products ?? []);
+      setDegraded(!!data.degraded);
       setNaverTotal(typeof data.total === "number" ? data.total : null);
       setNextStart(1 + PAGE_SIZE);
     } catch {
@@ -534,7 +536,9 @@ export default function PartialInstallPage() {
               </div>
             ) : visibleProducts.length === 0 ? (
               <div className="mt-6 border border-dashed border-zinc-300 py-16 text-center text-sm text-zinc-400">
-                {products.length > 0
+                {degraded
+                  ? "상품 정보를 일시적으로 불러오지 못했어요. 잠시 후 다시 시도해주세요."
+                  : products.length > 0
                   ? "이 가격대에 해당하는 상품이 없어요. 다른 가격대를 선택해보세요."
                   : "검색 결과가 없습니다. 다른 검색어로 시도해보세요."}
               </div>

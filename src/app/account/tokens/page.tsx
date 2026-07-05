@@ -233,23 +233,14 @@ function TokensPage() {
     setSelectedPlan(plan);
   };
 
+  // 구독/사업자 플랜 — 아직 결제 미연동. 무료 토큰 지급(구 시뮬레이션)은 제거됨(C3).
   const handlePay = async () => {
     if (!selectedPlan) return;
     setPaying(true);
     try {
-      await new Promise((r) => setTimeout(r, 1200));
-      const fakePaymentId = `sim_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      // 토큰 구매 시 50개씩 충전 (간단 처리), 구독은 별도 처리
-      if (selectedPlan.id === "consumer-token") {
-        await tokens.purchase(50, fakePaymentId, {
-          plan: selectedPlan.id,
-          price: 50 * 500,
-          simulated: true,
-        });
-        setSuccessInfo({ title: "토큰 50개 충전 완료" });
-      } else {
-        setSuccessInfo({ title: `${selectedPlan.title} 가입 완료 (시뮬레이션)` });
-      }
+      setSuccessInfo({
+        title: `${selectedPlan.title} — 사전 예약 접수`,
+      });
       setSelectedPlan(null);
     } finally {
       setPaying(false);
@@ -495,7 +486,8 @@ function TokensPage() {
                 </p>
 
                 <div className="mt-5 rounded-xl bg-primary-50/70 p-3 text-[0.78rem] text-primary-900/70">
-                  결제 시뮬레이션 — 실제 PG 연동 전 단계입니다. 토스페이먼츠 통합 후 실제 결제됩니다.
+                  이 플랜은 출시 준비 중이에요. 사전 예약해 두시면 오픈 시 가장 먼저 안내드립니다.
+                  지금은 <b>토큰 충전</b>으로 모든 기능을 이용할 수 있어요.
                 </div>
 
                 <div className="mt-5 flex gap-2">
@@ -512,10 +504,10 @@ function TokensPage() {
                   >
                     {paying ? (
                       <>
-                        <Loader2 className="h-4 w-4 animate-spin" /> 결제 중…
+                        <Loader2 className="h-4 w-4 animate-spin" /> 접수 중…
                       </>
                     ) : (
-                      <>결제하기</>
+                      <>사전 예약</>
                     )}
                   </button>
                 </div>

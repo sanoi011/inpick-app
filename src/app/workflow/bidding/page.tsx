@@ -19,6 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
+import { getOrCreateWorkflowProjectId } from "@/lib/inpick/estimate-context/client";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
 import type { Step2Data } from "@/components/workflow/Step2Designer";
 
@@ -143,23 +144,35 @@ export default function BiddingPage() {
       }
 
       // 실제 RFQ 등록 + 지역 사업자 자동 fanout
-      const estimateId = sessionStorage.getItem("workflow_estimate_id") || `temp-${Date.now()}`;
+      // estimateId 대신 안정적인 워크플로우 projectId를 보내 estimates 행을 upsert(2026-07-05 H2).
+      const consumerProjectId = getOrCreateWorkflowProjectId();
+      let publishOk = false;
       try {
-        await fetch("/api/rfq/publish", {
+        const res = await fetch("/api/rfq/publish", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            estimateId,
+            consumerProjectId,
             noticeNo,
             region,
+            addressText: region.fullAddress,
             deadlineAt: new Date(today.getTime() + period * 86400000).toISOString(),
             budgetWon: (step1?.basicInfo.budget ?? 0) * 10000,
             spaceType: step1?.buildingType === "apartment" ? "주거" : step1?.buildingType === "store" ? "상업" : "주거",
             exclusiveAreaM2: step1?.basicInfo.selectedPyeong?.exclusiveArea,
           }),
         });
-      } catch {
-        /* fanout 실패해도 진행 */
+        publishOk = res.ok;
+        if (!res.ok) {
+          const d = await res.json().catch(() => ({}));
+          console.warn("[bidding] rfq publish failed:", d);
+        }
+      } catch (e) {
+        console.warn("[bidding] rfq publish error:", e);
+      }
+      if (!publishOk) {
+        alert("공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.");
+        return;
       }
       // 마이페이지 계약 진행으로 이동 (입찰 비교)
       router.push("/mypage/contracts/progress");

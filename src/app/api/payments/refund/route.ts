@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { debitTokensForPaymentRefund } from "@/lib/inpick/tokens/ledger";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,9 +44,8 @@ export async function POST(req: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 관리자 / 사용자 인증 분기
-  const isAdminRequest =
-    req.headers.get("authorization")?.startsWith("Bearer ") || false;
+  // 관리자 / 사용자 인증 분기 — 관리자는 실제 토큰 검증(단순 Bearer 존재 확인은 IDOR)
+  const isAdminRequest = isAdminAuthorized(req);
   if (!user && !isAdminRequest) {
     return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
   }

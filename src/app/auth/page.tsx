@@ -124,6 +124,9 @@ function OAuthRow({
 function ConsumerAuthForm() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  // 복귀 URL — 코드베이스에 returnUrl/next/redirect 세 이름이 혼재하므로 모두 허용(2026-07-05 로그인 후 복귀 실패 수정)
+  const returnUrl =
+    searchParams.get("returnUrl") || searchParams.get("next") || searchParams.get("redirect");
   const [showSignupModal, setShowSignupModal] = useState(searchParams.get("mode") === "signup");
   const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState("");
@@ -179,7 +182,6 @@ function ConsumerAuthForm() {
         /* non-blocking: 후처리 실패는 로그인 흐름을 막지 않음 */
       }
       // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
-      const returnUrl = searchParams.get("returnUrl");
       window.location.href = returnUrl || "/";
     } catch (err) {
       console.error("[auth] login error", err);
@@ -220,7 +222,6 @@ function ConsumerAuthForm() {
     setError("");
     setOauthLoading(provider);
     try {
-      const returnUrl = searchParams.get("returnUrl");
       if (provider === "naver") {
         // 네이버는 Supabase 공식 미지원 — 커스텀 OAuth 라우트로 위임
         const params = new URLSearchParams();

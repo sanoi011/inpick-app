@@ -269,7 +269,70 @@ export async function creditTokensAfterPayment(input: {
     });
   }
 
+  // 3) ⚠️ 라이브 잔액 미러링 — 잔액표시(user/balance)와 AI 차감(credit-policy)은
+  //    token_wallets가 아니라 user_tokens를 본다. 결제로 산 토큰이 '안 보이고 못 쓰이는'
+  //    문제(2026-07-05 버그헌트 C2) 해결: 신규 충전 시에만 user_tokens에도 반영.
+  if (!paidResult.idempotent) {
+    await mirrorCreditToLiveBalance(
+      input.userId,
+      input.paidCredits + Math.max(0, input.bonusCredits),
+      input.paymentId,
+    );
+  }
+
   return { balanceAfter: paidResult.balanceAfter, idempotent: paidResult.idempotent };
+}
+
+/**
+ * 결제 충전분을 라이브 잔액 원장(user_tokens)에 미러링.
+ * user_tokens가 없으면 생성. 실패해도 throw 안 함(원장 기록은 이미 성공).
+ */
+async function mirrorCreditToLiveBalance(
+  userId: string,
+  amount: number,
+  paymentId: string,
+): Promise<void> {
+  if (amount <= 0) return;
+  const admin = getAdmin();
+  if (!admin) return;
+  try {
+    // 같은 결제가 이미 미러링됐는지 확인 (webhook+confirm 이중 경로 멱등)
+    const { data: dup } = await admin
+      .from("token_transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("type", "purchase")
+      .contains("metadata", { paymentId })
+      .maybeSingle();
+    if (dup) return;
+
+    const { data: tok } = await admin
+      .from("user_tokens")
+      .select("balance, total_purchased")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const prev = (tok as { balance?: number; total_purchased?: number } | null) ?? null;
+    const newBal = (prev?.balance ?? 0) + amount;
+    if (prev) {
+      await admin
+        .from("user_tokens")
+        .update({ balance: newBal, total_purchased: (prev.total_purchased ?? 0) + amount })
+        .eq("user_id", userId);
+    } else {
+      await admin
+        .from("user_tokens")
+        .insert({ user_id: userId, balance: newBal, total_purchased: amount, total_used: 0 });
+    }
+    await admin.from("token_transactions").insert({
+      user_id: userId,
+      type: "purchase",
+      amount,
+      balance_after: newBal,
+      metadata: { paymentId, mirrored: true },
+    });
+  } catch (e) {
+    console.warn("[ledger] mirrorCreditToLiveBalance failed (non-fatal):", e);
+  }
 }
 
 /**

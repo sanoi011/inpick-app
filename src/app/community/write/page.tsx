@@ -59,24 +59,30 @@ function WriteContent() {
       .split(/[,\s]+/)
       .map((t) => t.replace(/^#/, "").trim())
       .filter(Boolean);
-    const res = await fetch("/api/community/posts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ boardSlug, title, content, tags: tagsArr }),
-    });
-    const data = await res.json();
-    setSubmitting(false);
-    if (res.ok && data.postId) {
-      if (data.privacyRemoved > 0) {
-        toast({
-          type: "info",
-          title: "개인정보 자동 마스킹",
-          message: `${data.privacyRemoved}건의 개인정보가 자동 가려졌습니다.`,
-        });
+    try {
+      const res = await fetch("/api/community/posts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ boardSlug, title, content, tags: tagsArr }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.postId) {
+        if (data.privacyRemoved > 0) {
+          toast({
+            type: "info",
+            title: "개인정보 자동 마스킹",
+            message: `${data.privacyRemoved}건의 개인정보가 자동 가려졌습니다.`,
+          });
+        }
+        router.replace(`/community/posts/${data.postId}`);
+        return; // 성공 — 페이지 이동, submitting 유지(언마운트됨)
       }
-      router.replace(`/community/posts/${data.postId}`);
-    } else {
-      toast({ type: "error", title: "오류", message: data.hint || "작성 실패" });
+      toast({ type: "error", title: "오류", message: data.hint || data.error || "작성 실패" });
+    } catch {
+      // 네트워크/JSON 오류에도 버튼이 영구 잠기지 않게 (2026-07-05 무한 로딩 수정)
+      toast({ type: "error", title: "네트워크 오류", message: "잠시 후 다시 시도해주세요." });
+    } finally {
+      setSubmitting(false);
     }
   };
 

@@ -123,14 +123,36 @@ export async function verifyAppStoreTransaction(
     if (parts.length !== 3) {
       return { verified: false, error: "invalid JWS format" };
     }
+    // 이 payload는 Apple App Store Server API(인증된 우리 JWT)로 직접 조회한 것이므로 출처는 신뢰 가능.
+    // 단 아래 두 가지는 반드시 강제 — 미검증 시 샌드박스/타앱 트랜잭션이 실지급으로 이어짐(2026-07-05 H3).
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf-8")) as {
       productId: string;
       transactionId: string;
       originalTransactionId: string;
+      bundleId?: string;
       purchaseDate: number;
       expiresDate?: number;
       environment: "Sandbox" | "Production";
     };
+
+    // 1) 환경 일치 — production 운영에서 Sandbox 트랜잭션(무료 결제) 차단
+    const expectedEnv = env === "production" ? "Production" : "Sandbox";
+    if (payload.environment !== expectedEnv) {
+      return {
+        verified: false,
+        error: `environment_mismatch: got ${payload.environment}, expected ${expectedEnv}`,
+        rawPayload: payload as unknown as Record<string, unknown>,
+      };
+    }
+    // 2) 번들 ID 일치 — 타 앱 트랜잭션 차단
+    const expectedBundle = process.env.APP_STORE_BUNDLE_ID;
+    if (expectedBundle && payload.bundleId && payload.bundleId !== expectedBundle) {
+      return {
+        verified: false,
+        error: `bundle_mismatch: got ${payload.bundleId}, expected ${expectedBundle}`,
+        rawPayload: payload as unknown as Record<string, unknown>,
+      };
+    }
 
     return {
       verified: true,

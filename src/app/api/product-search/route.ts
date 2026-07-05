@@ -146,7 +146,11 @@ export async function GET(req: NextRequest) {
     fetchNaver(query, display, sort, start),
   ]);
 
-  const shop = naver?.products ?? mockProducts(query).slice(0, display);
+  // 네이버 실패 시: 운영에서는 가짜(mock) 상품·가격을 진짜처럼 노출하지 않는다(2026-07-05 H6).
+  //   → degraded 플래그로 UI가 '일시적으로 불러오지 못함'을 정직하게 표시하고, 견적도 산출하지 않음.
+  const degraded = !naver;
+  const isProd = process.env.NODE_ENV === "production";
+  const shop = naver?.products ?? (isProd ? [] : mockProducts(query).slice(0, display));
   // 내부 카탈로그 우선 + 쇼핑몰, 중복(동일 링크) 제거
   const seen = new Set<string>();
   const products = [...internal, ...shop].filter((p) => {
@@ -156,10 +160,11 @@ export async function GET(req: NextRequest) {
     return true;
   });
 
-  const source = naver ? (internal.length ? "internal+naver" : "naver") : internal.length ? "internal+mock" : "mock";
+  const source = naver ? (internal.length ? "internal+naver" : "naver") : internal.length ? "internal" : isProd ? "unavailable" : "mock";
   return NextResponse.json({
     products,
     source,
+    degraded,
     internalCount: internal.length,
     total: naver?.total ?? products.length,
     start,

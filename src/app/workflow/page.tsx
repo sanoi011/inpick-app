@@ -355,7 +355,9 @@ export default function WorkflowPage() {
           : step1.workflowEntry === "photo_commercial"
             ? "commercial"
             : "apartment";
-      const projectId = sessionStorage.getItem("workflow_project_id");
+      // ⚠️ projectId는 localStorage에 저장됨(getOrCreateWorkflowProjectId) — 직접 sessionStorage를
+      //    읽으면 항상 null이라 정밀 견적(context evidence)이 전원 비활성화됐던 버그(2026-07-05 H1).
+      const projectId = getOrCreateWorkflowProjectId();
       if (projectId) {
         const res = await fetch("/api/inpick/estimate-context/finalize", {
           method: "POST",
@@ -550,8 +552,9 @@ export default function WorkflowPage() {
                         sessionStorage.removeItem("workflow_step1");
                         sessionStorage.removeItem("workflow_step2");
                         sessionStorage.removeItem("workflow_step");
-                        // P1: workflow projectId도 함께 초기화 (새 세션 시작)
+                        // P1: workflow projectId도 함께 초기화 (새 세션 시작) — localStorage가 정본
                         sessionStorage.removeItem("workflow_project_id");
+                        localStorage.removeItem("workflow_project_id");
                       } catch {
                         /* private mode */
                       }

@@ -17,23 +17,35 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface Body {
-  estimateId: string;
+  /** 워크플로우 projectId 또는 기존 estimates.id (호환) */
+  estimateId?: string;
+  consumerProjectId?: string;
   noticeNo?: string;
-  region: { sido: string; gugun: string; fullAddress?: string };
+  /** 객체 또는 문자열("대전 유성구") 모두 허용 */
+  region: { sido: string; gugun?: string; fullAddress?: string } | string;
   deadlineAt: string;
   budgetWon?: number;
   spaceType?: string;
   exclusiveAreaM2?: number;
+  addressText?: string;
+}
+
+/** region을 {sido,gugun}로 정규화 (문자열 "대전 유성구" → {sido:"대전", gugun:"유성구"}) */
+function normalizeRegion(r: Body["region"]): { sido: string; gugun: string } {
+  if (typeof r === "string") {
+    const parts = r.trim().split(/\s+/);
+    return { sido: parts[0] || "", gugun: parts.slice(1).join(" ") };
+  }
+  return { sido: r?.sido || "", gugun: r?.gugun || "" };
 }
 
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Body;
-    if (!body.estimateId || !body.region?.sido) {
-      return NextResponse.json(
-        { error: "estimateId, region.sido 필수" },
-        { status: 400 },
-      );
+    const region = normalizeRegion(body.region);
+    const projectRef = body.consumerProjectId || body.estimateId;
+    if (!region.sido) {
+      return NextResponse.json({ error: "region 필수" }, { status: 400 });
     }
 
     const supabase = createServerClient();
@@ -46,34 +58,70 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    // 1) estimate 상태 업데이트 + RFQ 메타 저장
-    const { error: estErr } = await admin
-      .from("estimates")
-      .update({
-        status: "open",
-        rfq_data: {
-          noticeNo: body.noticeNo,
-          publishedAt: new Date().toISOString(),
-          deadlineAt: body.deadlineAt,
-          region: body.region,
-          spaceType: body.spaceType,
-          exclusiveAreaM2: body.exclusiveAreaM2,
-          budgetWon: body.budgetWon,
-        },
-      })
-      .eq("id", body.estimateId)
-      .eq("user_id", user.id);
-    if (estErr) {
-      return NextResponse.json(
-        { error: "견적 상태 업데이트 실패", detail: estErr.message },
-        { status: 500 },
-      );
+    // 1) estimates 행 확보 — 없으면 생성(upsert). 워크플로우는 construction_estimates에만
+    //    저장하므로 RFQ용 estimates 행이 없을 수 있음(2026-07-05 H2: 공고가 실제로 안 올라가던 원인).
+    const rfqData = {
+      noticeNo: body.noticeNo,
+      publishedAt: new Date().toISOString(),
+      deadlineAt: body.deadlineAt,
+      region,
+      spaceType: body.spaceType,
+      exclusiveAreaM2: body.exclusiveAreaM2,
+      budgetWon: body.budgetWon,
+    };
+
+    let estimateId: string | null = null;
+    // 기존 행 탐색: 명시 id → consumer_project_id
+    if (projectRef && !projectRef.startsWith("temp-")) {
+      const { data: byId } = await admin
+        .from("estimates")
+        .select("id")
+        .eq("user_id", user.id)
+        .or(`id.eq.${projectRef},consumer_project_id.eq.${projectRef}`)
+        .maybeSingle();
+      estimateId = (byId as { id: string } | null)?.id ?? null;
+    }
+
+    if (estimateId) {
+      const { error: updErr } = await admin
+        .from("estimates")
+        .update({
+          status: "open",
+          region: region.sido,
+          space_type: body.spaceType ?? null,
+          address: body.addressText ?? null,
+          rfq_data: rfqData,
+          consumer_project_id: body.consumerProjectId ?? projectRef ?? null,
+        })
+        .eq("id", estimateId)
+        .eq("user_id", user.id);
+      if (updErr) {
+        return NextResponse.json({ error: "견적 상태 업데이트 실패", detail: updErr.message }, { status: 500 });
+      }
+    } else {
+      const { data: inserted, error: insErr } = await admin
+        .from("estimates")
+        .insert({
+          user_id: user.id,
+          status: "open",
+          region: region.sido,
+          space_type: body.spaceType ?? null,
+          address: body.addressText ?? null,
+          rfq_data: rfqData,
+          consumer_project_id: body.consumerProjectId ?? (projectRef && !projectRef.startsWith("temp-") ? projectRef : null),
+        })
+        .select("id")
+        .single();
+      if (insErr || !inserted) {
+        return NextResponse.json({ error: "견적 공고 생성 실패", detail: insErr?.message }, { status: 500 });
+      }
+      estimateId = (inserted as { id: string }).id;
     }
 
     // 2) 지역 매칭 사업자 조회 — sido 또는 '전국' 사업자
     const sidoKeys = [
-      body.region.sido,
-      body.region.sido.replace(/(특별시|광역시|특별자치시|도|특별자치도)/g, ""),
+      region.sido,
+      region.sido.replace(/(특별시|광역시|특별자치시|도|특별자치도)/g, ""),
       "전국",
       "all",
     ];
@@ -92,14 +140,14 @@ export async function POST(req: NextRequest) {
       const rows = targets.map((c) => ({
         user_id: c.id,
         type: "rfq_published",
-        title: `새 입찰 공고 — ${body.region.sido} ${body.region.gugun}`,
+        title: `새 입찰 공고 — ${region.sido} ${region.gugun}`,
         message: `${body.spaceType || "주거"} ${body.exclusiveAreaM2 ?? "?"}㎡ · 예산 ₩${(body.budgetWon ?? 0).toLocaleString()} · 마감 ${body.deadlineAt.slice(0, 10)}`,
-        link: `/contractor/bids?estimateId=${body.estimateId}`,
+        link: `/contractor/bids?estimateId=${estimateId}`,
         is_read: false,
         metadata: {
-          estimateId: body.estimateId,
+          estimateId,
           noticeNo: body.noticeNo,
-          region: body.region,
+          region,
           deadlineAt: body.deadlineAt,
         },
       }));
@@ -110,7 +158,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      estimateId: body.estimateId,
+      estimateId,
       fanoutCount,
       targetContractors: targets.length,
     });

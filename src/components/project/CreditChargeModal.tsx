@@ -9,6 +9,8 @@ import {
   CREDITS_PER_GENERATION,
   FREE_GENERATION_LIMIT,
 } from "@/types/credits";
+import { isNativeApp } from "@/lib/mobile/platform";
+import { TokenPurchaseDrawer } from "@/components/billing/TokenPurchaseDrawer";
 
 interface CreditChargeModalProps {
   open: boolean;
@@ -60,6 +62,18 @@ export default function CreditChargeModal({
     credits: number;
     newBalance: number;
   } | null>(null);
+
+  // 네이티브 앱 — 외부 PG(토스) 노출 금지(App Store 3.1.1). 인앱결제 드로어로 위임(2026-07-05 H5).
+  if (isNativeApp()) {
+    return (
+      <TokenPurchaseDrawer
+        open={open}
+        onOpenChange={(o) => { if (!o) onClose(); }}
+        reason="manual_topup"
+        onProvisioned={() => { void reload(); }}
+      />
+    );
+  }
 
   if (!open) return null;
 

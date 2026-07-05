@@ -216,27 +216,31 @@ export function TokensProvider({ children }: { children: ReactNode }) {
         data: { user },
       } = await supabase.auth.getUser();
       if (user) {
-        // server route — service_role로 RLS 우회 (가장 신뢰할 수 있는 경로)
+        // 로그인 사용자는 서버 차감이 유일한 정본 — 실패 시 로컬 옵티미스틱으로 넘어가면
+        // 서버 차감 없이 기능이 실행되는 무료 사용 구멍이 됨(2026-07-05 H8). 항상 여기서 반환.
         try {
           const res = await fetch("/api/user/consume", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ amount, feature }),
           });
-          const d = await res.json();
+          const d = await res.json().catch(() => ({}));
           if (res.ok && d.success) {
             await loadFromSupabase(user.id);
             return true;
           }
           if (res.status === 402) {
             console.warn("[tokens] 잔액 부족:", d);
-            return false;
+          } else {
+            console.warn("[tokens] /api/user/consume 실패:", res.status, d);
           }
-          console.warn("[tokens] /api/user/consume 실패:", d);
+          return false;
         } catch (e) {
           console.warn("[tokens] /api/user/consume throw:", e);
+          return false; // 네트워크 오류 시에도 차감 없이 통과시키지 않음
         }
       }
+      // 비로그인(익명)만 로컬 폴백 — 서버 잔액이 없으므로 로컬 보너스로 동작
       let ok = false;
       setState((curr) => {
         if (curr.balance < amount) {
