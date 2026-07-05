@@ -25,6 +25,20 @@ export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
  */
 export const NATIVE_OAUTH_REDIRECT = "kr.inpick.app://auth/callback";
 
+/**
+ * iOS는 SFSafariViewController가 302→커스텀 스킴을 간헐 차단
+ * ("주소가 유효하지 않아 Safari가 페이지를 열 수 없습니다") →
+ * HTTPS 브릿지 페이지(/auth/app-return)로 복귀 후 자동/버튼으로 딥링크 점프.
+ * Android(Chrome Custom Tabs)는 직접 딥링크가 검증돼 있어 유지.
+ * ⚠️ Supabase 대시보드 Redirect URLs에 https://www.interiorpick.co.kr/auth/app-return 등록 필요.
+ */
+function nativeRedirectTarget(platform: ReturnType<typeof detectPlatform>): string {
+  if (platform === "ios" && typeof window !== "undefined") {
+    return `${window.location.origin}/auth/app-return`;
+  }
+  return NATIVE_OAUTH_REDIRECT;
+}
+
 export async function startOAuth(
   supabase: SupabaseClient,
   provider: SupabaseOAuthProvider,
@@ -36,8 +50,8 @@ export async function startOAuth(
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
-      // 네이티브: 딥링크로 복귀(appUrlOpen 리스너가 처리) / 웹·PWA: 기존 콜백 URL
-      redirectTo: isNative ? NATIVE_OAUTH_REDIRECT : opts.redirectTo,
+      // 네이티브: iOS=브릿지 페이지 / Android=딥링크 · 웹·PWA: 기존 콜백 URL
+      redirectTo: isNative ? nativeRedirectTarget(platform) : opts.redirectTo,
       queryParams: opts.queryParams,
       // 네이티브: 자동 redirect 막고 우리가 외부 브라우저로 직접 오픈
       skipBrowserRedirect: isNative,

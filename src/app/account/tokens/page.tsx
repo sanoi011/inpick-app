@@ -17,8 +17,11 @@ import {
   Zap,
   ChevronRight,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import LenisProvider from "@/components/landing-v4/LenisProvider";
 import { useTokens } from "@/hooks/useTokens";
+import { TokenPurchaseDrawer } from "@/components/billing/TokenPurchaseDrawer";
+import { isNativeApp } from "@/lib/mobile/platform";
 
 // ───── 사용자(소비자) 플랜 ─────
 const CONSUMER_PLANS = [
@@ -214,6 +217,21 @@ function TokensPage() {
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan | null>(null);
   const [paying, setPaying] = useState(false);
   const [successInfo, setSuccessInfo] = useState<{ title: string } | null>(null);
+  // 토큰 충전은 실결제 드로어(웹=PG/Mock · 앱=인앱결제)로 — 시뮬레이션 모달 사용 안 함
+  const [chargeOpen, setChargeOpen] = useState(false);
+
+  const handleSelectPlan = (plan: SelectedPlan) => {
+    if (plan.id === "consumer-token") {
+      setChargeOpen(true);
+      return;
+    }
+    // 구독·사업자 플랜: 앱에서는 외부/모의 결제 노출 금지 (App Store 3.1.1)
+    if (isNativeApp()) {
+      alert("구독 플랜은 앱에서 준비 중이에요.\n지금은 '토큰 충전'으로 모든 기능을 이용할 수 있습니다.");
+      return;
+    }
+    setSelectedPlan(plan);
+  };
 
   const handlePay = async () => {
     if (!selectedPlan) return;
@@ -399,7 +417,7 @@ function TokensPage() {
                   </ul>
 
                   <button
-                    onClick={() => setSelectedPlan(plan)}
+                    onClick={() => handleSelectPlan(plan)}
                     className={`mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-bold transition-colors ${
                       highlight
                         ? "bg-primary-500 text-white shadow-cta hover:bg-primary-600"
@@ -429,7 +447,19 @@ function TokensPage() {
           </div>
         </section>
 
-        {/* 결제 모달 */}
+        {/* 실결제 토큰 충전 (웹=PG/Mock · 앱=인앱결제, token_ledger 연동) */}
+        <TokenPurchaseDrawer
+          open={chargeOpen}
+          onOpenChange={setChargeOpen}
+          reason="manual_topup"
+          currentTokens={tokens.balance}
+          onProvisioned={() => {
+            void tokens.refresh();
+          }}
+        />
+
+        {/* 결제 모달 — body 포털 (transform 조상 때문에 화면 밖으로 밀리는 것 방지) */}
+        {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
           {selectedPlan && (
             <>
@@ -444,7 +474,7 @@ function TokensPage() {
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="fixed left-1/2 top-1/2 z-[81] w-full max-w-md -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-primary-100 bg-white p-7 shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-primary-100 bg-white p-7 shadow-card-hover"
               >
                 <div className="flex items-center gap-2">
                   <Lock className="h-3.5 w-3.5 text-primary-900/60" />
@@ -506,7 +536,7 @@ function TokensPage() {
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="fixed left-1/2 top-1/2 z-[81] w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-emerald-100 bg-white p-7 shadow-card-hover text-center"
+                className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-sm max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-emerald-100 bg-white p-7 shadow-card-hover text-center"
               >
                 <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                   <Check className="h-6 w-6" strokeWidth={3} />
@@ -529,7 +559,9 @@ function TokensPage() {
               </motion.div>
             </>
           )}
-        </AnimatePresence>
+        </AnimatePresence>,
+        document.body,
+        )}
       </main>
     </LenisProvider>
   );
