@@ -10,7 +10,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Hexagon, X } from "lucide-react";
-import { isNativeApp, isProbablyEmbeddedWebView } from "@/lib/mobile/platform";
+import { isRegularWebBrowser } from "@/lib/mobile/platform";
 
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL || "https://www.apple.com/app-store/";
@@ -43,9 +43,9 @@ export default function TokenNoticeModal() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    // 앱(WebView) 안에서는 절대 미표시 — Capacitor 감지 + WebView UA 이중 차단
-    const hiddenInApp = () => isNativeApp() || isProbablyEmbeddedWebView();
-    if (hiddenInApp()) return;
+    // '확실한 일반 웹 브라우저'에서만 표시 — 앱/인앱브라우저/PWA는 전부 미표시.
+    // (앱인지 감지 대신 정규 브라우저 양성 판정 → 애매하면 안 뜸)
+    if (!isRegularWebBrowser()) return;
     try {
       if (sessionStorage.getItem(SESSION_KEY) === "1") return;
       const hideUntil = Number(localStorage.getItem(HIDE_UNTIL_KEY) || 0);
@@ -53,13 +53,23 @@ export default function TokenNoticeModal() {
     } catch {
       /* ignore */
     }
-    // 첫 페인트 직후 잠깐 여유를 두고 표시 — Capacitor 주입이 늦는 케이스 대비 표시 직전 재확인
     const t = setTimeout(() => {
-      if (hiddenInApp()) return;
+      if (!isRegularWebBrowser()) return; // 표시 직전 재확인
       setOpen(true);
     }, 600);
     return () => clearTimeout(t);
   }, []);
+
+  // 안전장치 — 열려 있으면 ESC로도 닫히게 (혹시라도 떴을 때 무조건 닫을 수 있게)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const close = () => {
     setOpen(false);
@@ -101,17 +111,18 @@ export default function TokenNoticeModal() {
             role="dialog"
             aria-modal="true"
             aria-label="공지사항"
-            className="fixed left-1/2 top-1/2 z-[91] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-[28px] bg-white shadow-2xl"
+            className="fixed left-1/2 top-1/2 z-[91] w-[calc(100%-2rem)] max-w-sm max-h-[88vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] bg-white shadow-2xl"
           >
             {/* 상단 브랜드 밴드 */}
-            <div className="relative bg-gradient-to-br from-primary-500 via-primary-500 to-amber-500 px-6 pb-10 pt-6 text-white">
+            <div className="relative overflow-hidden rounded-t-[28px] bg-gradient-to-br from-primary-500 via-primary-500 to-amber-500 px-6 pb-10 pt-6 text-white">
+              {/* 닫기 — 터치 타깃 충분히 크게(44px) */}
               <button
                 type="button"
                 onClick={close}
                 aria-label="공지 닫기"
-                className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white/90 transition hover:bg-white/25"
+                className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/20 text-white transition hover:bg-white/30 active:bg-white/40"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </button>
               <span className="inline-flex items-center rounded-full bg-white/20 px-2.5 py-1 text-[0.65rem] font-bold tracking-widest">
                 공지사항

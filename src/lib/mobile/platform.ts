@@ -64,6 +64,39 @@ export function isNativeApp(): boolean {
  * ⚠️ 결제/OAuth 분기에는 절대 사용 금지 — 서드파티 WebView 오탐 시 잘못된 결제 채널을 탄다.
  *   그쪽은 반드시 isNativeApp()(Capacitor 정밀 감지) 사용.
  */
+/**
+ * '확실한 일반 웹 브라우저'일 때만 true — 공지 팝업·설치 배지 표시 게이트 전용.
+ *
+ * '앱인지'를 감지(어렵고 불확실)하는 대신, '정규 브라우저 탭이 확실한가'를 양성 판정한다.
+ * 애매하면 false(표시 안 함) → 앱/인앱브라우저에서 절대 뜨지 않는 것을 보장.
+ * 핵심 근거: iOS 인앱 WKWebView(우리 앱 포함)는 UA에 `Safari/`·`Version/` 토큰이 없다.
+ *            실제 모바일 Safari는 둘 다 있다.
+ */
+export function isRegularWebBrowser(): boolean {
+  if (typeof window === "undefined") return false;
+  // Capacitor 흔적이 조금이라도 있으면 앱 — 제외
+  if ((window as unknown as { Capacitor?: unknown }).Capacitor) return false;
+  // 홈화면 추가(PWA standalone) 제외
+  const standalone =
+    window.matchMedia?.("(display-mode: standalone)").matches ||
+    (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+  if (standalone) return false;
+
+  const ua = navigator.userAgent || "";
+  // 서드파티 인앱 브라우저(카카오/네이버/인스타/페북/라인/다음/안드 wv) 제외
+  if (/KAKAOTALK|NAVER\(|Instagram|FBAN|FBAV|FB_IAB|Line\/|DaumApps|Snapchat|; wv\)/i.test(ua)) return false;
+
+  if (/iPhone|iPad|iPod/.test(ua)) {
+    // 실제 모바일 Safari만 두 토큰 모두 보유. WKWebView(앱)는 없음.
+    return /Safari\//.test(ua) && /Version\//.test(ua);
+  }
+  if (/Android/.test(ua)) {
+    return /Chrome\/|Firefox\/|Samsung|Safari\//.test(ua) && !/; wv\)/.test(ua);
+  }
+  // 데스크탑 등 — 정규 브라우저 토큰 존재 시 true
+  return /Chrome\/|Firefox\/|Safari\/|Edg\/|OPR\//.test(ua);
+}
+
 export function isProbablyEmbeddedWebView(): boolean {
   if (typeof window === "undefined") return false;
   if ((window as unknown as { Capacitor?: unknown }).Capacitor) return true;

@@ -1232,11 +1232,9 @@ function EstimatePage() {
     : Math.round((materialCost + laborCost) * expenseRate);
   const subtotal = materialCost + laborCost + expenseCost;
   const vat = v2Totals ? v2Totals.vat : Math.round(subtotal * 0.1);
-  const finalTotal = v2Totals
-    ? v2Totals.totalWithVat
-    : vatIncl
-      ? subtotal + vat
-      : subtotal;
+  // VAT 토글이 헤드라인 총액에 반영되도록 v2/legacy 모두 동일 공식 사용.
+  // (v2는 vatIncl=true일 때 subtotal+vat === totalWithVat 로 일치 — 별도/포함 전환 가능)
+  const finalTotal = vatIncl ? subtotal + vat : subtotal;
   const budgetMan = step1?.basicInfo.budget || 0;
   const budgetWon = budgetMan * 10000;
   const budgetDelta = finalTotal - budgetWon;
