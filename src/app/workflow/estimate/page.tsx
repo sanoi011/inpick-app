@@ -1654,7 +1654,9 @@ function EstimatePage() {
                               ₩ {trade.totalAmount.toLocaleString()}
                             </span>
                           </div>
-                          <div className="divide-y divide-primary-50">
+                          {/* 모바일: 가로 스크롤(고정 7열이 390px에서 잘리던 것 방지, M4). 웹은 그대로 */}
+                          <div className="overflow-x-auto">
+                          <div className="divide-y divide-primary-50 min-w-[560px]">
                             {lines.map((line) => {
                               const isExcluded = excludedV2Lines.has(line.id);
                               return (
@@ -1720,6 +1722,7 @@ function EstimatePage() {
                               </div>
                               );
                             })}
+                          </div>
                           </div>
                         </section>
                       );

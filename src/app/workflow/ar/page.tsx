@@ -47,7 +47,7 @@ const PALETTE: Record<string, { color: string; name: string }[]> = {
 
 export default function ArPage() {
   const router = useRouter();
-  const { balance, consume } = useTokens();
+  const { balance, consume, loading: tokensLoading } = useTokens();
 
   const [entered, setEntered] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -56,13 +56,17 @@ export default function ArPage() {
   const [surface, setSurface] = useState<string>(SURFACES[0].v);
   const [pickIdx, setPickIdx] = useState<Record<string, Record<string, number>>>({});
 
-  // 진입 시 자동으로 확인 모달
+  // 진입 시 자동으로 확인 모달 — 잔액 로딩 완료 후에만 판단(초기 기본값 5로 잘못 뜨는 것·두 모달 겹침 방지)
   useEffect(() => {
-    if (!entered) {
-      if (balance < AR_COST) setInsufficientOpen(true);
-      else setConfirmOpen(true);
+    if (entered || tokensLoading) return;
+    if (balance < AR_COST) {
+      setInsufficientOpen(true);
+      setConfirmOpen(false);
+    } else {
+      setConfirmOpen(true);
+      setInsufficientOpen(false);
     }
-  }, [entered, balance]);
+  }, [entered, balance, tokensLoading]);
 
   const enterAr = async () => {
     setConfirmOpen(false);

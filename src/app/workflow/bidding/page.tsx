@@ -19,7 +19,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
-import { getOrCreateWorkflowProjectId } from "@/lib/inpick/estimate-context/client";
+import { getOrCreateWorkflowProjectId, fetchWorkflowState } from "@/lib/inpick/estimate-context/client";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
 import type { Step2Data } from "@/components/workflow/Step2Designer";
 
@@ -79,14 +79,31 @@ export default function BiddingPage() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
+    let cancelled = false;
+    // sessionStorage 우선(빠름), 비어있으면 DB workflow_state 폴백 —
+    // 재로그인/새 세션/다른 탭 진입 시 지역 '—'·예산 0으로 RFQ 발송되던 것 방지(2026-07-05 M2)
     try {
       const s1 = sessionStorage.getItem("workflow_step1");
       const s2 = sessionStorage.getItem("workflow_step2");
       if (s1) setStep1(JSON.parse(s1));
       if (s2) setStep2(JSON.parse(s2));
+      if (s1) return; // sessionStorage로 충분
     } catch {
       /* ignore */
     }
+    const projectId = getOrCreateWorkflowProjectId();
+    if (!projectId) return;
+    void fetchWorkflowState(projectId)
+      .then((row) => {
+        if (cancelled || !row?.exists || !row.workflowState) return;
+        const ws = row.workflowState;
+        if (ws.step1) setStep1(ws.step1 as unknown as Step1Data);
+        if (ws.step2) setStep2(ws.step2 as unknown as Step2Data);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const region = useMemo(() => {

@@ -27,6 +27,7 @@ export default function FindContractorsPage() {
 
   const fetchContractors = useCallback(async () => {
     setLoading(true);
+    setFetchError(false); // 재요청 시작 시 이전 에러 배너 초기화(성공해도 배너 남던 것 방지, M4)
     try {
       const params = new URLSearchParams();
       if (type !== "all") params.set("type", type);
