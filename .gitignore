@@ -88,3 +88,5 @@ runpod_serverless/**/__pycache__/
 /android/
 .capacitor/
 
+
+# iOS 구글 로그인 plist (클라이언트 ID는 공개값이나 관리 편의상 추적)

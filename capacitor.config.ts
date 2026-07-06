@@ -67,6 +67,13 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ["badge", "sound", "alert"],
     },
+    GoogleAuth: {
+      // iOS OAuth 클라이언트 ID (GoogleService-Info.plist의 CLIENT_ID)
+      iosClientId: "100217844228-6o0qc3denccvsrht4sbv5hvb76h0vt2k.apps.googleusercontent.com",
+      scopes: ["profile", "email"],
+      // serverClientId 미설정 → idToken aud = iOS 클라이언트 ID.
+      //   Supabase Google provider의 'Authorized Client IDs'에 이 iOS 클라이언트 ID를 추가해야 함.
+    },
   },
 };
 
