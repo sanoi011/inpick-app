@@ -18,6 +18,25 @@ export function isNativeSigninAvailable(): boolean {
   return p === "ios" || p === "android";
 }
 
+/**
+ * id_token(JWT) 페이로드에서 nonce 클레임 추출.
+ * 구글 네이티브 SDK는 nonce를 해시하지 않고 원본 그대로 토큰에 넣으므로,
+ * 토큰에서 꺼낸 값을 그대로 Supabase에 넘기면 항상 일치한다.
+ * (없으면 undefined → nonce 미전달 → "둘 다 없음"으로 일치)
+ */
+function extractNonceFromIdToken(idToken: string): string | undefined {
+  try {
+    const payload = idToken.split(".")[1];
+    if (!payload) return undefined;
+    const b64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
+    const json = JSON.parse(decodeURIComponent(escape(atob(padded)))) as { nonce?: unknown };
+    return typeof json.nonce === "string" && json.nonce ? json.nonce : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 /** raw nonce 생성 + SHA-256 해시(hex) — Apple signInWithIdToken 재생공격 방지용 */
 async function makeNonce(): Promise<{ raw: string; hashed: string }> {
   const bytes = new Uint8Array(32);
@@ -78,9 +97,13 @@ export async function signInWithGoogleNative(
     const idToken = user?.authentication?.idToken;
     if (!idToken) return { error: "구글 인증 토큰을 받지 못했습니다" };
 
+    // 플러그인이 토큰에 nonce를 심는 경우가 있어, 토큰에서 추출해 그대로 전달
+    // (nonce 불일치 "Passed nonce and nonce in id_token should either both exist or not" 방지)
+    const nonce = extractNonceFromIdToken(idToken);
     const { error } = await supabase.auth.signInWithIdToken({
       provider: "google",
       token: idToken,
+      ...(nonce ? { nonce } : {}),
     });
     if (error) return { error: error.message };
     return {};
