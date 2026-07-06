@@ -67,6 +67,33 @@ const pending = new Map<string, (r: IapPurchaseResult) => void>();
 const codeByAppProductId = new Map<string, string>();
 const registeredIds = new Set<string>();
 let storeInitialized = false;
+let cdvLoadPromise: Promise<void> | null = null;
+
+/**
+ * cordova-plugin-purchase의 store.js를 웹 번들에서 로드해 window.CdvPurchase 정의.
+ *
+ * ⚠️ Capacitor는 server.url 원격 페이지에 cordova 플러그인 www JS(cordova_plugins.js)를
+ *    자동 주입하지 않아 CdvPurchase가 undefined였음(IAP_NOT_AVAILABLE의 원인).
+ *    네이티브 플러그인은 앱에 포함돼 있으므로, store.js만 웹 번들로 로드하면
+ *    window.cordova.exec(Capacitor cordova 브릿지) 경유로 네이티브 결제가 동작한다.
+ *    → 재빌드 없이 웹 배포만으로 IAP 활성화.
+ */
+async function ensureCdvPurchaseLoaded(): Promise<void> {
+  if (typeof window === "undefined") return;
+  if (window.CdvPurchase?.store) return;
+  if (!cdvLoadPromise) {
+    cdvLoadPromise = (async () => {
+      try {
+        // 사이드이펙트 import — 로드 시 window.CdvPurchase 설정
+        // @ts-expect-error — 타입 정의 없는 cordova www 모듈
+        await import("cordova-plugin-purchase/www/store.js");
+      } catch (e) {
+        console.warn("[iap] CdvPurchase 로드 실패:", e);
+      }
+    })();
+  }
+  await cdvLoadPromise;
+}
 
 export function isIapAvailable(): boolean {
   const p = detectPlatform();
@@ -140,6 +167,7 @@ async function handleApproved(tx: CdvTransaction): Promise<void> {
 export async function ensureIapStore(
   products: Array<{ internalCode: string; appProductId: string }>,
 ): Promise<void> {
+  await ensureCdvPurchaseLoaded(); // store.js 로드해 window.CdvPurchase 정의
   if (!isIapAvailable()) throw new Error("IAP_NOT_AVAILABLE");
   const cdv = window.CdvPurchase!;
   const platform = nativePlatformConst();
