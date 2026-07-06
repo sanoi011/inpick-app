@@ -33,6 +33,20 @@ export async function startOAuth(
   const platform = detectPlatform();
   const isNative = platform === "ios" || platform === "android";
 
+  // 네이티브 앱: 애플·구글은 SDK로 직접 로그인(웹뷰 X → Safari '주소 유효하지 않음' 에러 소멸).
+  // 카카오는 아직 웹 OAuth 흐름 유지(추후 네이티브 SDK 도입).
+  if (isNative && (provider === "apple" || provider === "google")) {
+    const { signInWithAppleNative, signInWithGoogleNative } = await import("./native-signin");
+    const result =
+      provider === "apple"
+        ? await signInWithAppleNative(supabase)
+        : await signInWithGoogleNative(supabase);
+    if (result.error) return { error: result.error };
+    // 세션 확립됨 — 홈으로 (미들웨어가 새 쿠키 읽도록 hard nav)
+    if (typeof window !== "undefined") window.location.href = "/";
+    return {};
+  }
+
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
