@@ -64,6 +64,12 @@ export const metadata: Metadata = {
     title: "INPICK - AI 인테리어 견적 플랫폼",
     description: "주소만 입력하면, AI가 실시간 단가로 정확한 견적을 만들어 드립니다.",
   },
+  verification: {
+    // 네이버 서치어드바이저 사이트 소유 확인 (2026-07-07)
+    other: {
+      "naver-site-verification": "3f6eec071969ce3612e4d083917d8e24473eafb2",
+    },
+  },
 };
 
 // 모바일/Capacitor WebView 필수 viewport.
