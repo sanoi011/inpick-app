@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,9 @@ function getSupabase() {
 }
 
 export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = getSupabase();
   const { searchParams } = request.nextUrl;
   const view = searchParams.get("view") || "users";
@@ -80,6 +84,10 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // 크레딧 지급 엔드포인트 — 미들웨어는 Bearer 접두사만 확인하므로 여기서 토큰 검증 필수
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = getSupabase();
 
   try {
@@ -115,13 +123,28 @@ export async function POST(request: NextRequest) {
         .eq("user_id", userId);
     }
 
-    // 트랜잭션 기록
+    // 트랜잭션 기록 — "(ledger:" 마커는 마이페이지 병합 뷰에서 token_ledger 원본과 중복 제거용
     await supabase.from("credit_transactions").insert({
       user_id: userId,
       amount,
       type: type || "CHARGE",
-      description: description || `관리자 수동 조정 (${amount > 0 ? "+" : ""}${amount})`,
+      description: `${description || `관리자 수동 조정 (${amount > 0 ? "+" : ""}${amount})`} (ledger:admin_adjust)`,
     });
+
+    // 신 원장(token_wallets/token_ledger)에도 동기화 — 안 하면 지갑 기반 기능(PDF 발급)이
+    // 관리자 지급 토큰을 못 보고, /mypage/billing 지갑 표시와도 어긋남 (2026-07-07)
+    try {
+      const { adminAdjustTokens } = await import("@/lib/inpick/tokens/ledger");
+      await adminAdjustTokens({
+        userId,
+        adminId: "admin-credits-api",
+        requestId: crypto.randomUUID(),
+        delta: amount,
+        reasonKo: description || `관리자 수동 조정 (${amount > 0 ? "+" : ""}${amount})`,
+      });
+    } catch (mirrorErr) {
+      console.warn("[admin/credits] wallet 동기화 실패 (비치명):", mirrorErr);
+    }
 
     return NextResponse.json({ success: true, newBalance });
   } catch (err) {

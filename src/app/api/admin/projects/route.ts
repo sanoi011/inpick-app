@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 /**
  * GET /api/admin/projects?status=&page=&limit=&month=YYYY-MM
  * DELETE /api/admin/projects?id=...        — 단일 삭제
  * DELETE /api/admin/projects (body: {ids:[...]}) — 일괄 삭제
+ *
+ * ⚠️ consumer_projects는 auth.uid()=user_id RLS — anon 클라이언트로 읽으면 항상 0건.
+ *    관리자 조회·삭제는 service role 필수 (2026-07-07 수정).
  */
 export async function DELETE(request: NextRequest) {
-  const supabase = createClient();
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  const supabase = createAdminClient();
   const id = request.nextUrl.searchParams.get("id");
   let ids: string[] = id ? [id] : [];
 
@@ -53,7 +60,10 @@ export async function DELETE(request: NextRequest) {
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = createClient();
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  const supabase = createAdminClient();
   const { searchParams } = request.nextUrl;
   const status = searchParams.get("status");
   const month = searchParams.get("month"); // YYYY-MM 형식

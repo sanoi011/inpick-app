@@ -74,8 +74,11 @@ export async function GET() {
     ...((ledgerLegacy ?? []) as Array<{
       id: string; type: string; amount: number; description: string | null; created_at: string;
     }>)
-      // 결제 미러링 항목은 token_ledger에 이미 있으므로 중복 표시 제외
-      .filter((t) => !(t.description ?? "").includes("(payment:"))
+      // token_ledger에 원본이 있는 미러 항목(결제 충전·지갑 차감·관리자 조정)은 중복 표시 제외
+      .filter((t) => {
+        const d = t.description ?? "";
+        return !d.includes("(payment:") && !d.includes("(ledger:");
+      })
       .map((t) => ({
         id: `legacy-${t.id}`,
         entry_type: t.type === "USE" ? "consume" : "credit",

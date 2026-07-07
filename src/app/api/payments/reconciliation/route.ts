@@ -16,6 +16,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,10 @@ async function autoDetectIssues() {
 }
 
 export async function GET(req: NextRequest) {
+  // /api/admin/* 밖이라 미들웨어 Bearer 체크도 안 걸림 — 여기서 직접 검증 (2026-07-07)
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const admin = getAdmin();
   if (!admin) {
     return NextResponse.json({ error: "service not configured" }, { status: 500 });
@@ -147,6 +152,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const admin = getAdmin();
   if (!admin) {
     return NextResponse.json({ error: "service not configured" }, { status: 500 });

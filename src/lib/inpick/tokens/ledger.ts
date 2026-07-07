@@ -334,6 +334,50 @@ async function mirrorCreditToLiveBalance(
 }
 
 /**
+ * 지갑(token_wallets) 차감분을 라이브 잔액(user_credits)에도 미러 차감.
+ * 결제 충전이 양쪽(wallet+credits)에 지급되므로, wallet에서만 차감하면
+ * 같은 토큰을 credits 기반 기능(AI 렌더)에서 한 번 더 쓸 수 있는 이중지출이 생긴다(2026-07-07).
+ * 멱등: credit_transactions.description의 `ledger:{marker}` 마커. 실패해도 throw 안 함.
+ */
+async function mirrorDebitFromLiveBalance(
+  userId: string,
+  amount: number,
+  marker: string,
+): Promise<void> {
+  if (amount <= 0) return;
+  const admin = getAdmin();
+  if (!admin) return;
+  try {
+    const tag = `ledger:${marker}`;
+    const { data: dup } = await admin
+      .from("credit_transactions")
+      .select("id")
+      .eq("user_id", userId)
+      .like("description", `%${tag}%`)
+      .limit(1);
+    if (dup && dup.length > 0) return;
+
+    const { data: cred } = await admin
+      .from("user_credits")
+      .select("balance")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const prev = (cred as { balance?: number } | null) ?? null;
+    if (!prev) return; // 라이브 잔액 행 자체가 없으면 미러 대상 없음
+    const newBal = Math.max(0, (prev.balance ?? 0) - amount);
+    await admin.from("user_credits").update({ balance: newBal }).eq("user_id", userId);
+    await admin.from("credit_transactions").insert({
+      user_id: userId,
+      type: "USE",
+      amount: -amount,
+      description: `토큰 사용 (${tag})`,
+    });
+  } catch (e) {
+    console.warn("[ledger] mirrorDebitFromLiveBalance failed (non-fatal):", e);
+  }
+}
+
+/**
  * AI 작업 시작 시 크레딧 차감.
  * idempotency: consume:{action}:{jobId}
  */
@@ -348,15 +392,20 @@ export async function consumeTokensForAction(input: {
   if (input.amount <= 0) {
     throw new LedgerError("INVALID_AMOUNT", "amount must be > 0");
   }
-  return appendLedgerEntry({
+  const idempotencyKey = `consume:${input.action}:${input.jobId}`;
+  const result = await appendLedgerEntry({
     userId: input.userId,
     entryType: "ai_consume",
     delta: -input.amount,
     sourceType: "ai_action",
-    idempotencyKey: `consume:${input.action}:${input.jobId}`,
+    idempotencyKey,
     reasonKo: input.reasonKo || `${input.action} AI 호출`,
     metadata: { action: input.action, jobId: input.jobId, ...(input.metadata || {}) },
   });
+  if (!result.idempotent) {
+    await mirrorDebitFromLiveBalance(input.userId, input.amount, idempotencyKey);
+  }
+  return result;
 }
 
 /**
@@ -408,6 +457,10 @@ export async function debitTokensForPaymentRefund(input: {
     reasonKo: input.reasonKo,
     metadata: { paymentId: input.paymentId },
   });
+  // 환불 회수도 라이브 잔액에 미러 — 안 하면 환불 후에도 credits로 계속 사용 가능
+  if (!result.idempotent) {
+    await mirrorDebitFromLiveBalance(input.userId, input.amount, `refund_debit:${input.refundId}`);
+  }
   return { balanceAfter: result.balanceAfter, idempotent: result.idempotent };
 }
 

@@ -1,8 +1,13 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from "next/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
-export async function GET() {
-  const supabase = createClient();
+export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
+  // user_credits·consumer_projects는 RLS 때문에 anon으로 읽으면 항상 0 → service role (2026-07-07 수정)
+  const supabase = createAdminClient();
 
   try {
     const [

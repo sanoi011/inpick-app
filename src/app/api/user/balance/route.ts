@@ -58,6 +58,23 @@ export async function GET() {
       balance = credBal;
       source = "credits";
     } else {
+      // 유령 보너스 수정(2026-07-07): 기존엔 표시만 5로 하고 실제 지급이 없어
+      // 신규 유저가 첫 소비에서 402를 맞았음 → 첫 조회 시 user_credits에 실지급.
+      const { data: inserted } = await admin
+        .from("user_credits")
+        .upsert(
+          { user_id: user.id, balance: SIGNUP_BONUS, free_generations_used: 0 },
+          { onConflict: "user_id", ignoreDuplicates: true },
+        )
+        .select("user_id");
+      if (inserted && inserted.length > 0) {
+        await admin.from("credit_transactions").insert({
+          user_id: user.id,
+          type: "CHARGE",
+          amount: SIGNUP_BONUS,
+          description: "가입 보너스 토큰",
+        });
+      }
       balance = SIGNUP_BONUS;
       source = "signup_bonus";
     }

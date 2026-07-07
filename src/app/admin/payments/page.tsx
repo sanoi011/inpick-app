@@ -48,6 +48,7 @@ const STATUS_LABELS: Record<string, { label: string; color: string; icon: typeof
   created: { label: "대기", color: "bg-gray-100 text-gray-600", icon: Clock },
   confirming: { label: "확인 중", color: "bg-blue-50 text-blue-700", icon: Loader2 },
   paid: { label: "완료", color: "bg-emerald-50 text-emerald-700", icon: CheckCircle2 },
+  provisioned: { label: "지급 완료", color: "bg-emerald-50 text-emerald-700", icon: CheckCircle2 },
   confirm_failed: { label: "확인 실패", color: "bg-red-50 text-red-700", icon: XCircle },
   cancelled: { label: "취소", color: "bg-gray-100 text-gray-500", icon: XCircle },
   refunded: { label: "환불", color: "bg-amber-50 text-amber-700", icon: RotateCcw },

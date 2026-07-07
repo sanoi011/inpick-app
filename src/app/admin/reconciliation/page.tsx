@@ -54,7 +54,9 @@ export default function AdminReconciliationPage() {
     try {
       const params = new URLSearchParams({ status: statusFilter, limit: "50" });
       if (autoDetect) params.set("autoDetect", "true");
-      const res = await fetch(`/api/payments/reconciliation?${params}`);
+      const res = await fetch(`/api/payments/reconciliation?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
+      });
       if (res.ok) setData(await res.json());
     } catch (err) {
       console.error(err);
@@ -73,7 +75,10 @@ export default function AdminReconciliationPage() {
     try {
       const res = await fetch("/api/payments/reconciliation", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("admin_token")}`,
+        },
         body: JSON.stringify({ jobId, action, resolution_note: resolutionNote }),
       });
       if (res.ok) {

@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { trackServerEventAsync } from "@/lib/analytics/track";
 import {
   redactProjectForCommunity,
   buildCommunityPrivacyReport,
@@ -267,27 +268,25 @@ export async function POST(req: NextRequest) {
     await admin.from("community_attachments").insert(rows);
   }
 
-  // 10) analytics event
-  try {
-    await admin.from("analytics_events").insert({
-      event_type: "community.post_created_from_estimate",
-      user_id: user.id,
-      properties: {
-        postId: (postRow as { id: string }).id,
-        boardSlug: body.boardSlug,
-        projectMode: redacted.projectMode,
-        regionLabel: redacted.redactedProject.regionLabel,
-        areaLabel: redacted.redactedProject.areaLabel,
-        totalAmountRangeLabel: redacted.redactedEstimateSummary.totalAmountRangeLabel,
-        hasDesignImages: redacted.redactedDesignOutputs.length > 0,
-        hasTradeSummary: redacted.redactedTradeGroups.length > 0,
-        hasBrandSku: visibility.showBrandSku,
-        privacyAutoScanPassed: redacted.privacyReport.autoScanPassed,
-      },
-    });
-  } catch {
-    /* analytics_events 없거나 RLS 차단 시 무시 */
-  }
+  // 10) analytics event — 스키마는 event_name/props인데 event_type/properties로 raw insert해
+  // 매번 조용히 실패하던 버그(2026-07-07) → 정식 헬퍼로 교체 (sanitize·비동기·no-throw)
+  trackServerEventAsync({
+    eventName: "community.post_created_from_estimate",
+    actorType: "consumer",
+    userId: user.id,
+    props: {
+      postId: (postRow as { id: string }).id,
+      boardSlug: body.boardSlug,
+      projectMode: redacted.projectMode,
+      regionLabel: redacted.redactedProject.regionLabel,
+      areaLabel: redacted.redactedProject.areaLabel,
+      totalAmountRangeLabel: redacted.redactedEstimateSummary.totalAmountRangeLabel,
+      hasDesignImages: redacted.redactedDesignOutputs.length > 0,
+      hasTradeSummary: redacted.redactedTradeGroups.length > 0,
+      hasBrandSku: visibility.showBrandSku,
+      privacyAutoScanPassed: redacted.privacyReport.autoScanPassed,
+    },
+  });
 
   return NextResponse.json({
     postId: (postRow as { id: string }).id,
