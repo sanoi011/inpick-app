@@ -155,7 +155,8 @@ export default function MyPageDashboard() {
       value: balance,
       icon: Hexagon,
       iconBg: "bg-amber-100 text-amber-600",
-      href: "/account/tokens",
+      // 잔액 카드는 충전이 아니라 "어떻게 충전·사용됐는지" 로그로 — 충전은 quickActions의 토큰 충전
+      href: "/mypage/billing",
     },
   ];
 

@@ -36,6 +36,7 @@ interface BillingData {
     order_id: string;
     amount_krw: number;
     status: string;
+    provider: string | null;
     created_at: string;
     product:
       | { name_ko: string; code: string; product_type: string }
@@ -258,6 +259,13 @@ export default function MyBillingPage() {
   );
 }
 
+const PROVIDER_LABELS: Record<string, string> = {
+  app_store: "App Store",
+  google_play: "Google Play",
+  toss: "토스페이먼츠",
+  admin: "관리자 지급",
+};
+
 function PaymentsTab({ payments }: { payments: BillingData["payments"] }) {
   if (payments.length === 0) {
     return <EmptyHint text="결제 내역이 없습니다." />;
@@ -270,7 +278,14 @@ function PaymentsTab({ payments }: { payments: BillingData["payments"] }) {
           <div key={p.id} className="flex items-center justify-between rounded-lg border border-[#E5E2DD] bg-[#FAFAF8] px-3 py-2.5">
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-[#202123]">{prod?.name_ko ?? p.order_id}</p>
-              <p className="text-xs text-[#6B6B6B]">{new Date(p.created_at).toLocaleString("ko-KR")}</p>
+              <p className="text-xs text-[#6B6B6B]">
+                {new Date(p.created_at).toLocaleString("ko-KR")}
+                {p.provider && (
+                  <span className="ml-1.5 rounded bg-[#EFEDE8] px-1.5 py-0.5 text-[0.6rem] font-semibold text-[#6B6B6B]">
+                    {PROVIDER_LABELS[p.provider] ?? p.provider}
+                  </span>
+                )}
+              </p>
             </div>
             <div className="text-right">
               <p className="text-sm font-bold text-[#202123]">{p.amount_krw.toLocaleString()}원</p>
