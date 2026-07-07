@@ -14,8 +14,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectPlatform } from "@/lib/mobile/platform";
 
 export function isNativeSigninAvailable(): boolean {
+  // iOS 전용: build 4에 apple-sign-in/google-auth 플러그인이 포함돼 있음.
+  // Android AAB(versionCode 1, 2026-07-04 빌드)에는 두 플러그인이 없어 호출 시 에러
+  // → Android는 기존 딥링크 웹 OAuth(2026-07-02 실기 검증) 유지.
   const p = detectPlatform();
-  return p === "ios" || p === "android";
+  return p === "ios";
 }
 
 /** raw nonce 생성 + SHA-256 해시(hex) — Apple signInWithIdToken 재생공격 방지용 */

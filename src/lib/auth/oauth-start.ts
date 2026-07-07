@@ -33,9 +33,10 @@ export async function startOAuth(
   const platform = detectPlatform();
   const isNative = platform === "ios" || platform === "android";
 
-  // 네이티브 앱: 애플·구글은 SDK로 직접 로그인(웹뷰 X → Safari '주소 유효하지 않음' 에러 소멸).
-  // 카카오는 아직 웹 OAuth 흐름 유지(추후 네이티브 SDK 도입).
-  if (isNative && (provider === "apple" || provider === "google")) {
+  // iOS 앱: 애플·구글은 SDK로 직접 로그인(웹뷰 X → Safari '주소 유효하지 않음' 에러 소멸).
+  // Android는 AAB(versionCode 1, 2026-07-04)에 네이티브 로그인 플러그인이 없어
+  // 딥링크 웹 OAuth(2026-07-02 실기 검증) 유지. 카카오는 양쪽 다 웹 OAuth.
+  if (platform === "ios" && (provider === "apple" || provider === "google")) {
     const { signInWithAppleNative, signInWithGoogleNative } = await import("./native-signin");
     const result =
       provider === "apple"
