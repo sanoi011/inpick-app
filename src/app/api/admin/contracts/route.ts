@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = createClient();
   const { searchParams } = request.nextUrl;
   const view = searchParams.get("view") || "contracts";

@@ -3,6 +3,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
   ? createClient(
@@ -12,6 +13,9 @@ const supabase = process.env.SUPABASE_SERVICE_ROLE_KEY
   : null;
 
 export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   try {
     const { searchParams } = new URL(request.url);
     const region = searchParams.get("region");
@@ -45,6 +49,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   try {
     if (!supabase) {
       return NextResponse.json({ error: "Supabase not configured" }, { status: 500 });

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -9,9 +10,8 @@ function getSupabase() {
 }
 
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
   }
 
   const { searchParams } = new URL(request.url);

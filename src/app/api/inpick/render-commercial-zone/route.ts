@@ -19,6 +19,8 @@ import {
   CreditError,
 } from "@/lib/inpick/credit-policy";
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -174,6 +176,7 @@ function buildPrompt(b: RenderCommercialZoneBody): string {
 
 export async function POST(req: NextRequest) {
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
+  const startedAt = Date.now();
   try {
     const body = (await req.json()) as RenderCommercialZoneBody;
 
@@ -261,6 +264,22 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
+    // ─── 이미지 생성 요청 계측 (차감·rate limit 통과 = 실제 생성 시작) ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationRequested,
+      actorType: "consumer",
+      userId: charge.userId,
+      projectMode: "commercial",
+      source: "api",
+      props: {
+        endpoint: "render-commercial-zone",
+        quality: body.quality ?? "low",
+        businessType: body.businessType,
+        zoneType: body.zone.type,
+        credit_charged: charge.charged,
+      },
+    });
+
     // ─── OpenAI generations ────────────────────────────
     const compiledPrompt = buildPrompt(body);
     const apiKey = getOpenAIKey()!;
@@ -327,6 +346,18 @@ export async function POST(req: NextRequest) {
           "openai-failed:render-commercial-zone",
         ).catch(() => {});
       }
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge?.userId,
+        projectMode: "commercial",
+        source: "api",
+        props: {
+          endpoint: "render-commercial-zone",
+          model_status: "provider_error",
+          latency_ms: Date.now() - startedAt,
+        },
+      });
       return NextResponse.json(
         {
           error: "provider_error",
@@ -349,6 +380,22 @@ export async function POST(req: NextRequest) {
       console.warn("[render-commercial-zone] storage upload failed, returning base64:", err);
     }
 
+    // ─── 이미지 생성 성공 계측 ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationCompleted,
+      actorType: "consumer",
+      userId: charge?.userId,
+      projectMode: "commercial",
+      source: "api",
+      props: {
+        endpoint: "render-commercial-zone",
+        model: usedModel,
+        costUsd: costMap[quality] ?? 0.01,
+        latency_ms: Date.now() - startedAt,
+        credit_charged: charge?.charged ?? 0,
+      },
+    });
+
     return NextResponse.json({
       imageUrl: storedUrl,
       prompt: compiledPrompt,
@@ -367,6 +414,20 @@ export async function POST(req: NextRequest) {
         charge.charged,
         `internal:render-commercial-zone:${msg.slice(0, 80)}`,
       ).catch(() => {});
+      // 차감 이후(=생성 시도) 실패만 계측
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge.userId,
+        projectMode: "commercial",
+        source: "api",
+        props: {
+          endpoint: "render-commercial-zone",
+          model_status: "unknown",
+          error: msg.slice(0, 200),
+          latency_ms: Date.now() - startedAt,
+        },
+      });
     }
     return NextResponse.json({ error: "internal_error", hint: msg }, { status: 500 });
   }

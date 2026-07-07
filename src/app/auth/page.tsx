@@ -15,6 +15,8 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { startOAuth } from "@/lib/auth/oauth-start";
 import { SignupModal } from "@/components/auth/SignupModal";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
@@ -181,6 +183,10 @@ function ConsumerAuthForm() {
       } catch {
         /* non-blocking: 후처리 실패는 로그인 흐름을 막지 않음 */
       }
+      // 이메일 로그인 완료 계측 (sendBeacon — hard nav에도 전송됨)
+      trackClientEvent(AnalyticsEvents.LoginCompleted, {
+        props: { provider: "email", method: "password" },
+      });
       // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
       window.location.href = returnUrl || "/";
     } catch (err) {
@@ -572,6 +578,10 @@ function ContractorAuthForm() {
       localStorage.setItem("contractor_token", data.token);
       localStorage.setItem("contractor_id", data.contractor.id);
       localStorage.setItem("contractor_name", data.contractor.company_name);
+      // 사업자 이메일 로그인 완료 계측
+      trackClientEvent(AnalyticsEvents.LoginCompleted, {
+        props: { provider: "email", method: "password", account_type: "contractor" },
+      });
       router.push("/contractor");
     } catch {
       setError("서버 오류가 발생했습니다.");

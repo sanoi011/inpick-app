@@ -95,20 +95,27 @@ export async function verifyAppStoreTransaction(
     };
   }
 
-  const baseUrl =
-    env === "production"
+  const hostOf = (e: string) =>
+    e === "production"
       ? "https://api.storekit.itunes.apple.com"
       : "https://api.storekit-sandbox.itunes.apple.com";
-  const url = `${baseUrl}/inApps/v1/transactions/${input.transactionId}`;
 
   try {
-    const res = await fetch(url, {
+    // Apple 권장 패턴: 운영(production)에서 못 찾으면(404) sandbox 재시도.
+    // App Review는 샌드박스로 결제하므로, 이 폴백이 없으면 심사 중 IAP 검증이 전부 실패한다(2026-07-07).
+    // 샌드박스 계정은 개발자만 생성 가능해 악용 노출면은 제한적.
+    let effectiveEnv = env;
+    let res = await fetch(`${hostOf(env)}/inApps/v1/transactions/${input.transactionId}`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${jwt}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
     });
+    if (res.status === 404 && env === "production") {
+      effectiveEnv = "sandbox";
+      res = await fetch(`${hostOf("sandbox")}/inApps/v1/transactions/${input.transactionId}`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" },
+      });
+    }
     if (!res.ok) {
       const text = await res.text();
       return { verified: false, error: `HTTP ${res.status}: ${text.slice(0, 200)}` };
@@ -135,8 +142,9 @@ export async function verifyAppStoreTransaction(
       environment: "Sandbox" | "Production";
     };
 
-    // 1) 환경 일치 — production 운영에서 Sandbox 트랜잭션(무료 결제) 차단
-    const expectedEnv = env === "production" ? "Production" : "Sandbox";
+    // 1) 환경 일치 — 실제 조회에 성공한 환경(effectiveEnv) 기준으로 검증.
+    //    production 앱스토어 API에서 찾은 트랜잭션이 Sandbox일 수는 없으므로 교차 위조는 차단됨.
+    const expectedEnv = effectiveEnv === "production" ? "Production" : "Sandbox";
     if (payload.environment !== expectedEnv) {
       return {
         verified: false,

@@ -65,7 +65,9 @@ export default function FloorPlanLibraryPage() {
       if (filter === "verified") params.set("verified", "true");
       if (filter === "unverified") params.set("verified", "false");
 
-      const res = await fetch(`/api/admin/floor-plan-library?${params}`);
+      const res = await fetch(`/api/admin/floor-plan-library?${params}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("admin_token")}` },
+      });
       const data = await res.json();
       setItems(data.items || []);
       setTotal(data.total || 0);

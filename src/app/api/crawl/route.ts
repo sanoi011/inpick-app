@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { crawlMaterialPrices, crawlLaborCosts, crawlOverheadRates } from "@/lib/crawlers";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 // POST: 크롤러 실행 (관리자 전용)
 export async function POST(request: NextRequest) {
+  // 관리자 인증 (ADMIN_PASSWORD 직접 일치 또는 admin/login 발급 서명 토큰)
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   try {
     const { type } = await request.json();
-
-    // 관리자 인증
-    const authHeader = request.headers.get("authorization");
-    const adminPassword = process.env.ADMIN_PASSWORD || "inpick2026!";
-    if (!authHeader || authHeader !== `Bearer ${adminPassword}`) {
-      return NextResponse.json({ error: "관리자 인증이 필요합니다" }, { status: 401 });
-    }
 
     switch (type) {
       case "material": {

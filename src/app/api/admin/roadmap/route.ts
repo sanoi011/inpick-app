@@ -3,11 +3,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 type EntityType = "feature" | "milestone" | "stat";
 
 // GET: 전체 로드맵 데이터 조회
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = createClient();
 
   const [featuresRes, milestonesRes, statsRes] = await Promise.all([
@@ -26,6 +30,9 @@ export async function GET() {
 
 // POST: 새 항목 생성 또는 초기 데이터 시드
 export async function POST(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = createClient();
   const body = await request.json();
 
@@ -73,6 +80,9 @@ export async function POST(request: NextRequest) {
 
 // PATCH: 항목 수정
 export async function PATCH(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = createClient();
   const body = await request.json();
   const { type, id, ...data } = body as { type: EntityType; id: string } & Record<string, unknown>;
@@ -103,6 +113,9 @@ export async function PATCH(request: NextRequest) {
 
 // DELETE: 항목 삭제
 export async function DELETE(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = createClient();
   const type = request.nextUrl.searchParams.get("type") as EntityType;
   const id = request.nextUrl.searchParams.get("id");

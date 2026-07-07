@@ -38,6 +38,9 @@ import {
 } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
+import type { ProjectModeForAnalytics } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -662,9 +665,54 @@ function surfaceTypeToKorean(t: SurfaceType): string {
   return m[t] || "기타";
 }
 
+/** 계측용 — body.projectMode를 analytics project_mode로 정규화 */
+function toAnalyticsProjectMode(mode?: unknown): ProjectModeForAnalytics {
+  if (mode === "photo_only" || mode === "commercial") return mode;
+  return "apartment"; // residential/apartment/미지정 → 아파트 모드
+}
+
 export async function POST(req: NextRequest) {
+  // 계측용 — 인증 사용자 조회 (실패해도 견적 흐름 무영향)
+  let trackUserId: string | undefined;
+  let trackMode: ProjectModeForAnalytics = "apartment";
+  let trackProjectId: string | undefined;
   try {
     const body = await req.json();
+
+    trackMode = toAnalyticsProjectMode(body.projectMode);
+    trackProjectId = typeof body.projectId === "string" ? body.projectId : undefined;
+    try {
+      const {
+        data: { user },
+      } = await createClient().auth.getUser();
+      trackUserId = user?.id ?? undefined;
+    } catch {
+      /* 계측용 조회 실패 무시 */
+    }
+    // 견적 요청 계측 (fire-and-forget)
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.EstimateRequested,
+      actorType: trackUserId ? "consumer" : "anonymous",
+      userId: trackUserId,
+      projectId: trackProjectId,
+      projectMode: trackMode,
+      source: "api",
+      props: {
+        hasContextId: typeof body.contextId === "string" && body.contextId.length > 0,
+      },
+    });
+    /** 견적 생성 성공 계측 — 각 성공 반환 지점에서 호출 */
+    const trackGenerated = (engine: string, extraProps: Record<string, unknown> = {}) => {
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.EstimateGenerated,
+        actorType: trackUserId ? "consumer" : "anonymous",
+        userId: trackUserId,
+        projectId: trackProjectId,
+        projectMode: trackMode,
+        source: "api",
+        props: { engine, ...extraProps },
+      });
+    };
 
     // P2: contextId가 있으면 estimate_contexts에서 evidence 스냅샷을 읽어 견적 생성.
     //   - design_outputs.material_hints 기반 surfaces 합성
@@ -675,16 +723,24 @@ export async function POST(req: NextRequest) {
       const useV2 = body.estimateVersion !== "legacy_surface";
       if (useV2) {
         const v2Result = await buildConstructionEstimateFromContextId(body.contextId);
-        if (v2Result) return NextResponse.json(v2Result);
+        if (v2Result) {
+          trackGenerated("construction_trade_v2", { contextId: body.contextId });
+          return NextResponse.json(v2Result);
+        }
       }
       const ctxResult = await buildEstimateFromContext(body.contextId);
-      if (ctxResult) return NextResponse.json(ctxResult);
+      if (ctxResult) {
+        trackGenerated("context_v1", { contextId: body.contextId });
+        return NextResponse.json(ctxResult);
+      }
       // context 조회 실패 → 기존 분기로 폴백 (워크플로 막지 않음)
     }
 
     // ─── projectMode 분기 (MD §10) ────────────────────────────
     if (body.projectMode === "photo_only") {
-      return buildPhotoOnlyEstimate(body);
+      const res = buildPhotoOnlyEstimate(body);
+      trackGenerated("photo_only_rough");
+      return res;
     }
     if (body.projectMode === "commercial") {
       // scopeSpec 우선 — CommercialScopeSpec 기반 line item 견적 (정확)
@@ -694,6 +750,7 @@ export async function POST(req: NextRequest) {
             "@/lib/inpick/commercial/estimate-from-scope"
           );
           const result = buildCommercialEstimateFromScope(body.scopeSpec);
+          trackGenerated("commercial_scope");
           return NextResponse.json(result);
         } catch (err) {
           console.error("[build-estimate] scope-based estimate failed:", err);
@@ -701,7 +758,9 @@ export async function POST(req: NextRequest) {
         }
       }
       // 폴백 (scope 없을 때) — 기존 zone × 단가
-      return buildCommercialEstimate(body);
+      const res = buildCommercialEstimate(body);
+      trackGenerated("commercial_zone_rough");
+      return res;
     }
 
     const { rooms, visionAnalysisByRoom: visionAnalysisByRoomFromBody } = body as {
@@ -851,6 +910,12 @@ export async function POST(req: NextRequest) {
       { mainTotal: 0, auxTotal: 0, laborTotal: 0, totalWon: 0 },
     );
 
+    trackGenerated("legacy_surface", {
+      roomCount: estimates.length,
+      fallbackRoomCount: fallbackRooms.length,
+      totalWon: grand.totalWon,
+    });
+
     return NextResponse.json({
       estimates,
       grandTotal: grand,
@@ -863,6 +928,16 @@ export async function POST(req: NextRequest) {
       matchMetaByRoom,
     });
   } catch (e) {
+    // 견적 실패 계측 (fire-and-forget)
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.EstimateFailed,
+      actorType: trackUserId ? "consumer" : "anonymous",
+      userId: trackUserId,
+      projectId: trackProjectId,
+      projectMode: trackMode,
+      source: "api",
+      props: { error: (e instanceof Error ? e.message : String(e)).slice(0, 200) },
+    });
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },
       { status: 500 },

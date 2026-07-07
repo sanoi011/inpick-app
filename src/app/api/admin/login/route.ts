@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { signAdminToken } from "@/lib/admin-auth";
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,8 +36,9 @@ export async function POST(request: NextRequest) {
       .update({ last_login: new Date().toISOString() })
       .eq("id", admin.id);
 
-    // 간단한 토큰 생성 (프로덕션에서는 JWT 사용 권장)
-    const token = Buffer.from(`${admin.id}:${admin.email}:${Date.now()}`).toString("base64");
+    // HMAC-SHA256 서명 토큰 발급 (`${base64url(admin_id:email:timestamp)}.${sig}`)
+    // 검증은 src/lib/admin-auth.ts isAdminAuthorized에서 수행 (7일 만료)
+    const token = signAdminToken(admin.id, admin.email);
 
     return NextResponse.json({
       token,

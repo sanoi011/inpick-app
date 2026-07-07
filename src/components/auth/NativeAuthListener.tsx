@@ -13,8 +13,31 @@
  * ※ Supabase 대시보드 Redirect URLs 에 kr.inpick.app://auth/callback 등록 필요.
  */
 import { useEffect } from "react";
+import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
 import { isNativeApp } from "@/lib/mobile/platform";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
+
+/** 딥링크 OAuth 복귀 로그인 완료 계측 — 실패해도 로그인 흐름 무영향 */
+function trackNativeLoginCompleted(user: User | null | undefined) {
+  try {
+    const provider = (user?.app_metadata?.provider as string | undefined) ?? "unknown";
+    // 신규 가입 판별 — 생성 시각 2분 이내면 이 OAuth 흐름에서 방금 생성된 계정
+    const createdAt = user?.created_at ? new Date(user.created_at).getTime() : 0;
+    const isNewUser = createdAt > 0 && Date.now() - createdAt < 2 * 60 * 1000;
+    if (isNewUser) {
+      trackClientEvent(AnalyticsEvents.SignupCompleted, {
+        props: { provider, method: "native_deeplink" },
+      });
+    }
+    trackClientEvent(AnalyticsEvents.LoginCompleted, {
+      props: { provider, method: "native_deeplink", is_new_user: isNewUser },
+    });
+  } catch {
+    /* silent */
+  }
+}
 
 export default function NativeAuthListener() {
   useEffect(() => {
@@ -41,11 +64,12 @@ export default function NativeAuthListener() {
             const code = parsed.searchParams.get("code");
             if (code) {
               // PKCE: code → 세션 교환 (verifier 는 로그인 시작 시 저장돼 있음)
-              const { error } = await supabase.auth.exchangeCodeForSession(code);
+              const { data, error } = await supabase.auth.exchangeCodeForSession(code);
               if (error) {
                 console.error("[native-auth] exchangeCodeForSession 실패:", error.message);
                 return;
               }
+              trackNativeLoginCompleted(data?.user ?? data?.session?.user);
             } else {
               // implicit 폴백: #access_token=...&refresh_token=...
               const hash = url.split("#")[1];
@@ -57,11 +81,12 @@ export default function NativeAuthListener() {
               const access_token = hp.get("access_token");
               const refresh_token = hp.get("refresh_token");
               if (!access_token || !refresh_token) return;
-              const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+              const { data, error } = await supabase.auth.setSession({ access_token, refresh_token });
               if (error) {
                 console.error("[native-auth] setSession 실패:", error.message);
                 return;
               }
+              trackNativeLoginCompleted(data?.user ?? data?.session?.user);
             }
             if (!cancelled) {
               // 세션 확립 후 홈으로 (로그인 상태 반영)

@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -71,6 +72,9 @@ async function distinctUserCount(
 }
 
 export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const admin = getAdmin();
   if (!admin) {
     return NextResponse.json(

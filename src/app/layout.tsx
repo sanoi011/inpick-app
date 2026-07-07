@@ -4,6 +4,7 @@ import { Bodoni_Moda, Manrope } from "next/font/google";
 import { ToastContainer } from "@/components/ui/Toast";
 import { TokensProvider } from "@/contexts/TokensContext";
 import NativeAuthListener from "@/components/auth/NativeAuthListener";
+import SessionTracker from "@/components/analytics/SessionTracker";
 import "./globals.css";
 
 const geistSans = localFont({
@@ -96,6 +97,7 @@ export default function RootLayout({
           {children}
           <ToastContainer />
           <NativeAuthListener />
+          <SessionTracker />
         </TokensProvider>
         <ServiceWorkerRegistration />
       </body>

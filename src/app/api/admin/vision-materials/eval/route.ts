@@ -6,8 +6,9 @@
  * 최근 vision_eval_results를 dataset/run 기준으로 집계.
  */
 
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,7 +22,10 @@ function getAdmin() {
   });
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const admin = getAdmin();
   if (!admin) {
     return NextResponse.json({ error: "Supabase 미설정", runs: [] }, { status: 503 });

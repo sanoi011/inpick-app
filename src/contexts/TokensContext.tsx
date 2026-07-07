@@ -130,29 +130,17 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       } catch (e) {
         console.warn("[tokens] /api/user/balance 실패, client 직접 조회 fallback:", e);
       }
-      // 폴백: client 직접 조회 (RLS 통과되는 케이스)
-      const [tokRes, credRes] = await Promise.all([
-        supabase
-          .from("user_tokens")
-          .select("balance, total_purchased, total_used")
-          .eq("user_id", userId)
-          .maybeSingle(),
-        supabase
-          .from("user_credits")
-          .select("balance")
-          .eq("user_id", userId)
-          .maybeSingle(),
-      ]);
-      const tokBalance = tokRes.data?.balance ?? null;
-      const credBalance = credRes.data?.balance ?? null;
-      const effectiveBalance =
-        tokBalance != null && credBalance != null
-          ? Math.max(tokBalance, credBalance)
-          : (tokBalance ?? credBalance ?? SIGNUP_BONUS);
+      // 폴백: client 직접 조회 (RLS 통과되는 케이스) — user_credits 단일 소스
+      // (user_tokens는 운영 DB에 없는 죽은 테이블이라 2026-07-07 조회 제거)
+      const { data: cred } = await supabase
+        .from("user_credits")
+        .select("balance")
+        .eq("user_id", userId)
+        .maybeSingle();
       setState({
-        balance: effectiveBalance,
-        totalUsed: tokRes.data?.total_used ?? 0,
-        totalPurchased: tokRes.data?.total_purchased ?? 0,
+        balance: cred?.balance ?? SIGNUP_BONUS,
+        totalUsed: 0,
+        totalPurchased: 0,
         history: [],
         loading: false,
         authenticated: true,

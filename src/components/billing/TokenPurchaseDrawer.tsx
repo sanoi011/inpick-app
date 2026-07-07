@@ -19,6 +19,8 @@ import { useEffect, useState } from "react";
 import { X, Loader2, Coins, Sparkles, AlertCircle, Star } from "lucide-react";
 import { detectPlatform, isNativeApp } from "@/lib/mobile/platform";
 import { purchaseWithIap } from "@/lib/mobile/iap";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 type Product = {
   productId: string;
@@ -129,6 +131,17 @@ export function TokenPurchaseDrawer({
           setErrorMsg("앱 결제 상품이 아직 준비되지 않았습니다. 잠시 후 다시 시도해주세요.");
           return;
         }
+        // 구매 시작 계측 — 성공/실패/취소는 iap.ts에서 발화
+        trackClientEvent(AnalyticsEvents.IapPurchaseStarted, {
+          projectId,
+          props: {
+            productId: product.productId,
+            appProductId,
+            platform: detectPlatform(),
+            reason,
+            amountKrw: product.amountKrw,
+          },
+        });
         const r = await purchaseWithIap({
           internalCode: product.productId,
           appProductId,

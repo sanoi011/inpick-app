@@ -1,7 +1,11 @@
 /**
  * POST /api/user/consume
  *
- * 토큰 차감 — service_role로 RLS 우회하여 user_credits 또는 user_tokens 차감.
+ * 토큰 차감 — service_role로 RLS 우회하여 user_credits 차감.
+ *
+ * 2026-07-07 정리: user_tokens/token_transactions/deduct_tokens RPC는 운영 DB에
+ * 존재하지 않는 죽은 경로였음(매 호출 실패 라운드트립) → user_credits 단일 경로.
+ * 차감은 낙관적 동시성(현재 잔액 일치 조건부 UPDATE)으로 이중차감 race 방지.
  *
  * 입력: { amount, feature }
  * 출력: { success, balance, source }
@@ -17,6 +21,8 @@ interface Body {
   amount: number;
   feature: "ai_render" | "ar_session" | "drawing_option" | "welcome" | "manual";
 }
+
+const MAX_RETRIES = 3;
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,79 +40,37 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient();
 
-    // 1) RPC deduct_tokens 시도
-    try {
-      const { data, error } = await admin.rpc("deduct_tokens", {
-        p_user_id: user.id,
-        p_amount: amount,
-        p_feature: feature,
-      });
-      if (!error && data?.success) {
-        const { data: tok } = await admin
-          .from("user_tokens")
-          .select("balance")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        return NextResponse.json({
-          success: true,
-          balance: tok?.balance ?? 0,
-          source: "rpc_deduct_tokens",
-        });
-      }
-    } catch {
-      /* fallback */
-    }
+    let lastBalance: number | null = null;
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      const { data: cred } = await admin
+        .from("user_credits")
+        .select("balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      lastBalance = cred?.balance ?? null;
+      if (!cred || cred.balance < amount) break;
 
-    // 2) user_credits 직접 update (옛 시스템 + RLS 우회)
-    const { data: cred } = await admin
-      .from("user_credits")
-      .select("balance")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (cred && cred.balance >= amount) {
       const newBal = cred.balance - amount;
-      const { error: upErr } = await admin
+      // 읽은 잔액과 일치할 때만 차감 — 동시 요청이 끼어들면 0행 갱신되어 재시도
+      const { data: updated, error: upErr } = await admin
         .from("user_credits")
         .update({ balance: newBal })
-        .eq("user_id", user.id);
-      if (!upErr) {
-        await admin.from("credit_transactions").insert({
-          user_id: user.id,
-          amount: -amount,
-          type: "USE",
-          description: `토큰 사용 (${feature})`,
-        });
-        return NextResponse.json({
-          success: true,
-          balance: newBal,
-          source: "user_credits",
-        });
-      }
-    }
+        .eq("user_id", user.id)
+        .eq("balance", cred.balance)
+        .select("balance");
+      if (upErr) break;
+      if (!updated || updated.length === 0) continue; // race — 재시도
 
-    // 3) user_tokens 직접 update
-    const { data: tok } = await admin
-      .from("user_tokens")
-      .select("balance, total_used")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (tok && tok.balance >= amount) {
-      const newBal = tok.balance - amount;
-      await admin
-        .from("user_tokens")
-        .update({ balance: newBal, total_used: (tok.total_used ?? 0) + amount })
-        .eq("user_id", user.id);
-      await admin.from("token_transactions").insert({
+      await admin.from("credit_transactions").insert({
         user_id: user.id,
-        type: "use",
-        feature,
         amount: -amount,
-        balance_after: newBal,
+        type: "USE",
+        description: `토큰 사용 (${feature})`,
       });
       return NextResponse.json({
         success: true,
         balance: newBal,
-        source: "user_tokens",
+        source: "user_credits",
       });
     }
 
@@ -114,8 +78,7 @@ export async function POST(req: NextRequest) {
       {
         success: false,
         error: "잔액 부족",
-        creditsBalance: cred?.balance ?? null,
-        tokensBalance: tok?.balance ?? null,
+        creditsBalance: lastBalance,
       },
       { status: 402 },
     );

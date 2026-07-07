@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { startOAuth } from "@/lib/auth/oauth-start";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 interface LoginModalProps {
   open: boolean;
@@ -69,6 +71,10 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
         }
         return;
       }
+      // 이메일 로그인 완료 계측 (sendBeacon — hard nav에도 전송됨)
+      trackClientEvent(AnalyticsEvents.LoginCompleted, {
+        props: { provider: "email", method: "password" },
+      });
       window.location.href = returnUrl || "/";
     } catch (err) {
       console.error("[login-modal] error", err);

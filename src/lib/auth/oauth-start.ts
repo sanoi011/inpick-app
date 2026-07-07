@@ -14,6 +14,8 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectPlatform, openOAuthExternal } from "@/lib/mobile/platform";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
 
@@ -43,7 +45,11 @@ export async function startOAuth(
         ? await signInWithAppleNative(supabase)
         : await signInWithGoogleNative(supabase);
     if (result.error) return { error: result.error };
-    // 세션 확립됨 — 홈으로 (미들웨어가 새 쿠키 읽도록 hard nav)
+    // 세션 확립됨 — 로그인 완료 계측 (sendBeacon이라 hard nav에도 전송됨)
+    trackClientEvent(AnalyticsEvents.LoginCompleted, {
+      props: { provider, method: "native_sdk", platform: "ios" },
+    });
+    // 홈으로 (미들웨어가 새 쿠키 읽도록 hard nav)
     if (typeof window !== "undefined") window.location.href = "/";
     return {};
   }
@@ -60,6 +66,12 @@ export async function startOAuth(
   });
 
   if (error) return { error: error.message };
+
+  // OAuth 시작 성공 (웹은 redirect 직전, 네이티브는 외부 브라우저 오픈 직전).
+  // 완료(login_completed)는 웹: /auth/callback, 네이티브: NativeAuthListener에서 발화.
+  trackClientEvent(AnalyticsEvents.OAuthStarted, {
+    props: { provider, platform },
+  });
 
   if (isNative && data?.url) {
     // Chrome Custom Tabs / SFSafariViewController로 오픈 (System WebView 차단 우회)

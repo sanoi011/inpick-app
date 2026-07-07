@@ -21,6 +21,8 @@ import {
   InsufficientBalanceError,
 } from "@/lib/inpick/tokens/ledger";
 import { grantEstimatePdfSingleWithTokens } from "@/lib/inpick/entitlements";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -99,6 +101,21 @@ export async function POST(req: NextRequest) {
       ledgerId: consumed.ledgerId,
       estimateId: body.estimateId ?? null,
       consumerProjectId: body.consumerProjectId ?? null,
+    });
+    // PDF 발급 완료 계측 (fire-and-forget)
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.PdfIssued,
+      actorType: "consumer",
+      userId: user.id,
+      estimateId: body.estimateId ?? undefined,
+      source: "api",
+      props: {
+        source: "tokens",
+        tokensSpent: consumed.idempotent ? 0 : tokensNeeded,
+        tokensNeeded,
+        idempotent: consumed.idempotent,
+        consumerProjectId: body.consumerProjectId ?? undefined,
+      },
     });
     return NextResponse.json({
       entitlementId: grant.entitlementId,

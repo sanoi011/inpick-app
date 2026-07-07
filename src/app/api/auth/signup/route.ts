@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 interface SignupBody {
   email: string;
@@ -166,6 +168,15 @@ export async function POST(req: NextRequest) {
       { status: 500 }
     );
   }
+
+  // 이메일 회원가입 완료 계측 (fire-and-forget — 가입 흐름 무영향)
+  trackServerEventAsync({
+    eventName: AnalyticsEvents.SignupCompleted,
+    actorType: "consumer",
+    userId,
+    source: "api",
+    props: { provider: "email", agree_marketing: !!body.agreeMarketing },
+  });
 
   return NextResponse.json({
     ok: true,

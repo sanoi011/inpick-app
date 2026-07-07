@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,9 @@ function getSupabase() {
 //   ?trade=ARCH_ELEV&space=욕실           — 특정 공종·공간
 //   ?limit=50
 export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = getSupabase();
   const sp = req.nextUrl.searchParams;
   const hasRender    = sp.get("has_render");

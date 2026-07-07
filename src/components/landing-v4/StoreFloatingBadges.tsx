@@ -9,6 +9,8 @@
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { isRegularWebBrowser } from "@/lib/mobile/platform";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 const APP_STORE_URL =
   process.env.NEXT_PUBLIC_APP_STORE_URL || "https://www.apple.com/app-store/";
@@ -78,6 +80,11 @@ export default function StoreFloatingBadges() {
         href={APP_STORE_URL}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() =>
+          trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
+            props: { store: "app_store" },
+          })
+        }
         className="flex w-[170px] items-center gap-2.5 rounded-xl border border-white/15 bg-black px-3.5 py-2 text-white shadow-lg transition hover:scale-[1.02] hover:bg-zinc-900"
       >
         <AppleGlyph />
@@ -91,6 +98,11 @@ export default function StoreFloatingBadges() {
         href={GOOGLE_PLAY_URL}
         target="_blank"
         rel="noopener noreferrer"
+        onClick={() =>
+          trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
+            props: { store: "google_play" },
+          })
+        }
         className="flex w-[170px] items-center gap-2.5 rounded-xl border border-white/15 bg-black px-3.5 py-2 text-white shadow-lg transition hover:scale-[1.02] hover:bg-zinc-900"
       >
         <GooglePlayGlyph />

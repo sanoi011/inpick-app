@@ -28,6 +28,8 @@ import {
   saveRefineCache,
   isRefineCacheReady,
 } from "@/lib/inpick/refine-cache";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -78,6 +80,7 @@ interface Body {
 export async function POST(req: NextRequest) {
   // 차감 정보 — 외부 API 실패 시 환불에 사용
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
+  const startedAt = Date.now();
 
   try {
     const body = (await req.json()) as Body;
@@ -137,6 +140,21 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
+    // ─── 이미지 생성 요청 계측 (차감·rate limit 통과 = 실제 요청 시작) ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationRequested,
+      actorType: "consumer",
+      userId: charge.userId,
+      source: "api",
+      props: {
+        endpoint: "refine-render",
+        quality: body.quality ?? "medium",
+        roomName: body.roomName,
+        regionCategory: body.regionCategoryEn,
+        credit_charged: charge.charged,
+      },
+    });
+
     // ─── v2 §5-4 결과 캐시 hit 검사 — 적중 시 토큰 전액 환불 + gpt-image-2 skip ──
     const cacheKey = buildRefineCacheKey({
       imageRef: body.originalImageUrl,
@@ -155,6 +173,18 @@ export async function POST(req: NextRequest) {
       if (cached) {
         // 캐시 hit — 토큰 100% 환불 (외부 호출 0)
         await refundCredits(charge.userId, charge.charged, "refine-cache-hit").catch(() => {});
+        trackServerEventAsync({
+          eventName: AnalyticsEvents.ImageGenerationCompleted,
+          actorType: "consumer",
+          userId: charge.userId,
+          source: "api",
+          props: {
+            endpoint: "refine-render",
+            from_cache: true,
+            costUsd: 0,
+            latency_ms: Date.now() - startedAt,
+          },
+        });
         return NextResponse.json({
           imageUrl: cached.result_url,
           costUsd: 0,
@@ -281,6 +311,18 @@ export async function POST(req: NextRequest) {
         const r = await refundCredits(charge.userId, charge.charged, `refine-render-failed:${model_status}`);
         refunded = r.refunded;
       }
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge?.userId,
+        source: "api",
+        props: {
+          endpoint: "refine-render",
+          model_status,
+          refunded,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
       return NextResponse.json(
         {
           error: "고화질 재렌더에 실패했습니다",
@@ -301,11 +343,39 @@ export async function POST(req: NextRequest) {
         const r = await refundCredits(charge.userId, charge.charged, "refine-render-empty-response");
         refunded = r.refunded;
       }
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge?.userId,
+        source: "api",
+        props: {
+          endpoint: "refine-render",
+          model_status: "empty_response",
+          refunded,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
       return NextResponse.json(
         { error: "고화질 재렌더 응답이 비어있습니다", tokenConsumed: !refunded, refunded },
         { status: 502 },
       );
     }
+
+    // ─── 이미지 생성 성공 계측 ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationCompleted,
+      actorType: "consumer",
+      userId: charge?.userId,
+      source: "api",
+      props: {
+        endpoint: "refine-render",
+        model: usedModel,
+        costUsd: costMap[quality] ?? 0.04,
+        from_cache: false,
+        latency_ms: Date.now() - startedAt,
+        credit_charged: charge?.charged ?? 0,
+      },
+    });
 
     // Cloudflare 502 회피 — 큰 base64 대신 Storage URL로 응답
     const publicUrl = await uploadBase64ToStorage(b64);
@@ -343,6 +413,22 @@ export async function POST(req: NextRequest) {
     if (charge && charge.charged > 0) {
       const r = await refundCredits(charge.userId, charge.charged, `refine-render-error:${isTimeout ? "timeout" : "unknown"}`);
       refunded = r.refunded;
+    }
+    // 차감 이후(=생성 시도) 실패만 계측
+    if (charge) {
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge.userId,
+        source: "api",
+        props: {
+          endpoint: "refine-render",
+          model_status: isTimeout ? "timeout" : "unknown",
+          error: msg.slice(0, 200),
+          refunded,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
     }
     return NextResponse.json(
       {

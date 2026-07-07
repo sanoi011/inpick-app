@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { consumeEntitlement } from "@/lib/inpick/entitlements";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,5 +24,15 @@ export async function POST(req: NextRequest) {
   }
 
   const result = await consumeEntitlement(body.entitlementId);
+  // 발급권 소비 = PDF 실제 다운로드 완료 계측 (fire-and-forget)
+  if (result.consumed) {
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.PdfIssued,
+      actorType: "consumer",
+      userId: user.id,
+      source: "api",
+      props: { source: "entitlement", entitlementId: body.entitlementId },
+    });
+  }
   return NextResponse.json(result);
 }

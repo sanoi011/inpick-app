@@ -12,6 +12,8 @@
  * 웹/브라우저에서는 isIapAvailable()=false — 호출부에서 토스 등 웹 경로 사용.
  */
 import { detectPlatform } from "./platform";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 /* ── cordova-plugin-purchase v13 최소 타입 ── */
 interface CdvTransaction {
@@ -143,6 +145,15 @@ async function handleApproved(tx: CdvTransaction): Promise<void> {
     if (res.ok && data.ok) {
       // 검증+지급 성공 → 소모 처리 (여기서만 finish)
       await tx.finish();
+      trackClientEvent(AnalyticsEvents.IapPurchaseClientSucceeded, {
+        props: {
+          productId: internalCode,
+          appProductId,
+          platform,
+          creditsAdded: data.finalize?.creditsAdded,
+          alreadyProvisioned: !!data.alreadyProvisioned,
+        },
+      });
       resolve?.({
         ok: true,
         creditsAdded: data.finalize?.creditsAdded,
@@ -151,9 +162,27 @@ async function handleApproved(tx: CdvTransaction): Promise<void> {
       });
     } else {
       // finish 안 함 — 다음 앱 실행 시 approved 재전달로 재시도 가능
+      trackClientEvent(AnalyticsEvents.IapPurchaseFailed, {
+        props: {
+          productId: internalCode,
+          appProductId,
+          platform,
+          stage: "verify",
+          error: (data.hint || data.error || "").slice(0, 200),
+        },
+      });
       resolve?.({ ok: false, error: data.hint || data.error || "구매 검증에 실패했습니다" });
     }
   } catch (err) {
+    trackClientEvent(AnalyticsEvents.IapPurchaseFailed, {
+      props: {
+        productId: internalCode,
+        appProductId,
+        platform,
+        stage: "verify_network",
+        error: err instanceof Error ? err.message.slice(0, 200) : "network",
+      },
+    });
     resolve?.({
       ok: false,
       error: err instanceof Error ? err.message : "구매 검증 통신 오류",
@@ -218,6 +247,14 @@ export async function purchaseWithIap(input: {
   const product = cdv.store.get(input.appProductId, nativePlatformConst());
   const offer = product?.getOffer();
   if (!offer) {
+    trackClientEvent(AnalyticsEvents.IapPurchaseFailed, {
+      props: {
+        productId: input.internalCode,
+        appProductId: input.appProductId,
+        platform: detectPlatform(),
+        stage: "offer_not_found",
+      },
+    });
     return { ok: false, error: "스토어에서 상품을 찾을 수 없습니다 (상품 등록/심사 상태 확인)" };
   }
 
@@ -227,6 +264,14 @@ export async function purchaseWithIap(input: {
     setTimeout(() => {
       if (pending.get(input.appProductId) === resolve) {
         pending.delete(input.appProductId);
+        trackClientEvent(AnalyticsEvents.IapPurchaseFailed, {
+          props: {
+            productId: input.internalCode,
+            appProductId: input.appProductId,
+            platform: detectPlatform(),
+            stage: "timeout",
+          },
+        });
         resolve({ ok: false, error: "결제 응답 시간 초과 — 잔액은 잠시 후 자동 반영될 수 있습니다" });
       }
     }, input.timeoutMs ?? 180_000);
@@ -237,6 +282,17 @@ export async function purchaseWithIap(input: {
     pending.delete(input.appProductId);
     const msg = orderErr.message || "";
     const cancelled = /cancel/i.test(msg) || orderErr.code === 6777006; // USER_CANCELLED
+    trackClientEvent(
+      cancelled ? AnalyticsEvents.IapPurchaseCancelled : AnalyticsEvents.IapPurchaseFailed,
+      {
+        props: {
+          productId: input.internalCode,
+          appProductId: input.appProductId,
+          platform: detectPlatform(),
+          ...(cancelled ? {} : { stage: "order", error: msg.slice(0, 200) }),
+        },
+      },
+    );
     return cancelled
       ? { ok: false, cancelled: true }
       : { ok: false, error: msg || "구매 시작 실패" };

@@ -42,6 +42,8 @@ import {
   type CreditFeature,
 } from "@/lib/inpick/credit-policy";
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 // gpt-image-2는 40~80초 소요 — Vercel Pro maxDuration 800초 한도 내에서 300초로 설정
@@ -60,6 +62,7 @@ interface RenderBody extends RenderRoomInput {
 export async function POST(req: NextRequest) {
   // 차감 정보 — 외부 API 실패 시 환불에 사용
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
+  const startedAt = Date.now();
 
   try {
     const body = (await req.json()) as RenderBody;
@@ -170,6 +173,22 @@ export async function POST(req: NextRequest) {
 
     // floorplanImageUrl는 토큰 차감 전 단계에서 이미 검증·로드됨.
 
+    // ─── 이미지 생성 요청 계측 (차감·rate limit 통과 = 실제 생성 시작) ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationRequested,
+      actorType: "consumer",
+      userId: charge.userId,
+      projectId: body.propertyId,
+      projectMode: "apartment",
+      source: "api",
+      props: {
+        endpoint: "render-room",
+        quality: body.quality ?? "low",
+        roomName: body.roomName,
+        credit_charged: charge.charged,
+      },
+    });
+
     // ─── Launch-critical: RenderRoomSpec build (2026-05-11) ───
     // RENDER_ROOM_SPEC_ENABLED=true이면 도면 구조를 spec으로 변환 → prompt에 강제
     // 가이드: docs/launch/LAUNCH_ERROR_AUDIT_20260511.md
@@ -274,6 +293,29 @@ export async function POST(req: NextRequest) {
         modelStatus: result.modelStatus,
       });
 
+      // async 분기 계측 — 즉시 완료/실패가 확정된 경우만 (processing은 job 콜백에서 처리 불가 → skip)
+      if (result.status === "completed" || result.status === "failed") {
+        trackServerEventAsync({
+          eventName:
+            result.status === "completed"
+              ? AnalyticsEvents.ImageGenerationCompleted
+              : AnalyticsEvents.ImageGenerationFailed,
+          actorType: "consumer",
+          userId: charge?.userId,
+          projectId: body.propertyId,
+          projectMode: "apartment",
+          source: "api",
+          props: {
+            endpoint: "render-room",
+            backend: result.backend,
+            model: result.model,
+            costUsd: result.costUsd,
+            latency_ms: Date.now() - startedAt,
+            async_mode: true,
+          },
+        });
+      }
+
       return NextResponse.json({
         jobId: job.id,
         status: result.status,
@@ -309,6 +351,23 @@ export async function POST(req: NextRequest) {
         refunded = r.refunded;
       }
 
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge?.userId,
+        projectId: body.propertyId,
+        projectMode: "apartment",
+        source: "api",
+        props: {
+          endpoint: "render-room",
+          model_status,
+          backend: result.backend,
+          model: result.model,
+          refunded,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
+
       return NextResponse.json(
         {
           error: result.error || "이미지 생성에 실패했습니다",
@@ -341,6 +400,21 @@ export async function POST(req: NextRequest) {
         // storage 실패 — production에서는 에러로 응답, PoC면 base64 그대로
         if (process.env.NODE_ENV === "production") {
           console.error("[render-room] storage upload failed:", storageErr);
+          trackServerEventAsync({
+            eventName: AnalyticsEvents.ImageGenerationFailed,
+            actorType: "consumer",
+            userId: charge?.userId,
+            projectId: body.propertyId,
+            projectMode: "apartment",
+            source: "api",
+            props: {
+              endpoint: "render-room",
+              model_status: "storage_failed",
+              backend: result.backend,
+              model: result.model,
+              latency_ms: Date.now() - startedAt,
+            },
+          });
           return NextResponse.json(
             {
               error: "이미지 저장 실패",
@@ -356,6 +430,24 @@ export async function POST(req: NextRequest) {
         console.warn("[render-room] storage failed, falling back to base64:", storageErr);
       }
     }
+
+    // ─── 이미지 생성 성공 계측 ──
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationCompleted,
+      actorType: "consumer",
+      userId: charge?.userId,
+      projectId: body.propertyId,
+      projectMode: "apartment",
+      source: "api",
+      props: {
+        endpoint: "render-room",
+        backend: result.backend,
+        model: result.model,
+        costUsd: result.costUsd,
+        latency_ms: Date.now() - startedAt,
+        credit_charged: charge?.charged ?? 0,
+      },
+    });
 
     // ─── 성공 응답 (기존 shape 보존 + backend/jobId/renderSpec 추가) ───
     return NextResponse.json({
@@ -409,6 +501,24 @@ export async function POST(req: NextRequest) {
         `render-room-unexpected-error`,
       );
       refunded = r.refunded;
+    }
+
+    // 차감 이후(=생성 시도) 실패만 계측 — validation 단계 에러는 requested 자체가 없음
+    if (charge) {
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge.userId,
+        projectMode: "apartment",
+        source: "api",
+        props: {
+          endpoint: "render-room",
+          model_status: "unknown",
+          error: msg.slice(0, 200),
+          refunded,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
     }
 
     return NextResponse.json(

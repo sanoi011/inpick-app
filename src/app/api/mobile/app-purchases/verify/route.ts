@@ -23,6 +23,8 @@ import {
   acknowledgeGooglePlayPurchase,
 } from "@/lib/inpick/payments/providers/google-play-provider";
 import { finalizePaymentProvisioning } from "@/lib/inpick/payments/finalize-provisioning";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -195,6 +197,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // 스토어 영수증 검증 성공 계측 (fire-and-forget)
+  trackServerEventAsync({
+    eventName: AnalyticsEvents.IapVerified,
+    actorType: "consumer",
+    userId: user.id,
+    source: "api",
+    props: {
+      productId: product.code,
+      appProductId: body.appProductId,
+      platform: body.platform,
+      amountKrw: product.amount_krw,
+    },
+  });
+
   // 6) payment_intents 생성 + product_snapshot 저장
   const productSnapshot = {
     productId: product.code,
@@ -276,12 +292,31 @@ export async function POST(req: NextRequest) {
   );
 
   // entitlement_status 업데이트
+  const granted =
+    finalizeResult.status === "provisioned" || finalizeResult.status === "already_provisioned";
   await (admin.from("app_purchase_transactions") as ReturnType<typeof admin.from>)
     .update({
-      entitlement_status: finalizeResult.status === "provisioned" || finalizeResult.status === "already_provisioned" ? "granted" : "failed",
+      entitlement_status: granted ? "granted" : "failed",
       provisioned_at: new Date().toISOString(),
     } as never)
     .eq("id", txId);
+
+  // 지급 완료 계측 (fire-and-forget)
+  if (granted) {
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.IapProvisioned,
+      actorType: "consumer",
+      userId: user.id,
+      source: "api",
+      props: {
+        productId: product.code,
+        appProductId: body.appProductId,
+        platform: body.platform,
+        creditsAdded: finalizeResult.creditsAdded,
+        alreadyProvisioned: finalizeResult.status === "already_provisioned",
+      },
+    });
+  }
 
   return NextResponse.json({
     ok: true,

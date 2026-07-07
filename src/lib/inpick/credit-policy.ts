@@ -6,7 +6,8 @@
  * 핵심 원칙:
  *  - 비용 발생 endpoint는 호출 직전 enforceConsume() 통과해야 한다.
  *  - 외부 API 호출 실패 시 refundCredits()로 즉시 자동 환불.
- *  - DB 변경 0 — 기존 deduct_tokens RPC + user_credits/user_tokens 테이블 재사용.
+ *  - 원장은 user_credits + credit_transactions 단일 경로 (2026-07-07 정리 —
+ *    deduct_tokens RPC/user_tokens/token_transactions는 운영 DB에 없는 죽은 경로였음).
  */
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -39,22 +40,10 @@ export class CreditError extends Error {
 }
 
 /**
- * RPC `deduct_tokens`의 feature 인자에 맞게 매핑.
- * (RPC가 ai_render | ar_session | drawing_option | welcome | manual만 받음)
- */
-function mapFeatureForRpc(f: CreditFeature): string {
-  if (f === "render-room" || f === "render-room-high" || f === "refine-render") {
-    return "ai_render";
-  }
-  if (f === "normalize-floorplan") return "drawing_option";
-  return "manual";
-}
-
-/**
  * server-side 토큰 차감.
  *  - 인증 확인 (게스트는 401)
  *  - cost === 0이면 인증 통과만 검사하고 즉시 반환
- *  - deduct_tokens RPC → user_credits → user_tokens 3단계 폴백 (기존 /api/user/consume 동일 패턴)
+ *  - user_credits 낙관적 동시성 차감 (읽은 잔액 일치 조건부 UPDATE, race 시 재시도)
  *
  * @throws CreditError UNAUTHENTICATED(401) / INSUFFICIENT_CREDITS(402) / INTERNAL(500)
  */
@@ -77,90 +66,43 @@ export async function enforceConsume(
 
   const admin = createAdminClient();
 
-  // 1순위: deduct_tokens RPC (atomic)
-  try {
-    const { data, error } = await admin.rpc("deduct_tokens", {
-      p_user_id: user.id,
-      p_amount: cost,
-      p_feature: mapFeatureForRpc(feature),
-    });
-    if (!error && data?.success) {
-      const { data: tok } = await admin
-        .from("user_tokens")
-        .select("balance")
-        .eq("user_id", user.id)
-        .maybeSingle();
-      return {
-        userId: user.id,
-        balance: tok?.balance ?? 0,
-        charged: cost,
-        source: "rpc_deduct_tokens",
-      };
-    }
-  } catch {
-    /* fallback */
-  }
+  let lastBalance: number | null = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const { data: cred } = await admin
+      .from("user_credits")
+      .select("balance")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    lastBalance = cred?.balance ?? null;
+    if (!cred || cred.balance < cost) break;
 
-  // 2순위: user_credits 직접 차감
-  const { data: cred } = await admin
-    .from("user_credits")
-    .select("balance")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (cred && cred.balance >= cost) {
     const newBal = cred.balance - cost;
-    const { error } = await admin
+    const { data: updated, error } = await admin
       .from("user_credits")
       .update({ balance: newBal })
-      .eq("user_id", user.id);
-    if (!error) {
-      await admin.from("credit_transactions").insert({
-        user_id: user.id,
-        amount: -cost,
-        type: "USE",
-        description: `토큰 사용 (${feature})${metadata && Object.keys(metadata).length ? ` ${JSON.stringify(metadata)}` : ""}`,
-      });
-      return { userId: user.id, balance: newBal, charged: cost, source: "user_credits" };
-    }
-  }
+      .eq("user_id", user.id)
+      .eq("balance", cred.balance)
+      .select("balance");
+    if (error) break;
+    if (!updated || updated.length === 0) continue; // 동시 요청 race — 재시도
 
-  // 3순위: user_tokens 직접 차감
-  const { data: tok } = await admin
-    .from("user_tokens")
-    .select("balance, total_used")
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (tok && tok.balance >= cost) {
-    const newBal = tok.balance - cost;
-    const { error } = await admin
-      .from("user_tokens")
-      .update({
-        balance: newBal,
-        total_used: (tok.total_used ?? 0) + cost,
-      })
-      .eq("user_id", user.id);
-    if (!error) {
-      await admin.from("token_transactions").insert({
-        user_id: user.id,
-        type: "use",
-        feature: mapFeatureForRpc(feature),
-        amount: -cost,
-        balance_after: newBal,
-      });
-      return { userId: user.id, balance: newBal, charged: cost, source: "user_tokens" };
-    }
+    await admin.from("credit_transactions").insert({
+      user_id: user.id,
+      amount: -cost,
+      type: "USE",
+      description: `토큰 사용 (${feature})${metadata && Object.keys(metadata).length ? ` ${JSON.stringify(metadata)}` : ""}`,
+    });
+    return { userId: user.id, balance: newBal, charged: cost, source: "user_credits" };
   }
 
   throw new CreditError("INSUFFICIENT_CREDITS", 402, {
-    creditsBalance: cred?.balance ?? null,
-    tokensBalance: tok?.balance ?? null,
+    creditsBalance: lastBalance,
     required: cost,
   });
 }
 
 /**
- * API 실패 시 환불.
- * 차감과 같은 우선순위로 user_tokens → user_credits 복원.
+ * API 실패 시 환불 — 차감 원장과 동일하게 user_credits 복원.
  * 실패해도 throw하지 않음 — 호출자가 외부 API 에러를 우선 보고할 수 있게.
  */
 export async function refundCredits(
@@ -171,32 +113,6 @@ export async function refundCredits(
   if (amount <= 0) return { refunded: false };
   try {
     const admin = createAdminClient();
-
-    // 우선 user_tokens
-    const { data: tok } = await admin
-      .from("user_tokens")
-      .select("balance, total_used")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (tok) {
-      const newBal = tok.balance + amount;
-      await admin
-        .from("user_tokens")
-        .update({
-          balance: newBal,
-          total_used: Math.max(0, (tok.total_used ?? 0) - amount),
-        })
-        .eq("user_id", userId);
-      await admin.from("token_transactions").insert({
-        user_id: userId,
-        type: "refund",
-        amount,
-        balance_after: newBal,
-      });
-      return { refunded: true, source: "user_tokens" };
-    }
-
-    // user_credits 폴백
     const { data: cred } = await admin
       .from("user_credits")
       .select("balance")

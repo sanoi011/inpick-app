@@ -1,6 +1,7 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,10 @@ function getSupabase() {
 }
 
 // GET /api/admin/vision-stats — emotion_reference_images 집계
-export async function GET() {
+export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const supabase = getSupabase();
 
   try {

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 /**
  * GET /api/admin/fine-tuning
@@ -11,6 +12,9 @@ import { createClient } from "@/lib/supabase/server";
  *   format?: "jsonl" | "json" (default "jsonl")
  */
 export async function GET(request: NextRequest) {
+  if (!isAdminAuthorized(request)) {
+    return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
   const agentType = searchParams.get("agentType");
   const minRating = Math.max(0, Math.min(5, parseInt(searchParams.get("minRating") || "4", 10)));

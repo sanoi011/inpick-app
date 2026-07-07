@@ -50,6 +50,18 @@ export const AnalyticsEvents = {
   EstimateShared: "estimate_shared",                   // 공유
   SatisfactionSubmitted: "satisfaction_submitted",     // 만족도·피드백
 
+  // Billing / IAP (2026-07-07 계측 — 구매 시작~검증~지급 퍼널)
+  IapPurchaseStarted: "iap_purchase_started",             // 클라 — 스토어 결제 시작
+  IapPurchaseClientSucceeded: "iap_purchase_client_succeeded", // 클라 — 검증·지급까지 완료
+  IapPurchaseFailed: "iap_purchase_failed",               // 클라 — 실패 (stage props로 구분)
+  IapPurchaseCancelled: "iap_purchase_cancelled",         // 클라 — 사용자 취소
+  IapVerified: "iap_verified",                            // 서버 — 스토어 영수증 검증 성공
+  IapProvisioned: "iap_provisioned",                      // 서버 — 토큰/권한 지급 완료
+  PdfIssued: "pdf_issued",                                // 서버 — 견적서 PDF 발급(토큰 차감/권한 소비)
+
+  // 스토어 배지 (랜딩 → 앱 설치 유도)
+  StoreBadgeClicked: "store_badge_clicked",               // props.store: app_store | google_play
+
   // Scope / estimate
   CommercialScopeCreated: "commercial_scope_created",
   CommercialScopeUpdated: "commercial_scope_updated",

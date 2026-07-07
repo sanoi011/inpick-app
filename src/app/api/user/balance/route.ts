@@ -1,11 +1,11 @@
 /**
  * GET /api/user/balance
  *
- * 인증된 사용자의 토큰 잔액 조회.
- * - user_tokens + user_credits 둘 다 service_role로 조회 (RLS 우회)
- * - 큰 값 사용 (옛 시스템 잔액 보존)
+ * 인증된 사용자의 토큰 잔액 조회 — user_credits 단일 소스 (service_role, RLS 우회).
+ * (user_tokens는 운영 DB에 없는 죽은 테이블이라 2026-07-07 조회 제거)
+ * 행이 없으면 가입 보너스를 실지급 후 반환.
  *
- * 출력: { balance, totalUsed, totalPurchased, source: "tokens"|"credits"|"merged"|"signup_bonus" }
+ * 출력: { balance, totalUsed, totalPurchased, source: "credits"|"signup_bonus" }
  */
 import { NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
@@ -30,31 +30,17 @@ export async function GET() {
     }
 
     const admin = createAdminClient();
-    const [tokRes, credRes] = await Promise.all([
-      admin
-        .from("user_tokens")
-        .select("balance, total_purchased, total_used")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-      admin
-        .from("user_credits")
-        .select("balance")
-        .eq("user_id", user.id)
-        .maybeSingle(),
-    ]);
+    const credRes = await admin
+      .from("user_credits")
+      .select("balance")
+      .eq("user_id", user.id)
+      .maybeSingle();
 
-    const tokBal = tokRes.data?.balance ?? null;
     const credBal = credRes.data?.balance ?? null;
 
     let balance: number;
-    let source: "tokens" | "credits" | "merged" | "signup_bonus";
-    if (tokBal != null && credBal != null) {
-      balance = Math.max(tokBal, credBal);
-      source = "merged";
-    } else if (tokBal != null) {
-      balance = tokBal;
-      source = "tokens";
-    } else if (credBal != null) {
+    let source: "credits" | "signup_bonus";
+    if (credBal != null) {
       balance = credBal;
       source = "credits";
     } else {
@@ -83,9 +69,9 @@ export async function GET() {
       authenticated: true,
       userId: user.id,
       balance,
-      totalUsed: tokRes.data?.total_used ?? 0,
-      totalPurchased: tokRes.data?.total_purchased ?? 0,
-      tokensTableBalance: tokBal,
+      totalUsed: 0, // 누적 통계는 credit_transactions 집계로 추후 제공
+      totalPurchased: 0,
+      tokensTableBalance: null,
       creditsTableBalance: credBal,
       source,
     });
