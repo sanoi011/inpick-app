@@ -269,9 +269,9 @@ export async function creditTokensAfterPayment(input: {
     });
   }
 
-  // 3) ⚠️ 라이브 잔액 미러링 — 잔액표시(user/balance)와 AI 차감(credit-policy)은
-  //    token_wallets가 아니라 user_tokens를 본다. 결제로 산 토큰이 '안 보이고 못 쓰이는'
-  //    문제(2026-07-05 버그헌트 C2) 해결: 신규 충전 시에만 user_tokens에도 반영.
+  // 3) ⚠️ 라이브 잔액 미러링 — 잔액표시(user/balance)와 AI 차감(user/consume)은
+  //    token_wallets가 아니라 user_credits를 본다. 결제로 산 토큰이 '안 보이고 못 쓰이는'
+  //    문제(2026-07-05 버그헌트 C2) 해결: 신규 충전 시에만 user_credits에도 반영.
   if (!paidResult.idempotent) {
     await mirrorCreditToLiveBalance(
       input.userId,
@@ -284,8 +284,12 @@ export async function creditTokensAfterPayment(input: {
 }
 
 /**
- * 결제 충전분을 라이브 잔액 원장(user_tokens)에 미러링.
- * user_tokens가 없으면 생성. 실패해도 throw 안 함(원장 기록은 이미 성공).
+ * 결제 충전분을 라이브 잔액(user_credits + credit_transactions)에 미러링.
+ * ⚠️ user_tokens/token_transactions 테이블은 운영 DB에 존재하지 않음(2026-07-07 확인) —
+ *    잔액 표시(/api/user/balance)와 차감(/api/user/consume)이 실제로 읽고 쓰는 곳은
+ *    user_credits/credit_transactions. 없는 테이블에 쓰면 조용히 실패해 구매 토큰이
+ *    "안 보이고 못 쓰이는" 문제(2026-07-05 C2)가 IAP에서 재발한다.
+ * user_credits 행이 없으면 생성. 실패해도 throw 안 함(token_ledger 기록은 이미 성공).
  */
 async function mirrorCreditToLiveBalance(
   userId: string,
@@ -297,38 +301,32 @@ async function mirrorCreditToLiveBalance(
   if (!admin) return;
   try {
     // 같은 결제가 이미 미러링됐는지 확인 (webhook+confirm 이중 경로 멱등)
+    const marker = `payment:${paymentId}`;
     const { data: dup } = await admin
-      .from("token_transactions")
+      .from("credit_transactions")
       .select("id")
       .eq("user_id", userId)
-      .eq("type", "purchase")
-      .contains("metadata", { paymentId })
-      .maybeSingle();
-    if (dup) return;
+      .like("description", `%${marker}%`)
+      .limit(1);
+    if (dup && dup.length > 0) return;
 
-    const { data: tok } = await admin
-      .from("user_tokens")
-      .select("balance, total_purchased")
+    const { data: cred } = await admin
+      .from("user_credits")
+      .select("balance")
       .eq("user_id", userId)
       .maybeSingle();
-    const prev = (tok as { balance?: number; total_purchased?: number } | null) ?? null;
+    const prev = (cred as { balance?: number } | null) ?? null;
     const newBal = (prev?.balance ?? 0) + amount;
     if (prev) {
-      await admin
-        .from("user_tokens")
-        .update({ balance: newBal, total_purchased: (prev.total_purchased ?? 0) + amount })
-        .eq("user_id", userId);
+      await admin.from("user_credits").update({ balance: newBal }).eq("user_id", userId);
     } else {
-      await admin
-        .from("user_tokens")
-        .insert({ user_id: userId, balance: newBal, total_purchased: amount, total_used: 0 });
+      await admin.from("user_credits").insert({ user_id: userId, balance: newBal });
     }
-    await admin.from("token_transactions").insert({
+    await admin.from("credit_transactions").insert({
       user_id: userId,
-      type: "purchase",
+      type: "CHARGE",
       amount,
-      balance_after: newBal,
-      metadata: { paymentId, mirrored: true },
+      description: `토큰 충전 (${marker})`,
     });
   } catch (e) {
     console.warn("[ledger] mirrorCreditToLiveBalance failed (non-fatal):", e);

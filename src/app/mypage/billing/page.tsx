@@ -46,7 +46,7 @@ interface BillingData {
     id: string;
     entry_type: string;
     delta: number;
-    balance_after: number;
+    balance_after: number | null;
     reason_ko: string | null;
     source_type: string;
     created_at: string;
@@ -132,7 +132,11 @@ export default function MyBillingPage() {
     );
   }
 
-  const totalAvailable = data.wallet.balance - data.wallet.locked_balance;
+  // 라이브 잔액(user_credits)이 헤더·차감에 쓰이는 값 — 지갑(token_wallets)과 큰 쪽으로 표시 통일
+  const totalAvailable = Math.max(
+    data.wallet.balance - data.wallet.locked_balance,
+    data.userCreditsBalance ?? 0,
+  );
 
   return (
     <main className="min-h-screen bg-[#F7F7F5]">
@@ -296,7 +300,9 @@ function LedgerTab({ ledger }: { ledger: BillingData["ledger"] }) {
               {l.delta > 0 ? "+" : ""}
               {l.delta} 토큰
             </p>
-            <p className="text-[0.65rem] text-[#9A9A9A]">잔액 {l.balance_after}</p>
+            {l.balance_after != null && (
+              <p className="text-[0.65rem] text-[#9A9A9A]">잔액 {l.balance_after}</p>
+            )}
           </div>
         </div>
       ))}
