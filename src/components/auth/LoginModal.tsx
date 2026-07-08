@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { startOAuth } from "@/lib/auth/oauth-start";
+import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
 
@@ -181,7 +182,9 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
           <div className="flex flex-col gap-2.5">
             <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
             <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
-            <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
+            {NAVER_LOGIN_ENABLED && (
+              <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
+            )}
             <OAuthBtn provider="apple" onClick={() => handleOAuth("apple")} />
           </div>
 

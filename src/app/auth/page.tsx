@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { startOAuth } from "@/lib/auth/oauth-start";
+import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 import { SignupModal } from "@/components/auth/SignupModal";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
@@ -28,7 +29,7 @@ function OAuthRow({
   onProvider: (p: OAuthProvider) => void;
   loadingProvider: OAuthProvider | null;
 }) {
-  const items: {
+  const allItems: {
     key: OAuthProvider;
     label: string;
     bg: string;
@@ -100,6 +101,8 @@ function OAuthRow({
       ),
     },
   ];
+  // 네이버 검수 재신청 중 — 통과 후 NEXT_PUBLIC_ENABLE_NAVER_LOGIN=true로 재노출.
+  const items = NAVER_LOGIN_ENABLED ? allItems : allItems.filter((it) => it.key !== "naver");
 
   return (
     <div className="flex flex-col gap-2.5">

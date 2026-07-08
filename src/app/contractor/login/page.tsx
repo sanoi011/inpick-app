@@ -10,6 +10,7 @@ import {
   ArrowLeft,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
@@ -129,18 +130,20 @@ export default function ContractorLoginPage() {
                 )}
                 카카오로 로그인
               </button>
-              <button
-                onClick={() => handleOAuth("naver")}
-                disabled={!!oauthLoading}
-                className="w-full inline-flex items-center justify-center gap-3 h-12 rounded bg-[#03C75A] text-sm font-bold text-white hover:bg-[#02b552] disabled:opacity-50"
-              >
-                {oauthLoading === "naver" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <span className="text-base font-extrabold">N</span>
-                )}
-                네이버로 로그인
-              </button>
+              {NAVER_LOGIN_ENABLED && (
+                <button
+                  onClick={() => handleOAuth("naver")}
+                  disabled={!!oauthLoading}
+                  className="w-full inline-flex items-center justify-center gap-3 h-12 rounded bg-[#03C75A] text-sm font-bold text-white hover:bg-[#02b552] disabled:opacity-50"
+                >
+                  {oauthLoading === "naver" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <span className="text-base font-extrabold">N</span>
+                  )}
+                  네이버로 로그인
+                </button>
+              )}
               <button
                 onClick={() => handleOAuth("apple")}
                 disabled={!!oauthLoading}
