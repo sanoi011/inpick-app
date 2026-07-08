@@ -27,7 +27,10 @@ const config: CapacitorConfig = {
     // server.url과 호스트가 다른 내비게이션을 Capacitor가 "외부"로 보고 Safari로 던지는 문제 방지.
     url: "https://www.interiorpick.co.kr",
     // 두 호스트 모두 인앱 WebView 내비게이션으로 허용(외부 Safari 전환 방지).
-    allowNavigation: ["interiorpick.co.kr", "www.interiorpick.co.kr"],
+    // nid.naver.com: 네이버 OAuth 로그인을 인앱 WebView에서 완결(외부 Safari로 나가면
+    // Apple Guideline 4 거절 — 2026-07-07 v1.0(5) 리젝 사유). 콜백은 same-origin이라
+    // 세션 쿠키가 WebView에 그대로 박힘. 로그인 화면 외 naver.com 링크는 종전대로 외부 오픈.
+    allowNavigation: ["interiorpick.co.kr", "www.interiorpick.co.kr", "nid.naver.com"],
     cleartext: false,           // HTTPS 강제
     androidScheme: "https",
   },
