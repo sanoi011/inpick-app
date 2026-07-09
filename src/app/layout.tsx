@@ -35,33 +35,37 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://interiorpick.co.kr
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  // 브랜드명 표기: INPICK(영문)·인픽·인테리어픽(도메인 interiorpick 한글 독음) 병기.
+  // 네이버 브랜드 검색("인테리어픽")에 잡히려면 이 정확한 문자열이 title/description/keywords에 있어야 함.
   title: {
-    default: "INPICK - AI 인테리어 견적 플랫폼",
-    template: "%s | INPICK",
+    default: "인테리어픽(INPICK) - AI 인테리어 견적 플랫폼",
+    template: "%s | 인테리어픽 INPICK",
   },
   description:
-    "AI가 설계하는 나만의 인테리어 견적. 주소만 입력하면 실시간 공식 단가 기반으로 정확한 견적을 만들어 드립니다.",
+    "인테리어픽(INPICK) — AI가 설계하는 나만의 인테리어 견적. 주소만 입력하면 실시간 공식 단가 기반으로 정확한 견적을 만들어 드립니다.",
   keywords: [
+    "인테리어픽",
+    "인테리어픽 인픽",
+    "INPICK",
+    "인픽",
     "인테리어 견적",
     "AI 인테리어",
     "인테리어 플랫폼",
     "견적 자동화",
-    "INPICK",
-    "인픽",
     "인테리어 비용",
     "리모델링 견적",
     "인테리어 AI",
   ],
   openGraph: {
-    title: "INPICK - AI 인테리어 견적 플랫폼",
+    title: "인테리어픽(INPICK) - AI 인테리어 견적 플랫폼",
     description: "주소만 입력하면, AI가 실시간 단가로 정확한 견적을 만들어 드립니다.",
-    siteName: "INPICK",
+    siteName: "인테리어픽 INPICK",
     locale: "ko_KR",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "INPICK - AI 인테리어 견적 플랫폼",
+    title: "인테리어픽(INPICK) - AI 인테리어 견적 플랫폼",
     description: "주소만 입력하면, AI가 실시간 단가로 정확한 견적을 만들어 드립니다.",
   },
   verification: {
@@ -95,6 +99,33 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.json" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        {/* 브랜드 구조화 데이터 — 네이버/구글이 "인테리어픽=이 사이트"로 인식(alternateName) */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "인테리어픽",
+              alternateName: ["INPICK", "인픽", "인테리어픽", "interiorpick"],
+              url: SITE_URL,
+              logo: `${SITE_URL}/icons/icon-512x512.png`,
+              description: "AI 기반 인테리어 견적 플랫폼",
+            }),
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              name: "인테리어픽 INPICK",
+              alternateName: "인테리어픽",
+              url: SITE_URL,
+            }),
+          }}
+        />
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} ${hostGrotesk.variable} antialiased font-sans`}
