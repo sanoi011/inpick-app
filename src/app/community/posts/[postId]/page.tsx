@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Loader2, Send, Eye, MessageCircle, FileText, Trash2 } from "lucide-react";
 import CommunityShell from "@/components/community/CommunityShell";
+import PostModerationMenu from "@/components/community/PostModerationMenu";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "@/components/ui/Toast";
 import type {
@@ -129,8 +130,19 @@ export default function PostDetailPage({ params }: { params: { postId: string } 
     <CommunityShell>
       <article className="space-y-4">
         {/* 헤더 */}
-        <div className="rounded-xl border border-[#E5E2DD] bg-white p-5">
-          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[0.7rem] text-[#6B6B6B]">
+        <div className="relative rounded-xl border border-[#E5E2DD] bg-white p-5">
+          {/* 신고·차단 메뉴 (Apple 1.2) — 차단 시 피드로 복귀 */}
+          <div className="absolute right-3 top-3">
+            <PostModerationMenu
+              targetType="post"
+              targetId={post.id}
+              authorId={post.authorId}
+              onBlocked={() => {
+                window.location.href = "/community";
+              }}
+            />
+          </div>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 pr-10 text-[0.7rem] text-[#6B6B6B]">
             {post.postType === "estimate_share" && (
               <span className="rounded bg-[#FFF4E5] px-1.5 py-0.5 text-[#8B5A00]">견적 공유</span>
             )}
@@ -303,13 +315,21 @@ export default function PostDetailPage({ params }: { params: { postId: string } 
                     </span>
                     <span>·</span>
                     <span>{new Date(c.createdAt).toLocaleDateString("ko-KR")}</span>
-                    {user?.id === c.authorId && (
+                    {user?.id === c.authorId ? (
                       <button
                         onClick={() => deleteComment(c.id)}
                         className="ml-auto inline-flex items-center gap-0.5 text-[#9A9A9A] hover:text-[#C0392B]"
                       >
                         <Trash2 className="h-3 w-3" />
                       </button>
+                    ) : (
+                      <PostModerationMenu
+                        targetType="comment"
+                        targetId={c.id}
+                        authorId={c.authorId}
+                        onBlocked={() => reload()}
+                        className="ml-auto inline-flex h-7 w-7 items-center justify-center rounded-full text-[#9A9A9A] hover:bg-zinc-100 hover:text-zinc-600"
+                      />
                     )}
                   </div>
                   <p className="whitespace-pre-wrap text-sm text-[#202123]">{c.content}</p>

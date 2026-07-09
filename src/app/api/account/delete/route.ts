@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,10 +31,17 @@ export async function POST(request: NextRequest) {
 
     // 2. 크레딧 기록은 보존 (재무 기록 의무)
 
-    // 3. Supabase Auth 사용자 삭제
-    // 참고: service_role 키가 필요. 클라이언트에서는 signOut만 가능
-    // 관리자 API로 처리하거나, 사용자를 비활성화
-    const { error: updateError } = await supabase.auth.admin.deleteUser(userId);
+    // 3. Supabase Auth 사용자 삭제 — admin API는 service role 필수(세션 클라이언트는 항상 실패해
+    //    "관리자 확인 후 처리" 폴백으로 빠졌었음 → Apple 5.1.1 계정삭제는 즉시 처리돼야 함)
+    const serviceUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const adminClient =
+      serviceUrl && serviceKey
+        ? createServiceClient(serviceUrl, serviceKey, {
+            auth: { persistSession: false, autoRefreshToken: false },
+          })
+        : supabase;
+    const { error: updateError } = await adminClient.auth.admin.deleteUser(userId);
 
     if (updateError) {
       // admin API 권한 없는 경우 — 사용자 메타데이터에 삭제 요청 기록

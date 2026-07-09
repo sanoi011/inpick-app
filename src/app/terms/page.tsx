@@ -100,7 +100,34 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">제9조 (서비스 이용 제한)</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">제9조 (커뮤니티 및 사용자 제작 콘텐츠 — 무관용 원칙)</h2>
+            <p className="mb-2">
+              회사는 커뮤니티 등 이용자가 콘텐츠를 게시할 수 있는 공간에서{" "}
+              <strong>불쾌감을 주는 콘텐츠와 악성 이용자에 대해 무관용(Zero Tolerance) 원칙</strong>을 적용합니다.
+              커뮤니티를 이용(게시·댓글 작성 포함)하는 것은 본 조항에 동의하는 것으로 간주됩니다.
+            </p>
+            <ul className="list-disc pl-6 space-y-1">
+              <li>
+                <strong>금지 콘텐츠:</strong> 음란물, 폭력적·혐오적 표현, 욕설·비방, 타인의 개인정보 노출,
+                스팸·광고, 불법 정보 등 불쾌감을 주거나 법령에 위반되는 일체의 콘텐츠
+              </li>
+              <li>
+                <strong>신고:</strong> 모든 게시물과 댓글에는 신고 기능이 제공되며, 누구나 부적절한 콘텐츠를
+                신고할 수 있습니다
+              </li>
+              <li>
+                <strong>차단:</strong> 이용자는 다른 이용자를 차단할 수 있으며, 차단 즉시 해당 이용자의
+                콘텐츠가 보이지 않게 되고 운영팀에 자동 접수됩니다
+              </li>
+              <li>
+                <strong>24시간 내 조치:</strong> 회사는 신고 접수 후 24시간 이내에 검토하여 위반 콘텐츠를
+                삭제하고, 위반 이용자에 대해 이용 제한·회원 자격 박탈(퇴출) 조치를 취합니다
+              </li>
+            </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">제10조 (서비스 이용 제한)</h2>
             <p>
               회사는 이용자가 본 약관을 위반하거나 서비스의 정상적인 운영을 방해하는 경우
               서비스 이용을 제한하거나 회원 자격을 박탈할 수 있습니다.
@@ -108,7 +135,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">제10조 (면책)</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">제11조 (면책)</h2>
             <ul className="list-disc pl-6 space-y-1">
               <li>천재지변, 시스템 장애 등 불가항력으로 인한 서비스 중단에 대해 책임지지 않습니다</li>
               <li>이용자 간 거래에서 발생하는 분쟁에 대해 회사는 중개 역할만 수행합니다</li>
@@ -117,7 +144,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold text-gray-900 mb-3">제11조 (분쟁 해결)</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-3">제12조 (분쟁 해결)</h2>
             <p>
               서비스 이용과 관련하여 분쟁이 발생한 경우, 회사와 이용자는 상호 협의하여 해결하며,
               합의가 이루어지지 않을 경우 민사소송법에 따른 관할 법원에 소를 제기할 수 있습니다.
@@ -125,7 +152,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <p className="text-gray-500">시행일: 2026년 2월 19일</p>
+            <p className="text-gray-500">시행일: 2026년 2월 19일 · 최종 개정일: 2026년 7월 9일 (제9조 신설)</p>
           </section>
         </div>
       </main>

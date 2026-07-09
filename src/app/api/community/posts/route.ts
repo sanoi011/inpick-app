@@ -58,6 +58,21 @@ export async function GET(req: NextRequest) {
     boardId = (bd as { id: string }).id;
   }
 
+  // 차단한 사용자 게시물 제외 (Apple 1.2 — 차단 시 피드에서 즉시 제거)
+  let blockedIds: string[] = [];
+  try {
+    const { data: { user: viewer } } = await supabase.auth.getUser();
+    if (viewer) {
+      const { data: blocks } = await supabase
+        .from("community_user_blocks")
+        .select("blocked_user_id")
+        .eq("blocker_id", viewer.id);
+      blockedIds = ((blocks ?? []) as Array<{ blocked_user_id: string }>).map((b) => b.blocked_user_id);
+    }
+  } catch {
+    /* community_user_blocks 미생성 환경 — 무시 */
+  }
+
   // scope=home → 제외 게시판 ID 목록
   let excludedBoardIds: string[] = [];
   if (scope === "home" && !boardId) {
@@ -82,6 +97,7 @@ export async function GET(req: NextRequest) {
 
   if (boardId) query = query.eq("board_id", boardId);
   if (excludedBoardIds.length > 0) query = query.not("board_id", "in", `(${excludedBoardIds.join(",")})`);
+  if (blockedIds.length > 0) query = query.not("author_id", "in", `(${blockedIds.join(",")})`);
   if (postType) query = query.eq("post_type", postType);
   if (q) query = query.or(`title.ilike.%${q}%,content.ilike.%${q}%`);
 

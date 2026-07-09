@@ -28,6 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import PostModerationMenu from "@/components/community/PostModerationMenu";
 import type { AttachableProject } from "@/app/api/community/my-projects/route";
 
 /* ── 타입 ── */
@@ -46,6 +47,7 @@ interface FeedEstimateSummary {
 }
 interface FeedPost {
   id: string;
+  authorId: string | null;
   title: string;
   content: string;
   tags: string[];
@@ -178,7 +180,15 @@ function ProjectCardView({
 }
 
 /* ── 포스트 카드 ── */
-function PostCard({ post, onLike }: { post: FeedPost; onLike: (p: FeedPost) => void }) {
+function PostCard({
+  post,
+  onLike,
+  onBlocked,
+}: {
+  post: FeedPost;
+  onLike: (p: FeedPost) => void;
+  onBlocked: (authorId: string) => void;
+}) {
   const [clamped, setClamped] = useState(true);
   const photos = post.attachments.filter((a) => a.type === "image");
   const designs = post.attachments.filter((a) => a.type === "design_output");
@@ -228,6 +238,14 @@ function PostCard({ post, onLike }: { post: FeedPost; onLike: (p: FeedPost) => v
             )}
           </div>
         </div>
+        {/* 신고·차단 메뉴 (Apple 1.2 — 본인 글엔 미표시) */}
+        <PostModerationMenu
+          targetType="post"
+          targetId={post.id}
+          authorId={post.authorId}
+          authorName={post.author.displayName}
+          onBlocked={onBlocked}
+        />
       </div>
 
       {/* 본문 */}
@@ -670,7 +688,14 @@ export default function FeedV2() {
             </p>
           </div>
         ) : (
-          posts.map((p) => <PostCard key={p.id} post={p} onLike={toggleLike} />)
+          posts.map((p) => (
+            <PostCard
+              key={p.id}
+              post={p}
+              onLike={toggleLike}
+              onBlocked={(authorId) => setPosts((prev) => prev.filter((x) => x.authorId !== authorId))}
+            />
+          ))
         )}
       </div>
 

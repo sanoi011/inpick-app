@@ -12,12 +12,31 @@ export const dynamic = "force-dynamic";
 
 export async function GET(_req: NextRequest, { params }: { params: { postId: string } }) {
   const supabase = createClient();
-  const { data, error } = await supabase
+
+  // 차단한 사용자 댓글 제외 (Apple 1.2 — 차단 시 즉시 숨김)
+  let blockedIds: string[] = [];
+  try {
+    const { data: { user: viewer } } = await supabase.auth.getUser();
+    if (viewer) {
+      const { data: blocks } = await supabase
+        .from("community_user_blocks")
+        .select("blocked_user_id")
+        .eq("blocker_id", viewer.id);
+      blockedIds = ((blocks ?? []) as Array<{ blocked_user_id: string }>).map((b) => b.blocked_user_id);
+    }
+  } catch {
+    /* community_user_blocks 미생성 환경 — 무시 */
+  }
+
+  let query = supabase
     .from("community_comments")
     .select("*")
     .eq("post_id", params.postId)
     .eq("is_deleted", false)
     .order("created_at", { ascending: true });
+  if (blockedIds.length > 0) query = query.not("author_id", "in", `(${blockedIds.join(",")})`);
+
+  const { data, error } = await query;
   if (error) {
     console.error("[community/posts/:id/comments] GET error:", error.message);
     return NextResponse.json({ error: "query_failed" }, { status: 500 });
