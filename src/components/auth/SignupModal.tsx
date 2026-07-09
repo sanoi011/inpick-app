@@ -16,6 +16,30 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { startOAuth } from "@/lib/auth/oauth-start";
 import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
+import { isNativeApp, openOAuthExternal } from "@/lib/mobile/platform";
+
+/**
+ * 약관/개인정보 링크 — 웹은 새 탭, 네이티브 앱은 SFSafariViewController(인앱 브라우저).
+ * target=_blank 그대로 두면 Capacitor가 외부 Safari로 던져 Apple Guideline 4 위반
+ * (2026-07-07 네이버 로그인 리젝과 동일 패턴) + 가입 폼 입력값도 날아감.
+ */
+function PolicyLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      onClick={(e) => {
+        if (isNativeApp()) {
+          e.preventDefault();
+          void openOAuthExternal(`${window.location.origin}${href}`);
+        }
+      }}
+      className="text-gray-500 underline hover:text-gray-700"
+    >
+      {children}
+    </a>
+  );
+}
 
 interface SignupModalProps {
   open: boolean;
@@ -465,13 +489,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
                 label={
                   <>
                     <span className="text-red-500">[필수]</span> 이용약관 동의{" "}
-                    <a
-                      href="/terms"
-                      target="_blank"
-                      className="text-gray-500 underline hover:text-gray-700"
-                    >
-                      보기
-                    </a>
+                    <PolicyLink href="/terms">보기</PolicyLink>
                   </>
                 }
               />
@@ -481,13 +499,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
                 label={
                   <>
                     <span className="text-red-500">[필수]</span> 개인정보 수집·이용 동의{" "}
-                    <a
-                      href="/privacy"
-                      target="_blank"
-                      className="text-gray-500 underline hover:text-gray-700"
-                    >
-                      보기
-                    </a>
+                    <PolicyLink href="/privacy">보기</PolicyLink>
                   </>
                 }
               />
@@ -654,11 +666,7 @@ function FinalConsentStep({
       )}
 
       <div className="mt-3 text-[11px] text-gray-500">
-        자세한 사항은{" "}
-        <a href="/privacy" target="_blank" className="underline hover:text-gray-700">
-          개인정보처리방침
-        </a>
-        을 참조하세요.
+        자세한 사항은 <PolicyLink href="/privacy">개인정보처리방침</PolicyLink>을 참조하세요.
       </div>
 
       <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border-2 border-orange-200 bg-orange-50 p-3 hover:bg-orange-100">
