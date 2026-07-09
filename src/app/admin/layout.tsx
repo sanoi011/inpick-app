@@ -6,12 +6,13 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   BarChart3, Users, FolderKanban, FileText, Hexagon,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
-  Library, ExternalLink, Rocket, Heart, Activity, CreditCard, AlertTriangle, MessagesSquare, Wrench,
+  Library, ExternalLink, Rocket, Heart, Activity, CreditCard, AlertTriangle, MessagesSquare, Wrench, PieChart,
 } from "lucide-react";
 
 const NAV_ITEMS = [
   { label: "대시보드", href: "/admin", icon: BarChart3 },
   { label: "행동 분석", href: "/admin/analytics", icon: Activity },
+  { label: "제공사별 유저 분석", href: "/admin/user-segments", icon: PieChart },
   { label: "사용자 관리", href: "/admin/users", icon: Users },
   { label: "회원 정합성·감사", href: "/admin/members", icon: Shield },
   { label: "프로젝트", href: "/admin/projects", icon: FolderKanban },

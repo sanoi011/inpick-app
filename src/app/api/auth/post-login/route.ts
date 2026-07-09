@@ -12,11 +12,16 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import {
   ensureConsumerProfile,
   recordAuditEvent,
   normalizeEmail,
 } from "@/lib/auth/self-member-service";
+import {
+  extractDemographicsFromIdentity,
+  upsertUserDemographics,
+} from "@/lib/analytics/demographics";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,6 +55,23 @@ export async function POST(req: NextRequest) {
     hasProfile = r.profileExists;
   } catch (err) {
     console.error("[post-login] ensureConsumerProfile error:", err);
+  }
+
+  // 로그인 제공사별 인구통계 수집(대시보드 provider 세분화) — 성별/연령은 provider 동의 승인 시에만 채워짐.
+  try {
+    let demo = {};
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if ((provider === "kakao") && url && key) {
+      // identity_data에서 카카오 연령대/성별 추출(관리자 조회 필요)
+      const admin = createServiceClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+      const { data: full } = await admin.auth.admin.getUserById(user.id);
+      const ident = full?.user?.identities?.find((i) => i.provider === "kakao");
+      demo = extractDemographicsFromIdentity(provider, ident?.identity_data as Record<string, unknown> | undefined);
+    }
+    await upsertUserDemographics(user.id, provider, demo);
+  } catch (err) {
+    console.error("[post-login] demographics error:", err);
   }
 
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || null;

@@ -157,6 +157,14 @@ export async function GET(req: NextRequest) {
     return fail(`verifyOtp failed: ${verifyErr.message}`);
   }
 
+  // 6-1) 로그인 제공사 기록(대시보드 provider 세분화). 성별/생일은 네이버 검수 반려로 미수집.
+  try {
+    const { upsertUserDemographics } = await import("@/lib/analytics/demographics");
+    await upsertUserDemographics(existingUserId, "naver");
+  } catch (err) {
+    console.error("[naver-oauth] demographics error:", err);
+  }
+
   // 6) 정리 + redirect
   const res = NextResponse.redirect(new URL(next, origin));
   res.cookies.delete("naver_oauth_state");
