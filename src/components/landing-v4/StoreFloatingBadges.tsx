@@ -94,18 +94,23 @@ export default function StoreFloatingBadges() {
         </span>
       </a>
 
-      {/* 안드로이드 정식 출시 전 — '곧 출시' 비활성. 출시 후 <a href={GOOGLE_PLAY_URL}>로 교체. */}
-      <div
-        aria-disabled="true"
-        className="flex w-[170px] items-center gap-2.5 rounded-xl border border-white/10 bg-black/70 px-3.5 py-2 text-white/50 shadow-lg"
+      <a
+        href={GOOGLE_PLAY_URL}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={() =>
+          trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
+            props: { store: "google_play" },
+          })
+        }
+        className="flex w-[170px] items-center gap-2.5 rounded-xl border border-white/15 bg-black px-3.5 py-2 text-white shadow-lg transition hover:scale-[1.02] hover:bg-zinc-900"
       >
         <GooglePlayGlyph />
-        <span className="flex flex-1 flex-col leading-tight">
-          <span className="text-[10px] font-medium text-white/50">GET IT ON</span>
+        <span className="flex flex-col leading-tight">
+          <span className="text-[10px] font-medium text-white/75">GET IT ON</span>
           <span className="-mt-0.5 text-[15px] font-semibold tracking-tight">Google Play</span>
         </span>
-        <span className="rounded-full bg-white/15 px-1.5 py-0.5 text-[9px] font-bold text-white/80">곧 출시</span>
-      </div>
+      </a>
     </div>
   );
 }
