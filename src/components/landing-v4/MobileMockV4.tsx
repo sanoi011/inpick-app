@@ -70,19 +70,14 @@ export default function MobileMockV4() {
             >
               App Store
             </a>
-            <a
-              href={GOOGLE_PLAY_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={() =>
-                trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
-                  props: { store: "google_play", placement: "mobile_first_section" },
-                })
-              }
-              className="font-en rounded-full border-[1.5px] border-apricot-300/40 px-5 py-3 text-[13px] font-semibold text-offwhite transition hover:scale-[1.03] hover:border-apricot-300/70"
+            {/* 안드로이드 정식 출시 전 — '곧 출시' 비활성. 출시 후 아래를 App Store와 동일한 <a>로 교체. */}
+            <span
+              aria-disabled="true"
+              className="font-en inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-apricot-300/25 px-5 py-3 text-[13px] font-semibold text-offwhite/50"
             >
               Play Store
-            </a>
+              <span className="rounded-full bg-apricot-300/20 px-1.5 py-0.5 text-[10px] font-bold text-apricot-300">곧 출시</span>
+            </span>
           </div>
         </motion.div>
 
