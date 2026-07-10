@@ -13,8 +13,9 @@ const COMPANY_INFO = {
   copyright: "Copyright © 2026 주식회사 아이오드 (AIOD). All rights reserved.",
   ceo: "운영사: 주식회사 아이오드 (AIOD) | 서비스명: INPICK",
   businessNumber: "사업자등록번호: 384-81-04107",
+  telecomNumber: "통신판매업신고번호: 제2026-대전유성-1245호",
   phone: "대표: 김선본",
-  address: "소재지: 대전광역시 유성구 대덕512번길20, 대전정보문화산업진흥원 B동 2층 1인창조기업지원센터",
+  address: "소재지: 대전광역시 유성구 대덕대로512번길 20, 대전정보문화산업진흥원 1인창조기업지원센터 B동 2층 (도룡동)",
   email: "이메일: lookingseon@aiod.kr",
 };
 
@@ -64,6 +65,8 @@ export default function LandingFooter() {
                 <span>{COMPANY_INFO.ceo}</span>
                 <span className="text-gray-700">·</span>
                 <span>{COMPANY_INFO.businessNumber}</span>
+                <span className="text-gray-700">·</span>
+                <span>{COMPANY_INFO.telecomNumber}</span>
                 <span className="text-gray-700">·</span>
                 <span>{COMPANY_INFO.phone}</span>
                 <span className="text-gray-700">·</span>
