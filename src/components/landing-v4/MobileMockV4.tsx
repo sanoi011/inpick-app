@@ -2,6 +2,14 @@
 
 import { useRef } from "react";
 import { motion, useScroll, useTransform } from "motion/react";
+import { trackClientEvent } from "@/lib/analytics/client";
+import { AnalyticsEvents } from "@/lib/analytics/events";
+
+// 실제 스토어 URL (StoreFloatingBadges와 동일 env). 출시 후 env 값이 실제 앱으로 연결됨.
+const APP_STORE_URL =
+  process.env.NEXT_PUBLIC_APP_STORE_URL || "https://www.apple.com/app-store/";
+const GOOGLE_PLAY_URL =
+  process.env.NEXT_PUBLIC_GOOGLE_PLAY_URL || "https://play.google.com/store";
 
 export default function MobileMockV4() {
   const ref = useRef<HTMLDivElement>(null);
@@ -49,12 +57,32 @@ export default function MobileMockV4() {
             견적 → AR 확인 → 표준계약 서명까지. iOS · Android 모두 지원하며, 평균 12분 안에 첫 견적이 손 안에 도착합니다.
           </p>
           <div className="mt-8 flex gap-3">
-            <div className="font-en rounded-full bg-offwhite px-5 py-3 text-[13px] font-semibold text-ink">
+            <a
+              href={APP_STORE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
+                  props: { store: "app_store", placement: "mobile_first_section" },
+                })
+              }
+              className="font-en rounded-full bg-offwhite px-5 py-3 text-[13px] font-semibold text-ink transition hover:scale-[1.03] hover:bg-white"
+            >
               App Store
-            </div>
-            <div className="font-en rounded-full border-[1.5px] border-apricot-300/40 px-5 py-3 text-[13px] font-semibold text-offwhite">
+            </a>
+            <a
+              href={GOOGLE_PLAY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() =>
+                trackClientEvent(AnalyticsEvents.StoreBadgeClicked, {
+                  props: { store: "google_play", placement: "mobile_first_section" },
+                })
+              }
+              className="font-en rounded-full border-[1.5px] border-apricot-300/40 px-5 py-3 text-[13px] font-semibold text-offwhite transition hover:scale-[1.03] hover:border-apricot-300/70"
+            >
               Play Store
-            </div>
+            </a>
           </div>
         </motion.div>
 
