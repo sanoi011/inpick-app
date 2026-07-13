@@ -335,6 +335,7 @@ function EstimatePage() {
   const searchParams = useSearchParams();
   // P2: workflow page의 finalize가 발급한 contextId — 있으면 evidence 기반 견적 합성
   const contextId = searchParams?.get("contextId") ?? null;
+  const [resolvedContextId, setResolvedContextId] = useState<string | null>(contextId);
 
   const [step1, setStep1] = useState<Step1Data | null>(null);
   const [step2, setStep2] = useState<Step2Data | null>(null);
@@ -385,6 +386,43 @@ function EstimatePage() {
   const [shareModalOpen, setShareModalOpen] = useState(false);
   // 자재 라인 → 실구매/카탈로그/미리보기 드로어
   const [shopMaterial, setShopMaterial] = useState<string | null>(null);
+
+  const goBackToDesign = () => {
+    try {
+      sessionStorage.setItem("workflow_step", "2");
+    } catch {
+      /* private mode */
+    }
+    router.push("/workflow?step=2");
+  };
+
+  useEffect(() => {
+    router.prefetch("/workflow?step=2");
+  }, [router]);
+
+  async function finalizeEstimateContext(s1: Step1Data): Promise<string | null> {
+    const projectId = getOrCreateWorkflowProjectId();
+    if (!projectId) return null;
+    const projectMode: "apartment" | "photo_only" | "commercial" =
+      s1.workflowEntry === "photo_residential"
+        ? "photo_only"
+        : s1.workflowEntry === "photo_commercial"
+          ? "commercial"
+          : "apartment";
+    try {
+      const res = await fetch("/api/inpick/estimate-context/finalize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, projectMode, step1Snapshot: s1 }),
+      });
+      if (!res.ok) return null;
+      const data = (await res.json()) as { contextId?: string };
+      return data.contextId || null;
+    } catch (error) {
+      console.warn("[estimate] context finalize skipped — legacy estimate fallback", error);
+      return null;
+    }
+  }
 
   const toggleV2LineIncluded = (lineId: string) => {
     setExcludedV2Lines((prev) => {
@@ -532,27 +570,30 @@ function EstimatePage() {
       let parsedS1: Step1Data | null = null;
       let parsedS2: Step2Data | null = null;
 
-      if (projectId) {
-        const dbRow = await fetchWorkflowState(projectId);
-        if (cancelled) return;
-        if (dbRow?.exists && dbRow.workflowState) {
-          const ws = dbRow.workflowState;
-          if (ws.step1) parsedS1 = ws.step1 as unknown as Step1Data;
-          if (ws.step2) parsedS2 = ws.step2 as unknown as Step2Data;
-        }
-      }
-      if (!parsedS1 && s1raw) {
+      // 같은 탭에서 넘어온 데이터는 네트워크보다 먼저 복원한다.
+      if (s1raw) {
         try {
           parsedS1 = JSON.parse(s1raw) as Step1Data;
         } catch {
           /* ignore */
         }
       }
-      if (!parsedS2 && s2raw) {
+      if (s2raw) {
         try {
           parsedS2 = JSON.parse(s2raw) as Step2Data;
         } catch {
           /* ignore */
+        }
+      }
+
+      // 세션이 없는 새 기기/새 탭에서만 DB 복원을 기다린다.
+      if (projectId && (!parsedS1 || !parsedS2)) {
+        const dbRow = await fetchWorkflowState(projectId);
+        if (cancelled) return;
+        if (dbRow?.exists && dbRow.workflowState) {
+          const ws = dbRow.workflowState;
+          if (!parsedS1 && ws.step1) parsedS1 = ws.step1 as unknown as Step1Data;
+          if (!parsedS2 && ws.step2) parsedS2 = ws.step2 as unknown as Step2Data;
         }
       }
       // P2: contextId 있으면 sessionStorage 없어도 시도 가능 (DB 스냅샷 truth)
@@ -581,7 +622,11 @@ function EstimatePage() {
       } catch {
         /* quota */
       }
-      void runEstimate(finalS1, finalS2);
+      // 화면 전환 후 context를 생성하므로 이전 화면에서 API를 기다리지 않는다.
+      const nextContextId = contextId || (await finalizeEstimateContext(finalS1));
+      if (cancelled) return;
+      setResolvedContextId(nextContextId);
+      void runEstimate(finalS1, finalS2, nextContextId);
     };
     void restore().catch((e) => {
       console.error("[estimate] restore failed:", e);
@@ -595,19 +640,23 @@ function EstimatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function runEstimate(s1: Step1Data, s2: Step2Data) {
+  async function runEstimate(
+    s1: Step1Data,
+    s2: Step2Data,
+    contextIdOverride: string | null = resolvedContextId,
+  ) {
     setLoading(true);
     setError(null);
     setWarnings([]);
     const accumulatedWarnings: string[] = [];
     try {
       // P2: contextId 있으면 evidence 기반 합성 견적 시도 — 실패 시 legacy 분기로 폴백
-      if (contextId) {
+      if (contextIdOverride) {
         try {
           const ctxRes = await fetch("/api/inpick/build-estimate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contextId }),
+            body: JSON.stringify({ contextId: contextIdOverride }),
           });
           if (ctxRes.ok) {
             const ctxData = (await ctxRes.json()) as {
@@ -1250,9 +1299,9 @@ function EstimatePage() {
           {/* 좌측 아이콘 사이드바 */}
           <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-1 border-r border-primary-100 bg-white py-6">
             <button
-              onClick={() => router.push("/workflow")}
+              onClick={goBackToDesign}
               className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white shadow-cta hover:bg-primary-600"
-              aria-label="홈"
+              aria-label="디자인 단계로 돌아가기"
             >
               <span className="font-extrabold text-sm">iP</span>
             </button>
@@ -1297,10 +1346,12 @@ function EstimatePage() {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-3 px-6 lg:px-10 pt-8 pb-4">
               <button
-                onClick={() => router.push("/workflow/branch")}
-                className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-100 bg-white text-primary-900"
+                onClick={goBackToDesign}
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-primary-100 bg-white px-3 text-primary-900 shadow-sm transition hover:bg-primary-50"
+                aria-label="디자인 단계로 돌아가기"
               >
                 <ArrowLeft className="h-4 w-4" />
+                <span className="hidden text-xs font-bold sm:inline">디자인으로</span>
               </button>
               <div className="flex items-center gap-2 ml-auto">
                 <button
@@ -1975,13 +2026,13 @@ function EstimatePage() {
                       </p>
                       <div className="mt-5 flex items-center justify-center gap-2">
                         <button
-                          onClick={() => router.push("/workflow")}
+                          onClick={goBackToDesign}
                           className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white px-4 py-2 text-xs font-semibold text-primary-900 hover:bg-primary-50"
                         >
-                          처음으로
+                          디자인으로 돌아가기
                         </button>
                         <button
-                          onClick={() => router.push("/workflow")}
+                          onClick={goBackToDesign}
                           className="inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow-cta hover:bg-primary-600"
                         >
                           Step2로 돌아가서 디자인 생성하기 <ArrowRight className="h-3 w-3" />
@@ -2534,7 +2585,7 @@ function EstimatePage() {
           getOrCreateWorkflowProjectId() ||
           ""
         }
-        estimateContextId={contextId ?? undefined}
+        estimateContextId={resolvedContextId ?? undefined}
         hints={{
           areaLabel: step1?.basicInfo?.selectedPyeong?.exclusiveArea
             ? `${Math.round((step1.basicInfo.selectedPyeong.exclusiveArea / 3.3058) / 10) * 10}평대`

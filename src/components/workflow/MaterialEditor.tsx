@@ -3,7 +3,7 @@
  * 자재 수정 에디터 — 가이드 InPick_Segmentation_Material_Replacement_Guide 기반 구현.
  *
  * 흐름:
- * 1. "자재 영역 분석 (1토큰)" → /api/inpick/extract-material-regions (SegmentationData)
+ * 1. 자재 영역 분석/클릭 선택(무료) → 사용자가 마스크 경계 확인
  * 2. SVG <polygon> 오버레이로 클릭 가능 영역 표시 (가이드 §3-1)
  * 3. 영역 클릭 → 카테고리별 자재 라이브러리 모달 (/api/inpick/material-library)
  * 4. 자재 선택 시 region.current_material_sku 업데이트
@@ -37,10 +37,8 @@ interface Props {
   styleHint?: string;
   renderItem: RenderItem;
   tokenBalance: number;
-  onConsumeToken: (
-    amount: number,
-    feature: "ai_render" | "drawing_option",
-  ) => Promise<boolean>;
+  /** 서버의 원자적 차감/환불 후 전역 잔액 동기화 */
+  onTokensChanged?: () => Promise<void> | void;
   onUpdate: (next: RenderItem) => void;
 }
 
@@ -50,7 +48,7 @@ export default function MaterialEditor({
   styleHint,
   renderItem,
   tokenBalance,
-  onConsumeToken,
+  onTokensChanged,
   onUpdate,
 }: Props) {
   // SegmentationData가 RenderItem.materialRegions(legacy) 또는 segmentation에 보관됨
@@ -64,7 +62,7 @@ export default function MaterialEditor({
 
   // 모드 — "auto" (전체 자동 분석) / "sam" (사용자 클릭 정밀 분할)
   // 가이드 권장: SAM 클릭이 더 정확하지만 RunPod 환경 필요. auto는 GPT-4o Vision으로 실행 가능.
-  const [editMode, setEditMode] = useState<"auto" | "sam">("auto");
+  const [editMode, setEditMode] = useState<"auto" | "sam">("sam");
   const [samSelection, setSamSelection] = useState<SamPolygonResult | null>(null);
   const [samCategoryPicker, setSamCategoryPicker] = useState(false); // 카테고리 선택 모달
   // expensesRatio knob 제거 — spec §C는 고정 요율 (산안비 3.11% / 일반관리비 5% / 이윤 10%) 사용.
@@ -83,25 +81,15 @@ export default function MaterialEditor({
 
   // 1) 영역 추출
   const handleExtract = async () => {
-    if (tokenBalance < 1) {
-      setError("토큰 부족 — 1토큰 필요");
-      return;
-    }
-    // 클릭 즉시 시각 피드백 (토큰 차감 await 전에 먼저 로딩 ON)
+    // 분석/선택은 무료. 경계 확인 후 GPT Image 2 재렌더에서만 2토큰 차감.
     setExtracting(true);
     setError(null);
-    const ok = await onConsumeToken(1, "drawing_option");
-    if (!ok) {
-      setExtracting(false);
-      setError("토큰 차감 실패");
-      return;
-    }
     try {
       const res = await fetch("/api/inpick/extract-material-regions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrl: renderItem.url,
+          imageUrl: renderItem.refinedUrl || renderItem.url,
           roomName: roomLabel,
           realWorldAreaSqm,
         }),
@@ -156,23 +144,20 @@ export default function MaterialEditor({
     setSamCategoryPicker(false);
     setRefining(true);
     setError(null);
-    const ok = await onConsumeToken(2, "drawing_option");
-    if (!ok) {
-      setRefining(false);
-      setError("토큰 차감 실패");
-      return;
-    }
     try {
-      // SAM polygon → alpha mask → refine-render 호출
+      // SAM 원본 raster mask를 우선 사용. polygon은 저장 실패/구버전 fallback.
       const [w, h] = samSelection.image_size;
-      const maskBase64 = await buildAlphaMaskFromPolygon(w, h, samSelection.polygon);
+      const maskBase64 = samSelection.mask_url
+        ? "server-will-use-selection-mask"
+        : await buildAlphaMaskFromPolygon(w, h, samSelection.polygon);
 
       const res = await fetch("/api/inpick/refine-render", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          originalImageUrl: renderItem.url,
+          originalImageUrl: renderItem.refinedUrl || renderItem.url,
           maskBase64,
+          selectionMaskUrl: samSelection.mask_url || undefined,
           prompt: `${material.description}`,
           roomName: roomLabel,
           styleHint,
@@ -197,6 +182,7 @@ export default function MaterialEditor({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefining(false);
+      await onTokensChanged?.();
     }
   };
 
@@ -217,12 +203,6 @@ export default function MaterialEditor({
     // 클릭 즉시 시각 피드백
     setRefining(true);
     setError(null);
-    const ok = await onConsumeToken(2, "drawing_option");
-    if (!ok) {
-      setRefining(false);
-      setError("토큰 차감 실패");
-      return;
-    }
     try {
       // 한 번에 여러 영역을 alpha 마스크로 묶음 (모든 변경 영역을 투명 처리)
       const [w, h] = segmentation.image_size;
@@ -240,7 +220,7 @@ export default function MaterialEditor({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          originalImageUrl: renderItem.url,
+          originalImageUrl: renderItem.refinedUrl || renderItem.url,
           maskBase64,
           prompt: promptParts,
           roomName: roomLabel,
@@ -263,6 +243,7 @@ export default function MaterialEditor({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setRefining(false);
+      await onTokensChanged?.();
     }
   };
 
@@ -276,8 +257,8 @@ export default function MaterialEditor({
           </p>
           <p className="mt-0.5 text-[0.72rem] text-primary-900/50">
             {editMode === "auto"
-              ? "전체 영역 자동 분석 → 영역별 자재 선택 → 고화질 재렌더"
-              : "원하는 부위만 정확히 클릭 → 자재 즉시 교체 (가장 정밀)"}
+              ? "전체 영역 자동 분석 → 영역별 자재 선택 → 2토큰 재렌더"
+              : "원하는 부위 클릭 → 경계 확인·보정 → 2토큰 재렌더"}
           </p>
         </div>
 
@@ -322,9 +303,7 @@ export default function MaterialEditor({
               <>
                 <Sparkles className="h-4 w-4" />
                 자재 영역 분석 시작
-                <span className="ml-1 inline-flex items-center gap-0.5 rounded bg-white/20 px-1.5 py-0.5 text-[0.7rem]">
-                  <Hexagon className="h-2.5 w-2.5 fill-white" /> 1
-                </span>
+                <span className="ml-1 rounded bg-white/20 px-1.5 py-0.5 text-[0.65rem]">무료</span>
               </>
             )}
           </button>
@@ -338,7 +317,7 @@ export default function MaterialEditor({
             imageUrl={renderItem.refinedUrl || renderItem.url}
             onConfirm={handleSamConfirm}
             initialMode="select"
-            hint="첫 호출은 cold start로 30~60초 소요. 이후 1~3초"
+            hint="선택·경계 보정은 무료입니다. 첫 호출은 30~60초, 이후 1~3초 소요됩니다."
           />
         </div>
       )}

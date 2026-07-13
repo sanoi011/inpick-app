@@ -19,7 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const CREDIT_COSTS = {
   "render-room": 1, // 1차 미리보기 (low/medium quality)
   "render-room-high": 2, // 고화질 재생성
-  "refine-render": 1, // 자재 교체
+  "refine-render": 2, // 정밀 영역 선택 후 GPT Image 2 자재 재렌더
   "normalize-floorplan": 1, // 캐시 miss 시 (정형화)
   "extract-material": 0, // 자동 분석 무료
   "design-chat": 0, // 채팅 무료 (rate limit으로 보호)

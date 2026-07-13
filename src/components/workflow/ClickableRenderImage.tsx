@@ -16,7 +16,7 @@
 
 import { useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { Loader2, Eye, Crosshair, Plus, Minus, ChevronRight, RotateCcw } from "lucide-react";
+import { Loader2, Eye, Crosshair, Plus, Minus, ChevronRight, RotateCcw, ScanLine, ShieldCheck } from "lucide-react";
 import { useSamClient, type SamPolygonResult, type SamPoint } from "@/hooks/useSamClient";
 
 interface Props {
@@ -45,6 +45,8 @@ export default function ClickableRenderImage({
 }: Props) {
   const [mode, setMode] = useState<Mode>(initialMode);
   const [selected, setSelected] = useState<SamPolygonResult | null>(null);
+  const [candidateOptions, setCandidateOptions] = useState<SamPolygonResult[]>([]);
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [refinePoints, setRefinePoints] = useState<RefinePoints>({ positive: [], negative: [] });
   const [refineMode, setRefineMode] = useState<"add" | "remove">("add");
   const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
@@ -90,6 +92,8 @@ export default function ClickableRenderImage({
             : refinePoints.negative,
       };
       setRefinePoints(nextRefine);
+      setCandidateOptions([]);
+      setCandidateIndex(0);
       const result = await sam.refine.call({
         imageUrl,
         positive: nextRefine.positive,
@@ -107,13 +111,25 @@ export default function ClickableRenderImage({
       y: point.y,
     });
     if (result) {
-      setSelected(result);
+      const candidates = (result.candidates || [])
+        .map((candidate) => ({ ...candidate, image_size: result.image_size }))
+        .sort((a, b) => a.area_pixels - b.area_pixels);
+      const options = candidates.length > 0 ? candidates : [result];
+      const recommended = Math.max(
+        0,
+        options.findIndex((option) => option.mask_url === result.mask_url),
+      );
+      setCandidateOptions(options);
+      setCandidateIndex(recommended);
+      setSelected(options[recommended]);
       setRefinePoints({ positive: [point], negative: [] });
     }
   };
 
   const handleReset = () => {
     setSelected(null);
+    setCandidateOptions([]);
+    setCandidateIndex(0);
     setRefinePoints({ positive: [], negative: [] });
     sam.click.reset();
     sam.refine.reset();
@@ -221,13 +237,15 @@ export default function ClickableRenderImage({
             preserveAspectRatio="none"
             className="absolute inset-0 w-full h-full pointer-events-none"
           >
-            <polygon
-              points={selected.polygon.map((p) => p.join(",")).join(" ")}
-              fill="rgba(247, 59, 32, 0.30)"
-              stroke="#F73B20"
-              strokeWidth={Math.max(2, imageNatural.w / 200)}
-              vectorEffect="non-scaling-stroke"
-            />
+            {!selected.mask_url && (
+              <polygon
+                points={selected.polygon.map((p) => p.join(",")).join(" ")}
+                fill="rgba(247, 59, 32, 0.30)"
+                stroke="#F73B20"
+                strokeWidth={Math.max(2, imageNatural.w / 200)}
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
             {/* refine 점들 */}
             {refinePoints.positive.map((p, i) => (
               <circle
@@ -254,6 +272,26 @@ export default function ClickableRenderImage({
               />
             ))}
           </svg>
+        )}
+
+        {/* polygon 근사치가 아닌 SAM 원본 raster mask로 정확한 선택 경계를 표시 */}
+        {selected?.mask_url && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 bg-primary-500/40"
+            style={{
+              WebkitMaskImage: `url(${selected.mask_url})`,
+              maskImage: `url(${selected.mask_url})`,
+              WebkitMaskSize: "100% 100%",
+              maskSize: "100% 100%",
+              WebkitMaskRepeat: "no-repeat",
+              maskRepeat: "no-repeat",
+            }}
+          />
+        )}
+
+        {mode === "select" && !selected && !loading && (
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-gradient-to-r from-transparent via-primary-500 to-transparent shadow-[0_0_14px_rgba(247,59,32,0.8)]" />
         )}
 
         {/* 로딩 오버레이 */}
@@ -285,6 +323,55 @@ export default function ClickableRenderImage({
         )}
       </div>
 
+      {/* SAM 다중 마스크 후보 — 좁게/추천/넓게를 직접 보고 선택 */}
+      {selected && candidateOptions.length > 1 && !loading && (
+        <div className="rounded-xl border border-primary-200 bg-white p-3">
+          <div className="flex items-center gap-2">
+            <ScanLine className="h-3.5 w-3.5 text-primary-500" />
+            <p className="text-xs font-bold text-primary-900">선택 경계 비교</p>
+            <span className="text-[0.65rem] text-primary-900/50">가장 정확한 범위를 고르세요</span>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-1.5">
+            {candidateOptions.map((candidate, index) => {
+              const labels = candidateOptions.length === 3
+                ? ["좁게", "중간", "넓게"]
+                : candidateOptions.map((_, i) => `후보 ${i + 1}`);
+              return (
+                <button
+                  key={`${candidate.area_pixels}-${index}`}
+                  type="button"
+                  onClick={() => {
+                    setCandidateIndex(index);
+                    setSelected(candidate);
+                  }}
+                  className={`rounded-lg border px-2 py-2 text-[0.7rem] font-bold transition ${
+                    candidateIndex === index
+                      ? "border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-200"
+                      : "border-primary-100 text-primary-900/60 hover:border-primary-300"
+                  }`}
+                >
+                  {labels[index]}
+                  <span className="mt-0.5 block text-[0.58rem] font-medium opacity-60">
+                    {((candidate.area_pixels / Math.max(1, imageNatural!.w * imageNatural!.h)) * 100).toFixed(1)}%
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {selected && !loading && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+          <p className="inline-flex items-center gap-1.5 font-bold">
+            <ShieldCheck className="h-3.5 w-3.5" /> 오렌지 영역만 변경됩니다
+          </p>
+          <p className="mt-1 text-[0.68rem] text-emerald-900/70">
+            걸레받이·벽·창호가 포함됐다면 <strong>제외</strong>를 누르고 해당 부위를 찍어 경계를 보정하세요.
+          </p>
+        </div>
+      )}
+
       {/* 에러 */}
       {(sam.click.error || sam.refine.error) && (
         <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap">
@@ -309,7 +396,7 @@ export default function ClickableRenderImage({
               onClick={handleConfirm}
               className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-primary-600"
             >
-              이 부위 자재 바꾸기
+              선택 경계 확인 · 자재 고르기
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           )}

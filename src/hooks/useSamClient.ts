@@ -16,6 +16,13 @@ export interface SamPolygonResult {
   area_pixels: number;
   image_size: [number, number];
   mask_url: string | null; // Supabase Storage public URL (자재 교체 시 재사용)
+  /** 단일 클릭이 모호할 때 SAM이 제안하는 다중 마스크 후보 */
+  candidates?: Array<{
+    polygon: number[][];
+    confidence: number;
+    area_pixels: number;
+    mask_url: string | null;
+  }>;
 }
 
 export interface SamAutoRegion {
@@ -72,6 +79,12 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return data as T;
 }
 
+function samImageInput(imageUrl: string): { imageUrl?: string; imageBase64?: string } {
+  return imageUrl.startsWith("data:image/")
+    ? { imageBase64: imageUrl }
+    : { imageUrl };
+}
+
 export function useSamClient() {
   const [click, setClick] = useState<CallState<SamPolygonResult>>(initial());
   const [refine, setRefine] = useState<CallState<SamPolygonResult>>(initial());
@@ -85,7 +98,11 @@ export function useSamClient() {
     async (input: { imageUrl: string; x: number; y: number }): Promise<SamPolygonResult | null> => {
       setClick({ status: "loading", data: null, error: null, hint: null });
       try {
-        const data = await postJson<SamPolygonResult>("/api/inpick/sam/click", input);
+        const data = await postJson<SamPolygonResult>("/api/inpick/sam/click", {
+          ...samImageInput(input.imageUrl),
+          x: input.x,
+          y: input.y,
+        });
         setClick({ status: "ok", data, error: null, hint: null });
         return data;
       } catch (e) {
@@ -113,7 +130,11 @@ export function useSamClient() {
     }): Promise<SamPolygonResult | null> => {
       setRefine({ status: "loading", data: null, error: null, hint: null });
       try {
-        const data = await postJson<SamPolygonResult>("/api/inpick/sam/refine", input);
+        const data = await postJson<SamPolygonResult>("/api/inpick/sam/refine", {
+          ...samImageInput(input.imageUrl),
+          positive: input.positive,
+          negative: input.negative,
+        });
         setRefine({ status: "ok", data, error: null, hint: null });
         return data;
       } catch (e) {
@@ -138,7 +159,10 @@ export function useSamClient() {
     async (input: { imageUrl: string; realWorldAreaSqm?: number }): Promise<SamAutoResult | null> => {
       setAuto({ status: "loading", data: null, error: null, hint: null });
       try {
-        const data = await postJson<SamAutoResult>("/api/inpick/sam/auto-segment", input);
+        const data = await postJson<SamAutoResult>("/api/inpick/sam/auto-segment", {
+          ...samImageInput(input.imageUrl),
+          realWorldAreaSqm: input.realWorldAreaSqm,
+        });
         setAuto({ status: "ok", data, error: null, hint: null });
         return data;
       } catch (e) {

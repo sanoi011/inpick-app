@@ -30,6 +30,7 @@ import {
 } from "@/lib/inpick/refine-cache";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -64,6 +65,8 @@ async function uploadBase64ToStorage(b64: string): Promise<string | null> {
 interface Body {
   originalImageUrl: string;
   maskBase64: string;          // alpha PNG: alpha=0=교체, alpha=255=보존 (가이드 §2-1)
+  /** SAM이 생성한 원본 raster mask. 있으면 polygon 재생성보다 우선한다. */
+  selectionMaskUrl?: string;
   prompt: string;              // 새 자재 묘사 (영문 권장 — gpt-image-2 prompt에 직접 들어감)
   roomName?: string;
   styleHint?: string;          // 전체 스타일 일관성 유지용
@@ -77,6 +80,95 @@ interface Body {
   quality?: "low" | "medium" | "high";
 }
 
+interface PreparedMask {
+  /** OpenAI edits 용: 변경 영역 alpha=0, 보존 영역 alpha=255 */
+  openAiMask: Buffer;
+  /** 최종 합성 용: 변경 영역 255, 보존 영역 0 */
+  targetAlpha: Buffer;
+}
+
+async function prepareSelectionMask(
+  body: Body,
+  width: number,
+  height: number,
+): Promise<PreparedMask> {
+  if (body.selectionMaskUrl) {
+    const maskUrl = new URL(body.selectionMaskUrl);
+    const supabaseHost = (() => {
+      try {
+        return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || "").hostname;
+      } catch {
+        return "";
+      }
+    })();
+    if (maskUrl.protocol !== "https:" || !supabaseHost || maskUrl.hostname !== supabaseHost) {
+      throw new Error("허용되지 않은 선택 마스크 URL");
+    }
+    const maskResponse = await fetch(body.selectionMaskUrl);
+    if (!maskResponse.ok) throw new Error(`SAM 마스크 다운로드 실패 ${maskResponse.status}`);
+    const sourceMask = Buffer.from(await maskResponse.arrayBuffer());
+    // SAM mask: 선택=white, 배경=black. 임계값 처리로 중간톤 누출을 방지.
+    const targetAlpha = await sharp(sourceMask)
+      .resize(width, height, { fit: "fill", kernel: sharp.kernel.nearest })
+      .greyscale()
+      .threshold(128)
+      .raw()
+      .toBuffer();
+    const preserveAlpha = await sharp(targetAlpha, {
+      raw: { width, height, channels: 1 },
+    })
+      .negate()
+      .raw()
+      .toBuffer();
+    const openAiMask = await sharp({
+      create: { width, height, channels: 3, background: { r: 0, g: 0, b: 0 } },
+    })
+      .joinChannel(preserveAlpha, { raw: { width, height, channels: 1 } })
+      .png()
+      .toBuffer();
+    return { openAiMask, targetAlpha };
+  }
+
+  const sourceMask = Buffer.from(
+    body.maskBase64.replace(/^data:.*;base64,/, ""),
+    "base64",
+  );
+  const openAiMask = await sharp(sourceMask)
+    .resize(width, height, { fit: "fill", kernel: sharp.kernel.nearest })
+    .ensureAlpha()
+    .png()
+    .toBuffer();
+  const targetAlpha = await sharp(openAiMask)
+    .extractChannel("alpha")
+    .negate()
+    .threshold(128)
+    .raw()
+    .toBuffer();
+  return { openAiMask, targetAlpha };
+}
+
+async function compositeInsideSelection(
+  originalPng: Buffer,
+  generatedB64: string,
+  targetAlpha: Buffer,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  // GPT Image의 mask는 prompt guidance이므로 출력을 그대로 쓰지 않는다.
+  // 생성 이미지를 SAM 마스크 안에만 합성해 마스크 밖 픽셀을 원본과 동일하게 보장.
+  const generated = Buffer.from(generatedB64, "base64");
+  const selectedOnly = await sharp(generated)
+    .resize(width, height, { fit: "fill" })
+    .removeAlpha()
+    .joinChannel(targetAlpha, { raw: { width, height, channels: 1 } })
+    .png()
+    .toBuffer();
+  return sharp(originalPng)
+    .composite([{ input: selectedOnly, blend: "over" }])
+    .png()
+    .toBuffer();
+}
+
 export async function POST(req: NextRequest) {
   // 차감 정보 — 외부 API 실패 시 환불에 사용
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
@@ -84,9 +176,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as Body;
-    if (!body.originalImageUrl || !body.maskBase64 || !body.prompt) {
+    if (!body.originalImageUrl || (!body.maskBase64 && !body.selectionMaskUrl) || !body.prompt) {
       return NextResponse.json(
-        { error: "originalImageUrl, maskBase64, prompt 필수" },
+        { error: "originalImageUrl, maskBase64(또는 selectionMaskUrl), prompt 필수" },
         { status: 400 },
       );
     }
@@ -158,7 +250,7 @@ export async function POST(req: NextRequest) {
     // ─── v2 §5-4 결과 캐시 hit 검사 — 적중 시 토큰 전액 환불 + gpt-image-2 skip ──
     const cacheKey = buildRefineCacheKey({
       imageRef: body.originalImageUrl,
-      maskRef: body.maskBase64.slice(0, 4096), // 마스크 앞부분만 hash 입력 (전체는 너무 큼)
+      maskRef: body.selectionMaskUrl || body.maskBase64.slice(0, 4096),
       materialKey: [
         body.regionCategoryEn ?? "",
         body.materialName ?? "",
@@ -200,12 +292,16 @@ export async function POST(req: NextRequest) {
     // 1) 원본 이미지 다운로드 (DALL-E 임시 URL)
     const imgRes = await fetch(body.originalImageUrl);
     if (!imgRes.ok) {
-      return NextResponse.json({ error: "원본 이미지 다운로드 실패" }, { status: 502 });
+      throw new Error(`원본 이미지 다운로드 실패 ${imgRes.status}`);
     }
     const imgBuf = Buffer.from(await imgRes.arrayBuffer());
-
-    // 2) 마스크 base64 → buffer
-    const maskBuf = Buffer.from(body.maskBase64.replace(/^data:.*;base64,/, ""), "base64");
+    // OpenAI mask 요건: image/mask 동일 크기·포맷 + alpha channel.
+    const preparedImage = await sharp(imgBuf).rotate().ensureAlpha().png().toBuffer();
+    const imageMetadata = await sharp(preparedImage).metadata();
+    const imageWidth = imageMetadata.width;
+    const imageHeight = imageMetadata.height;
+    if (!imageWidth || !imageHeight) throw new Error("원본 이미지 크기 확인 실패");
+    const preparedMask = await prepareSelectionMask(body, imageWidth, imageHeight);
 
     // 3) 가이드 §2-2 build_replacement_prompt — [변경] + [보존 rules] + [스타일] 3블록 패턴
     const targetEn = body.regionCategoryEn || "target area";
@@ -232,60 +328,49 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join("\n");
 
-    // 4) edits API — 모델 폴백 체인 (사용자 정책: gpt-image-2 우선, 5/8 워킹 상태 복원)
-    // gpt-image-2 (40~80s, 우선) → gpt-image-1 (30~60s, 차선)
+    // 4) edits API — 사용자 지정 GPT Image 2 단일 엔진.
     // 가이드 v2 §5-1 quality tier — 미지정 시 medium (자재 미리보기는 medium으로 충분, 고화질은 명시)
     const quality = body.quality || "medium";
     const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
 
     let editRes: Response | null = null;
-    let usedModel = "";
-    const editErrors: string[] = [];
+    const usedModel = "gpt-image-2";
     let lastErrText = "";
     let lastStatus = 0;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 280_000);
     try {
-      for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
-        const form = new FormData();
-        form.append("model", modelName);
-        form.append("image", new Blob([new Uint8Array(imgBuf)], { type: "image/png" }), "image.png");
-        form.append("mask", new Blob([new Uint8Array(maskBuf)], { type: "image/png" }), "mask.png");
-        form.append("prompt", refinedPrompt);
-        form.append("size", "1024x1024");
-        form.append("quality", quality);
+      const form = new FormData();
+      form.append("model", usedModel);
+      form.append("image", new Blob([new Uint8Array(preparedImage)], { type: "image/png" }), "image.png");
+      form.append("mask", new Blob([new Uint8Array(preparedMask.openAiMask)], { type: "image/png" }), "mask.png");
+      form.append("prompt", refinedPrompt);
+      const requestedSize = imageWidth / imageHeight > 1.2
+        ? "1536x1024"
+        : imageHeight / imageWidth > 1.2
+          ? "1024x1536"
+          : "1024x1024";
+      form.append("size", requestedSize);
+      form.append("quality", quality);
 
-        const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${key}` },
-          body: form,
-          signal: controller.signal,
-        });
-
-        if (res.ok) {
-          editRes = res;
-          usedModel = modelName;
-          break;
-        }
-
-        const errText = await res.text();
-        const lower = errText.toLowerCase();
-        const recoverable =
-          res.status === 404 ||
-          lower.includes("model_not_found") ||
-          lower.includes("does not have access") ||
-          lower.includes("invalid_value");
-        editErrors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
-        lastErrText = errText;
+      const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${key}` },
+        body: form,
+        signal: controller.signal,
+      });
+      if (res.ok) {
+        editRes = res;
+      } else {
+        lastErrText = await res.text();
         lastStatus = res.status;
-        if (!recoverable) break; // billing/auth/rate-limit 등은 다른 모델도 동일 → 폴백 중단
       }
     } finally {
       clearTimeout(timeoutId);
     }
 
     if (!editRes || !editRes.ok) {
-      const errText = lastErrText || editErrors.join(" | ");
+      const errText = lastErrText;
       const lower = errText.toLowerCase();
       let hint: string | undefined;
       let model_status: string = "unknown";
@@ -304,7 +389,7 @@ export async function POST(req: NextRequest) {
       } else {
         hint = "이미지 편집 실패 (요금이 발생하지 않았습니다)";
       }
-      console.warn("[refine-render] edit failed (all fallback exhausted):", lastStatus, errText.slice(0, 300));
+      console.warn("[refine-render] GPT Image 2 edit failed:", lastStatus, errText.slice(0, 300));
       // ─── v2 §4-2 실패 시 자동 환불 ──
       let refunded = false;
       if (charge && charge.charged > 0) {
@@ -361,6 +446,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // GPT Image mask는 prompt guidance이므로 선택 영역 밖이 바뀌 수 있다.
+    // 최종 출력은 SAM raster mask로 다시 합성해 비선택 픽셀을 원본과 동일하게 고정.
+    const composited = await compositeInsideSelection(
+      preparedImage,
+      b64,
+      preparedMask.targetAlpha,
+      imageWidth,
+      imageHeight,
+    );
+    const finalB64 = composited.toString("base64");
+
     // ─── 이미지 생성 성공 계측 ──
     trackServerEventAsync({
       eventName: AnalyticsEvents.ImageGenerationCompleted,
@@ -378,7 +474,7 @@ export async function POST(req: NextRequest) {
     });
 
     // Cloudflare 502 회피 — 큰 base64 대신 Storage URL로 응답
-    const publicUrl = await uploadBase64ToStorage(b64);
+    const publicUrl = await uploadBase64ToStorage(finalB64);
     const successPayload = {
       costUsd: costMap[quality] ?? 0.04,
       quality,
@@ -400,7 +496,7 @@ export async function POST(req: NextRequest) {
     }
     // Storage 실패 시 fallback — base64 직접 반환 (작은 응답 위해 압축)
     return NextResponse.json({
-      imageUrl: `data:image/png;base64,${b64}`,
+      imageUrl: `data:image/png;base64,${finalB64}`,
       ...successPayload,
       from_cache: false,
     });

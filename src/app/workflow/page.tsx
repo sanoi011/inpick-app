@@ -33,7 +33,7 @@ const TOTAL_STEPS = 5;
 
 export default function WorkflowPage() {
   const router = useRouter();
-  const { balance, consume } = useTokens();
+  const { balance, consume, refresh: refreshTokens } = useTokens();
 
   const [step, setStep] = useState<1 | 2>(1);
   const [step1, setStep1] = useState<Step1Data>({
@@ -60,6 +60,7 @@ export default function WorkflowPage() {
   const [quickMode, setQuickMode] = useState<WorkflowEntry | null>(null);
   const [quickPhotoSpace, setQuickPhotoSpace] = useState<PhotoResidentialSpace>("apartment");
   const [quickBusiness, setQuickBusiness] = useState<PhotoCommercialBusiness>("cafe");
+  const [workflowReady, setWorkflowReady] = useState(false);
   const hydratedRef = useRef(false);
 
   const startQuickPhotoFlow = () => {
@@ -126,6 +127,7 @@ export default function WorkflowPage() {
       let s1: Step1Data | null = null;
       let s2: Step2Data | null = null;
       let lastStep = 1;
+      const requestedStep2 = new URLSearchParams(window.location.search).get("step") === "2";
       try {
         const s1raw = sessionStorage.getItem("workflow_step1");
         const s2raw = sessionStorage.getItem("workflow_step2");
@@ -136,6 +138,13 @@ export default function WorkflowPage() {
       } catch (e) {
         console.warn("[workflow] sessionStorage restore fail", e);
       }
+
+      // 같은 브라우저에서 돌아온 경우에는 DB를 기다리지 않고 즉시 Step2를 복원한다.
+      // 요청 URL이 ?step=2라면 첫 화면을 잠깐 그렸다가 튀는 현상도 막는다.
+      if (s1) setStep1(s1);
+      if (s2) setStep2(s2);
+      if (requestedStep2 || lastStep === 2) setStep(2);
+      if ((s1 && s2) || !requestedStep2) setWorkflowReady(true);
 
       // Step 2: DB workflow_state — sessionStorage가 비어있거나 더 오래된 경우 우선
       let projectId = getOrCreateWorkflowProjectId();
@@ -228,7 +237,7 @@ export default function WorkflowPage() {
       // Step 4: state 적용 + sessionStorage 동기화
       if (s1) setStep1(s1);
       if (s2) setStep2(s2);
-      if (lastStep === 2) setStep(2);
+      if (requestedStep2 || lastStep === 2) setStep(2);
       try {
         if (s1) sessionStorage.setItem("workflow_step1", JSON.stringify(s1));
         if (s2) sessionStorage.setItem("workflow_step2", JSON.stringify(s2));
@@ -237,12 +246,18 @@ export default function WorkflowPage() {
         /* quota */
       }
       hydratedRef.current = true;
+      setWorkflowReady(true);
     };
     void run();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  // 디자인 단계에 있는 동안 다음 화면의 JS를 미리 받아 첫 전환을 빠르게 만든다.
+  useEffect(() => {
+    if (step === 2) router.prefetch("/workflow/estimate");
+  }, [router, step]);
 
   // 변경 시 자동 저장 — sessionStorage 즉시 + DB 디바운스 (P8)
   const dbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -334,56 +349,36 @@ export default function WorkflowPage() {
     }
   };
   const goPrev = () => setStep(1);
-  const goBranch = async () => {
+  const goBranch = () => {
     // sessionStorage 저장 실패(Quota/프라이빗 모드)가 네비게이션을 막지 않도록 보호.
     // (step2에 base64 렌더 이미지가 많으면 QuotaExceeded로 throw → 견적요청 클릭이 먹통이 되던 버그)
     if (typeof window !== "undefined") {
       try {
         sessionStorage.setItem("workflow_step1", JSON.stringify(step1));
         sessionStorage.setItem("workflow_step2", JSON.stringify(lightenWorkflowStep2(step2)));
+        sessionStorage.setItem("workflow_step", "2");
       } catch (e) {
         console.warn("[workflow] goBranch sessionStorage save skipped (non-fatal):", e);
       }
     }
-    // P2: estimate_contexts finalize 시도 — contextId 받으면 그 ID로 견적 페이지 이동.
-    //     실패해도 견적 페이지로는 무조건 이동 (sessionStorage 폴백 사용)
-    let contextIdQuery = "";
-    try {
-      const projectMode: "apartment" | "photo_only" | "commercial" =
-        step1.workflowEntry === "photo_residential"
-          ? "photo_only"
-          : step1.workflowEntry === "photo_commercial"
-            ? "commercial"
-            : "apartment";
-      // ⚠️ projectId는 localStorage에 저장됨(getOrCreateWorkflowProjectId) — 직접 sessionStorage를
-      //    읽으면 항상 null이라 정밀 견적(context evidence)이 전원 비활성화됐던 버그(2026-07-05 H1).
-      const projectId = getOrCreateWorkflowProjectId();
-      if (projectId) {
-        const res = await fetch("/api/inpick/estimate-context/finalize", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            projectId,
-            projectMode,
-            step1Snapshot: step1,
-          }),
-        });
-        if (res.ok) {
-          const data = (await res.json()) as { contextId?: string };
-          if (data.contextId) {
-            contextIdQuery = `?contextId=${encodeURIComponent(data.contextId)}`;
-          }
-        } else {
-          console.warn(
-            `[workflow] estimate-context finalize skipped (status ${res.status}) — using sessionStorage`,
-          );
-        }
-      }
-    } catch (err) {
-      console.warn("[workflow] estimate-context finalize error (non-fatal):", err);
-    }
-    router.push(`/workflow/estimate${contextIdQuery}`);
+    // context 생성은 견적 화면에서 진행한다. 여기서는 먼저 화면을 전환해 클릭 반응을 즉시 보인다.
+    router.push("/workflow/estimate");
   };
+
+  if (!workflowReady) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#FFF6F5_0%,#FDE5DF_48%,#EFE8DC_100%)] px-6 text-primary-900">
+        <div className="w-full max-w-sm rounded-[28px] border border-white/70 bg-white/80 p-7 text-center shadow-card-hover backdrop-blur">
+          <div className="relative mx-auto h-14 w-14">
+            <div className="absolute inset-0 rounded-full border-4 border-primary-100" />
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary-500 border-r-primary-500" />
+          </div>
+          <p className="mt-4 text-base font-extrabold">디자인 작업을 불러오는 중</p>
+          <p className="mt-1 text-xs text-primary-900/55">저장된 Step 2 화면으로 바로 돌아갑니다.</p>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <LenisProvider>
@@ -601,6 +596,7 @@ export default function WorkflowPage() {
                   onChange={setStep2}
                   tokenBalance={balance}
                   onConsumeToken={(amount, feature) => consume(amount, feature)}
+                  onTokensChanged={refreshTokens}
                   onComplete={goBranch}
                 />
               </motion.div>

@@ -22,6 +22,7 @@ import {
   Layers,
   X,
   Sparkles,
+  Crosshair,
   Paperclip,
   ImagePlus,
 } from "lucide-react";
@@ -165,10 +166,9 @@ const RENDER_COUNT = 4;
 
 /**
  * 부위별 자재뷰(자재 수정 + 견적 산출) 공개 여부.
- * 2026-07-04 대표 지시 — 설계 재정비 전까지 "서비스 준비 중"으로 잠금.
- * 재공개 시 true로만 바꾸면 기존 기능 그대로 복원됨.
+ * 2026-07-14 정밀 선택 UX + GPT Image 2 영역 편집 파이프라인으로 재공개.
  */
-const PARTIAL_MATERIAL_VIEW_ENABLED = false;
+const PARTIAL_MATERIAL_VIEW_ENABLED = true;
 
 /**
  * 내부 생성용 기술 프롬프트 감지 — 채팅 말풍선에 그대로 노출하지 않는다.
@@ -249,7 +249,8 @@ interface Props {
   onChange: (next: Step2Data) => void;
   tokenBalance: number;
   onConsumeToken: (amount: number, feature: ConsumeFeature) => Promise<boolean>;
-  onComplete: () => void;
+  onTokensChanged?: () => Promise<void> | void;
+  onComplete: () => Promise<void> | void;
 }
 
 export default function Step2Designer({
@@ -264,6 +265,7 @@ export default function Step2Designer({
   onChange,
   tokenBalance,
   onConsumeToken,
+  onTokensChanged,
   onComplete,
 }: Props) {
   // 가이드: Step2 방 목록에서 베란다/드레스룸 제외 (이미지 생성 X). 단 견적 면적엔 포함.
@@ -329,9 +331,19 @@ export default function Step2Designer({
     return rooms.filter((r) => r !== "all" && !RENDER_EXCLUDED.includes(r));
   }, [rooms, availableTabs]);
 
-  const [activeRoom, setActiveRoom] = useState<string>(availableTabs[0]?.v ?? "living");
+  const [activeRoom, setActiveRoom] = useState<string>(() => {
+    // 견적 화면에서 돌아왔거나 저장된 디자인을 복원한 경우, 빈 "전체" 탭보다
+    // 생성 이미지가 있는 첫 실을 바로 열어 자재 수정 버튼이 즉시 보이게 한다.
+    const generatedRoom = availableTabs.find(
+      (tab) => tab.v !== "all" && (value.rendersByRoom[tab.v]?.length ?? 0) > 0,
+    );
+    return generatedRoom?.v ?? availableTabs[0]?.v ?? "living";
+  });
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [estimateTransitioning, setEstimateTransitioning] = useState(false);
+  const [estimateTransitionProgress, setEstimateTransitionProgress] = useState(0);
+  const [estimateTransitionError, setEstimateTransitionError] = useState<string | null>(null);
   // 가이드 STEP2-INPUT-ANALYSIS Q3 — 일괄 생성 직렬화 진행률
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomLabel: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -350,6 +362,8 @@ export default function Step2Designer({
   // Phase 7 — Vision Material Picker 모달
   const [visionPickerOpen, setVisionPickerOpen] = useState(false);
   const [visionPickerRequest, setVisionPickerRequest] = useState<VisionMaterialAnalyzeRequest | null>(null);
+  const [materialEditorOpen, setMaterialEditorOpen] = useState(false);
+  const [openMaterialWhenReady, setOpenMaterialWhenReady] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
   // 채팅 모드 + 메시지는 local useState로 — 스트리밍 빈번 갱신 시 closure stale 회피
@@ -364,6 +378,7 @@ export default function Step2Designer({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const chatFileInputRef = useRef<HTMLInputElement>(null);
+  const materialFileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // 부모(value)와 sync — 페이지 이탈 후 복원용. 단, 매 chunk마다 X (debounce).
@@ -434,6 +449,47 @@ export default function Step2Designer({
     return () => clearInterval(interval);
   }, [generating, progress]);
 
+  // 견적 화면 전환은 context finalize + 상태 저장으로 수 초가 걸릴 수 있다.
+  // 즉시 피드백을 주고 92%에서 대기하다가 라우트 전환 시 unmount된다.
+  useEffect(() => {
+    if (!estimateTransitioning) {
+      setEstimateTransitionProgress(0);
+      return;
+    }
+    setEstimateTransitionProgress(8);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      const target = elapsed < 900 ? 38 : elapsed < 2200 ? 68 : elapsed < 4200 ? 84 : 92;
+      setEstimateTransitionProgress((current) => Math.max(current, target));
+    }, 180);
+    return () => window.clearInterval(timer);
+  }, [estimateTransitioning]);
+
+  const handleEstimateTransition = async () => {
+    if (estimateTransitioning) return;
+    setEstimateTransitionError(null);
+    setEstimateTransitioning(true);
+    try {
+      // 카드의 로딩 상태가 최소 한 프레임은 확실히 그려진 뒤 라우팅을 시작한다.
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 100));
+      try {
+        sessionStorage.setItem("workflow_step2", JSON.stringify(lightenWorkflowStep2(value)));
+        sessionStorage.setItem("workflow_step", "2");
+      } catch {
+        /* private mode / quota */
+      }
+      await onComplete();
+      setEstimateTransitionProgress(100);
+      // router.push 후 새 화면이 mount될 때까지 overlay를 유지한다.
+    } catch (error) {
+      setEstimateTransitioning(false);
+      setEstimateTransitionError(
+        error instanceof Error ? error.message : "견적 화면을 불러오지 못했습니다.",
+      );
+    }
+  };
+
   // popup 외부 클릭 닫기
   useEffect(() => {
     if (!openRoomPopup) return;
@@ -482,6 +538,74 @@ export default function Step2Designer({
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
   const hasGenerated = renders.length > 0;
   const allRoomsDecided = realRoomTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
+  const firstGeneratedRoom = availableTabs.find(
+    (tab) => tab.v !== "all" && (value.rendersByRoom[tab.v]?.length ?? 0) > 0,
+  )?.v;
+  const hasAnyGeneratedRender = !!firstGeneratedRoom;
+
+  const openMaterialWorkspace = () => {
+    if (activeRender && selectedIdx != null) {
+      setMaterialEditorOpen(true);
+      return;
+    }
+    if (firstGeneratedRoom) {
+      setOpenMaterialWhenReady(true);
+      setActiveRoom(firstGeneratedRoom);
+      setImageMinimized(false);
+      return;
+    }
+    materialFileInputRef.current?.click();
+  };
+
+  const handleMaterialImageUpload = (file: File | null | undefined) => {
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("이미지 파일만 업로드할 수 있습니다.");
+      return;
+    }
+    if (file.size > 12 * 1024 * 1024) {
+      setErrorMsg("자재 수정용 이미지는 12MB 이하로 올려주세요.");
+      return;
+    }
+    const roomKey =
+      activeRoom !== "all"
+        ? activeRoom
+        : realRoomTabs[0]?.v ?? availableTabs.find((tab) => tab.v !== "all")?.v ?? "living";
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== "string") return;
+      const existing = value.rendersByRoom[roomKey] || [];
+      const uploadedRender: RenderItem = {
+        url: reader.result,
+        prompt: "사용자가 부위별 자재 수정을 위해 업로드한 실내 이미지",
+        costUsd: 0,
+        timestamp: new Date().toISOString(),
+      };
+      setErrorMsg(null);
+      setOpenMaterialWhenReady(true);
+      setActiveRoom(roomKey);
+      setImageMinimized(false);
+      onChange({
+        ...value,
+        rendersByRoom: {
+          ...value.rendersByRoom,
+          [roomKey]: [...existing, uploadedRender],
+        },
+        selectedByRoom: {
+          ...value.selectedByRoom,
+          [roomKey]: existing.length,
+        },
+      });
+    };
+    reader.onerror = () => setErrorMsg("이미지를 읽지 못했습니다. 다른 파일로 다시 시도해주세요.");
+    reader.readAsDataURL(file);
+  };
+
+  useEffect(() => {
+    if (!openMaterialWhenReady || !activeRender || selectedIdx == null) return;
+    setMaterialEditorOpen(true);
+    setOpenMaterialWhenReady(false);
+  }, [activeRender, openMaterialWhenReady, selectedIdx]);
 
   // 채팅 히스토리 자동 스크롤
   useEffect(() => {
@@ -1352,61 +1476,146 @@ export default function Step2Designer({
             </span>
           </div>
           <p className="mt-1 text-[0.65rem] text-amber-700/70 leading-snug">
-            1차 미리보기 무료 · 자재 분석 1 · 고화질 재렌더 2
+            1차 미리보기 무료 · 부위 선택 무료 · 자재 재렌더 2
           </p>
         </div>
 
-        {/* 진행 상황 — 좌측 컬럼 하단으로 push (메인 캔버스 하단과 정렬) */}
-        <div className="mt-auto rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
-          <div className="flex items-center justify-between mb-1.5">
-            <p className="text-xs font-bold text-primary-700">진행 상황</p>
-            <span className="text-[0.65rem] tabular font-bold text-primary-900">
-              {completedCount}/{totalCount}
-            </span>
-          </div>
-          <div className="h-1.5 rounded-full bg-primary-50 overflow-hidden">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
-              transition={{ duration: 0.5 }}
-              className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
-            />
-          </div>
-          <a
-            href="/workflow/estimate"
-            onClick={(e) => {
-              // P2: contextId 기반 라우팅을 위해 동기 네비게이션 차단.
-              //     onComplete (goBranch)가 async finalize 후 router.push로 contextId 포함하여 이동.
-              //     finalize 실패 시에도 goBranch가 안전한 fallback URL로 push 처리함.
-              e.preventDefault();
-              // sessionStorage에 step1/step2 저장 후 onComplete 호출
-              try {
-                sessionStorage.setItem("workflow_step1", JSON.stringify({
-                  basicInfo,
-                  buildingType: rooms.includes("all") ? null : null, // 부모 state는 onComplete가 더 정확
-                  rooms,
-                  roomFurnishings,
-                  normalizedFloorplan,
-                }));
-                sessionStorage.setItem("workflow_step2", JSON.stringify(lightenWorkflowStep2(value)));
-              } catch {
-                /* private mode */
-              }
-              void onComplete();
+        {/* 생성 결과 유무와 관계없이 항상 보이는 자재 수정 진입점 */}
+        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
+          <input
+            ref={materialFileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            className="hidden"
+            onChange={(event) => {
+              handleMaterialImageUpload(event.target.files?.[0]);
+              event.currentTarget.value = "";
             }}
-            className={`relative z-10 mt-3 inline-flex w-full items-center justify-center gap-1 rounded-lg px-3 py-2.5 text-xs font-bold shadow-cta transition-all cursor-pointer ${
-              allRoomsDecided
-                ? "bg-primary-500 text-white hover:bg-primary-600 ring-2 ring-primary-200"
-                : "bg-primary-500 text-white hover:bg-primary-600"
-            }`}
+          />
+          <div className="flex items-start gap-2">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+              <Crosshair className="h-4 w-4" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-extrabold text-primary-900">부위별 자재 선택·수정</p>
+              <p className="mt-0.5 text-[0.64rem] leading-snug text-primary-900/55">
+                바닥·벽을 클릭해 경계를 확인하고 원하는 자재로 변경
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openMaterialWorkspace}
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-black/10 bg-white px-3 py-2.5 text-xs font-extrabold text-black shadow-sm transition hover:bg-zinc-50"
           >
-            {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
-            <ChevronRight className="h-3 w-3" />
-          </a>
-          <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-primary-900/45">
-            클릭 후 견적서를 불러오는 데 몇 초 걸릴 수 있어요. 잠시만 기다려주세요.
+            {hasAnyGeneratedRender ? (
+              <>
+                <Crosshair className="h-3.5 w-3.5" /> 자재 수정 화면 열기
+              </>
+            ) : (
+              <>
+                <ImagePlus className="h-3.5 w-3.5" /> 사진 올려서 바로 테스트
+              </>
+            )}
+          </button>
+          {hasAnyGeneratedRender && (
+            <button
+              type="button"
+              onClick={() => materialFileInputRef.current?.click()}
+              className="mt-1.5 w-full rounded-lg border border-black/10 bg-white px-3 py-1.5 text-[0.65rem] font-bold text-black hover:bg-zinc-50"
+            >
+              다른 사진 업로드
+            </button>
+          )}
+          <p className="mt-2 text-center text-[0.58rem] font-medium text-primary-900/45">
+            영역 선택 무료 · 실제 자재 재렌더 2토큰
           </p>
         </div>
+
+        {/* 진행 상황 — 견적 요청 시 카드 전체가 전환 상태로 바뀐다. */}
+        <motion.div
+          layout
+          className={`relative mt-auto min-h-[154px] overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
+            estimateTransitioning
+              ? "border-primary-400 bg-gradient-to-br from-primary-600 via-primary-500 to-amber-500 text-white shadow-cta"
+              : "border-amber-200/60 bg-white/80 backdrop-blur"
+          }`}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {estimateTransitioning ? (
+              <motion.div
+                key="estimate-loading"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex min-h-[128px] flex-col items-center justify-center text-center"
+              >
+                <div className="relative h-12 w-12">
+                  <div className="absolute inset-0 rounded-full border-4 border-white/25" />
+                  <motion.div
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                    className="absolute inset-0 rounded-full border-4 border-transparent border-t-white border-r-white"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <Sparkles className="h-4 w-4" />
+                  </div>
+                </div>
+                <p className="mt-3 text-sm font-extrabold">견적 화면으로 이동 중</p>
+                <p className="mt-1 text-[0.67rem] font-medium text-white/80">
+                  디자인과 자재 정보를 연결하고 있어요
+                </p>
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                  <motion.div
+                    animate={{ width: `${estimateTransitionProgress}%` }}
+                    transition={{ duration: 0.35, ease: "easeOut" }}
+                    className="h-full rounded-full bg-white"
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="estimate-ready"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="text-xs font-bold text-primary-700">진행 상황</p>
+                  <span className="text-[0.65rem] tabular font-bold text-primary-900">
+                    {completedCount}/{totalCount}
+                  </span>
+                </div>
+                <div className="h-1.5 rounded-full bg-primary-50 overflow-hidden">
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
+                    transition={{ duration: 0.5 }}
+                    className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleEstimateTransition()}
+                  className={`relative z-10 mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-primary-500 px-3 py-2.5 text-xs font-bold text-white shadow-cta transition-all hover:bg-primary-600 ${
+                    allRoomsDecided ? "ring-2 ring-primary-200" : ""
+                  }`}
+                >
+                  {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
+                  <ChevronRight className="h-3 w-3" />
+                </button>
+                {estimateTransitionError && (
+                  <p className="mt-2 text-center text-[0.68rem] font-semibold text-danger-text">
+                    {estimateTransitionError} 다시 시도해 주세요.
+                  </p>
+                )}
+                <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-primary-900/45">
+                  누르면 카드가 진행 상태로 바뀐 뒤 견적서로 이동합니다.
+                </p>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </aside>
 
       {/* ─── 메인 캔버스: 흰색 톤(#F8F9F6) — 대표 지시 ─── */}
@@ -2053,6 +2262,15 @@ export default function Step2Designer({
                 >
                   <Minimize2 className="h-3.5 w-3.5" />
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setMaterialEditorOpen(true)}
+                  className="absolute bottom-3 right-3 z-30 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2.5 text-xs font-extrabold text-black shadow-xl ring-2 ring-white/80 transition hover:bg-zinc-50 hover:scale-[1.02]"
+                >
+                  <Crosshair className="h-4 w-4" />
+                  부위별 자재 수정
+                  <span className="rounded-full bg-black/5 px-1.5 py-0.5 text-[0.62rem] text-black">재렌더 2토큰</span>
+                </button>
                 <img
                   src={activeRender.refinedUrl || activeRender.url}
                   alt="design"
@@ -2151,7 +2369,7 @@ export default function Step2Designer({
                 styleHint={activeRender.prompt}
                 renderItem={activeRender}
                 tokenBalance={tokenBalance}
-                onConsumeToken={onConsumeToken}
+                onTokensChanged={onTokensChanged}
                 onUpdate={(updated) => updateRender(selectedIdx, updated)}
               />
             </div>
@@ -2184,6 +2402,72 @@ export default function Step2Designer({
           );
         }}
       />
+
+      {/* 생성 이미지가 없는 계정에서도 기능 위치를 놓치지 않는 고정 진입 버튼 */}
+      {!activeRender && (
+        <motion.button
+          type="button"
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={openMaterialWorkspace}
+          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-5 py-3 text-sm font-extrabold text-black shadow-2xl ring-2 ring-white transition hover:bg-zinc-50 sm:bottom-7 sm:right-7"
+        >
+          <Crosshair className="h-4 w-4" />
+          부위별 자재 선택·수정
+          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[0.65rem] text-black">사진으로 테스트</span>
+        </motion.button>
+      )}
+
+      {/* 생성 이미지 위 버튼으로 여는 부위별 자재 수정 작업실 */}
+      <AnimatePresence>
+        {materialEditorOpen && activeRender && selectedIdx != null && typeof document !== "undefined" && createPortal(
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setMaterialEditorOpen(false)}
+              className="fixed inset-0 z-[70] bg-primary-900/65 backdrop-blur-md"
+            />
+            <motion.section
+              initial={{ opacity: 0, scale: 0.97, y: 18 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 18 }}
+              className="fixed inset-2 z-[71] overflow-y-auto rounded-[24px] border border-white/30 bg-[#FFFDFC] shadow-2xl sm:inset-5 lg:inset-8"
+            >
+              <header className="sticky top-0 z-10 flex items-center justify-between border-b border-primary-100 bg-white/95 px-5 py-4 backdrop-blur">
+                <div>
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-primary-500">Material edit</p>
+                  <h2 className="mt-0.5 text-lg font-extrabold tracking-tight text-primary-900">
+                    {ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom} · 부위별 자재 수정
+                  </h2>
+                  <p className="mt-1 text-xs text-primary-900/55">이미지에서 바닥·벽을 클릭하고 경계를 확인한 뒤 자재를 선택하세요.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMaterialEditorOpen(false)}
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
+                  aria-label="자재 수정 닫기"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </header>
+              <div className="mx-auto max-w-6xl p-4 pb-10 sm:p-6">
+                <MaterialEditor
+                  roomLabel={ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom}
+                  realWorldAreaSqm={basicInfo.selectedPyeong?.exclusiveArea}
+                  styleHint={activeRender.prompt}
+                  renderItem={activeRender}
+                  tokenBalance={tokenBalance}
+                  onTokensChanged={onTokensChanged}
+                  onUpdate={(updated) => updateRender(selectedIdx, updated)}
+                />
+              </div>
+            </motion.section>
+          </>,
+          document.body,
+        )}
+      </AnimatePresence>
 
       {/* 토큰 부족 모달 */}
       <AnimatePresence>
