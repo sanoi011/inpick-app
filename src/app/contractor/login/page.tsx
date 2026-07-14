@@ -7,7 +7,6 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Loader2,
-  Building2,
   ArrowLeft,
   ArrowUpRight,
   ShieldCheck,
@@ -96,10 +95,7 @@ export default function ContractorLoginPage() {
 
         <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-24 sm:px-8 lg:py-24">
           <div className="w-full max-w-[420px]">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary-500">
-              <Building2 className="h-5 w-5" strokeWidth={1.8} />
-            </span>
-            <p className="mt-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">Partner access</p>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">Partner access</p>
             <h2 className="mt-2 text-[28px] font-medium tracking-[-0.055em] sm:text-[34px]">사업자 로그인</h2>
             <p className="mt-3 text-[13px] leading-6 text-black/48">간편 소셜 로그인 후 사업자 정보를 등록할 수 있습니다.</p>
 
@@ -166,7 +162,7 @@ export default function ContractorLoginPage() {
                 Apple로 로그인
               </button>
               {error && (
-                <p role="alert" className="rounded-2xl bg-primary-50 px-4 py-3 text-[12px] font-medium text-primary-700">
+                <p role="alert" className="rounded-2xl border border-black/[0.07] bg-black/[0.04] px-4 py-3 text-[12px] font-medium text-black/70">
                   {error}
                 </p>
               )}
