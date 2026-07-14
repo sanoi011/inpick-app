@@ -204,47 +204,66 @@ export async function POST(req: NextRequest) {
     const errors: string[] = [];
     try {
       for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
-        const form = new FormData();
-        form.append("model", modelName);
-        form.append("image", new Blob([new Uint8Array(buf)], { type }), "source.png");
-        form.append("prompt", compiledPrompt);
-        form.append("size", size);
-        form.append("quality", quality);
+        // 모델 혼잡(429/5xx)은 같은 모델을 한 번 재시도한 뒤 다음 모델로 자동 폴백한다.
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          const form = new FormData();
+          form.append("model", modelName);
+          form.append("image", new Blob([new Uint8Array(buf)], { type }), "source.png");
+          form.append("prompt", compiledPrompt);
+          form.append("size", size);
+          form.append("quality", quality);
 
-        const res = await fetch(`${OPENAI_BASE}/images/edits`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}` },
-          body: form,
-          signal: controller.signal,
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const b64 = data.data?.[0]?.b64_json;
-          if (b64) {
-            imageBase64 = b64;
-            usedModel = modelName;
+          const res = await fetch(`${OPENAI_BASE}/images/edits`, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}` },
+            body: form,
+            signal: controller.signal,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const b64 = data.data?.[0]?.b64_json;
+            if (b64) {
+              imageBase64 = b64;
+              usedModel = modelName;
+              break;
+            }
+            errors.push(`${modelName}: no image data`);
             break;
           }
-          errors.push(`${modelName}: no image data`);
-          continue;
+
+          const errText = await res.text();
+          const lower = errText.toLowerCase();
+          const capacityError =
+            res.status === 429 ||
+            res.status === 500 ||
+            res.status === 502 ||
+            res.status === 503 ||
+            lower.includes("at capacity") ||
+            lower.includes("overloaded");
+          const recoverable =
+            capacityError ||
+            res.status === 404 ||
+            lower.includes("model_not_found") ||
+            lower.includes("does not have access") ||
+            lower.includes("invalid_value");
+          errors.push(`${modelName} ${res.status} attempt ${attempt + 1}: ${errText.slice(0, 200)}`);
+          if (capacityError && attempt === 0) {
+            await new Promise((resolve) => setTimeout(resolve, 1_500));
+            continue;
+          }
+          if (!recoverable) {
+            throw new Error(`OpenAI edits 실패 (non-recoverable) — ${errors.join(" | ")}`);
+          }
+          break;
         }
-        const errText = await res.text();
-        const lower = errText.toLowerCase();
-        const recoverable =
-          res.status === 404 ||
-          lower.includes("model_not_found") ||
-          lower.includes("does not have access") ||
-          lower.includes("invalid_value");
-        errors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
-        if (!recoverable) {
-          throw new Error(`OpenAI edits 실패 (non-recoverable) — ${errors.join(" | ")}`);
-        }
+        if (imageBase64) break;
       }
     } finally {
       clearTimeout(timeoutId);
     }
 
     if (!imageBase64) {
+      const providerBusy = errors.some((message) => /capacity|overloaded| 429 | 500 | 502 | 503 /.test(message));
       if (charge) {
         await refundCredits(
           charge.userId,
@@ -254,8 +273,10 @@ export async function POST(req: NextRequest) {
       }
       return NextResponse.json(
         {
-          error: "provider_error",
-          hint: "이미지 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
+          error: providerBusy ? "provider_busy" : "provider_error",
+          hint: providerBusy
+            ? "이미지 생성 서버가 혼잡합니다. 사용한 토큰은 자동 환불됐으며 잠시 후 다시 시도해주세요."
+            : "이미지 생성에 실패했습니다. 사용한 토큰은 자동 환불됐습니다.",
           details: errors.join(" | "),
         },
         { status: 502 },

@@ -16,6 +16,7 @@ import {
   MapPin,
   PaintBucket,
   PanelTop,
+  Save,
   ShoppingBag,
   Sofa,
   Sparkles,
@@ -146,6 +147,8 @@ export default function PartialAiPage() {
   const [productQuery, setProductQuery] = useState("");
   const [productLoading, setProductLoading] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<{ target: SamSurfaceTarget; confidence: number } | null>(null);
+  const [savingBoard, setSavingBoard] = useState(false);
+  const [boardMessage, setBoardMessage] = useState("");
 
   const roomMeta = ROOMS.find((item) => item.key === room) ?? ROOMS[0];
   const styleMeta = STYLES.find((item) => item.key === styleKey) ?? STYLES[0];
@@ -247,6 +250,45 @@ export default function PartialAiPage() {
     }
   };
 
+  const saveSelectionBoard = async () => {
+    if (!resultUrl) return;
+    setSavingBoard(true);
+    setBoardMessage("");
+    try {
+      const res = await fetch("/api/material-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: roomMeta.label,
+          surface: "전체 마감",
+          materialName: [selectedMaterials.floor.name, selectedMaterials.wall.name, selectedMaterials.ceiling.name].join(" · "),
+          prompt: JSON.stringify({
+            service: "partial_ai_room",
+            style: styleMeta.label,
+            roomArea: roomMeta.area,
+            roomSize: roomMeta.size,
+            materialQueries: Object.values(selectedMaterials).map((material) => material.query),
+            features: ROOM_FEATURES[room].map((group) => ({ label: group.label, value: group.options[featureChoices[group.label] ?? 0] })),
+            customPrompt: customPrompt.trim() || null,
+          }),
+          sourceUrl: "/partial-ai",
+          resultUrl,
+          model: "gpt-image-2",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBoardMessage(data?.error || "선택 보드 저장에 실패했습니다.");
+        return;
+      }
+      setBoardMessage("내 선택 보드에 저장했습니다. 시공 상담 때 그대로 활용할 수 있어요.");
+    } catch {
+      setBoardMessage("네트워크 오류로 저장하지 못했습니다.");
+    } finally {
+      setSavingBoard(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-[#f7f7f5] text-black">
       <HeaderV4 variant="solid" />
@@ -332,10 +374,16 @@ export default function PartialAiPage() {
                 </div>
                 {error && <p className="mt-3 rounded-xl bg-black/[0.04] px-3 py-2 text-xs font-semibold text-black">{error}</p>}
                 {resultUrl && (
-                  <a href={resultUrl} target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs font-bold text-black/55 hover:text-black">
-                    <Download className="h-3.5 w-3.5" /> 원본 이미지 열기
-                  </a>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <a href={resultUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-2 text-xs font-bold text-black/55 hover:border-black hover:text-black">
+                      <Download className="h-3.5 w-3.5" /> 원본 이미지
+                    </a>
+                    <button type="button" onClick={saveSelectionBoard} disabled={savingBoard} className="inline-flex items-center gap-1.5 rounded-full border border-black/10 px-3 py-2 text-xs font-bold text-black/55 hover:border-black hover:text-black disabled:opacity-50">
+                      {savingBoard ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} 선택 보드 저장
+                    </button>
+                  </div>
                 )}
+                {boardMessage && <p className="mt-2 text-[11px] font-semibold leading-5 text-black/55">{boardMessage}</p>}
               </div>
             </div>
           </div>

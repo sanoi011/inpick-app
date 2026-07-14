@@ -19,6 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import AppDownloadSection from "@/components/landing/AppDownloadSection";
 
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
@@ -334,6 +335,8 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      <AppDownloadSection />
 
       <section id="showcase" className="px-3 pb-3 sm:px-5 sm:pb-5">
         <div className="mx-auto mb-8 flex max-w-[1560px] items-end justify-between gap-5 px-2 sm:mb-10">

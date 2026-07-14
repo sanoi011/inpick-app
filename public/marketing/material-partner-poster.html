@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>INPICK 자재 파트너 모집</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; min-height: 100%; background: #ddd; }
+    body { display: flex; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif; color: #101010; }
+    .poster { position: relative; width: 1080px; height: 1350px; overflow: hidden; background: #f6f2ea; }
+    .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .wash { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(248,245,238,.96) 0%, rgba(248,245,238,.91) 49%, rgba(248,245,238,.2) 75%, rgba(248,245,238,0) 100%); }
+    .content { position: absolute; inset: 0; padding: 64px 68px 54px; display: flex; flex-direction: column; }
+    .brand { display: flex; align-items: center; gap: 12px; font-size: 25px; font-weight: 850; letter-spacing: -1.3px; }
+    .hex { width: 25px; height: 25px; background: #ff503d; clip-path: polygon(25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0 50%); }
+    .partner { margin-left: 11px; padding-left: 18px; border-left: 1px solid rgba(0,0,0,.2); font-size: 13px; font-weight: 750; letter-spacing: 2px; color: rgba(0,0,0,.48); }
+    .eyebrow { margin-top: 82px; display: inline-flex; align-self: flex-start; border: 1px solid rgba(0,0,0,.16); border-radius: 999px; padding: 10px 15px; background: rgba(255,255,255,.62); font-size: 14px; font-weight: 750; letter-spacing: .2px; }
+    h1 { margin: 27px 0 0; width: 710px; font-size: 62px; line-height: 1.12; letter-spacing: -4.5px; font-weight: 850; }
+    .intro { margin-top: 24px; width: 650px; font-size: 20px; line-height: 1.62; letter-spacing: -0.65px; color: rgba(0,0,0,.62); word-break: keep-all; }
+    .steps { margin-top: 52px; width: 715px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .step { min-height: 176px; padding: 20px 18px; border: 1px solid rgba(0,0,0,.1); border-radius: 20px; background: rgba(255,255,255,.78); backdrop-filter: blur(8px); }
+    .num { font-size: 12px; font-weight: 800; letter-spacing: 1.4px; color: rgba(0,0,0,.34); }
+    .step h2 { margin: 19px 0 0; font-size: 20px; letter-spacing: -1px; }
+    .step p { margin: 9px 0 0; font-size: 13px; line-height: 1.55; color: rgba(0,0,0,.53); word-break: keep-all; }
+    .cta { margin-top: auto; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 30px; border-radius: 26px; background: #101010; color: #fff; padding: 25px 28px 25px 30px; box-shadow: 0 18px 42px rgba(0,0,0,.16); }
+    .cta-label { font-size: 13px; font-weight: 700; letter-spacing: .4px; color: rgba(255,255,255,.56); }
+    .cta-title { margin-top: 7px; font-size: 25px; font-weight: 800; letter-spacing: -1px; }
+    .cta-contact { text-align: right; }
+    .site { font-size: 23px; font-weight: 820; letter-spacing: -.6px; }
+    .mail { margin-top: 6px; font-size: 14px; color: rgba(255,255,255,.58); }
+    .foot { display: flex; justify-content: space-between; margin-top: 18px; padding: 0 3px; font-size: 11px; color: rgba(0,0,0,.42); }
+  </style>
+</head>
+<body>
+  <main class="poster">
+    <img class="bg" src="./material-partner-poster-bg-v1.png" alt="" />
+    <div class="wash"></div>
+    <div class="content">
+      <div class="brand"><span class="hex"></span><span>inpick</span><span class="partner">MATERIAL PARTNER</span></div>
+      <div class="eyebrow">국내 자재 제조·납품사 파트너 모집</div>
+      <h1>우리 자재가<br />AI 인테리어 이미지 속<br />실제 선택지가 됩니다.</h1>
+      <p class="intro">소비자가 공간을 디자인하고 자재를 선택하는 순간부터<br />실제 제품 구매와 지역 시공업체 연결까지, 인픽이 이어드립니다.</p>
+
+      <section class="steps">
+        <article class="step"><div class="num">01 · PRODUCT</div><h2>제품 등록</h2><p>브랜드·SKU·스펙·가격·시공단가와 고화질 샘플 이미지를 등록합니다.</p></article>
+        <article class="step"><div class="num">02 · VISUALIZE</div><h2>AI 공간 적용</h2><p>거실·주방·욕실 등 실제 렌더 이미지에 제품을 부위별로 적용합니다.</p></article>
+        <article class="step"><div class="num">03 · CONNECT</div><h2>구매·시공 연결</h2><p>제품 비교, 예상견적, 지역 시공업체 추천까지 하나의 흐름으로 연결합니다.</p></article>
+      </section>
+
+      <section class="cta">
+        <div><div class="cta-label">초기 자재 파트너 입점 · 데이터 연동 · 공동 마케팅</div><div class="cta-title">제품 카탈로그 제휴를 시작하세요.</div></div>
+        <div class="cta-contact"><div class="site">www.interiorpick.co.kr</div><div class="mail">lookingseon@aiod.kr</div></div>
+      </section>
+      <div class="foot"><span>주식회사 아이오드 · INPICK</span><span>AI DESIGN → MATERIAL → INSTALLATION</span></div>
+    </div>
+  </main>
+</body>
+</html>
