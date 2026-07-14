@@ -15,5 +15,6 @@
 capacitor.config.ts
 *.py
 *.pdf
+!public/legal/ftc-standard-contract-10079.pdf
 *.dwg
 *.dxf
