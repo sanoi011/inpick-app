@@ -5,20 +5,22 @@ import { ArrowLeft } from "lucide-react";
 
 export default function PrivacyPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4">
-        <div className="max-w-3xl mx-auto flex items-center gap-3">
-          <Link href="/" className="text-gray-400 hover:text-gray-600">
+    <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
+      <header className="bg-white px-4 py-5 sm:px-6">
+        <div className="mx-auto flex max-w-4xl items-center justify-between">
+          <Link href="/" className="rounded-full p-2 text-black/45 hover:bg-black/[0.04] hover:text-black" aria-label="홈으로">
             <ArrowLeft className="w-5 h-5" />
           </Link>
-          <Link href="/" className="text-xl font-bold text-blue-600">INPICK</Link>
+          <Link href="/" className="inline-flex items-center gap-2.5"><span className="hex-mask h-6 w-6 text-[#f15b4a]" /><span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span></Link>
+          <span className="w-9" />
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-12">
-        <h1 className="text-2xl font-bold text-gray-900 mb-8">개인정보처리방침</h1>
+      <main className="mx-auto max-w-4xl px-4 py-10 sm:px-6 sm:py-14">
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">PRIVACY</p>
+        <h1 className="mb-8 mt-2 text-[32px] font-medium tracking-[-0.055em] sm:text-[40px]">개인정보처리방침</h1>
 
-        <div className="bg-white rounded-xl border border-gray-200 p-8 space-y-8 text-sm text-gray-700 leading-relaxed">
+        <div className="space-y-8 rounded-[28px] border border-black/[0.07] bg-white p-6 text-sm leading-relaxed text-black/65 sm:p-9">
           <section>
             <h2 className="text-lg font-semibold text-gray-900 mb-3">제1조 (목적)</h2>
             <p>

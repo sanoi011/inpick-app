@@ -3,14 +3,12 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
   Lock,
   Download,
-  FileSpreadsheet,
   Loader2,
   AlertCircle,
   RefreshCw,
@@ -326,7 +324,7 @@ export default function EstimatePageWithSuspense() {
       fallback={
         <main className="flex min-h-screen items-center justify-center bg-white">
           <div className="flex items-center gap-3 text-black">
-            <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
+            <Loader2 className="h-5 w-5 animate-spin text-black" />
             <span className="text-sm font-semibold">견적서 불러오는 중…</span>
           </div>
         </main>
@@ -395,6 +393,7 @@ function EstimatePage() {
   const [detailsAccessChecked, setDetailsAccessChecked] = useState(false);
   const [detailsUnlocking, setDetailsUnlocking] = useState(false);
   const [detailsAccessError, setDetailsAccessError] = useState<string | null>(null);
+  const [detailsGateVisible, setDetailsGateVisible] = useState(false);
   // community v2 (2026-05-14): 커뮤니티 공유 모달
   const [shareModalOpen, setShareModalOpen] = useState(false);
   // 자재 라인 → 실구매/카탈로그/미리보기 드로어
@@ -555,10 +554,9 @@ function EstimatePage() {
   const [sortOpen, setSortOpen] = useState(false);
   // 사용자가 견적에서 제외한 항목 ID set (`${room}::${idx}` 형식)
   const [excluded, setExcluded] = useState<Set<string>>(new Set());
-  // 경비 비율 (기본 3% — 사용자 조정 가능, 0~15% 범위)
-  const [expenseRate, setExpenseRate] = useState(0.03);
+  // 소비자 견적은 표준 경비율을 고정 적용한다.
+  const expenseRate = 0.03;
 
-  const itemKey = (roomName: string, idx: number) => `${roomName}::${idx}`;
   const toggleExcluded = (key: string) => {
     setExcluded((prev) => {
       const next = new Set(prev);
@@ -1365,6 +1363,16 @@ function EstimatePage() {
     ? Object.keys(ROOM_NAME_MAP)
     : step1?.rooms?.filter((r) => r in ROOM_NAME_MAP) || [];
 
+  // 총 공사금액을 먼저 보여준 뒤 세부견적 잠금 안내를 노출한다.
+  useEffect(() => {
+    if (detailsUnlocked || loading || error || finalTotal <= 0) {
+      setDetailsGateVisible(false);
+      return;
+    }
+    const timer = window.setTimeout(() => setDetailsGateVisible(true), 1200);
+    return () => window.clearTimeout(timer);
+  }, [detailsUnlocked, loading, error, finalTotal]);
+
   return (
     <LenisProvider>
       <main className="relative min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
@@ -1374,10 +1382,10 @@ function EstimatePage() {
           <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 border-r border-black/[0.07] bg-white py-5 lg:flex">
             <button
               onClick={goBackToDesign}
-              className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-500 transition hover:bg-primary-100"
+              className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-black text-white transition hover:bg-black/75"
               aria-label="디자인 단계로 돌아가기"
             >
-              <span className="hex-mask h-5 w-5 text-primary-500" />
+              <span className="hex-mask h-5 w-5 text-white" />
             </button>
             <button
               onClick={() => setFilterRoom(null)}
@@ -1448,7 +1456,7 @@ function EstimatePage() {
 
             <div className="px-4 sm:px-6 lg:px-10">
               {/* 영어 1개만 — Invoice */}
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/45">
                 STEP 03 · Estimate
               </p>
               <h1 className="mt-2 text-[32px] font-medium leading-none tracking-[-0.06em] text-black sm:text-[42px]">
@@ -1475,7 +1483,7 @@ function EstimatePage() {
                       {step1.basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
                     </span>
                   )}
-                  <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1 font-bold text-primary-700 tabular">
+                  <span className="rounded-full border border-black/[0.07] bg-white px-3 py-1 font-semibold text-black/60 tabular">
                     목표 {budgetMan.toLocaleString()}만원
                   </span>
                 </div>
@@ -1504,13 +1512,13 @@ function EstimatePage() {
                       <Filter className="h-3.5 w-3.5 text-black/45" />
                       필터
                       {filterCat !== "all" && (
-                        <span className="ml-1 rounded-full bg-primary-500 px-1.5 py-0.5 text-[0.65rem] text-white">
+                        <span className="ml-1 rounded-full bg-black px-1.5 py-0.5 text-[0.65rem] text-white">
                           {filterCat === "main" ? "주자재" : filterCat === "aux" ? "부자재" : "인건비"}
                         </span>
                       )}
                     </button>
                     {filterOpen && (
-                      <div className="absolute z-10 mt-1.5 w-44 rounded-xl border border-primary-100 bg-white shadow-card-hover py-1">
+                      <div className="absolute z-10 mt-1.5 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
                         {(["all", "main", "aux", "labor"] as FilterCategory[]).map((c) => (
                           <button
                             key={c}
@@ -1518,12 +1526,12 @@ function EstimatePage() {
                               setFilterCat(c);
                               setFilterOpen(false);
                             }}
-                            className={`flex w-full items-center justify-between px-4 py-2 text-[0.85rem] hover:bg-primary-50 ${
-                              filterCat === c ? "text-primary-700 font-bold" : "text-primary-900/70"
+                            className={`flex w-full items-center justify-between px-4 py-2 text-[0.85rem] hover:bg-black/[0.035] ${
+                              filterCat === c ? "font-bold text-black" : "text-black/65"
                             }`}
                           >
                             {c === "all" ? "전체" : c === "main" ? "주자재" : c === "aux" ? "부자재 (10%)" : "인건비 (MOLIT)"}
-                            {filterCat === c && <span className="text-primary-500">✓</span>}
+                            {filterCat === c && <span className="text-black">✓</span>}
                           </button>
                         ))}
                       </div>
@@ -1541,13 +1549,13 @@ function EstimatePage() {
                       <ArrowUpDown className="h-3.5 w-3.5 text-black/45" />
                       정렬
                       {sortBy !== "default" && (
-                        <span className="ml-1 text-[0.65rem] text-primary-700">
+                        <span className="ml-1 text-[0.65rem] text-black/55">
                           {sortBy === "price-desc" ? "가격↓" : sortBy === "price-asc" ? "가격↑" : "이름"}
                         </span>
                       )}
                     </button>
                     {sortOpen && (
-                      <div className="absolute z-10 mt-1.5 w-44 rounded-xl border border-primary-100 bg-white shadow-card-hover py-1">
+                      <div className="absolute z-10 mt-1.5 w-44 rounded-xl border border-black/10 bg-white py-1 shadow-[0_16px_44px_rgba(0,0,0,0.12)]">
                         {(
                           [
                             ["default", "기본"],
@@ -1562,12 +1570,12 @@ function EstimatePage() {
                               setSortBy(v);
                               setSortOpen(false);
                             }}
-                            className={`flex w-full items-center justify-between px-4 py-2 text-[0.85rem] hover:bg-primary-50 ${
-                              sortBy === v ? "text-primary-700 font-bold" : "text-primary-900/70"
+                            className={`flex w-full items-center justify-between px-4 py-2 text-[0.85rem] hover:bg-black/[0.035] ${
+                              sortBy === v ? "font-bold text-black" : "text-black/65"
                             }`}
                           >
                             {label}
-                            {sortBy === v && <span className="text-primary-500">✓</span>}
+                            {sortBy === v && <span className="text-black">✓</span>}
                           </button>
                         ))}
                       </div>
@@ -1590,27 +1598,27 @@ function EstimatePage() {
                     </button>
                   </div>
 
-                  <span className="ml-auto text-[0.78rem] text-primary-900/40 tabular">
+                  <span className="ml-auto text-[0.78rem] text-black/40 tabular">
                     {filteredRooms.reduce((s, r) => s + r.items.length, 0)} 건
                   </span>
                 </div>
 
                 {/* P3: 자재 정밀 분석 진행 상태 (분석 끝나면 견적 자동 보강 안내) */}
                 {!loading && !error && analysisStatus && analysisStatus.total > 0 && (
-                  <div className="mb-3 rounded-2xl border border-blue-200 bg-blue-50/70 px-4 py-3">
+                  <div className="mb-3 rounded-[20px] border border-black/[0.08] bg-white px-4 py-3">
                     <div className="flex items-start gap-2">
                       {analysisStatus.pending > 0 ? (
-                        <Loader2 className="h-4 w-4 text-blue-600 mt-0.5 shrink-0 animate-spin" />
+                        <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-black/60" />
                       ) : (
-                        <Sparkles className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+                        <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-black/60" />
                       )}
                       <div className="flex-1">
-                        <p className="text-xs font-bold text-blue-800">
+                        <p className="text-xs font-semibold text-black">
                           {analysisStatus.pending > 0
                             ? `자재 정밀 분석 진행 중 — ${analysisStatus.done}/${analysisStatus.total} 완료`
                             : `자재 정밀 분석 완료 — ${analysisStatus.done}건${analysisStatus.failed > 0 ? `, 실패 ${analysisStatus.failed}건` : ""}`}
                         </p>
-                        <p className="mt-1 text-[0.72rem] text-blue-800/80 leading-snug">
+                        <p className="mt-1 text-[0.72rem] leading-snug text-black/55">
                           {analysisStatus.pending > 0
                             ? "현재 견적 기준: 디자인 기반 견적. 완료되면 견적 항목이 자동 보강됩니다."
                             : "이미지 분석 결과가 견적에 반영되었습니다."}
@@ -1620,7 +1628,7 @@ function EstimatePage() {
                             onClick={() => {
                               if (step1 && step2) void runEstimate(step1, step2);
                             }}
-                            className="mt-2 inline-flex items-center gap-1 rounded-full border border-blue-300 bg-white px-3 py-1 text-[0.7rem] font-bold text-blue-700 hover:bg-blue-50"
+                            className="mt-2 inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-3 py-1 text-[0.7rem] font-medium text-black/65 hover:bg-black/[0.04]"
                           >
                             <RefreshCw className="h-3 w-3" /> 견적 새로고침
                           </button>
@@ -1632,16 +1640,16 @@ function EstimatePage() {
 
                 {/* P0: 폴백/표준자재 적용 경고 배너 — 소비자 화면에서는 숨김(내부 진단용) */}
                 {false && !loading && !error && warnings.length > 0 && (
-                  <div className="mb-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3">
+                  <div className="mb-3 rounded-2xl border border-black/10 bg-white px-4 py-3">
                     <div className="flex items-start gap-2">
-                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-black/60" />
                       <div className="flex-1">
-                        <p className="text-xs font-bold text-amber-800">
+                        <p className="text-xs font-bold text-black">
                           견적 산출 안내 — 일부 항목은 표준값으로 계산됐어요
                         </p>
                         <ul className="mt-1.5 space-y-1">
                           {warnings.map((w, i) => (
-                            <li key={i} className="text-[0.72rem] text-amber-800/80 leading-snug">
+                            <li key={i} className="text-[0.72rem] leading-snug text-black/65">
                               • {w}
                             </li>
                           ))}
@@ -1701,7 +1709,7 @@ function EstimatePage() {
                 {!loading && !error && constructionEstimate && (
                   <button
                     onClick={() => setShowLegacy((v) => !v)}
-                    className="mb-2 text-[0.72rem] font-semibold text-primary-700/70 hover:text-primary-700 underline"
+                    className="mb-2 text-[0.72rem] font-semibold text-black/55 underline hover:text-black"
                   >
                     {showLegacy ? "← 새 견적서 폼으로" : "기존 상세표(공종/공간/부위/자재별) 보기"}
                   </button>
@@ -1718,7 +1726,7 @@ function EstimatePage() {
 
                 {/* P7-4: 공종별/공간별/부위별/자재별 보기 탭 (기존 상세표 — 토글 시) */}
                 {(showLegacy || !constructionEstimate) && !loading && !error && (
-                  <div className="mb-3 flex items-center gap-1 rounded-2xl border border-primary-100 bg-white p-1.5 shadow-sm">
+                  <div className="mb-3 flex items-center gap-1 rounded-2xl border border-black/[0.08] bg-white p-1.5">
                     {(
                       [
                         { v: "trade", label: "공종별", desc: "01~17 공종 실행내역서" },
@@ -1737,10 +1745,10 @@ function EstimatePage() {
                           title={disabled ? "v2 견적 활성 시 사용 가능" : m.desc}
                           className={`flex-1 rounded-xl px-3 py-2 text-xs font-bold transition ${
                             active
-                              ? "bg-primary-500 text-white shadow"
+                              ? "bg-black text-white"
                               : disabled
-                                ? "text-primary-900/30 cursor-not-allowed"
-                                : "text-primary-900 hover:bg-primary-50"
+                                ? "cursor-not-allowed text-black/25"
+                                : "text-black/65 hover:bg-black/[0.035] hover:text-black"
                           }`}
                         >
                           {m.label}
@@ -1752,14 +1760,14 @@ function EstimatePage() {
 
                 {/* P7-FIX: constructionEstimate 없을 때 진단 안내 */}
                 {!loading && !error && viewMode === "trade" && !constructionEstimate && (
-                  <div className="mb-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3">
-                    <p className="text-xs font-bold text-rose-800">
+                  <div className="mb-3 rounded-2xl border border-black/10 bg-white px-4 py-3">
+                    <p className="text-xs font-bold text-black">
                       ⚠️ 17공종 견적 데이터 미생성
                     </p>
-                    <p className="mt-1 text-[0.72rem] text-rose-800/80 leading-snug">
+                    <p className="mt-1 text-[0.72rem] leading-snug text-black/65">
                       Step1에서 평형/면적이 누락됐거나 견적 빌드가 실패했습니다. 콘솔에서 `[estimate-v2]` 로그를 확인하세요.
                       <br />
-                      "부위별" 탭을 클릭하면 기존 견적 표를 볼 수 있습니다.
+                      &quot;부위별&quot; 탭을 클릭하면 기존 견적 표를 볼 수 있습니다.
                     </p>
                   </div>
                 )}
@@ -1774,9 +1782,9 @@ function EstimatePage() {
                       return (
                         <section
                           key={trade.tradeCode}
-                          className="rounded-2xl overflow-hidden border border-primary-100 bg-white shadow-sm"
+                          className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white"
                         >
-                          <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-primary-700 to-primary-600 text-white">
+                          <div className="flex items-center justify-between bg-black px-5 py-3 text-white">
                             <span className="font-bold text-sm">
                               {trade.tradeCode}. {trade.tradeNameKo}
                               <span className="ml-2 text-[0.7rem] opacity-80">
@@ -1789,7 +1797,7 @@ function EstimatePage() {
                           </div>
                           {/* 모바일: 가로 스크롤(고정 7열이 390px에서 잘리던 것 방지, M4). 웹은 그대로 */}
                           <div className="overflow-x-auto">
-                          <div className="divide-y divide-primary-50 min-w-[560px]">
+                          <div className="min-w-[560px] divide-y divide-black/[0.06]">
                             {lines.map((line) => {
                               const isExcluded = excludedV2Lines.has(line.id);
                               return (
@@ -1803,51 +1811,51 @@ function EstimatePage() {
                                   type="checkbox"
                                   checked={!isExcluded}
                                   onChange={() => toggleV2LineIncluded(line.id)}
-                                  className="accent-primary-500"
+                                  className="accent-black"
                                   title="견적 포함/제외 토글"
                                 />
-                                <div className="text-primary-900/40 tabular">{line.sortNo}</div>
-                                <div className="font-bold text-primary-700">
+                                <div className="text-black/40 tabular">{line.sortNo}</div>
+                                <div className="font-bold text-black">
                                   {line.subTradeCode}
-                                  <p className="text-[0.65rem] text-primary-900/60 font-normal mt-0.5">
+                                  <p className="mt-0.5 text-[0.65rem] font-normal text-black/60">
                                     {line.subTradeNameKo}
                                   </p>
                                 </div>
-                                <div className="text-primary-900/80">{line.roomName}</div>
+                                <div className="text-black/80">{line.roomName}</div>
                                 <div>
-                                  <p className="font-bold text-primary-900">{line.taskNameKo}</p>
-                                  <p className="text-[0.65rem] text-primary-900/55 mt-0.5">
+                                  <p className="font-bold text-black">{line.taskNameKo}</p>
+                                  <p className="mt-0.5 text-[0.65rem] text-black/55">
                                     {line.itemNameKo}
                                     {line.spec ? ` · ${line.spec}` : ""}
                                   </p>
                                   {/* P12: 제조사/브랜드/SKU/단가출처 표시 — DB 매칭된 line만 */}
                                   {(line.brand || line.manufacturer || line.sku) && (
-                                    <p className="text-[0.62rem] text-blue-700 mt-0.5 font-semibold">
+                                    <p className="mt-0.5 text-[0.62rem] font-semibold text-black/65">
                                       {line.manufacturer && `${line.manufacturer} · `}
                                       {line.brand}
                                       {line.sku && ` · SKU ${line.sku}`}
                                     </p>
                                   )}
-                                  <p className="text-[0.62rem] text-primary-900/40 mt-0.5">
+                                  <p className="mt-0.5 text-[0.62rem] text-black/40">
                                     산출: {line.quantityFormulaKo}
                                     {line.materialPriceSource && line.materialPriceSource !== "kpa_standard" && (
-                                      <span className="ml-1 text-emerald-700">
+                                      <span className="ml-1 text-black/65">
                                         · 단가: {priceSourceLabel(line.materialPriceSource)}
                                       </span>
                                     )}
                                     {line.fallbackReason && (
-                                      <span className="ml-1 text-rose-600" title={line.fallbackReason}>
+                                      <span className="ml-1 text-black/65" title={line.fallbackReason}>
                                         · ⚠️ 표준 fallback
                                       </span>
                                     )}
                                   </p>
                                 </div>
-                                <div className="text-right tabular text-primary-900/80">
+                                <div className="text-right tabular text-black/80">
                                   {line.quantity.toLocaleString()} {line.unit === "m2" ? "m²" : line.unit}
                                 </div>
-                                <div className={`text-right tabular font-bold ${isExcluded ? "line-through text-primary-900/40" : "text-primary-900"}`}>
+                                <div className={`text-right tabular font-bold ${isExcluded ? "line-through text-black/40" : "text-black"}`}>
                                   ₩ {line.totalAmount.toLocaleString()}
-                                  <p className="text-[0.6rem] text-primary-900/40 font-normal">
+                                  <p className="text-[0.6rem] font-normal text-black/40">
                                     재 {line.materialAmount.toLocaleString()} · 노{" "}
                                     {line.laborAmount.toLocaleString()}
                                   </p>
@@ -1867,7 +1875,7 @@ function EstimatePage() {
                           제외 {adjustedV2.excludedCount}건 ·{" "}
                           <span className="line-through">₩ {adjustedV2.excludedAmount.toLocaleString()}</span> 절감
                         </span>
-                        <span className="text-sm font-bold text-primary-900 tabular">
+                        <span className="text-sm font-bold text-black tabular">
                           조정 합계 ₩ {adjustedV2.totals.totalWithVat.toLocaleString()}
                         </span>
                       </div>
@@ -1877,14 +1885,14 @@ function EstimatePage() {
 
                 {/* P7-4: 공간별 보기 — constructionEstimate.roomSummaries */}
                 {showLegacy && !loading && !error && viewMode === "room" && constructionEstimate && (
-                  <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
-                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
+                  <div className="mb-3 rounded-2xl border border-black/[0.08] bg-white p-5">
+                    <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
                       공간별 합계
                     </p>
                     <div className="overflow-x-auto">
                     <table className="w-full min-w-[480px] text-sm">
                       <thead>
-                        <tr className="border-b border-primary-100 text-primary-900/60 text-[0.7rem]">
+                        <tr className="border-b border-black/[0.08] text-[0.7rem] text-black/60">
                           <th className="py-2 text-left">공간</th>
                           <th className="py-2 text-right">재료비</th>
                           <th className="py-2 text-right">노무비</th>
@@ -1894,8 +1902,8 @@ function EstimatePage() {
                       </thead>
                       <tbody>
                         {constructionEstimate.roomSummaries.map((r) => (
-                          <tr key={r.roomId} className="border-b border-primary-50">
-                            <td className="py-2 font-bold text-primary-900">{r.roomName}</td>
+                          <tr key={r.roomId} className="border-b border-black/[0.06]">
+                            <td className="py-2 font-bold text-black">{r.roomName}</td>
                             <td className="py-2 text-right tabular">
                               ₩ {r.materialAmount.toLocaleString()}
                             </td>
@@ -1905,7 +1913,7 @@ function EstimatePage() {
                             <td className="py-2 text-right tabular">
                               ₩ {r.expenseAmount.toLocaleString()}
                             </td>
-                            <td className="py-2 text-right tabular font-bold text-primary-900">
+                            <td className="py-2 text-right tabular font-bold text-black">
                               ₩ {r.totalAmount.toLocaleString()}
                             </td>
                           </tr>
@@ -1918,18 +1926,18 @@ function EstimatePage() {
 
                 {/* P7-4 + P12: 자재집계표 — 제조사/브랜드/SKU/단가출처 표시 */}
                 {showLegacy && !loading && !error && viewMode === "material" && constructionEstimate && (
-                  <div className="mb-3 rounded-2xl border border-primary-100 bg-white p-5 shadow-card overflow-x-auto">
+                  <div className="mb-3 overflow-x-auto rounded-2xl border border-black/[0.08] bg-white p-5">
                     <div className="flex items-center justify-between mb-3">
-                      <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
                         자재집계표 ({constructionEstimate.materialSummary.length}건)
                       </p>
-                      <p className="text-[0.6rem] text-primary-900/50">
+                      <p className="text-[0.6rem] text-black/50">
                         제조사 / 브랜드 / 납품사 / SKU / 단가출처 표시
                       </p>
                     </div>
                     <table className="w-full text-[0.8rem] tabular">
                       <thead>
-                        <tr className="border-b-2 border-primary-200 text-primary-900/60 text-[0.65rem] bg-primary-50/40">
+                        <tr className="border-b-2 border-black/15 bg-[#f4f4f2] text-[0.65rem] text-black/60">
                           <th className="px-2 py-2 text-left w-12">No</th>
                           <th className="px-2 py-2 text-left">분류</th>
                           <th className="px-2 py-2 text-left">자재명</th>
@@ -1997,57 +2005,49 @@ function EstimatePage() {
                             (a, b) => b.totalAmount - a.totalAmount,
                           );
                           return rows.map((r, i) => (
-                            <tr key={i} className="border-b border-primary-50">
-                              <td className="px-2 py-2 text-primary-900/40 tabular">{i + 1}</td>
-                              <td className="px-2 py-2 text-primary-700 text-[0.7rem]">
+                            <tr key={i} className="border-b border-black/[0.06]">
+                              <td className="px-2 py-2 text-black/40 tabular">{i + 1}</td>
+                              <td className="px-2 py-2 text-[0.7rem] text-black/65">
                                 {r.category}
                               </td>
-                              <td className="px-2 py-2 font-bold text-primary-900">
+                              <td className="px-2 py-2 font-bold text-black">
                                 {r.brand ? `${r.brand} ` : ""}
                                 {r.itemNameKo}
                               </td>
-                              <td className="px-2 py-2 text-[0.7rem] text-primary-900/70">
+                              <td className="px-2 py-2 text-[0.7rem] text-black/70">
                                 {r.manufacturer || "-"}
                                 {r.supplierName && (
-                                  <p className="text-[0.62rem] text-primary-900/50">
+                                  <p className="text-[0.62rem] text-black/50">
                                     납품 {r.supplierName}
                                   </p>
                                 )}
                               </td>
-                              <td className="px-2 py-2 text-[0.7rem] text-primary-900/60 font-mono">
+                              <td className="px-2 py-2 text-[0.7rem] font-mono text-black/60">
                                 {r.sku ? `SKU ${r.sku}` : "-"}
                                 {r.spec && (
-                                  <p className="text-[0.62rem] text-primary-900/40">{r.spec}</p>
+                                  <p className="text-[0.62rem] text-black/40">{r.spec}</p>
                                 )}
                               </td>
                               <td className="px-2 py-2 text-right tabular">
                                 {Math.round(r.totalQty * 10) / 10}{" "}
                                 {r.unit === "m2" ? "m²" : r.unit}
                               </td>
-                              <td className="px-2 py-2 text-right tabular text-primary-900/70">
+                              <td className="px-2 py-2 text-right tabular text-black/70">
                                 ₩ {Math.round(r.totalAmount / r.totalQty).toLocaleString()}
                               </td>
-                              <td className="px-2 py-2 text-right tabular font-bold text-primary-900">
+                              <td className="px-2 py-2 text-right tabular font-bold text-black">
                                 ₩ {r.totalAmount.toLocaleString()}
                               </td>
                               <td className="px-2 py-2 text-[0.7rem]">
                                 {r.priceSource ? (
                                   <span
-                                    className={
-                                      r.priceSource === "material_price_lookup" ||
-                                      r.priceSource === "contractor_price"
-                                        ? "text-emerald-700 font-semibold"
-                                        : r.priceSource === "kpa_standard" ||
-                                            r.priceSource === "category_standard"
-                                          ? "text-rose-600"
-                                          : "text-primary-700"
-                                    }
+                                    className="font-semibold text-black/70"
                                     title={r.fallbackReason ?? ""}
                                   >
                                     {priceSourceLabel(r.priceSource)}
                                   </span>
                                 ) : (
-                                  <span className="text-primary-900/40">미확정</span>
+                                  <span className="text-black/40">미확정</span>
                                 )}
                               </td>
                             </tr>
@@ -2060,8 +2060,8 @@ function EstimatePage() {
 
                 {/* P4: source 범례 — 각 견적 라인 출처 표시 가이드 */}
                 {!loading && !error && tradeGroups.length > 0 && (
-                  <div className="mb-3 rounded-2xl border border-primary-100 bg-white/80 px-4 py-2.5">
-                    <p className="text-[0.65rem] font-bold text-primary-700 uppercase tracking-wider mb-1.5">
+                  <div className="mb-3 rounded-2xl border border-black/[0.08] bg-white/80 px-4 py-2.5">
+                    <p className="mb-1.5 text-[0.65rem] font-semibold uppercase tracking-wider text-black/50">
                       견적 라인 출처
                     </p>
                     <div className="flex items-center gap-2 flex-wrap">
@@ -2081,14 +2081,14 @@ function EstimatePage() {
                   </div>
                 )}
 
-                <div className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden">
+                <div className="overflow-hidden rounded-2xl border border-black/[0.08] bg-white">
                   {loading && (
                     <div className="px-7 py-16 text-center">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-                      <p className="mt-3 text-sm font-semibold text-primary-900">
+                      <Loader2 className="mx-auto h-8 w-8 animate-spin text-black" />
+                      <p className="mt-3 text-sm font-semibold text-black">
                         견적 분석 중…
                       </p>
-                      <p className="mt-1 text-xs text-primary-900/50">
+                      <p className="mt-1 text-xs text-black/50">
                         실별 자재·물량·단가 산출 중 (약 5–10초 / 실)
                       </p>
                     </div>
@@ -2096,26 +2096,26 @@ function EstimatePage() {
 
                   {error && !loading && (
                     <div className="px-7 py-12 text-center">
-                      <AlertCircle className="h-10 w-10 text-amber-500 mx-auto" />
-                      <p className="mt-3 text-base font-bold text-primary-900">
+                      <AlertCircle className="mx-auto h-10 w-10 text-black/55" />
+                      <p className="mt-3 text-base font-bold text-black">
                         견적을 만들 수 없습니다
                       </p>
-                      <p className="mt-2 text-sm text-primary-900/60 max-w-md mx-auto leading-relaxed">
+                      <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-black/60">
                         {error}
                       </p>
-                      <p className="mt-3 text-[0.78rem] text-primary-700 font-semibold">
+                      <p className="mt-3 text-[0.78rem] font-semibold text-black/65">
                         InPick 견적의 정밀성은 AI 가 생성한 실내 이미지를 분석해서 나옵니다.
                       </p>
                       <div className="mt-5 flex items-center justify-center gap-2">
                         <button
                           onClick={goBackToDesign}
-                          className="inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white px-4 py-2 text-xs font-semibold text-primary-900 hover:bg-primary-50"
+                          className="inline-flex items-center gap-1 rounded-full border border-black/10 bg-white px-4 py-2 text-xs font-semibold text-black hover:bg-black/[0.035]"
                         >
                           디자인으로 돌아가기
                         </button>
                         <button
                           onClick={goBackToDesign}
-                          className="inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-xs font-semibold text-white shadow-cta hover:bg-primary-600"
+                          className="inline-flex items-center gap-1 rounded-full bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-black/75"
                         >
                           Step2로 돌아가서 디자인 생성하기 <ArrowRight className="h-3 w-3" />
                         </button>
@@ -2132,7 +2132,7 @@ function EstimatePage() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-[0.82rem] tabular">
                         <thead>
-                          <tr className="border-b-2 border-primary-200 text-left text-[0.7rem] font-bold tracking-tight text-primary-900/60 bg-primary-50/40">
+                          <tr className="border-b-2 border-black/15 bg-[#f4f4f2] text-left text-[0.7rem] font-bold tracking-tight text-black/60">
                             <th className="px-2 py-2.5 w-10 text-center">번호</th>
                             <th className="px-2 py-2.5 w-20">구분</th>
                             <th className="px-3 py-2.5">품명</th>
@@ -2165,7 +2165,7 @@ function EstimatePage() {
                 </div>
 
                 {!loading && !error && estimates.length > 0 && (
-                  <div className="mt-5 rounded-2xl border border-primary-100 bg-white p-6 shadow-card">
+                  <div className="mt-5 rounded-[22px] border border-black/[0.08] bg-white p-6">
                     {excludedTotal.count > 0 && (
                       <div className="mb-4 flex items-center justify-between rounded-xl bg-zinc-50 border border-zinc-200 px-4 py-2.5">
                         <span className="text-[0.78rem] text-zinc-700">
@@ -2178,86 +2178,60 @@ function EstimatePage() {
                     )}
 
                     {/* 표준 견적서 정산 (재료비 / 노무비 / 경비) */}
-                    <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40 mb-3">
+                    <p className="mb-3 text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
                       견적 정산 (표준 양식)
                     </p>
                     <table className="w-full text-sm">
                       <tbody>
-                        <tr className="border-b border-primary-100">
+                        <tr className="border-b border-black/[0.07]">
                           <td className="py-2.5 align-middle">
-                            <p className="font-bold text-primary-900">재료비</p>
-                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                            <p className="font-semibold text-black">재료비</p>
+                            <p className="mt-0.5 text-[0.7rem] text-black/50">
                               주자재 ₩{grandTotal.main.toLocaleString()} + 부자재 ₩{grandTotal.aux.toLocaleString()}
                             </p>
                           </td>
-                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                          <td className="py-2.5 text-right tabular font-semibold text-black">
                             ₩ {materialCost.toLocaleString()}
                           </td>
                         </tr>
-                        <tr className="border-b border-primary-100">
+                        <tr className="border-b border-black/[0.07]">
                           <td className="py-2.5 align-middle">
-                            <p className="font-bold text-primary-900">노무비</p>
-                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                            <p className="font-semibold text-black">노무비</p>
+                            <p className="mt-0.5 text-[0.7rem] text-black/50">
                               국토부 표준품셈 일위대가 기준
                             </p>
                           </td>
-                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                          <td className="py-2.5 text-right tabular font-semibold text-black">
                             ₩ {laborCost.toLocaleString()}
                           </td>
                         </tr>
-                        <tr className="border-b border-primary-100">
+                        <tr className="border-b border-black/[0.07]">
                           <td className="py-2.5 align-middle">
-                            <p className="font-bold text-primary-900">경비</p>
-                            <p className="text-[0.7rem] text-primary-900/50 mt-0.5">
+                            <p className="font-semibold text-black">경비</p>
+                            <p className="mt-0.5 text-[0.7rem] text-black/50">
                               현장관리비·안전관리비·일반관리비
                             </p>
-                            <div className="mt-2 flex items-center gap-2">
-                              <span className="text-[0.7rem] text-primary-900/60">비율</span>
-                              <input
-                                type="range"
-                                min={0}
-                                max={15}
-                                step={0.5}
-                                value={expenseRate * 100}
-                                onChange={(e) =>
-                                  setExpenseRate(Number(e.target.value) / 100)
-                                }
-                                className="flex-1 max-w-[140px] accent-primary-500"
-                              />
-                              <input
-                                type="number"
-                                min={0}
-                                max={15}
-                                step={0.5}
-                                value={(expenseRate * 100).toFixed(1)}
-                                onChange={(e) => {
-                                  const v = Math.max(0, Math.min(15, Number(e.target.value)));
-                                  setExpenseRate(v / 100);
-                                }}
-                                className="w-14 rounded border border-primary-200 px-1.5 py-0.5 text-[0.78rem] text-right tabular outline-none focus:border-primary-400"
-                              />
-                              <span className="text-[0.78rem] font-semibold text-primary-900/70">
-                                %
-                              </span>
-                            </div>
+                            <p className="mt-1 text-[0.68rem] text-black/40">
+                              표준 경비율 3% 적용
+                            </p>
                           </td>
-                          <td className="py-2.5 text-right tabular font-bold text-primary-900 align-top">
+                          <td className="py-2.5 text-right tabular font-semibold text-black align-top">
                             ₩ {expenseCost.toLocaleString()}
                           </td>
                         </tr>
-                        <tr className="border-b-2 border-primary-300">
-                          <td className="py-2.5 align-middle font-bold text-primary-900">
+                        <tr className="border-b-2 border-black/20">
+                          <td className="py-2.5 align-middle font-semibold text-black">
                             소계
                           </td>
-                          <td className="py-2.5 text-right tabular font-bold text-primary-900">
+                          <td className="py-2.5 text-right tabular font-semibold text-black">
                             ₩ {subtotal.toLocaleString()}
                           </td>
                         </tr>
-                        <tr className="border-b border-primary-100">
-                          <td className="py-2 align-middle text-[0.85rem] text-primary-900/70">
+                        <tr className="border-b border-black/[0.07]">
+                          <td className="py-2 align-middle text-[0.85rem] text-black/70">
                             VAT 10% {vatIncl ? "(포함)" : "(별도)"}
                           </td>
-                          <td className="py-2 text-right tabular text-primary-900/80">
+                          <td className="py-2 text-right tabular text-black/80">
                             ₩ {vat.toLocaleString()}
                           </td>
                         </tr>
@@ -2265,8 +2239,8 @@ function EstimatePage() {
                     </table>
 
                     <div className="mt-3 flex items-center justify-between">
-                      <span className="text-base font-bold text-primary-900">총액</span>
-                      <span className="text-[2rem] font-extrabold tabular leading-none tracking-tightest text-gradient-primary">
+                      <span className="text-base font-semibold text-black">총액</span>
+                      <span className="text-[2rem] font-semibold tabular leading-none tracking-[-0.05em] text-black">
                         ₩ {finalTotal.toLocaleString()}
                       </span>
                     </div>
@@ -2277,48 +2251,32 @@ function EstimatePage() {
               <aside className="min-w-0 lg:col-span-4">
                 <div className="space-y-4 lg:sticky lg:top-6">
                   {!loading && !error && estimates.length > 0 && (
-                    <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
-                      <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
+                    <div className="rounded-[22px] border border-black/[0.08] bg-white p-5">
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
                         예산 vs 견적
                       </p>
                       <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                        <div className="rounded-xl bg-primary-50 p-3">
-                          <p className="text-[0.65rem] text-primary-900/60 font-semibold">
+                        <div className="rounded-xl bg-[#f4f4f2] p-3">
+                          <p className="text-[0.65rem] font-medium text-black/55">
                             목표
                           </p>
-                          <p className="mt-1 text-base font-extrabold tabular text-primary-900">
+                          <p className="mt-1 text-base font-semibold tabular text-black">
                             {budgetMan.toLocaleString()}만
                           </p>
                         </div>
-                        <div
-                          className={`rounded-xl p-3 ${
-                            budgetDelta > 0 ? "bg-amber-50" : "bg-emerald-50"
-                          }`}
-                        >
-                          <p
-                            className={`text-[0.65rem] font-semibold ${
-                              budgetDelta > 0 ? "text-amber-700/70" : "text-emerald-700/70"
-                            }`}
-                          >
+                        <div className="rounded-xl bg-[#f4f4f2] p-3">
+                          <p className="text-[0.65rem] font-medium text-black/55">
                             {budgetDelta > 0 ? "초과" : "여유"}
                           </p>
-                          <p
-                            className={`mt-1 text-base font-extrabold tabular ${
-                              budgetDelta > 0 ? "text-amber-700" : "text-emerald-700"
-                            }`}
-                          >
+                          <p className="mt-1 text-base font-semibold tabular text-black">
                             {budgetDelta > 0 ? "+" : ""}
                             {Math.round(budgetDelta / 10000).toLocaleString()}만
                           </p>
                         </div>
                       </div>
-                      <div className="mt-3 h-2 rounded-full bg-primary-50 overflow-hidden">
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.07]">
                         <div
-                          className={`h-full transition-all ${
-                            budgetDelta > 0
-                              ? "bg-gradient-to-r from-amber-300 to-amber-500"
-                              : "bg-gradient-to-r from-emerald-300 to-primary-500"
-                          }`}
+                          className="h-full bg-black transition-all"
                           style={{
                             width: `${Math.min(100, (finalTotal / Math.max(budgetWon, 1)) * 100)}%`,
                           }}
@@ -2368,14 +2326,14 @@ function EstimatePage() {
                     }
                     if (items.length === 0) return null;
                     return (
-                      <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
+                      <div className="rounded-[22px] border border-black/[0.08] bg-white p-5">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-900/40">
+                          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
                             분석된 디자인 · {items.length}건
                           </p>
                           {designOutputsForGallery.length === 0 && (
                             <span
-                              className="text-[0.6rem] text-amber-700"
+                              className="text-[0.6rem] text-black/45"
                               title="design_outputs DB 미수신 — 로그인 또는 마이그레이션 확인 필요"
                             >
                               로컬만
@@ -2386,7 +2344,7 @@ function EstimatePage() {
                           {items.map((it) => (
                             <div
                               key={it.key}
-                              className="relative aspect-square rounded-lg overflow-hidden border border-primary-100"
+                              className="relative aspect-square overflow-hidden rounded-lg border border-black/[0.08]"
                             >
                               <img
                                 src={it.imageUrl}
@@ -2397,17 +2355,17 @@ function EstimatePage() {
                                 {it.label}
                               </span>
                               {it.status === "analysis_pending" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-blue-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute right-1 top-1 inline-flex items-center rounded-full bg-black/75 px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">
                                   분석중
                                 </span>
                               )}
                               {it.status === "analysis_done" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-emerald-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute right-1 top-1 inline-flex items-center rounded-full bg-black px-1.5 py-0.5 text-[0.65rem] font-semibold text-white">
                                   완료
                                 </span>
                               )}
                               {it.status === "analysis_failed" && (
-                                <span className="absolute top-1 right-1 inline-flex items-center rounded-full bg-rose-500/90 text-white text-[0.65rem] font-bold px-1.5 py-0.5">
+                                <span className="absolute right-1 top-1 inline-flex items-center rounded-full border border-black/15 bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-black">
                                   실패
                                 </span>
                               )}
@@ -2418,14 +2376,14 @@ function EstimatePage() {
                     );
                   })()}
 
-                  <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
+                  <div className="rounded-[22px] border border-black/[0.08] bg-white p-5">
                     <div className="flex items-center gap-2">
-                      <FileText className="h-3.5 w-3.5 text-primary-600" />
-                      <p className="text-[0.85rem] font-bold tracking-tight text-primary-900">
+                      <FileText className="h-3.5 w-3.5 text-black/55" />
+                      <p className="text-[0.85rem] font-semibold tracking-tight text-black">
                         건축공사 견적서
                       </p>
                     </div>
-                    <p className="mt-2 text-[0.78rem] leading-relaxed text-primary-900/60">
+                    <p className="mt-2 text-[0.78rem] leading-relaxed text-black/60">
                       공개한 세부견적은 PDF로 내려받을 수 있습니다. 계약 단계에서는 공정위 공식 표준계약서와 전체 견적 부속서류를 한 세트로 발급합니다.
                     </p>
                     <button
@@ -2530,7 +2488,7 @@ function EstimatePage() {
                       )}
                       계약견적서 패키지 (9,900원)
                     </button>
-                    <p className="mt-2 text-[0.65rem] text-primary-900/50 text-center">
+                    <p className="mt-2 text-center text-[0.65rem] text-black/50">
                       공정위 표준계약서 갑·을지 + 견적 갑지·총괄표·세부내역·이미지·특기사항·서명란
                     </p>
                     <button
@@ -2581,36 +2539,36 @@ function EstimatePage() {
                           ? "medium"
                           : "low";
                     return (
-                      <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">
+                      <div className="rounded-[22px] border border-black/[0.08] bg-white p-5">
                         <div className="flex items-center gap-2 mb-2">
-                          <Sparkles className="h-3.5 w-3.5 text-primary-500" />
-                          <p className="text-[0.85rem] font-bold tracking-tight text-primary-900">
+                          <Sparkles className="h-3.5 w-3.5 text-black/55" />
+                          <p className="text-[0.85rem] font-semibold tracking-tight text-black">
                             산정 근거 ({totalLines}건 라인)
                           </p>
                         </div>
                         {/* P5: 진단 — 현재 산출 경로 */}
-                        <div className="mb-3 rounded-lg bg-primary-50/50 px-3 py-2">
-                          <p className="text-[0.7rem] font-bold text-primary-900 mb-0.5">
+                        <div className="mb-3 rounded-lg bg-[#f4f4f2] px-3 py-2">
+                          <p className="mb-0.5 text-[0.7rem] font-semibold text-black">
                             현재 산출 경로:
                           </p>
-                          <p className="text-[0.7rem] text-primary-900/70">
+                          <p className="text-[0.7rem] text-black/70">
                             {estimatePath.path === "context_evidence" && (
                               <>
-                                ✅ <b>Evidence 기반</b> ({estimatePath.estimateLevel ?? "L1"})
+                                <b>Evidence 기반</b> ({estimatePath.estimateLevel ?? "L1"})
                                 <br />
                                 <span className="text-[0.65rem]">design_outputs + 자재분석 결과 활용</span>
                               </>
                             )}
                             {estimatePath.path === "legacy_vision" && (
                               <>
-                                🟡 <b>Legacy Vision</b>
+                                <b>Legacy Vision</b>
                                 <br />
                                 <span className="text-[0.65rem]">이미지 1차 분석 + 표준자재 혼합</span>
                               </>
                             )}
                             {estimatePath.path === "legacy_standard" && (
                               <>
-                                ⚠️ <b>표준자재 폴백</b>
+                                <b>표준자재 폴백</b>
                                 <br />
                                 <span className="text-[0.65rem]">이미지 분석 결과 미반영 — 로그인/마이그레이션 확인 필요</span>
                               </>
@@ -2620,44 +2578,44 @@ function EstimatePage() {
                         {/* P5: 실제 라인 source 분포 — 사기 표시 방지 */}
                         {totalLines > 0 && (
                           <div className="mb-3">
-                            <p className="text-[0.7rem] font-bold text-primary-900 mb-1.5">
+                            <p className="mb-1.5 text-[0.7rem] font-semibold text-black">
                               자재 출처 분포
                             </p>
-                            <ul className="space-y-0.5 text-[0.7rem] text-primary-900/70">
+                            <ul className="space-y-0.5 text-[0.7rem] text-black/70">
                               {userTotal > 0 && (
                                 <li>
-                                  · <span className="text-emerald-700 font-bold">사용자 확정</span>{" "}
+                                  · <span className="font-semibold text-black">사용자 확정</span>{" "}
                                   {userTotal}건 ({pct(userTotal)}%)
                                 </li>
                               )}
                               {visionTotal > 0 && (
                                 <li>
-                                  · <span className="text-blue-700 font-bold">이미지 분석</span>{" "}
+                                  · <span className="font-semibold text-black">이미지 분석</span>{" "}
                                   {visionTotal}건 ({pct(visionTotal)}%)
                                 </li>
                               )}
                               {promptTotal > 0 && (
                                 <li>
-                                  · <span className="text-amber-700 font-bold">디자인 설명 기반</span>{" "}
+                                  · <span className="font-semibold text-black">디자인 설명 기반</span>{" "}
                                   {promptTotal}건 ({pct(promptTotal)}%)
                                 </li>
                               )}
                               {scopeTotal > 0 && (
                                 <li>
-                                  · <span className="text-stone-700 font-bold">Scope 기본값</span>{" "}
+                                  · <span className="font-semibold text-black">Scope 기본값</span>{" "}
                                   {scopeTotal}건 ({pct(scopeTotal)}%)
                                 </li>
                               )}
                               {standardTotal > 0 && (
                                 <li>
-                                  · <span className="text-rose-700 font-bold">표준 기본값</span>{" "}
+                                  · <span className="font-semibold text-black">표준 기본값</span>{" "}
                                   {standardTotal}건 ({pct(standardTotal)}%)
                                 </li>
                               )}
                             </ul>
                           </div>
                         )}
-                        <ul className="space-y-1 text-[0.72rem] text-primary-900/70 leading-relaxed">
+                        <ul className="space-y-1 text-[0.72rem] leading-relaxed text-black/70">
                           <li>
                             · <b>주자재 단가</b>: 한국물가협회 단가 (2026 Q1)
                           </li>
@@ -2674,21 +2632,13 @@ function EstimatePage() {
                             · <b>VAT</b>: 10%
                           </li>
                         </ul>
-                        <p
-                          className={`mt-2 text-[0.7rem] font-bold ${
-                            trustLevel === "high"
-                              ? "text-emerald-700"
-                              : trustLevel === "medium"
-                                ? "text-amber-700"
-                                : "text-rose-700"
-                          }`}
-                        >
+                        <p className="mt-2 text-[0.7rem] font-semibold text-black">
                           {trustLevel === "high" &&
-                            "🟢 이미지 분석 기반 — 정밀도 높음"}
+                            "이미지 분석 기반 — 정밀도 높음"}
                           {trustLevel === "medium" &&
-                            "🟡 부분 분석 적용 — 추가 자재 선택 권장"}
+                            "부분 분석 적용 — 추가 자재 선택 권장"}
                           {trustLevel === "low" &&
-                            "🔴 표준값 기반 가견적 — Step2에서 이미지 생성/자재 선택 시 정밀 산출"}
+                            "표준값 기반 가견적 — Step2에서 이미지 생성/자재 선택 시 정밀 산출"}
                         </p>
                       </div>
                     );
@@ -2696,7 +2646,7 @@ function EstimatePage() {
                 </div>
               </aside>
             </div>
-              {!detailsUnlocked && (
+              {!detailsUnlocked && detailsGateVisible && (
                 <div className="absolute inset-0 z-20 flex items-start justify-center overflow-hidden bg-gradient-to-b from-[#f7f7f5]/55 via-[#f7f7f5]/80 to-[#f7f7f5] px-4 pt-16 sm:pt-24">
                   <div className="w-full max-w-md rounded-[26px] border border-black/10 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(0,0,0,0.14)] backdrop-blur-xl sm:p-8">
                     <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-black text-white">
@@ -2729,7 +2679,7 @@ function EstimatePage() {
                     </button>
                     <p className="mt-3 text-xs text-black/40">현재 보유 {tokenBalance}토큰</p>
                     {detailsAccessError && (
-                      <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                      <p className="mt-3 rounded-xl bg-[#f4f4f2] px-3 py-2 text-xs font-semibold text-black/70">
                         {detailsAccessError}
                       </p>
                     )}
@@ -2855,22 +2805,22 @@ function TradeGroup({
           return (
             <tr
               key={r.no}
-              className={`border-b border-primary-50 transition-colors ${
-                isExcluded ? "bg-zinc-50" : "hover:bg-primary-50/30"
+              className={`border-b border-black/[0.06] transition-colors ${
+                isExcluded ? "bg-zinc-50" : "hover:bg-black/[0.025]"
               }`}
             >
-              <td className="px-2 py-2 text-center text-[0.7rem] tabular text-primary-900/50">
+              <td className="px-2 py-2 text-center text-[0.7rem] tabular text-black/50">
                 {r.no}
               </td>
               <td className="px-2 py-2">
-                <span className="inline-flex items-center rounded bg-primary-100/60 px-1.5 py-0.5 text-[0.65rem] font-bold text-primary-700">
+                <span className="inline-flex items-center rounded bg-black/[0.06] px-1.5 py-0.5 text-[0.65rem] font-bold text-black/65">
                   {r.trade}
                 </span>
               </td>
               <td className="px-3 py-2">
                 <p
                   className={`font-semibold tracking-tight ${
-                    isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                    isExcluded ? "line-through text-black/40" : "text-black"
                   }`}
                 >
                   {r.materialName}
@@ -2878,18 +2828,18 @@ function TradeGroup({
                 <button
                   type="button"
                   onClick={() => onShop?.(r.materialName)}
-                  className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-bold text-primary-600 hover:text-primary-700"
+                  className="mt-1 inline-flex items-center gap-1 text-[0.65rem] font-bold text-black/55 hover:text-black"
                 >
                   <ShoppingBag className="h-3 w-3" /> 자재·구매 보기
                 </button>
-                <p className="text-[0.65rem] mt-0.5 flex items-center gap-1.5 flex-wrap text-primary-900/50">
+                <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[0.65rem] text-black/50">
                   {r.brand && (
-                    <span className="inline-flex items-center rounded bg-primary-50 border border-primary-100 px-1.5 py-0.5 text-[0.6rem] font-bold text-primary-700">
+                    <span className="inline-flex items-center rounded border border-black/[0.08] bg-[#f4f4f2] px-1.5 py-0.5 text-[0.6rem] font-bold text-black/65">
                       {r.brand}
                     </span>
                   )}
                   {r.sku && (
-                    <span className="inline-flex items-center rounded bg-amber-50 border border-amber-100 px-1.5 py-0.5 text-[0.6rem] font-mono text-amber-800">
+                    <span className="inline-flex items-center rounded border border-black/[0.08] bg-[#f4f4f2] px-1.5 py-0.5 text-[0.6rem] font-mono text-black/65">
                       SKU {r.sku}
                     </span>
                   )}
@@ -2900,12 +2850,12 @@ function TradeGroup({
                     <>
                       {/* P4 폴백: source 없으면 legacy matchStatus 배지 유지 */}
                       {r.matchStatus === "confirmed" && (
-                        <span className="inline-flex items-center rounded bg-emerald-100 border border-emerald-200 px-1.5 py-0.5 text-[0.6rem] font-bold text-emerald-800">
+                        <span className="inline-flex items-center rounded border border-black/[0.08] bg-[#f4f4f2] px-1.5 py-0.5 text-[0.6rem] font-bold text-black/65">
                           확정 {typeof r.confidence === "number" ? `${Math.round(r.confidence * 100)}%` : ""}
                         </span>
                       )}
                       {r.matchStatus === "recommended" && (
-                        <span className="inline-flex items-center rounded bg-amber-100 border border-amber-200 px-1.5 py-0.5 text-[0.6rem] font-bold text-amber-800">
+                        <span className="inline-flex items-center rounded border border-black/[0.08] bg-[#f4f4f2] px-1.5 py-0.5 text-[0.6rem] font-bold text-black/65">
                           추천 {typeof r.confidence === "number" ? `${Math.round(r.confidence * 100)}%` : ""}
                         </span>
                       )}
@@ -2921,49 +2871,49 @@ function TradeGroup({
               </td>
               <td
                 className={`px-2 py-2 text-[0.78rem] ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/70"
+                  isExcluded ? "line-through text-black/40" : "text-black/70"
                 }`}
               >
                 {r.spec || "—"}
               </td>
               <td
                 className={`px-2 py-2 text-center text-[0.78rem] ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/70"
+                  isExcluded ? "line-through text-black/40" : "text-black/70"
                 }`}
               >
                 {r.unit}
               </td>
               <td
                 className={`px-2 py-2 text-right tabular ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                  isExcluded ? "line-through text-black/40" : "text-black"
                 }`}
               >
                 {r.quantity}
               </td>
               <td
                 className={`px-2 py-2 text-right tabular ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/80"
+                  isExcluded ? "line-through text-black/40" : "text-black/80"
                 }`}
               >
                 {r.materialCost.toLocaleString()}
               </td>
               <td
                 className={`px-2 py-2 text-right tabular ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-amber-800/90"
+                  isExcluded ? "line-through text-black/40" : "text-black/80"
                 }`}
               >
                 {r.laborCost.toLocaleString()}
               </td>
               <td
                 className={`px-2 py-2 text-right tabular ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900/60"
+                  isExcluded ? "line-through text-black/40" : "text-black/60"
                 }`}
               >
                 {r.expenseCost.toLocaleString()}
               </td>
               <td
                 className={`px-2 py-2 pr-3 text-right tabular font-bold ${
-                  isExcluded ? "line-through text-primary-900/40" : "text-primary-900"
+                  isExcluded ? "line-through text-black/40" : "text-black"
                 }`}
               >
                 {r.total.toLocaleString()}
@@ -2975,7 +2925,7 @@ function TradeGroup({
                   className={`inline-flex h-4 w-4 items-center justify-center rounded border-2 transition-all ${
                     isExcluded
                       ? "border-zinc-300 bg-white"
-                      : "border-primary-500 bg-primary-500 text-white"
+                      : "border-black bg-black text-white"
                   }`}
                 >
                   {!isExcluded && (
@@ -2995,50 +2945,5 @@ function TradeGroup({
           );
         })}
     </>
-  );
-}
-
-// 구 RoomRows — TradeGroup으로 대체됨, 제거 보류 (참조 X)
-function _UnusedRoomRows(_props: {
-  room: EstimateRoom;
-  excluded: Set<string>;
-  onToggle: (key: string) => void;
-}) {
-  void _props;
-  return null;
-}
-
-
-function SumCard({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-xl bg-primary-50/50 p-3">
-      <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-primary-900/40">
-        {label}
-      </p>
-      <p className="mt-1 text-base font-extrabold tabular text-primary-900">
-        ₩ {value.toLocaleString()}
-      </p>
-    </div>
-  );
-}
-
-function LockedButton({
-  icon: Icon,
-  label,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-}) {
-  return (
-    <button
-      disabled
-      className="inline-flex w-full items-center justify-between gap-2 rounded-lg border border-dashed border-primary-200 bg-primary-50/40 px-3 py-2 text-[0.78rem] font-semibold text-primary-900/50"
-    >
-      <span className="inline-flex items-center gap-2">
-        <Icon className="h-3 w-3" />
-        {label}
-      </span>
-      <Lock className="h-3 w-3" />
-    </button>
   );
 }

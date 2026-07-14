@@ -29,33 +29,34 @@ export default function MyPageSupport() {
   const filteredFAQ = FAQ_DATA.filter((item) => item.category === activeCategory);
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8 space-y-8">
+    <div className="mx-auto max-w-5xl space-y-7 px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
       <div>
-        <h1 className="text-xl font-bold text-gray-900 mb-2">고객센터</h1>
-        <p className="text-sm text-gray-500">궁금한 점이 있으시면 아래에서 답변을 찾아보세요.</p>
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">SUPPORT</p>
+        <h1 className="mt-2 text-[30px] font-medium tracking-[-0.055em] sm:text-[36px]">고객센터</h1>
+        <p className="mt-2 text-sm text-black/45">궁금한 점이 있으시면 아래에서 답변을 찾아보세요.</p>
       </div>
 
       {/* 연락처 카드 */}
       <div className="grid md:grid-cols-3 gap-3">
-        <a href="mailto:support@inpick.kr" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-blue-300 hover:shadow-sm transition-all flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center"><Mail className="w-5 h-5 text-blue-600" /></div>
-          <div><p className="text-sm font-medium text-gray-900">이메일 문의</p><p className="text-xs text-gray-500">support@inpick.kr</p></div>
+        <a href="mailto:lookingseon@aiod.kr" className="flex items-center gap-3 rounded-[20px] border border-black/[0.07] bg-white p-4 transition hover:-translate-y-0.5 hover:border-black/20">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f4f2]"><Mail className="h-5 w-5 text-black/65" strokeWidth={1.7} /></div>
+          <div><p className="text-sm font-medium">이메일 문의</p><p className="text-xs text-black/45">lookingseon@aiod.kr</p></div>
         </a>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 opacity-60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center"><Phone className="w-5 h-5 text-green-600" /></div>
+        <div className="flex items-center gap-3 rounded-[20px] border border-black/[0.07] bg-white p-4 opacity-55">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f4f2]"><Phone className="h-5 w-5 text-black/65" strokeWidth={1.7} /></div>
           <div><p className="text-sm font-medium text-gray-900">전화 상담</p><p className="text-xs text-gray-400">준비 중</p></div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4 opacity-60 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg bg-yellow-50 flex items-center justify-center"><MessageCircle className="w-5 h-5 text-yellow-600" /></div>
+        <div className="flex items-center gap-3 rounded-[20px] border border-black/[0.07] bg-white p-4 opacity-55">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#f4f4f2]"><MessageCircle className="h-5 w-5 text-black/65" strokeWidth={1.7} /></div>
           <div><p className="text-sm font-medium text-gray-900">카카오톡 문의</p><p className="text-xs text-gray-400">준비 중</p></div>
         </div>
       </div>
 
       {/* FAQ 아코디언 */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-          <HelpCircle className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">자주 묻는 질문</h2>
+      <div className="overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
+        <div className="flex items-center gap-2 border-b border-black/[0.06] px-5 py-4">
+          <HelpCircle className="h-5 w-5 text-black/65" strokeWidth={1.7} />
+          <h2 className="text-lg font-medium tracking-[-0.03em]">자주 묻는 질문</h2>
         </div>
 
         {/* 카테고리 탭 */}
@@ -65,7 +66,7 @@ export default function MyPageSupport() {
               key={cat}
               onClick={() => { setActiveCategory(cat); setOpenIndex(null); }}
               className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors ${
-                activeCategory === cat ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                activeCategory === cat ? "bg-[#0d0d0d] text-white" : "bg-[#f4f4f2] text-black/55 hover:bg-[#e9e9e5]"
               }`}
             >
               {cat}
@@ -74,19 +75,19 @@ export default function MyPageSupport() {
         </div>
 
         {/* 질문 목록 */}
-        <div className="divide-y divide-gray-100">
+        <div className="divide-y divide-black/[0.05]">
           {filteredFAQ.map((item, idx) => (
             <div key={idx}>
               <button
                 onClick={() => setOpenIndex(openIndex === idx ? null : idx)}
-                className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-gray-50 transition-colors"
+                className="flex w-full items-center justify-between px-5 py-4 text-left transition-colors hover:bg-black/[0.025]"
               >
-                <span className="text-sm font-medium text-gray-900 pr-4">{item.question}</span>
+                <span className="pr-4 text-sm font-medium">{item.question}</span>
                 <ChevronDown className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${openIndex === idx ? "rotate-180" : ""}`} />
               </button>
               {openIndex === idx && (
                 <div className="px-5 pb-4">
-                  <p className="text-sm text-gray-600 leading-relaxed bg-gray-50 rounded-lg p-4">{item.answer}</p>
+                  <p className="rounded-2xl bg-[#f7f7f5] p-4 text-sm leading-relaxed text-black/62">{item.answer}</p>
                 </div>
               )}
             </div>
@@ -96,15 +97,15 @@ export default function MyPageSupport() {
 
       {/* 바로가기 */}
       <div className="grid md:grid-cols-3 gap-3">
-        <Link href="/terms" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-3">
+        <Link href="/terms" className="flex items-center gap-3 rounded-[18px] border border-black/[0.07] bg-white p-4 transition hover:border-black/20">
           <FileText className="w-5 h-5 text-gray-400" />
           <span className="text-sm font-medium text-gray-700">이용약관</span>
         </Link>
-        <Link href="/privacy" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-3">
+        <Link href="/privacy" className="flex items-center gap-3 rounded-[18px] border border-black/[0.07] bg-white p-4 transition hover:border-black/20">
           <Shield className="w-5 h-5 text-gray-400" />
           <span className="text-sm font-medium text-gray-700">개인정보처리방침</span>
         </Link>
-        <Link href="/#features" className="bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-300 hover:shadow-sm transition-all flex items-center gap-3">
+        <Link href="/#features" className="flex items-center gap-3 rounded-[18px] border border-black/[0.07] bg-white p-4 transition hover:border-black/20">
           <Info className="w-5 h-5 text-gray-400" />
           <span className="text-sm font-medium text-gray-700">서비스 소개</span>
         </Link>

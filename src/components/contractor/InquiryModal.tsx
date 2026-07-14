@@ -166,7 +166,7 @@ export function InquiryModal({ contractorId, companyName, onClose }: InquiryModa
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-full bg-[#0d0d0d] px-4 py-2.5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-50"
           >
             {submitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />

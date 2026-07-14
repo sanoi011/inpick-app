@@ -35,17 +35,17 @@ function SummaryCards({ contracts }: { contracts: Contract[] }) {
   const inProgress = contracts.filter((c) => c.status === "SIGNED" || c.status === "IN_PROGRESS").length;
   const completed = contracts.filter((c) => c.status === "COMPLETED").length;
   const cards = [
-    { label: "전체", count: total, color: "bg-blue-50 text-blue-700 border-blue-200" },
-    { label: "서명 대기", count: pending, color: "bg-amber-50 text-amber-700 border-amber-200" },
-    { label: "시공중", count: inProgress, color: "bg-indigo-50 text-indigo-700 border-indigo-200" },
-    { label: "완공", count: completed, color: "bg-green-50 text-green-700 border-green-200" },
+    { label: "전체", count: total },
+    { label: "서명 대기", count: pending },
+    { label: "시공중", count: inProgress },
+    { label: "완공", count: completed },
   ];
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
       {cards.map((card) => (
-        <div key={card.label} className={`px-4 py-3 rounded-xl border ${card.color}`}>
-          <p className="text-xs font-medium opacity-80">{card.label}</p>
-          <p className="text-2xl font-bold mt-1">{card.count}</p>
+        <div key={card.label} className="rounded-[20px] border border-black/[0.07] bg-white px-4 py-4">
+          <p className="text-xs font-medium text-black/42">{card.label}</p>
+          <p className="mt-1 text-2xl font-semibold tracking-[-0.04em]">{card.count}</p>
         </div>
       ))}
     </div>
@@ -55,23 +55,23 @@ function SummaryCards({ contracts }: { contracts: Contract[] }) {
 function ContractCard({ contract, onClick }: { contract: Contract; onClick: () => void }) {
   const contractor = ((contract as unknown as Record<string, unknown>)?.specialty_contractors || null) as Record<string, string> | null;
   return (
-    <button onClick={onClick} className="w-full text-left bg-white border border-gray-200 rounded-xl p-5 hover:border-blue-300 hover:shadow-sm transition-all">
+    <button onClick={onClick} className="w-full rounded-[22px] border border-black/[0.07] bg-white p-5 text-left transition hover:-translate-y-0.5 hover:border-black/20">
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
           {STATUS_ICONS[contract.status]}
-          <h3 className="text-sm font-bold text-gray-900">{contract.projectName || "인테리어 공사"}</h3>
+          <h3 className="text-sm font-semibold">{contract.projectName || "인테리어 공사"}</h3>
         </div>
         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${CONTRACT_STATUS_COLORS[contract.status]}`}>
           {CONTRACT_STATUS_LABELS[contract.status]}
         </span>
       </div>
-      {contract.address && <p className="text-xs text-gray-500 mb-2">{contract.address}</p>}
+      {contract.address && <p className="mb-2 text-xs text-black/45">{contract.address}</p>}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3 text-xs text-gray-500">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-black/42">
           {contractor?.company_name && <span>시공사: {contractor.company_name}</span>}
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{new Date(contract.createdAt).toLocaleDateString("ko-KR")}</span>
         </div>
-        <span className="text-sm font-bold text-blue-600">{fmt(contract.totalAmount)}원</span>
+        <span className="text-sm font-semibold">{fmt(contract.totalAmount)}원</span>
       </div>
     </button>
   );
@@ -124,7 +124,7 @@ export default function MyPageContracts() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
         <SkeletonSummaryCards />
         <div className="space-y-3">{[1, 2, 3].map((i) => <SkeletonContractCard key={i} />)}</div>
       </div>
@@ -132,8 +132,8 @@ export default function MyPageContracts() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8 space-y-6">
-      <h1 className="text-xl font-bold text-gray-900">내 계약</h1>
+    <div className="mx-auto max-w-5xl space-y-6 px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
+      <div><p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">CONTRACTS</p><h1 className="mt-2 text-[30px] font-medium tracking-[-0.055em] sm:text-[36px]">내 계약서</h1><p className="mt-2 text-sm text-black/45">서명부터 시공 완료까지 계약 상태를 확인합니다.</p></div>
       <SummaryCards contracts={contracts} />
       {contracts.length > 0 && (
         <SearchFilterBar searchValue={search} onSearchChange={setSearch} placeholder="프로젝트명, 주소, 시공사 검색..." filters={CONTRACT_FILTERS} activeFilter={statusFilter} onFilterChange={setStatusFilter} />
@@ -145,12 +145,12 @@ export default function MyPageContracts() {
         </div>
       )}
       {filtered.length === 0 && !error ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-          <Inbox className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-900 mb-2">{contracts.length === 0 ? "아직 계약이 없습니다" : "검색 결과가 없습니다"}</h3>
-          <p className="text-sm text-gray-500 mb-6">{contracts.length === 0 ? "프로젝트를 시작하고 견적을 받아보세요" : "다른 검색어나 필터를 시도해보세요"}</p>
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-12 text-center">
+          <Inbox className="mx-auto mb-4 h-12 w-12 text-black/18" strokeWidth={1.5} />
+          <h3 className="mb-2 text-lg font-medium">{contracts.length === 0 ? "아직 계약이 없습니다" : "검색 결과가 없습니다"}</h3>
+          <p className="mb-6 text-sm text-black/45">{contracts.length === 0 ? "프로젝트를 시작하고 견적을 받아보세요" : "다른 검색어나 필터를 시도해보세요"}</p>
           {contracts.length === 0 && (
-            <button onClick={() => router.push("/project/new")} className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">프로젝트 시작하기</button>
+            <button onClick={() => router.push("/project/new")} className="rounded-full bg-[#0d0d0d] px-6 py-2.5 text-sm font-medium text-white hover:bg-black/80">프로젝트 시작하기</button>
           )}
         </div>
       ) : (
@@ -159,7 +159,7 @@ export default function MyPageContracts() {
             <ContractCard key={contract.id} contract={contract} onClick={() => router.push(`/contract/${contract.id}`)} />
           ))}
           {filtered.length > visibleCount && (
-            <button onClick={() => setVisibleCount((v) => v + 10)} className="w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
+            <button onClick={() => setVisibleCount((v) => v + 10)} className="w-full rounded-full border border-black/[0.08] bg-white py-3 text-sm font-medium text-black/60 transition hover:border-black/30 hover:text-black">
               더 보기 ({filtered.length - visibleCount}개 남음)
             </button>
           )}

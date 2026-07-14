@@ -74,34 +74,35 @@ export default function FindContractorsPage() {
     : contractors;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
       <Header />
 
       {/* 히어로 배너 */}
-      <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white">
-        <div className="max-w-5xl mx-auto px-6 py-12 text-center">
-          <div className="flex items-center justify-center gap-2 mb-3">
-            <Building2 className="w-6 h-6" />
-            <h1 className="text-2xl sm:text-3xl font-bold">인테리어 전문업체 찾기</h1>
+      <section className="bg-white pt-24 sm:pt-28">
+        <div className="mx-auto max-w-5xl px-4 py-10 text-center sm:px-6 sm:py-14">
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <Building2 className="h-5 w-5 text-black/55" strokeWidth={1.7} />
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">CONTRACTOR DIRECTORY</p>
           </div>
-          <p className="text-sm text-blue-100 mb-6">
+          <h1 className="text-[32px] font-medium tracking-[-0.055em] sm:text-[42px]">인테리어 전문업체 찾기</h1>
+          <p className="mb-6 mt-2 text-sm text-black/45">
             검증된 종합 인테리어 업체와 전문공종 업체를 찾아보세요
           </p>
           {/* 검색 바 (히어로 내) */}
           <form className="max-w-xl mx-auto relative" onSubmit={(e) => e.preventDefault()}>
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black/30" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="업체명으로 검색..."
-              className="w-full pl-11 pr-4 py-3 rounded-xl text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-300 shadow-lg"
+              className="w-full rounded-full border border-black/[0.09] bg-[#f7f7f5] py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-black/40"
             />
           </form>
         </div>
       </section>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
         {/* 필터 */}
         <div className="mb-6">
           <ContractorFilters
@@ -129,11 +130,11 @@ export default function FindContractorsPage() {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+            <Loader2 className="h-8 w-8 animate-spin text-black/45" />
             <p className="text-sm text-gray-500">업체 목록 불러오는 중...</p>
           </div>
         ) : contractors.length === 0 && !fetchError ? (
-          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <div className="rounded-[24px] border border-black/[0.07] bg-white p-12 text-center">
             <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-gray-900 mb-2">
               {search || type !== "all" || trade || region
@@ -202,7 +203,7 @@ export default function FindContractorsPage() {
                       onClick={() => setPage(pageNum)}
                       className={`w-8 h-8 rounded-lg text-xs font-medium ${
                         page === pageNum
-                          ? "bg-blue-600 text-white"
+                          ? "bg-[#0d0d0d] text-white"
                           : "border border-gray-200 text-gray-600 hover:bg-gray-50"
                       }`}
                     >

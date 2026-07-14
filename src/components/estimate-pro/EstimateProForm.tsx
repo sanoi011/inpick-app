@@ -18,7 +18,7 @@ import { buildSchedule } from "@/lib/estimate-pro/schedule-model";
 
 const won = (n: number) => Math.round(n || 0).toLocaleString("ko-KR");
 
-// 색상 규칙(2026-07-04 대표 지시): 대분류=회색 · 소계=파란색 · 총계=노란색 · 나머지 무채색
+// 견적 UI는 메인 서비스와 동일하게 흰색·검정·웜그레이만 사용한다.
 const PART_BADGE = "bg-zinc-100 text-zinc-600";
 
 type Row = DetailLine;
@@ -72,7 +72,12 @@ export default function EstimateProForm({ lines, category = "residential", proje
   const updateJebi = (key: string, patch: Partial<JebiItem>) =>
     setJebi((js) => js.map((j) => (j.key === key ? { ...j, ...patch } : j)));
   const toggleGroup = (t: string) =>
-    setExpanded((p) => { const n = new Set(p); n.has(t) ? n.delete(t) : n.add(t); return n; });
+    setExpanded((p) => {
+      const n = new Set(p);
+      if (n.has(t)) n.delete(t);
+      else n.add(t);
+      return n;
+    });
 
   // 공종별 선행공정 (공정표 순서 기반 — 견적에 있는 공종만)
   const precedingByTrade = useMemo(() => {
@@ -86,12 +91,12 @@ export default function EstimateProForm({ lines, category = "residential", proje
   }, [schedule]);
 
   return (
-    <div className="bg-gray-50 rounded-2xl">
+    <div className="rounded-2xl bg-[#f4f4f2]">
       {/* 탭 + 역할 */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200 rounded-t-2xl">
         <div className="px-4 py-2 flex items-center gap-2 flex-wrap">
           {visionBadge && (
-            <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{visionBadge}</span>
+            <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] text-black/65">{visionBadge}</span>
           )}
           <div className="ml-auto flex items-center bg-gray-100 rounded-lg p-0.5">
             <Seg active={role === "owner"} onClick={() => setRole("owner")}>고객/업체</Seg>
@@ -120,17 +125,17 @@ export default function EstimateProForm({ lines, category = "residential", proje
 
 /* 1. 갑지 */
 function CoverTab({ meta, setMeta, cost, category, areaLabel, lineCount, tradeCount }: any) {
-  const fld = "w-full text-xs border-b border-slate-200 focus:border-blue-400 focus:outline-none py-1 bg-transparent";
+  const fld = "w-full text-xs border-b border-slate-200 focus:border-black focus:outline-none py-1 bg-transparent";
   return (
     <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm p-8">
       <div className="text-center border-b-2 border-slate-800 pb-5 mb-6">
-        <p className="text-xs tracking-[0.3em] text-amber-600 font-semibold">INPICK ESTIMATE</p>
+        <p className="text-xs font-semibold tracking-[0.3em] text-black/55">INPICK ESTIMATE</p>
         <h1 className="text-3xl font-bold text-slate-900 mt-2 tracking-tight">견　적　서</h1>
         <p className="text-[11px] text-slate-400 mt-2">{category === "residential" ? "공동주택(아파트) 인테리어" : "상가·근린생활시설 인테리어"}{areaLabel ? ` · ${areaLabel}` : ""}</p>
       </div>
       <div className="bg-slate-800 text-white rounded-lg px-6 py-5 text-center mb-6">
         <p className="text-xs text-slate-400">견 적 금 액 (VAT 포함)</p>
-        <p className="text-4xl font-bold tabular-nums mt-1 text-amber-400">{won(cost.contractPrice)}<span className="text-lg font-normal text-slate-400 ml-1">원</span></p>
+        <p className="mt-1 text-4xl font-bold tabular-nums text-white">{won(cost.contractPrice)}<span className="ml-1 text-lg font-normal text-white/55">원</span></p>
         <p className="text-[11px] text-slate-400 mt-1">금 {numToKorean(cost.contractPrice)}원정</p>
       </div>
       <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-xs">
@@ -158,7 +163,7 @@ function Field({ label, children }: any) { return (<div><p className="text-[10px
 function RowKV({ k, v, strong, sub }: { k: string; v: number; strong?: boolean; sub?: boolean }) {
   return (
     <div className={`flex justify-between px-4 py-2 border-b border-slate-100 last:border-0 ${strong ? "bg-slate-800 text-white font-bold" : sub ? "bg-slate-50/50 text-slate-500" : ""}`}>
-      <span className={sub ? "pl-3 text-[11px]" : ""}>{k}</span><span className={`tabular-nums ${strong ? "text-amber-400" : ""}`}>{won(v)}원</span>
+      <span className={sub ? "pl-3 text-[11px]" : ""}>{k}</span><span className={`tabular-nums ${strong ? "text-white" : ""}`}>{won(v)}원</span>
     </div>
   );
 }
@@ -170,7 +175,7 @@ function numToKorean(n: number): string {
 
 /* 2. 총괄표 (원가계산서) */
 function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updateJebi, setMargins }: any) {
-  const rateCls = "w-14 text-right text-[11px] border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-400 tabular-nums";
+  const rateCls = "w-14 text-right text-[11px] border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-black tabular-nums";
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
@@ -179,8 +184,8 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
           <p className="text-[11px] text-gray-400 mt-0.5">소규모 인테리어 현장 기준 — 모든 요율 편집 가능. 인테리어는 대부분 <b>필수 아님</b>.</p>
         </div>
         <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
-          <span className={includeJebi ? "text-blue-600" : "text-gray-400"}>제비용 포함</span>
-          <button onClick={() => setIncludeJebi(!includeJebi)} className={`w-10 h-5 rounded-full relative ${includeJebi ? "bg-blue-600" : "bg-gray-300"}`}>
+          <span className={includeJebi ? "text-black" : "text-gray-400"}>제비용 포함</span>
+          <button onClick={() => setIncludeJebi(!includeJebi)} className={`w-10 h-5 rounded-full relative ${includeJebi ? "bg-black" : "bg-gray-300"}`}>
             <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-all ${includeJebi ? "left-5" : "left-0.5"}`} />
           </button>
         </label>
@@ -213,7 +218,7 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
                   <td className="px-2 py-1.5 text-right tabular-nums text-slate-800">{won(row.amount)}</td>
                   <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={j.include} onChange={(e) => updateJebi(j.key, { include: e.target.checked })} /></td>
                   <td className="px-2 py-1.5">{role === "bidder" ? (
-                    <input value={j.comment} placeholder="코멘트…" onChange={(e) => updateJebi(j.key, { comment: e.target.value })} className="w-full text-[10px] border border-slate-200 rounded px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" />
+                    <input value={j.comment} placeholder="코멘트…" onChange={(e) => updateJebi(j.key, { comment: e.target.value })} className="w-full rounded border border-slate-200 px-1.5 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-black" />
                   ) : (<span className="text-[10px] text-slate-400">{j.note}</span>)}</td>
                 </tr>
               );
@@ -226,7 +231,7 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
             <Fixed label="공급가액" amount={cost.supplyPrice} strong />
             <Margin label="부가가치세" basis="공급가액 × 요율" amount={cost.vat} rate={margins.vat} onRate={(v: number) => setMargins({ ...margins, vat: v })} rateCls={rateCls} />
           </tbody>
-          <tfoot><tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (계약금액)</td><td colSpan={3} className="px-2 py-2.5 text-right text-base font-bold tabular-nums text-amber-400">{won(cost.contractPrice)}원</td></tr></tfoot>
+          <tfoot><tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (계약금액)</td><td colSpan={3} className="px-2 py-2.5 text-right text-base font-bold tabular-nums text-white">{won(cost.contractPrice)}원</td></tr></tfoot>
         </table>
       </div>
     </div>
@@ -252,18 +257,18 @@ function RollupTab({ sheet, cost }: any) {
         <thead><tr className="bg-slate-100 text-slate-600 border-b border-slate-200"><th className="px-3 py-2 text-left font-semibold">공종</th><th className="px-2 py-2 text-right font-semibold">재료비</th><th className="px-2 py-2 text-right font-semibold">노무비</th><th className="px-2 py-2 text-right font-semibold">경비(안분)</th><th className="px-2 py-2 text-right font-semibold">합계</th><th className="px-3 py-2 text-left font-semibold w-40">구성비</th></tr></thead>
         <tbody>
           {rows.map((r: any) => (
-            <tr key={r.trade} className="border-b border-slate-50 hover:bg-blue-50/30">
+            <tr key={r.trade} className="border-b border-slate-50 hover:bg-black/[0.025]">
               <td className="px-3 py-1.5 text-slate-700">{String(r.order).padStart(2, "0")}. {r.trade}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.matSum)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.labSum)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{won(r.exp)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-900">{won(r.total)}</td>
-              <td className="px-3 py-1.5"><div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{ width: `${(r.share / maxShare) * 100}%` }} /></div><span className="text-[10px] text-slate-400 tabular-nums w-9 text-right">{(r.share * 100).toFixed(1)}%</span></div></td>
+              <td className="px-3 py-1.5"><div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-black rounded-full" style={{ width: `${(r.share / maxShare) * 100}%` }} /></div><span className="text-[10px] text-slate-400 tabular-nums w-9 text-right">{(r.share * 100).toFixed(1)}%</span></div></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-blue-700">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-[10px] text-slate-400">공급가액</td></tr>
+          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-black">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-[10px] text-slate-400">공급가액</td></tr>
           <tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (VAT 포함)</td><td colSpan={2} className="px-2 py-2.5 text-right text-base font-bold tabular-nums">{won(cost.contractPrice)}원</td></tr>
         </tfoot>
       </table>
@@ -290,14 +295,14 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
         const preceding = precedingByTrade?.[g.trade];
         return (
           <div key={g.trade} className="border-b border-zinc-100 last:border-0">
-            {/* 대분류 헤더 — 회색 / 소계 금액 — 파란색 */}
+            {/* 대분류와 소계 모두 무채색으로 표시 */}
             <button onClick={() => toggleGroup(g.trade)} className="w-full flex items-center justify-between gap-2 px-4 py-3.5 bg-zinc-100 hover:bg-zinc-200/70 transition-colors">
               <div className="flex min-w-0 items-center gap-2">
                 {open ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-400" /> : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" />}
                 <span className="truncate text-sm font-bold text-zinc-700">{String(g.order).padStart(2, "0")}. {g.trade}</span>
                 <span className="shrink-0 text-xs text-zinc-400">{g.lines.length}건</span>
               </div>
-              <span className="shrink-0 text-sm font-bold text-blue-600 tabular-nums">{won(g.sum)}원</span>
+              <span className="shrink-0 text-sm font-bold text-black tabular-nums">{won(g.sum)}원</span>
             </button>
             {open && (
               <>
@@ -322,7 +327,7 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
                     </tr></thead>
                     <tbody>
                       {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} />))}
-                      <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-blue-600">{won(g.sum)}</td><td></td></tr>
+                      <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-black">{won(g.sum)}</td><td></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -331,8 +336,7 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
           </div>
         );
       })}
-      {/* 총계 — 노란색 표기 */}
-      <div className="bg-zinc-900 text-white px-4 py-3.5 flex items-center justify-between"><span className="text-sm font-bold">직접공사비 합계</span><span className="text-lg font-bold tabular-nums text-amber-400">{won(sheet.directTotal)}원</span></div>
+      <div className="bg-zinc-900 text-white px-4 py-3.5 flex items-center justify-between"><span className="text-sm font-bold">직접공사비 합계</span><span className="text-lg font-bold tabular-nums text-white">{won(sheet.directTotal)}원</span></div>
     </div>
   );
 }
@@ -363,7 +367,7 @@ function EditRow({ l, updateRow, deleteRow }: { l: Row; updateRow: any; deleteRo
       <td className="px-1 py-1.5"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-zinc-400 flex-shrink-0" /></span>}<input type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /></div></td>
       <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.labAmount)}</td>
       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-zinc-900">{won(l.amount)}</td>
-      <td className="px-1 py-1.5 text-center"><button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-red-500" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td className="px-1 py-1.5 text-center"><button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-black" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button></td>
     </tr>
   );
 }
@@ -376,7 +380,7 @@ function ScheduleTab({ schedule, targetDays, setTargetDays }: any) {
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
         <div><h2 className="text-sm font-bold text-gray-900">공정표 — 견적 기반 막대그래프</h2><p className="text-[11px] text-gray-400 mt-0.5">공종별 금액 비중으로 공기 자동 배분 · 총 {schedule.totalDays}일</p></div>
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">목표 공사일<input type="number" value={targetDays} min={10} max={120} onChange={(e) => setTargetDays(Math.max(5, Number(e.target.value) || 30))} className="w-16 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400" /><span className="text-gray-400">일</span></label>
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">목표 공사일<input type="number" value={targetDays} min={10} max={120} onChange={(e) => setTargetDays(Math.max(5, Number(e.target.value) || 30))} className="w-16 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black" /><span className="text-gray-400">일</span></label>
       </div>
       <div className="flex items-center mb-1 pl-44"><div className="flex-1 relative h-4">{ticks.map((d) => (<span key={d} className="absolute text-[9px] text-slate-400 -translate-x-1/2" style={{ left: `${(d / total) * 100}%` }}>{d}일</span>))}</div></div>
       <div className="space-y-1.5">
@@ -385,7 +389,7 @@ function ScheduleTab({ schedule, targetDays, setTargetDays }: any) {
             <div className="w-44 flex-shrink-0 pr-2 text-[11px] text-slate-600 font-medium truncate" title={p.trades.join(", ")}>{p.name}</div>
             <div className="flex-1 relative h-6 bg-slate-50 rounded">
               {ticks.map((d) => (<span key={d} className="absolute top-0 bottom-0 border-l border-slate-100" style={{ left: `${(d / total) * 100}%` }} />))}
-              <div className="absolute top-0.5 bottom-0.5 rounded flex items-center px-1.5 text-[9px] text-white font-medium overflow-hidden whitespace-nowrap" style={{ left: `${(p.startDay / total) * 100}%`, width: `${(p.durationDays / total) * 100}%`, backgroundColor: p.color }} title={`${p.name} · ${p.durationDays}일 · ${won(p.cost)}원`}>{p.durationDays}일</div>
+              <div className="absolute top-0.5 bottom-0.5 rounded flex items-center px-1.5 text-[9px] text-white font-medium overflow-hidden whitespace-nowrap" style={{ left: `${(p.startDay / total) * 100}%`, width: `${(p.durationDays / total) * 100}%`, backgroundColor: "#111111" }} title={`${p.name} · ${p.durationDays}일 · ${won(p.cost)}원`}>{p.durationDays}일</div>
             </div>
             <div className="w-24 flex-shrink-0 text-right text-[10px] text-slate-500 tabular-nums">{won(p.cost)}</div>
           </div>
@@ -401,5 +405,5 @@ function Seg({ active, onClick, icon, children }: any) {
   return (<button onClick={onClick} className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${active ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>{icon}{children}</button>);
 }
 function Tab({ active, onClick, icon, children }: any) {
-  return (<button onClick={onClick} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${active ? "border-blue-600 text-blue-600" : "border-transparent text-gray-400 hover:text-gray-600"}`}>{icon}{children}</button>);
+  return (<button onClick={onClick} className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border-b-2 transition-colors whitespace-nowrap ${active ? "border-black text-black" : "border-transparent text-gray-400 hover:text-gray-600"}`}>{icon}{children}</button>);
 }

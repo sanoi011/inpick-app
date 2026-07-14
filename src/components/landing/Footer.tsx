@@ -26,42 +26,42 @@ const LEGAL_LINKS = [
 
 export default function LandingFooter() {
   return (
-    <footer className="w-full bg-gray-950">
+    <footer className="w-full border-t border-black/[0.06] bg-white text-[#0d0d0d]">
       <div className="mx-auto max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
         <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className="flex flex-col gap-10">
           <div className="flex flex-col gap-8 lg:flex-row lg:justify-between">
             <div className="flex flex-col gap-3">
-              <a href="/" className="text-2xl font-bold text-blue-500">INPICK</a>
-              <p className="text-sm text-gray-400">AI 기반 소비자 주도 인테리어 견적 플랫폼</p>
+              <a href="/" className="inline-flex items-center gap-2.5"><span className="hex-mask h-6 w-6 text-[#f15b4a]" /><span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span></a>
+              <p className="text-sm text-black/45">AI 기반 소비자 주도 인테리어 견적 플랫폼</p>
             </div>
             <div className="flex flex-col gap-6 sm:flex-row sm:gap-16">
               <div className="flex flex-col gap-4">
-                <p className="text-sm font-medium text-white">서비스</p>
+                <p className="text-sm font-medium">서비스</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
                   {HOME_LINKS.map((link) => (
-                    <a key={link.label} href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</a>
+                    <a key={link.label} href={link.href} className="text-sm text-black/45 transition-colors hover:text-black">{link.label}</a>
                   ))}
                 </div>
               </div>
               <div className="flex flex-col gap-4">
-                <p className="text-sm font-medium text-white">바로가기</p>
+                <p className="text-sm font-medium">바로가기</p>
                 <div className="flex flex-wrap gap-x-4 gap-y-2">
-                  <a href="/project/new" className="text-sm text-gray-400 hover:text-white transition-colors">프로젝트 시작</a>
-                  <a href="/contractor/register" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 등록</a>
-                  <a href="/find-contractors" className="text-sm text-gray-400 hover:text-white transition-colors">업체 찾기</a>
-                  <a href="/community" className="text-sm text-gray-400 hover:text-white transition-colors">커뮤니티</a>
-                  <a href="/contractor/login" className="text-sm text-gray-400 hover:text-white transition-colors">사업자 로그인</a>
-                  <a href="/aiod" className="text-sm text-gray-400 hover:text-white transition-colors">AIOD 소개</a>
-                  <a href="#contact" className="text-sm text-gray-400 hover:text-white transition-colors">문의하기</a>
+                  <a href="/project/new" className="text-sm text-black/45 transition-colors hover:text-black">프로젝트 시작</a>
+                  <a href="/contractor/register" className="text-sm text-black/45 transition-colors hover:text-black">사업자 등록</a>
+                  <a href="/find-contractors" className="text-sm text-black/45 transition-colors hover:text-black">업체 찾기</a>
+                  <a href="/community" className="text-sm text-black/45 transition-colors hover:text-black">커뮤니티</a>
+                  <a href="/contractor/login" className="text-sm text-black/45 transition-colors hover:text-black">사업자 로그인</a>
+                  <a href="/aiod" className="text-sm text-black/45 transition-colors hover:text-black">AIOD 소개</a>
+                  <a href="#contact" className="text-sm text-black/45 transition-colors hover:text-black">문의하기</a>
                 </div>
               </div>
             </div>
           </div>
-          <div className="flex flex-col gap-6 pt-8 lg:flex-row lg:justify-between lg:items-start border-t border-gray-800">
-            <div className="max-w-3xl text-sm leading-relaxed text-gray-400">
+          <div className="flex flex-col gap-6 border-t border-black/[0.06] pt-8 lg:flex-row lg:items-start lg:justify-between">
+            <div className="max-w-3xl text-sm leading-relaxed text-black/45">
               <p className="mb-1.5">{COMPANY_INFO.copyright}</p>
               {/* 사업자 정보 — 가로 wrap으로 컴팩트하게 (세로 스크롤 최소화) */}
-              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-gray-500">
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[13px] text-black/38">
                 <span>{COMPANY_INFO.ceo}</span>
                 <span className="text-gray-700">·</span>
                 <span>{COMPANY_INFO.businessNumber}</span>
@@ -77,9 +77,9 @@ export default function LandingFooter() {
             </div>
             <div className="flex flex-wrap gap-4 items-center">
               {LEGAL_LINKS.map((link) => (
-                <a key={link.label} href={link.href} className="text-sm text-gray-400 hover:text-white transition-colors">{link.label}</a>
+                <a key={link.label} href={link.href} className="text-sm text-black/45 transition-colors hover:text-black">{link.label}</a>
               ))}
-              <a href="/admin" className="text-sm text-gray-600 hover:text-gray-400 transition-colors">관리자</a>
+              <a href="/admin" className="text-sm text-black/35 transition-colors hover:text-black">관리자</a>
             </div>
           </div>
         </motion.div>

@@ -593,7 +593,7 @@ function SamCategoryMaterialModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-2xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
+        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -807,7 +807,7 @@ function MaterialLibraryModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-2xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
+        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -942,7 +942,7 @@ function EstimateModal({
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-1rem)] max-w-xl max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-primary-100 bg-white p-5 shadow-card-hover"
+        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
       >
         <div className="flex items-center justify-between">
           <div>

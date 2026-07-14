@@ -15,8 +15,10 @@ import {
   Layers3,
   Menu,
   Sparkles,
+  UserRound,
   X,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
@@ -147,6 +149,7 @@ const FOOTER_LINKS = [
 
 export default function Home() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [trendIndex, setTrendIndex] = useState(0);
 
@@ -186,9 +189,22 @@ export default function Home() {
           </nav>
 
           <div className="ml-auto hidden items-center gap-3 sm:flex">
-            <Link href="/auth?type=consumer" className="px-2 py-2 text-[14px] font-medium hover:opacity-55">
-              로그인
-            </Link>
+            {authLoading ? (
+              <span className="h-10 w-10 animate-pulse rounded-full bg-black/[0.05]" aria-hidden />
+            ) : user ? (
+              <Link
+                href="/mypage"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black/65 transition hover:bg-black/[0.04] hover:text-black"
+                aria-label="내 프로필"
+                title={user.user_metadata?.full_name || user.email || "마이페이지"}
+              >
+                <UserRound className="h-[18px] w-[18px]" strokeWidth={1.8} />
+              </Link>
+            ) : (
+              <Link href="/auth?type=consumer" className="px-2 py-2 text-[14px] font-medium hover:opacity-55">
+                로그인
+              </Link>
+            )}
             <Link
               href="/workflow"
               className="rounded-full bg-black px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-black/75"
@@ -226,9 +242,17 @@ export default function Home() {
               ))}
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-black/[0.06] pt-4">
-              <Link href="/auth?type=consumer" className="rounded-full border border-black/15 px-4 py-2.5 text-center text-sm font-semibold">
-                로그인
-              </Link>
+              {authLoading ? (
+                <span className="h-10 animate-pulse rounded-full bg-black/[0.05]" />
+              ) : user ? (
+                <Link href="/mypage" onClick={() => setMenuOpen(false)} className="inline-flex items-center justify-center gap-2 rounded-full border border-black/15 px-4 py-2.5 text-center text-sm font-semibold">
+                  <UserRound className="h-4 w-4" />내 프로필
+                </Link>
+              ) : (
+                <Link href="/auth?type=consumer" className="rounded-full border border-black/15 px-4 py-2.5 text-center text-sm font-semibold">
+                  로그인
+                </Link>
+              )}
               <Link href="/workflow" className="rounded-full bg-black px-4 py-2.5 text-center text-sm font-semibold text-white">
                 무료 시작
               </Link>

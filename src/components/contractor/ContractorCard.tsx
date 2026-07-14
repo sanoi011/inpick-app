@@ -12,8 +12,8 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
   return (
     <Link
       href={`/find-contractors/${contractor.id}`}
-      className={`block bg-white border rounded-xl p-5 transition-all hover:shadow-md ${
-        isPremium ? "border-amber-300 ring-1 ring-amber-100" : "border-gray-200 hover:border-blue-300"
+      className={`block rounded-[22px] border bg-white p-5 transition-all hover:-translate-y-0.5 ${
+        isPremium ? "border-black/25 ring-1 ring-black/[0.04]" : "border-black/[0.07] hover:border-black/20"
       }`}
     >
       {/* 상단: 로고 + 기본 정보 */}
@@ -35,7 +35,7 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
           <div className="flex items-center gap-1.5">
             <h3 className="text-sm font-bold text-gray-900 truncate">{contractor.companyName}</h3>
             {contractor.isVerified && (
-              <Shield className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+              <Shield className="w-3.5 h-3.5 text-black/55 flex-shrink-0" />
             )}
             {isPremium && (
               <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
@@ -101,7 +101,7 @@ export function ContractorCard({ contractor }: { contractor: PublicContractor })
         <span className="text-xs text-gray-400">
           시공 {contractor.completedProjects}건
         </span>
-        <span className="text-xs font-medium text-blue-600">
+        <span className="text-xs font-medium text-black/60">
           상세보기 &rarr;
         </span>
       </div>

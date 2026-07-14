@@ -30,11 +30,11 @@ export default function MyPageAccount() {
   const isEmailUser = provider === "email";
 
   const providerLabel: Record<string, { label: string; cls: string }> = {
-    google: { label: "Google", cls: "bg-red-50 text-red-700" },
-    kakao: { label: "카카오", cls: "bg-yellow-50 text-yellow-700" },
-    naver: { label: "네이버", cls: "bg-green-50 text-green-700" },
-    apple: { label: "Apple", cls: "bg-gray-900 text-white" },
-    email: { label: "이메일", cls: "bg-gray-100 text-gray-600" },
+    google: { label: "Google", cls: "bg-[#f4f4f2] text-black/60" },
+    kakao: { label: "카카오", cls: "bg-[#f4f4f2] text-black/60" },
+    naver: { label: "네이버", cls: "bg-[#f4f4f2] text-black/60" },
+    apple: { label: "Apple", cls: "bg-[#0d0d0d] text-white" },
+    email: { label: "이메일", cls: "bg-[#f4f4f2] text-black/60" },
   };
   const providerInfo = providerLabel[provider] ?? providerLabel.email;
 
@@ -97,47 +97,51 @@ export default function MyPageAccount() {
   const initials = (fullName || user.email || "U").slice(0, 2).toUpperCase();
 
   return (
-    <div className="max-w-2xl mx-auto px-6 py-8">
-      <h1 className="text-xl font-bold text-gray-900 mb-8">내 계정</h1>
+    <div className="mx-auto w-full max-w-4xl px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
+      <div className="mb-7">
+        <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">ACCOUNT</p>
+        <h1 className="mt-2 text-[30px] font-medium tracking-[-0.055em] sm:text-[36px]">내 계정</h1>
+        <p className="mt-2 text-sm text-black/45">프로필과 로그인, 알림 설정을 관리합니다.</p>
+      </div>
 
       {/* 프로필 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <div className="flex items-center gap-2 mb-6"><User className="w-5 h-5 text-blue-600" /><h2 className="text-lg font-semibold text-gray-900">프로필</h2></div>
+      <div className="mb-5 rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-7">
+        <div className="mb-6 flex items-center gap-2"><User className="h-5 w-5 text-black/65" strokeWidth={1.7} /><h2 className="text-lg font-medium tracking-[-0.03em]">프로필</h2></div>
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-xl font-bold text-blue-600">{initials}</div>
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[#0d0d0d] text-xl font-semibold text-white">{initials}</div>
           <div>
-            <p className="text-sm font-medium text-gray-900">{fullName || user.email?.split("@")[0]}</p>
+            <p className="text-sm font-medium">{fullName || user.email?.split("@")[0]}</p>
             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${providerInfo.cls}`}>
               <Shield className="w-3 h-3" />{providerInfo.label}
             </span>
           </div>
         </div>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">이름</label>
-          <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="이름을 입력하세요" className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <label className="mb-1.5 block text-xs font-medium text-black/55">이름</label>
+          <div className="relative"><User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/30" />
+            <input type="text" value={fullName} onChange={(e) => setFullName(e.target.value)} placeholder="이름을 입력하세요" className="w-full rounded-xl border border-black/10 bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-black/45" />
           </div>
         </div>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
-          <div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="email" value={user.email || ""} readOnly className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+          <label className="mb-1.5 block text-xs font-medium text-black/55">이메일</label>
+          <div className="relative"><Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/30" />
+            <input type="email" value={user.email || ""} readOnly className="w-full cursor-not-allowed rounded-xl border border-black/[0.06] bg-[#f7f7f5] py-3 pl-10 pr-4 text-sm text-black/45" />
           </div>
         </div>
         <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 mb-1">전화번호</label>
-          <div className="relative"><Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+          <label className="mb-1.5 block text-xs font-medium text-black/55">전화번호</label>
+          <div className="relative"><Phone className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-black/30" />
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="010-0000-0000" className="w-full rounded-xl border border-black/10 bg-white py-3 pl-10 pr-4 text-sm outline-none transition focus:border-black/45" />
           </div>
         </div>
-        <button onClick={handleSaveProfile} disabled={saving} className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50">
+        <button onClick={handleSaveProfile} disabled={saving} className="flex h-10 items-center gap-2 rounded-full bg-[#0d0d0d] px-5 text-sm font-medium text-white transition hover:bg-black/80 disabled:opacity-40">
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}프로필 저장
         </button>
       </div>
 
       {/* 알림 설정 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6">
-        <div className="flex items-center gap-2 mb-6"><Bell className="w-5 h-5 text-blue-600" /><h2 className="text-lg font-semibold text-gray-900">알림 설정</h2></div>
+      <div className="mb-5 rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-7">
+        <div className="mb-6 flex items-center gap-2"><Bell className="h-5 w-5 text-black/65" strokeWidth={1.7} /><h2 className="text-lg font-medium tracking-[-0.03em]">알림 설정</h2></div>
         <div className="space-y-4">
           {([
             { key: "bid" as const, label: "입찰 알림", desc: "새 입찰이 도착하면 알림을 받습니다" },
@@ -145,31 +149,31 @@ export default function MyPageAccount() {
             { key: "payment" as const, label: "결제 알림", desc: "결제 관련 알림을 받습니다" },
             { key: "system" as const, label: "시스템 알림", desc: "공지사항 및 시스템 알림을 받습니다" },
           ]).map((item) => (
-            <div key={item.key} className="flex items-center justify-between">
-              <div><p className="text-sm font-medium text-gray-900">{item.label}</p><p className="text-xs text-gray-500">{item.desc}</p></div>
-              <button onClick={() => toggleNotif(item.key)} className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${notifPref[item.key] ? "bg-blue-600" : "bg-gray-200"}`}>
+            <div key={item.key} className="flex items-center justify-between gap-4 rounded-2xl bg-[#f7f7f5] px-4 py-3">
+              <div><p className="text-sm font-medium">{item.label}</p><p className="mt-0.5 text-xs text-black/43">{item.desc}</p></div>
+              <button aria-label={`${item.label} ${notifPref[item.key] ? "끄기" : "켜기"}`} onClick={() => toggleNotif(item.key)} className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${notifPref[item.key] ? "bg-[#0d0d0d]" : "bg-black/15"}`}>
                 <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform shadow-sm ${notifPref[item.key] ? "translate-x-6" : "translate-x-1"}`} />
               </button>
             </div>
           ))}
         </div>
-        <p className="mt-4 text-xs text-gray-400">알림 설정은 프로필 저장 시 함께 저장됩니다</p>
+        <p className="mt-4 text-xs text-black/35">알림 설정은 프로필 저장 시 함께 저장됩니다</p>
       </div>
 
       {/* 계정 관리 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-center gap-2 mb-6"><Shield className="w-5 h-5 text-blue-600" /><h2 className="text-lg font-semibold text-gray-900">계정 관리</h2></div>
+      <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-7">
+        <div className="mb-6 flex items-center gap-2"><Shield className="h-5 w-5 text-black/65" strokeWidth={1.7} /><h2 className="text-lg font-medium tracking-[-0.03em]">계정 관리</h2></div>
         {isEmailUser && (
           <div className="mb-6 pb-6 border-b border-gray-100">
             <h3 className="text-sm font-medium text-gray-900 mb-3">비밀번호 변경</h3>
             <div className="space-y-3">
               <div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="새 비밀번호 (6자 이상)" className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="새 비밀번호 (6자 이상)" className="w-full rounded-xl border border-black/10 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-black/45" />
               </div>
               <div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호 확인" className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="비밀번호 확인" className="w-full rounded-xl border border-black/10 py-3 pl-10 pr-4 text-sm outline-none transition focus:border-black/45" />
               </div>
-              <button onClick={handleChangePassword} disabled={changingPassword || !newPassword} className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50">
+              <button onClick={handleChangePassword} disabled={changingPassword || !newPassword} className="flex items-center gap-2 rounded-full bg-[#f4f4f2] px-4 py-2 text-sm font-medium text-black/70 transition hover:bg-[#e9e9e5] disabled:opacity-40">
                 {changingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : <Lock className="w-4 h-4" />}비밀번호 변경
               </button>
             </div>

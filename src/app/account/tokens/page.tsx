@@ -35,9 +35,10 @@ const CONSUMER_PLANS = [
     desc: "AI 디자인 생성 토큰 1개당 500원",
     features: [
       "토큰 단가 ₩500 / 개",
-      "AI 디자인 1장당 1토큰",
-      "자재 영역 분석 1토큰",
-      "고화질 재렌더 2토큰",
+      "거실 이미지 생성 5토큰",
+      "추가 공간 공개 1토큰 / 장",
+      "부위별 자재 수정 2토큰",
+      "세부 견적 공개·PDF 10토큰",
       "유효기간 12개월",
     ],
     cta: "토큰 충전",
@@ -191,8 +192,8 @@ export default function TokensPageWrapper() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-[#FDF7F4] flex items-center justify-center">
-          <Loader2 className="h-6 w-6 animate-spin text-primary-500" />
+        <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
+          <Loader2 className="h-6 w-6 animate-spin text-black/45" />
         </div>
       }
     >
@@ -254,40 +255,41 @@ function TokensPage() {
 
   return (
     <LenisProvider>
-      <main className="relative min-h-screen bg-[#FDF7F4] text-primary-900">
+      <main className="relative min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
         <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-6 pt-10 lg:px-8">
           <button
             onClick={goBack}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/[0.08] bg-white text-black/65 hover:bg-black/[0.04]"
             aria-label="이전"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
-          <a href="/" className="text-[1.3rem] font-extrabold tracking-tightest text-primary-900">
-            In<span className="text-primary-500">Pick</span>
+          <a href="/" className="inline-flex items-center gap-2.5">
+            <span className="hex-mask h-6 w-6 text-[#f15b4a]" /><span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
           </a>
-          <div className="inline-flex items-center gap-2 rounded-full bg-white border border-primary-100 px-3 py-1.5">
-            <Hexagon className="h-3.5 w-3.5 fill-token-400 text-token-400" />
-            <span className="font-bold tabular text-primary-900">{tokens.balance}</span>
+          <div className="inline-flex items-center gap-2 rounded-full border border-black/[0.07] bg-white px-3 py-1.5">
+            <Hexagon className="h-3.5 w-3.5 fill-[#f15b4a] text-[#f15b4a]" />
+            <span className="font-semibold tabular-nums">{tokens.balance}</span>
           </div>
         </header>
 
         <section className="relative z-20 mx-auto max-w-6xl px-6 py-10 lg:px-8 lg:py-12">
-          <h1 className="text-[2rem] lg:text-[2.6rem] font-extrabold tracking-tightest leading-tight text-primary-900">
-            요금제
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">PLANS & TOKENS</p>
+          <h1 className="mt-2 text-[2rem] font-medium leading-tight tracking-[-0.055em] lg:text-[2.6rem]">
+            요금제와 토큰
           </h1>
-          <p className="mt-2 text-sm text-primary-900/60">
+          <p className="mt-2 text-sm text-black/48">
             사용 목적에 맞는 플랜을 선택하세요. 언제든 변경 가능합니다.
           </p>
 
           {/* 청중 토글 (소비자 / 사업자) */}
-          <div className="mt-6 inline-flex items-center gap-1 rounded-full border border-primary-200 bg-white p-1">
+          <div className="mt-6 inline-flex items-center gap-1 rounded-full border border-black/[0.08] bg-white p-1">
             <button
               onClick={() => setAudience("consumer")}
               className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-colors ${
                 audience === "consumer"
-                  ? "bg-primary-500 text-white shadow-cta"
-                  : "text-primary-900/60 hover:bg-primary-50"
+                  ? "bg-[#0d0d0d] text-white"
+                  : "text-black/55 hover:bg-black/[0.04]"
               }`}
             >
               <User className="h-3.5 w-3.5" />
@@ -297,8 +299,8 @@ function TokensPage() {
               onClick={() => setAudience("contractor")}
               className={`inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold transition-colors ${
                 audience === "contractor"
-                  ? "bg-primary-500 text-white shadow-cta"
-                  : "text-primary-900/60 hover:bg-primary-50"
+                  ? "bg-[#0d0d0d] text-white"
+                  : "text-black/55 hover:bg-black/[0.04]"
               }`}
             >
               <Building2 className="h-3.5 w-3.5" />
@@ -313,8 +315,8 @@ function TokensPage() {
                 onClick={() => setContractorCategory("interior")}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold border transition-colors ${
                   contractorCategory === "interior"
-                    ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-primary-100 bg-white text-primary-900/60"
+                    ? "border-[#0d0d0d] bg-[#0d0d0d] text-white"
+                    : "border-black/[0.08] bg-white text-black/55"
                 }`}
               >
                 <Building2 className="h-3 w-3" />
@@ -324,8 +326,8 @@ function TokensPage() {
                 onClick={() => setContractorCategory("manufacturer")}
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-bold border transition-colors ${
                   contractorCategory === "manufacturer"
-                    ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-primary-100 bg-white text-primary-900/60"
+                    ? "border-[#0d0d0d] bg-[#0d0d0d] text-white"
+                    : "border-black/[0.08] bg-white text-black/55"
                 }`}
               >
                 <Factory className="h-3 w-3" />
@@ -349,19 +351,19 @@ function TokensPage() {
                   whileHover={{ scale: 1.01 }}
                   className={`relative overflow-hidden rounded-3xl border p-6 transition-all ${
                     highlight
-                      ? "border-primary-500 bg-gradient-to-br from-primary-50 to-amber-50 shadow-card-hover"
-                      : "border-primary-100 bg-white shadow-card hover:shadow-card-hover"
+                      ? "border-[#0d0d0d] bg-white"
+                      : "border-black/[0.07] bg-white"
                   }`}
                 >
                   {highlight && (
-                    <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-primary-500 px-2.5 py-0.5 text-[0.65rem] font-bold text-white">
+                    <div className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-[#0d0d0d] px-2.5 py-0.5 text-[0.65rem] font-semibold text-white">
                       <Crown className="h-3 w-3" />
                       추천
                     </div>
                   )}
                   <div className="flex items-center gap-2">
                     {"badge" in plan && plan.badge && (
-                      <span className="text-[0.65rem] font-bold uppercase tracking-widest text-primary-600">
+                      <span className="text-[0.65rem] font-semibold uppercase tracking-widest text-black/45">
                         {plan.badge}
                       </span>
                     )}
@@ -369,28 +371,28 @@ function TokensPage() {
                       <span
                         className={`text-[0.65rem] font-bold uppercase tracking-widest ${
                           plan.tier === "business"
-                            ? "text-amber-700"
+                            ? "text-black"
                             : plan.tier === "max"
-                              ? "text-primary-600"
-                              : "text-primary-500"
+                              ? "text-black/65"
+                              : "text-black/45"
                         }`}
                       >
                         {plan.tier.toUpperCase()}
                       </span>
                     )}
                   </div>
-                  <h3 className="mt-2 text-2xl font-extrabold tracking-tight text-primary-900">
+                  <h3 className="mt-2 text-2xl font-medium tracking-[-0.04em]">
                     {plan.title}
                   </h3>
-                  <p className="mt-1 text-[0.85rem] text-primary-900/60">
+                  <p className="mt-1 text-[0.85rem] text-black/48">
                     {plan.desc}
                   </p>
 
                   <div className="mt-5 flex items-baseline gap-1">
-                    <span className="text-[2.4rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
+                    <span className="text-[2.4rem] font-semibold tabular-nums leading-none tracking-[-0.05em]">
                       ₩{plan.price.toLocaleString()}
                     </span>
-                    <span className="text-sm font-bold text-primary-900/60">
+                    <span className="text-sm font-medium text-black/50">
                       {plan.priceLabel}
                     </span>
                   </div>
@@ -399,7 +401,7 @@ function TokensPage() {
                     {plan.features.map((f, i) => (
                       <li
                         key={i}
-                        className="flex items-start gap-2 text-[0.85rem] text-primary-900/80"
+                        className="flex items-start gap-2 text-[0.85rem] text-black/68"
                       >
                         <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-emerald-600" />
                         <span>{f}</span>
@@ -411,8 +413,8 @@ function TokensPage() {
                     onClick={() => handleSelectPlan(plan)}
                     className={`mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-bold transition-colors ${
                       highlight
-                        ? "bg-primary-500 text-white shadow-cta hover:bg-primary-600"
-                        : "border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
+                        ? "bg-[#0d0d0d] text-white hover:bg-black/80"
+                        : "border border-black/[0.09] bg-white text-black hover:bg-black/[0.04]"
                     }`}
                   >
                     {"cta" in plan && plan.cta ? plan.cta : "선택"}
@@ -424,9 +426,9 @@ function TokensPage() {
           </div>
 
           {/* 안내 */}
-          <div className="mt-8 rounded-2xl border border-primary-100 bg-white p-5 text-[0.78rem] text-primary-900/70 leading-relaxed">
-            <p className="flex items-center gap-2 font-bold text-primary-900 mb-1.5">
-              <Zap className="h-3.5 w-3.5 text-amber-500" />
+          <div className="mt-8 rounded-[22px] border border-black/[0.07] bg-white p-5 text-[0.78rem] leading-relaxed text-black/60">
+            <p className="mb-1.5 flex items-center gap-2 font-semibold text-black">
+              <Zap className="h-3.5 w-3.5 text-black/65" />
               플랜 비교
             </p>
             <ul className="space-y-1 list-disc list-inside">
@@ -459,33 +461,33 @@ function TokensPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSelectedPlan(null)}
-                className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+                className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 16 }}
-                className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-primary-100 bg-white p-7 shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[81] max-h-[92vh] w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-[28px] border border-black/[0.07] bg-white p-7 shadow-xl"
               >
                 <div className="flex items-center gap-2">
-                  <Lock className="h-3.5 w-3.5 text-primary-900/60" />
-                  <span className="text-sm font-bold tracking-tight text-primary-900">
+                  <Lock className="h-3.5 w-3.5 text-black/50" />
+                  <span className="text-sm font-semibold tracking-tight">
                     InPick 결제
                   </span>
                 </div>
-                <h3 className="mt-3 text-xl font-extrabold tracking-tight text-primary-900">
+                <h3 className="mt-3 text-xl font-medium tracking-[-0.035em]">
                   {selectedPlan.title}
                 </h3>
-                <p className="mt-0.5 text-sm text-primary-900/60">{selectedPlan.desc}</p>
+                <p className="mt-0.5 text-sm text-black/48">{selectedPlan.desc}</p>
 
-                <p className="mt-5 text-[2.4rem] font-extrabold tabular leading-none text-primary-900">
+                <p className="mt-5 text-[2.4rem] font-semibold tabular-nums leading-none tracking-[-0.05em]">
                   ₩{selectedPlan.price.toLocaleString()}
-                  <span className="text-sm font-bold text-primary-900/60 ml-1">
+                  <span className="ml-1 text-sm font-medium text-black/50">
                     {selectedPlan.priceLabel}
                   </span>
                 </p>
 
-                <div className="mt-5 rounded-xl bg-primary-50/70 p-3 text-[0.78rem] text-primary-900/70">
+                <div className="mt-5 rounded-2xl bg-[#f7f7f5] p-3 text-[0.78rem] text-black/60">
                   이 플랜은 출시 준비 중이에요. 사전 예약해 두시면 오픈 시 가장 먼저 안내드립니다.
                   지금은 <b>토큰 충전</b>으로 모든 기능을 이용할 수 있어요.
                 </div>
@@ -493,14 +495,14 @@ function TokensPage() {
                 <div className="mt-5 flex gap-2">
                   <button
                     onClick={() => setSelectedPlan(null)}
-                    className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+                    className="flex-1 rounded-full border border-black/[0.09] px-4 py-2.5 text-sm font-medium text-black/65 hover:bg-black/[0.04]"
                   >
                     취소
                   </button>
                   <button
                     onClick={handlePay}
                     disabled={paying}
-                    className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+                    className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-[#0d0d0d] px-4 py-2.5 text-sm font-medium text-white hover:bg-black/80 disabled:opacity-50"
                   >
                     {paying ? (
                       <>
@@ -522,7 +524,7 @@ function TokensPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setSuccessInfo(null)}
-                className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+                className="fixed inset-0 z-[80] bg-black/45 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, scale: 0.95, y: 16 }}
@@ -533,10 +535,10 @@ function TokensPage() {
                 <div className="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                   <Check className="h-6 w-6" strokeWidth={3} />
                 </div>
-                <h3 className="mt-4 text-xl font-extrabold tracking-tight text-primary-900">
+                <h3 className="mt-4 text-xl font-medium tracking-[-0.035em]">
                   {successInfo.title}
                 </h3>
-                <p className="mt-2 text-sm text-primary-900/70">
+                <p className="mt-2 text-sm text-black/60">
                   현재 잔액: <span className="font-bold tabular">{tokens.balance}</span>
                 </p>
                 <button
@@ -544,7 +546,7 @@ function TokensPage() {
                     setSuccessInfo(null);
                     goBack();
                   }}
-                  className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-primary-500 px-4 py-3 text-sm font-bold text-white shadow-cta hover:bg-primary-600"
+                  className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-[#0d0d0d] px-4 py-3 text-sm font-medium text-white hover:bg-black/80"
                 >
                   {returnUrl ? "워크플로 계속하기" : "계속하기"}
                 </button>

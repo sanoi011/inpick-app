@@ -210,20 +210,20 @@ export default function MyPageProjects() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 space-y-3">
+      <div className="mx-auto max-w-5xl space-y-3 px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
         {[1, 2, 3, 4].map((i) => <SkeletonProjectCard key={i} />)}
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="mx-auto max-w-5xl px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
       {/* 페이지 타이틀 */}
-      <div className="flex items-center justify-between mb-6 gap-2 flex-wrap">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
         <div className="flex items-center gap-3">
-          <h1 className="text-xl font-bold text-gray-900">내 프로젝트</h1>
+          <div><p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">PROJECTS</p><h1 className="mt-2 text-[30px] font-medium tracking-[-0.055em] sm:text-[36px]">내 프로젝트</h1><p className="mt-2 text-sm text-black/45">진행 중인 디자인과 견적을 이어서 관리합니다.</p></div>
           {projects.length > 0 && (
-            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">
+            <span className="mb-2 rounded-full bg-[#0d0d0d] px-2 py-0.5 text-xs font-semibold text-white">
               {projects.length}
             </span>
           )}
@@ -232,7 +232,7 @@ export default function MyPageProjects() {
           {projects.length > 0 && !selectMode && (
             <button
               onClick={() => setSelectMode(true)}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-full border border-black/[0.09] bg-white px-4 py-2.5 text-sm font-medium text-black/65 transition hover:border-black/25 hover:text-black"
             >
               <CheckSquare className="w-4 h-4" /> 선택
             </button>
@@ -240,14 +240,14 @@ export default function MyPageProjects() {
           {selectMode && (
             <button
               onClick={exitSelectMode}
-              className="flex items-center gap-1.5 px-3 py-2 bg-white border border-gray-300 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center gap-1.5 rounded-full border border-black/[0.09] bg-white px-4 py-2.5 text-sm font-medium text-black/65 transition hover:border-black/25 hover:text-black"
             >
               <X className="w-4 h-4" /> 취소
             </button>
           )}
           <button
             onClick={() => router.push("/project/new")}
-            className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-1.5 rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black/80"
           >
             <Plus className="w-4 h-4" /> 새 프로젝트
           </button>
@@ -256,7 +256,7 @@ export default function MyPageProjects() {
 
       {/* 선택 모드 툴바 */}
       {selectMode && filtered.length > 0 && (
-        <div className="mb-4 flex items-center justify-between gap-2 flex-wrap bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-[18px] border border-black/[0.08] bg-white px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => {
@@ -265,7 +265,7 @@ export default function MyPageProjects() {
                 if (allSelected) setSelectedIds(new Set());
                 else setSelectedIds(new Set(allIds));
               }}
-              className="flex items-center gap-1.5 text-sm font-medium text-blue-700 hover:text-blue-900"
+              className="flex items-center gap-1.5 text-sm font-medium text-black/65 hover:text-black"
             >
               {filtered.length > 0 && filtered.every((p) => selectedIds.has(p.id)) ? (
                 <CheckSquare className="w-4 h-4" />
@@ -275,7 +275,7 @@ export default function MyPageProjects() {
               전체 선택
             </button>
             <span className="text-sm text-gray-600">
-              <strong className="text-blue-700">{selectedIds.size}</strong> / {filtered.length}개 선택
+              <strong className="text-black">{selectedIds.size}</strong> / {filtered.length}개 선택
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -329,16 +329,16 @@ export default function MyPageProjects() {
       )}
 
       {filtered.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
-          <FolderOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-900 mb-2">
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-12 text-center">
+          <FolderOpen className="mx-auto mb-4 h-12 w-12 text-black/18" strokeWidth={1.5} />
+          <h3 className="mb-2 text-lg font-medium">
             {projects.length === 0 ? "프로젝트가 없습니다" : "검색 결과가 없습니다"}
           </h3>
-          <p className="text-sm text-gray-500 mb-6">
+          <p className="mb-6 text-sm text-black/45">
             {projects.length === 0 ? "새 프로젝트를 시작해보세요" : "다른 검색어나 필터를 시도해보세요"}
           </p>
           {projects.length === 0 && (
-            <button onClick={() => router.push("/project/new")} className="px-6 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+            <button onClick={() => router.push("/project/new")} className="rounded-full bg-[#0d0d0d] px-6 py-2.5 text-sm font-medium text-white transition hover:bg-black/80">
               프로젝트 시작하기
             </button>
           )}
@@ -359,12 +359,12 @@ export default function MyPageProjects() {
             const displayName = p.address?.buildingName || p.address?.roadAddress || "새 프로젝트";
             const isSelected = selectedIds.has(p.id);
             return (
-              <div key={p.id} className={`bg-white border rounded-xl p-5 transition-all ${
+              <div key={p.id} className={`rounded-[22px] border bg-white p-5 transition-all ${
                 selectMode && isSelected
-                  ? "border-blue-500 ring-2 ring-blue-200"
+                  ? "border-black ring-2 ring-black/10"
                   : isContracted
-                    ? "border-green-200 hover:border-green-300 hover:shadow-sm"
-                    : "border-gray-200 hover:border-blue-300 hover:shadow-sm"
+                    ? "border-black/15 hover:-translate-y-0.5 hover:border-black/30"
+                    : "border-black/[0.07] hover:-translate-y-0.5 hover:border-black/20"
               }`}>
                 <button
                   onClick={() => selectMode ? toggleSelect(p.id) : router.push(getTargetUrl())}
@@ -375,11 +375,11 @@ export default function MyPageProjects() {
                       {selectMode && (
                         <div className="mt-0.5 flex-shrink-0">
                           {isSelected
-                            ? <CheckSquare className="w-5 h-5 text-blue-600" />
+                            ? <CheckSquare className="w-5 h-5 text-black" />
                             : <Square className="w-5 h-5 text-gray-300" />}
                         </div>
                       )}
-                      <h3 className="text-sm font-bold text-gray-900 truncate">
+                      <h3 className="truncate text-sm font-semibold">
                         {displayName}
                       </h3>
                     </div>
@@ -416,14 +416,14 @@ export default function MyPageProjects() {
                     {isContracted ? (
                       <>
                         <span className="text-xs text-green-600 font-medium flex items-center gap-1"><FileSignature className="w-3.5 h-3.5" />업체 선정 완료</span>
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/contracts`); }} className="flex items-center gap-1.5 px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition-colors">
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/contracts`); }} className="flex items-center gap-1.5 rounded-full bg-[#0d0d0d] px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80">
                           <FileSignature className="w-4 h-4" />계약진행<ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </>
                     ) : (
                       <>
-                        <span className="text-xs text-blue-600 font-medium">입찰 확인 중</span>
-                        <button onClick={(e) => { e.stopPropagation(); router.push(`/project/${p.id}/rfq`); }} className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                        <span className="text-xs font-medium text-black/55">입찰 확인 중</span>
+                        <button onClick={(e) => { e.stopPropagation(); router.push(`/project/${p.id}/rfq`); }} className="flex items-center gap-1.5 rounded-full bg-[#0d0d0d] px-4 py-2 text-sm font-medium text-white transition hover:bg-black/80">
                           입찰 확인<ArrowRight className="w-3.5 h-3.5" />
                         </button>
                       </>
@@ -434,7 +434,7 @@ export default function MyPageProjects() {
             );
           })}
           {filtered.length > visibleCount && (
-            <button onClick={() => setVisibleCount((v) => v + 10)} className="w-full py-3 text-sm font-medium text-blue-600 hover:text-blue-700 bg-white border border-gray-200 rounded-xl hover:border-blue-300 transition-colors">
+            <button onClick={() => setVisibleCount((v) => v + 10)} className="w-full rounded-full border border-black/[0.08] bg-white py-3 text-sm font-medium text-black/60 transition hover:border-black/30 hover:text-black">
               더 보기 ({filtered.length - visibleCount}개 남음)
             </button>
           )}

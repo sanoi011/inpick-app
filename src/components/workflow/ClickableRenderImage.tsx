@@ -14,7 +14,7 @@
  */
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, Eye, Crosshair, Plus, Minus, ChevronRight, RotateCcw, ScanLine, ShieldCheck } from "lucide-react";
 import { useSamClient, type SamPolygonResult, type SamPoint } from "@/hooks/useSamClient";
@@ -37,6 +37,83 @@ interface RefinePoints {
   negative: SamPoint[];
 }
 
+/**
+ * SAM 마스크는 흑백 PNG라 alpha 채널이 이미지 전체에 존재한다.
+ * luminance를 실제 alpha로 바꿔 검정 배경은 투명하게 만들고,
+ * 선택 영역 내부는 옅게, 실제 경계만 선명하게 표시한다.
+ */
+function RasterMaskOverlay({ maskUrl }: { maskUrl: string }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [fallback, setFallback] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const mask = new Image();
+    mask.crossOrigin = "anonymous";
+    mask.onload = () => {
+      if (cancelled || !canvasRef.current) return;
+      try {
+        const scale = Math.min(1, 1400 / Math.max(1, mask.naturalWidth));
+        const width = Math.max(1, Math.round(mask.naturalWidth * scale));
+        const height = Math.max(1, Math.round(mask.naturalHeight * scale));
+        const canvas = canvasRef.current;
+        canvas.width = width;
+        canvas.height = height;
+        const context = canvas.getContext("2d", { willReadFrequently: true });
+        if (!context) throw new Error("canvas context unavailable");
+        context.drawImage(mask, 0, 0, width, height);
+        const image = context.getImageData(0, 0, width, height);
+        const source = new Uint8ClampedArray(image.data);
+        const selectedAt = (index: number) =>
+          source[index] + source[index + 1] + source[index + 2] >= 384;
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            const index = (y * width + x) * 4;
+            if (!selectedAt(index)) {
+              image.data[index + 3] = 0;
+              continue;
+            }
+            const edge =
+              x === 0 || y === 0 || x === width - 1 || y === height - 1 ||
+              !selectedAt(index - 4) || !selectedAt(index + 4) ||
+              !selectedAt(index - width * 4) || !selectedAt(index + width * 4);
+            image.data[index] = 241;
+            image.data[index + 1] = 91;
+            image.data[index + 2] = 74;
+            image.data[index + 3] = edge ? 235 : 58;
+          }
+        }
+        context.putImageData(image, 0, 0);
+      } catch {
+        if (!cancelled) setFallback(true);
+      }
+    };
+    mask.onerror = () => {
+      if (!cancelled) setFallback(true);
+    };
+    mask.src = maskUrl;
+    return () => {
+      cancelled = true;
+    };
+  }, [maskUrl]);
+
+  if (fallback) {
+    return (
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-[#f15b4a]/25"
+        style={{
+          maskImage: "url(" + maskUrl + ")",
+          maskMode: "luminance",
+          maskSize: "100% 100%",
+          maskRepeat: "no-repeat",
+        }}
+      />
+    );
+  }
+  return <canvas ref={canvasRef} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" />;
+}
+
 export default function ClickableRenderImage({
   imageUrl,
   onConfirm,
@@ -47,6 +124,7 @@ export default function ClickableRenderImage({
   const [selected, setSelected] = useState<SamPolygonResult | null>(null);
   const [candidateOptions, setCandidateOptions] = useState<SamPolygonResult[]>([]);
   const [candidateIndex, setCandidateIndex] = useState(0);
+  const [recommendedCandidateIndex, setRecommendedCandidateIndex] = useState(0);
   const [refinePoints, setRefinePoints] = useState<RefinePoints>({ positive: [], negative: [] });
   const [refineMode, setRefineMode] = useState<"add" | "remove">("add");
   const [imageNatural, setImageNatural] = useState<{ w: number; h: number } | null>(null);
@@ -115,12 +193,27 @@ export default function ClickableRenderImage({
         .map((candidate) => ({ ...candidate, image_size: result.image_size }))
         .sort((a, b) => a.area_pixels - b.area_pixels);
       const options = candidates.length > 0 ? candidates : [result];
-      const recommended = Math.max(
+      const topScored = Math.max(
         0,
-        options.findIndex((option) => option.mask_url === result.mask_url),
+        options.findIndex(
+          (option) =>
+            option.area_pixels === result.area_pixels &&
+            Math.abs(option.confidence - result.confidence) < 0.0001,
+        ),
       );
+      const imageArea = Math.max(1, result.image_size[0] * result.image_size[1]);
+      const reasonable = options
+        .map((option, index) => ({
+          option,
+          index,
+          ratio: option.area_pixels / imageArea,
+        }))
+        .filter(({ ratio }) => ratio >= 0.005 && ratio <= 0.82)
+        .sort((a, b) => b.option.confidence - a.option.confidence);
+      const recommended = reasonable[0]?.index ?? topScored;
       setCandidateOptions(options);
       setCandidateIndex(recommended);
+      setRecommendedCandidateIndex(recommended);
       setSelected(options[recommended]);
       setRefinePoints({ positive: [point], negative: [] });
     }
@@ -130,6 +223,7 @@ export default function ClickableRenderImage({
     setSelected(null);
     setCandidateOptions([]);
     setCandidateIndex(0);
+    setRecommendedCandidateIndex(0);
     setRefinePoints({ positive: [], negative: [] });
     sam.click.reset();
     sam.refine.reset();
@@ -275,20 +369,7 @@ export default function ClickableRenderImage({
         )}
 
         {/* polygon 근사치가 아닌 SAM 원본 raster mask로 정확한 선택 경계를 표시 */}
-        {selected?.mask_url && (
-          <div
-            aria-hidden
-            className="pointer-events-none absolute inset-0 bg-primary-500/40"
-            style={{
-              WebkitMaskImage: `url(${selected.mask_url})`,
-              maskImage: `url(${selected.mask_url})`,
-              WebkitMaskSize: "100% 100%",
-              maskSize: "100% 100%",
-              WebkitMaskRepeat: "no-repeat",
-              maskRepeat: "no-repeat",
-            }}
-          />
-        )}
+        {selected?.mask_url && <RasterMaskOverlay maskUrl={selected.mask_url} />}
 
         {mode === "select" && !selected && !loading && (
           <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-gradient-to-r from-transparent via-primary-500 to-transparent shadow-[0_0_14px_rgba(247,59,32,0.8)]" />
@@ -350,7 +431,7 @@ export default function ClickableRenderImage({
                       : "border-primary-100 text-primary-900/60 hover:border-primary-300"
                   }`}
                 >
-                  {labels[index]}
+                  {labels[index]}{index === recommendedCandidateIndex ? " · 추천" : ""}
                   <span className="mt-0.5 block text-[0.58rem] font-medium opacity-60">
                     {((candidate.area_pixels / Math.max(1, imageNatural!.w * imageNatural!.h)) * 100).toFixed(1)}%
                   </span>
@@ -362,12 +443,21 @@ export default function ClickableRenderImage({
       )}
 
       {selected && !loading && (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-relaxed text-emerald-900">
+        <div
+          className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
+            imageNatural && selected.area_pixels / Math.max(1, imageNatural.w * imageNatural.h) > 0.82
+              ? "border-amber-200 bg-amber-50 text-amber-900"
+              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+          }`}
+        >
           <p className="inline-flex items-center gap-1.5 font-bold">
-            <ShieldCheck className="h-3.5 w-3.5" /> 오렌지 영역만 변경됩니다
+            <ShieldCheck className="h-3.5 w-3.5" />
+            {imageNatural && selected.area_pixels / Math.max(1, imageNatural.w * imageNatural.h) > 0.82
+              ? "선택 범위가 너무 넓습니다"
+              : "붉은 경계 안쪽만 변경됩니다"}
           </p>
-          <p className="mt-1 text-[0.68rem] text-emerald-900/70">
-            걸레받이·벽·창호가 포함됐다면 <strong>제외</strong>를 누르고 해당 부위를 찍어 경계를 보정하세요.
+          <p className="mt-1 text-[0.68rem] opacity-75">
+            걸레받이·벽·창호가 포함됐다면 <strong>제외</strong>를 누르고 잘못 포함된 부위를 찍어 경계를 보정하세요.
           </p>
         </div>
       )}

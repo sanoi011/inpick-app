@@ -59,9 +59,9 @@ export default function ContractorDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#f7f7f5]">
         <Header />
-        <main className="max-w-4xl mx-auto px-6 py-8">
+        <main className="mx-auto max-w-4xl px-4 pb-10 pt-28 sm:px-6">
           <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mb-4" />
           <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -91,14 +91,14 @@ export default function ContractorDetailPage() {
 
   if (!contractor) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#f7f7f5]">
         <Header />
         <div className="max-w-3xl mx-auto px-6 py-20 text-center">
           <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-900 mb-2">업체를 찾을 수 없습니다</h2>
           <button
             onClick={() => router.push("/find-contractors")}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            className="mt-4 rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm text-white hover:bg-black/80"
           >
             업체 목록으로
           </button>
@@ -122,10 +122,10 @@ export default function ContractorDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
       <Header />
 
-      <main className="max-w-4xl mx-auto px-6 py-8">
+      <main className="mx-auto max-w-4xl px-4 pb-10 pt-28 sm:px-6">
         {/* 뒤로가기 */}
         <button
           onClick={() => router.push("/find-contractors")}
@@ -135,8 +135,8 @@ export default function ContractorDetailPage() {
         </button>
 
         {/* 프로필 히어로 */}
-        <div className={`bg-white border rounded-xl p-6 mb-6 ${
-          isPremium ? "border-amber-300 ring-1 ring-amber-100" : "border-gray-200"
+        <div className={`mb-6 rounded-[26px] border bg-white p-5 sm:p-7 ${
+          isPremium ? "border-black/25 ring-1 ring-black/[0.04]" : "border-black/[0.07]"
         }`}>
           <div className="flex flex-col sm:flex-row items-start gap-4">
             {/* 로고 */}
@@ -151,7 +151,7 @@ export default function ContractorDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-gray-900">{c.company_name}</h1>
-                {c.is_verified && <Shield className="w-5 h-5 text-blue-500" />}
+                {c.is_verified && <Shield className="w-5 h-5 text-black/55" />}
                 {isPremium && <Crown className="w-5 h-5 text-amber-500" />}
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                   CONTRACTOR_TYPE_COLORS[c.contractor_type || "specialty"]
@@ -188,7 +188,7 @@ export default function ContractorDetailPage() {
             {/* CTA */}
             <button
               onClick={() => setShowInquiry(true)}
-              className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors flex-shrink-0"
+              className="flex flex-shrink-0 items-center gap-2 rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black/80"
             >
               <MessageCircle className="w-4 h-4" />
               견적 요청하기
@@ -204,7 +204,7 @@ export default function ContractorDetailPage() {
               onClick={() => setActiveTab(tab.key)}
               className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
                 activeTab === tab.key
-                  ? "text-blue-600 border-blue-600"
+                  ? "border-[#0d0d0d] text-[#0d0d0d]"
                   : "text-gray-500 border-transparent hover:text-gray-700"
               }`}
             >
@@ -218,7 +218,7 @@ export default function ContractorDetailPage() {
 
         {/* 탭 내용 */}
         {activeTab === "intro" && (
-          <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-6">
+          <div className="space-y-6 rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
             <div>
               <h3 className="text-sm font-bold text-gray-900 mb-2">회사 소개</h3>
               <p className="text-sm text-gray-600 whitespace-pre-line">
@@ -252,7 +252,7 @@ export default function ContractorDetailPage() {
                       key={t.trade_code}
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         t.is_primary
-                          ? "bg-blue-100 text-blue-700"
+                          ? "bg-[#0d0d0d] text-white"
                           : "bg-gray-100 text-gray-600"
                       }`}
                     >
@@ -268,14 +268,14 @@ export default function ContractorDetailPage() {
         {activeTab === "portfolio" && (
           <div>
             {portfolio.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+              <div className="rounded-[24px] border border-black/[0.07] bg-white p-12 text-center">
                 <Camera className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-500">등록된 포트폴리오가 없습니다</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {portfolio.map((p) => (
-                  <div key={p.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                  <div key={p.id} className="overflow-hidden rounded-[22px] border border-black/[0.07] bg-white">
                     {p.image_urls?.[0] && (
                       <div className="relative w-full h-48">
                         <Image
@@ -327,14 +327,14 @@ export default function ContractorDetailPage() {
         {activeTab === "reviews" && (
           <div>
             {reviews.length === 0 ? (
-              <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+              <div className="rounded-[24px] border border-black/[0.07] bg-white p-12 text-center">
                 <Star className="w-10 h-10 text-gray-300 mx-auto mb-3" />
                 <p className="text-sm text-gray-500">아직 리뷰가 없습니다</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {/* 평점 요약 */}
-                <div className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-4">
+                <div className="flex items-center gap-4 rounded-[22px] border border-black/[0.07] bg-white p-4">
                   <div className="text-center">
                     <div className="text-3xl font-bold text-gray-900">{c.rating.toFixed(1)}</div>
                     <div className="flex items-center gap-0.5 mt-1">
@@ -355,7 +355,7 @@ export default function ContractorDetailPage() {
 
                 {/* 리뷰 리스트 */}
                 {reviews.map((r) => (
-                  <div key={r.id} className="bg-white border border-gray-200 rounded-xl p-4">
+                  <div key={r.id} className="rounded-[22px] border border-black/[0.07] bg-white p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="flex items-center gap-0.5">
                         {[1, 2, 3, 4, 5].map((s) => (
@@ -392,15 +392,15 @@ export default function ContractorDetailPage() {
             {trades.map((t) => (
               <div
                 key={t.trade_code}
-                className={`bg-white border rounded-xl p-4 ${
-                  t.is_primary ? "border-blue-200 bg-blue-50/50" : "border-gray-200"
+                className={`rounded-[20px] border bg-white p-4 ${
+                  t.is_primary ? "border-black/25" : "border-black/[0.07]"
                 }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold text-gray-900">{t.trade_name}</span>
                     {t.is_primary && (
-                      <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded">
+                      <span className="rounded bg-[#0d0d0d] px-1.5 py-0.5 text-xs font-semibold text-white">
                         주공종
                       </span>
                     )}

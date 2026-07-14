@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   LayoutDashboard,
   FolderKanban,
+  FileText,
   FileSignature,
   Bell,
   UserCircle,
@@ -15,19 +16,30 @@ import {
   X,
   Hexagon,
   Receipt,
+  ArrowUpRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useTokens } from "@/hooks/useTokens";
 
 const NAV_ITEMS = [
-  { label: "대시보드", href: "/mypage", icon: LayoutDashboard },
+  { label: "대시보드", href: "/mypage", icon: LayoutDashboard, exact: true },
   { label: "내 프로젝트", href: "/mypage/projects", icon: FolderKanban },
-  { label: "계약 진행", href: "/mypage/contracts/progress", icon: FileSignature },
+  { label: "내 계약서", href: "/mypage/contracts", icon: FileText, exact: true },
+  { label: "입찰·계약 진행", href: "/mypage/contracts/progress", icon: FileSignature },
   { label: "알림", href: "/mypage/notifications", icon: Bell },
   { label: "결제·토큰", href: "/mypage/billing", icon: Receipt },
   { label: "내 계정", href: "/mypage/account", icon: UserCircle },
   { label: "고객센터", href: "/mypage/support", icon: HelpCircle },
 ];
+
+function Brand() {
+  return (
+    <span className="inline-flex items-center gap-2.5 text-[#0d0d0d]">
+      <span className="hex-mask h-6 w-6 shrink-0 text-[#f15b4a]" />
+      <span className="text-[21px] font-bold leading-none tracking-[-0.055em]">inpick</span>
+    </span>
+  );
+}
 
 export default function MyPageLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,146 +49,85 @@ export default function MyPageLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push(`/auth?returnUrl=${encodeURIComponent(pathname)}`);
-    }
+    if (!loading && !user) router.push(`/auth?returnUrl=${encodeURIComponent(pathname)}`);
   }, [loading, user, router, pathname]);
 
-  const isActive = (href: string) => {
-    if (href === "/mypage") return pathname === "/mypage";
-    return pathname.startsWith(href);
-  };
+  useEffect(() => setSidebarOpen(false), [pathname]);
 
-  const displayName =
-    user?.user_metadata?.full_name || user?.email?.split("@")[0] || "";
+  const isActive = (href: string, exact?: boolean) =>
+    exact ? pathname === href : pathname.startsWith(href);
+  const displayName = user?.user_metadata?.full_name || user?.email?.split("@")[0] || "";
 
   if (loading || !user) {
     return (
-      <div className="min-h-screen bg-[#FDF7F4] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-primary-500 border-t-transparent rounded-full animate-spin" />
+      <div className="flex min-h-screen items-center justify-center bg-[#f7f7f5]">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-black/15 border-t-[#0d0d0d]" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#FDF7F4] text-primary-900 flex">
+    <div className="flex min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
       {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-primary-900/30 z-40 lg:hidden"
+        <button
+          type="button"
+          aria-label="메뉴 닫기"
+          className="fixed inset-0 z-40 bg-black/25 backdrop-blur-[2px] lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
-      {/* 사이드바 */}
-      <aside
-        className={`
-        fixed lg:sticky top-0 left-0 z-50 h-screen w-64
-        bg-white border-r border-primary-100 flex flex-col
-        transition-transform duration-200
-        ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
-      `}
-      >
-        {/* 로고 */}
-        <div className="px-5 py-5 border-b border-primary-100 flex items-center justify-between">
-          <Link
-            href="/"
-            className="text-[1.3rem] font-extrabold tracking-tightest text-primary-900"
-          >
-            In<span className="text-primary-500">Pick</span>
-          </Link>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden text-primary-900/40 hover:text-primary-900"
-          >
-            <X className="w-5 h-5" />
+      <aside className={`fixed left-0 top-0 z-50 flex h-dvh w-[276px] flex-col border-r border-black/[0.06] bg-white transition-transform duration-300 lg:sticky ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
+        <div className="flex h-[72px] items-center justify-between px-6">
+          <Link href="/" aria-label="인픽 홈"><Brand /></Link>
+          <button type="button" aria-label="메뉴 닫기" onClick={() => setSidebarOpen(false)} className="rounded-full p-2 text-black/45 hover:bg-black/[0.05] hover:text-black lg:hidden">
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* 토큰 잔액 */}
-        <Link
-          href="/account/tokens"
-          className="mx-3 mt-3 px-3 py-2.5 rounded-xl border border-amber-200 bg-amber-50 flex items-center justify-between hover:bg-amber-100 transition-colors"
-        >
-          <span className="text-[0.7rem] font-semibold uppercase tracking-widest text-amber-700/70">
-            보유 토큰
-          </span>
-          <span className="inline-flex items-center gap-1 text-base font-extrabold tabular text-amber-700">
-            <Hexagon className="h-3.5 w-3.5 fill-amber-500 text-amber-500" />
-            {balance}
-          </span>
+        <Link href="/account/tokens" className="group mx-4 mb-3 flex items-center justify-between rounded-2xl border border-black/[0.08] bg-[#f7f7f5] px-4 py-3.5 transition hover:bg-[#efefec]">
+          <div>
+            <p className="text-[11px] font-medium text-black/45">사용 가능 토큰</p>
+            <p className="mt-0.5 flex items-center gap-1.5 text-xl font-semibold tabular-nums tracking-[-0.04em]">
+              <Hexagon className="h-3.5 w-3.5 fill-[#f15b4a] text-[#f15b4a]" />{balance.toLocaleString()}
+            </p>
+          </div>
+          <ArrowUpRight className="h-4 w-4 text-black/25 transition group-hover:text-black/65" />
         </Link>
 
-        {/* 네비게이션 */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-4 py-2" aria-label="마이페이지 메뉴">
           {NAV_ITEMS.map((item) => {
-            const active = isActive(item.href);
+            const active = isActive(item.href, item.exact);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
-                  active
-                    ? "bg-primary-500 text-white shadow-cta"
-                    : "text-primary-900/70 hover:bg-primary-50 hover:text-primary-900"
-                }`}
-              >
-                <item.icon
-                  className={`w-4 h-4 ${active ? "text-white" : "text-primary-900/50"}`}
-                />
-                {item.label}
+              <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 text-[14px] font-medium transition ${active ? "bg-[#0d0d0d] text-white" : "text-black/62 hover:bg-black/[0.045] hover:text-black"}`}>
+                <item.icon className="h-[17px] w-[17px]" strokeWidth={1.8} />{item.label}
               </Link>
             );
           })}
         </nav>
 
-        {/* 하단 유저 정보 */}
-        <div className="px-3 py-4 border-t border-primary-100">
-          <div className="px-3 mb-2">
-            <p className="text-sm font-bold text-primary-900 truncate">
-              {displayName}
-            </p>
-            <p className="text-xs text-primary-900/50 truncate">{user.email}</p>
+        <div className="border-t border-black/[0.06] p-4">
+          <div className="mb-2 px-3 py-2">
+            <p className="truncate text-sm font-medium">{displayName}</p>
+            <p className="mt-0.5 truncate text-xs text-black/42">{user.email}</p>
           </div>
-          <button
-            onClick={() => {
-              signOut();
-              router.replace("/");
-            }}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-primary-900/60 hover:bg-primary-50 hover:text-primary-900 w-full transition-colors"
-          >
-            <LogOut className="w-4 h-4 text-primary-900/40" />
-            로그아웃
+          <button type="button" onClick={async () => { await signOut(); router.replace("/"); }} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-black/55 transition hover:bg-black/[0.045] hover:text-black">
+            <LogOut className="h-4 w-4" strokeWidth={1.8} />로그아웃
           </button>
         </div>
       </aside>
 
-      {/* 메인 영역 */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0">
-        {/* 모바일 헤더 */}
-        <header className="lg:hidden bg-white border-b border-primary-100 px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-primary-900/70 hover:text-primary-900"
-          >
-            <Menu className="w-6 h-6" />
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 items-center justify-between bg-white/90 px-4 backdrop-blur-xl lg:hidden">
+          <button type="button" aria-label="마이페이지 메뉴 열기" onClick={() => setSidebarOpen(true)} className="rounded-full p-2 text-black/65 hover:bg-black/[0.05]">
+            <Menu className="h-5 w-5" />
           </button>
-          <Link
-            href="/"
-            className="text-[1.1rem] font-extrabold tracking-tightest text-primary-900"
-          >
-            In<span className="text-primary-500">Pick</span>
-          </Link>
-          <Link
-            href="/account/tokens"
-            className="inline-flex items-center gap-1 rounded-full bg-amber-50 border border-amber-200 px-2 py-1 text-xs font-bold tabular text-amber-700"
-          >
-            <Hexagon className="h-3 w-3 fill-amber-500" />
-            {balance}
+          <Link href="/" aria-label="인픽 홈"><Brand /></Link>
+          <Link href="/account/tokens" aria-label={`보유 토큰 ${balance}개`} className="inline-flex min-w-10 items-center justify-center gap-1 rounded-full bg-[#f4f4f2] px-2.5 py-1.5 text-xs font-semibold tabular-nums">
+            <Hexagon className="h-3 w-3 fill-[#f15b4a] text-[#f15b4a]" />{balance}
           </Link>
         </header>
-
-        <main className="flex-1">{children}</main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
   );

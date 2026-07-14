@@ -43,7 +43,7 @@ export function ContractorFilters(props: ContractorFiltersProps) {
           value={props.search}
           onChange={(e) => props.onSearchChange(e.target.value)}
           placeholder="업체명으로 검색..."
-          className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          className="w-full rounded-full border border-black/[0.08] bg-white py-2.5 pl-9 pr-4 text-sm outline-none transition focus:border-black/40"
         />
       </div>
 
@@ -55,8 +55,8 @@ export function ContractorFilters(props: ContractorFiltersProps) {
             onClick={() => props.onTypeChange(tab.value)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
               props.type === tab.value
-                ? "bg-blue-600 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                ? "bg-[#0d0d0d] text-white"
+                : "bg-white text-black/55 hover:bg-black/[0.04]"
             }`}
           >
             {tab.label}
@@ -71,7 +71,7 @@ export function ContractorFilters(props: ContractorFiltersProps) {
         <select
           value={props.region}
           onChange={(e) => props.onRegionChange(e.target.value)}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-full border border-black/[0.08] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-black/35"
         >
           <option value="">지역 전체</option>
           {REGION_OPTIONS.map((r) => (
@@ -82,7 +82,7 @@ export function ContractorFilters(props: ContractorFiltersProps) {
         <select
           value={props.trade}
           onChange={(e) => props.onTradeChange(e.target.value)}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-full border border-black/[0.08] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-black/35"
         >
           <option value="">공종 전체</option>
           {TRADE_OPTIONS.map((t) => (
@@ -93,7 +93,7 @@ export function ContractorFilters(props: ContractorFiltersProps) {
         <select
           value={props.minRating}
           onChange={(e) => props.onMinRatingChange(Number(e.target.value))}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-full border border-black/[0.08] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-black/35"
         >
           {RATING_OPTIONS.map((r) => (
             <option key={r.value} value={r.value}>{r.label === "전체" ? "평점 전체" : `★ ${r.label}`}</option>
@@ -105,7 +105,7 @@ export function ContractorFilters(props: ContractorFiltersProps) {
         <select
           value={props.sort}
           onChange={(e) => props.onSortChange(e.target.value)}
-          className="px-2.5 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="rounded-full border border-black/[0.08] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-black/35"
         >
           {SORT_OPTIONS.map((s) => (
             <option key={s.value} value={s.value}>{s.label}</option>

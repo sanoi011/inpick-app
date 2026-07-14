@@ -114,22 +114,22 @@ export default function MyBillingPage() {
 
   if (!user && !authLoading) {
     return (
-      <main className="min-h-screen bg-[#F7F7F5] flex items-center justify-center p-4">
+      <div className="flex min-h-[70vh] items-center justify-center p-4">
         <div className="rounded-2xl border border-[#E5E2DD] bg-white p-8 text-center max-w-sm w-full">
           <p className="text-sm text-[#6B6B6B] mb-4">결제 내역은 로그인 후 확인할 수 있습니다.</p>
           <Link href="/auth?redirect=/mypage/billing" className="inline-block rounded-full bg-[#202123] px-5 py-2.5 text-sm font-semibold text-white">
             로그인
           </Link>
         </div>
-      </main>
+      </div>
     );
   }
 
   if (loading || !data) {
     return (
-      <main className="min-h-screen bg-[#F7F7F5] flex items-center justify-center">
+      <div className="flex min-h-[70vh] items-center justify-center">
         <Loader2 className="h-6 w-6 animate-spin text-[#9A9A9A]" />
-      </main>
+      </div>
     );
   }
 
@@ -140,18 +140,19 @@ export default function MyBillingPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#F7F7F5]">
-      <div className="mx-auto max-w-5xl px-4 py-6 md:py-10">
-        <div className="flex items-start justify-between mb-6">
+    <div>
+      <div className="mx-auto max-w-6xl px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
+        <div className="mb-7 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-end">
           <div>
-            <h1 className="text-2xl font-bold text-[#202123] mb-1">결제·토큰 관리</h1>
-            <p className="text-sm text-[#6B6B6B]">
-              토큰 잔액, 결제 내역, PDF 발급권, 이미지 생성 작업을 한 화면에서 확인합니다.
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">BILLING</p>
+            <h1 className="mt-2 text-[30px] font-medium tracking-[-0.055em] sm:text-[36px]">결제·토큰 관리</h1>
+            <p className="mt-2 text-sm text-black/45">
+              토큰 잔액, 결제 내역, 계약견적서 발급권, 이미지 생성 작업을 확인합니다.
             </p>
           </div>
           <button
             onClick={() => setDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-orange-500 text-white text-sm font-bold rounded-full shadow-cta hover:bg-orange-600 whitespace-nowrap"
+            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black/80"
           >
             <Plus className="w-4 h-4" /> 토큰 충전
           </button>
@@ -159,22 +160,22 @@ export default function MyBillingPage() {
 
         {/* 상단 요약 카드 */}
         <div className="grid gap-3 md:grid-cols-3 mb-6">
-          <div className="rounded-2xl border border-[#E5E2DD] bg-white p-5">
+          <div className="rounded-[22px] border border-black/[0.07] bg-white p-5">
             <div className="flex items-center gap-2 text-[#6B6B6B] text-xs mb-1">
               <Coins className="w-4 h-4" /> 사용 가능 토큰
             </div>
-            <p className="text-3xl font-bold text-[#202123]">{totalAvailable.toLocaleString()}</p>
+            <p className="text-3xl font-semibold tracking-[-0.045em] text-[#202123]">{totalAvailable.toLocaleString()}</p>
             {data.wallet.locked_balance > 0 && (
               <p className="text-xs text-[#9A9A9A] mt-1">
                 예약 중 {data.wallet.locked_balance}개 별도
               </p>
             )}
           </div>
-          <div className="rounded-2xl border border-[#E5E2DD] bg-white p-5">
+          <div className="rounded-[22px] border border-black/[0.07] bg-white p-5">
             <div className="flex items-center gap-2 text-[#6B6B6B] text-xs mb-1">
-              <FileText className="w-4 h-4" /> PDF 발급권
+              <FileText className="w-4 h-4" /> 계약견적서 발급권
             </div>
-            <p className="text-3xl font-bold text-[#202123]">
+            <p className="text-3xl font-semibold tracking-[-0.045em] text-[#202123]">
               {
                 data.entitlements.filter(
                   (e) =>
@@ -186,11 +187,11 @@ export default function MyBillingPage() {
             </p>
             <p className="text-xs text-[#9A9A9A] mt-1">미사용 권한 (재다운로드는 무료)</p>
           </div>
-          <div className="rounded-2xl border border-[#E5E2DD] bg-white p-5">
+          <div className="rounded-[22px] border border-black/[0.07] bg-white p-5">
             <div className="flex items-center gap-2 text-[#6B6B6B] text-xs mb-1">
               <AlertTriangle className="w-4 h-4" /> 복구 필요
             </div>
-            <p className="text-3xl font-bold text-[#202123]">
+            <p className="text-3xl font-semibold tracking-[-0.045em] text-[#202123]">
               {data.recoveryCases.length}
             </p>
             <p className="text-xs text-[#9A9A9A] mt-1">관리자 확인 진행 중</p>
@@ -216,18 +217,18 @@ export default function MyBillingPage() {
         )}
 
         {/* 탭 */}
-        <div className="flex gap-1 border-b border-[#E5E2DD] mb-3">
+        <div className="mb-3 flex gap-1 overflow-x-auto border-b border-black/[0.07]">
           {([
             { key: "payments", label: "결제 내역", icon: Receipt },
             { key: "ledger", label: "토큰 내역", icon: Coins },
-            { key: "pdf", label: "PDF 발급권", icon: FileText },
+            { key: "pdf", label: "계약견적서", icon: FileText },
             { key: "generation", label: "이미지 생성", icon: ImageIcon },
             { key: "recovery", label: "복구 상태", icon: AlertTriangle },
           ] as const).map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`inline-flex items-center gap-1.5 px-3 py-2 text-sm font-semibold transition ${
+              className={`inline-flex shrink-0 items-center gap-1.5 px-3 py-2 text-sm font-medium transition ${
                 tab === t.key
                   ? "border-b-2 border-[#202123] text-[#202123]"
                   : "text-[#6B6B6B] hover:text-[#202123]"
@@ -240,7 +241,7 @@ export default function MyBillingPage() {
         </div>
 
         {/* 탭 콘텐츠 */}
-        <div className="rounded-2xl border border-[#E5E2DD] bg-white p-4">
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-4">
           {tab === "payments" && <PaymentsTab payments={data.payments} />}
           {tab === "ledger" && <LedgerTab ledger={data.ledger} />}
           {tab === "pdf" && <EntitlementsTab entitlements={data.entitlements} />}
@@ -255,7 +256,7 @@ export default function MyBillingPage() {
         currentTokens={totalAvailable}
         onProvisioned={() => { reload(); }}
       />
-    </main>
+    </div>
   );
 }
 
@@ -328,7 +329,7 @@ function LedgerTab({ ledger }: { ledger: BillingData["ledger"] }) {
 function EntitlementsTab({ entitlements }: { entitlements: BillingData["entitlements"] }) {
   const active = entitlements.filter((e) => !e.revoked_at);
   if (active.length === 0) {
-    return <EmptyHint text="PDF 발급권이 없습니다." />;
+    return <EmptyHint text="계약견적서 발급권이 없습니다." />;
   }
   return (
     <div className="space-y-1.5">
@@ -341,7 +342,7 @@ function EntitlementsTab({ entitlements }: { entitlements: BillingData["entitlem
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold text-[#202123]">
-                  {isUnlimited ? "PDF 무제한 권한" : "견적서 PDF 발급권"}
+                  {isUnlimited ? "계약견적서 무제한 권한" : "계약견적서 패키지 발급권"}
                   {e.estimate_version && (
                     <span className="ml-2 text-xs text-[#6B6B6B]">version {e.estimate_version}</span>
                   )}

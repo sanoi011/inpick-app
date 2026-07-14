@@ -119,7 +119,9 @@ export default function MyPageDashboard() {
   }, [loadDashboard]);
 
   const timeAgo = (dateStr: string) => {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const createdAt = new Date(dateStr).getTime();
+    if (!Number.isFinite(createdAt)) return "최근";
+    const diff = Date.now() - createdAt;
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "방금";
     if (mins < 60) return `${mins}분 전`;
@@ -133,28 +135,24 @@ export default function MyPageDashboard() {
       label: "진행중 프로젝트",
       value: stats.activeProjects,
       icon: FolderKanban,
-      iconBg: "bg-primary-100 text-primary-600",
       href: "/mypage/projects",
     },
     {
       label: "활성 계약",
       value: stats.activeContracts,
       icon: FileSignature,
-      iconBg: "bg-indigo-100 text-indigo-600",
       href: "/mypage/contracts",
     },
     {
       label: "새 알림",
       value: stats.unreadNotifications,
       icon: Bell,
-      iconBg: "bg-emerald-100 text-emerald-600",
       href: "/mypage/notifications",
     },
     {
       label: "보유 토큰",
       value: balance,
       icon: Hexagon,
-      iconBg: "bg-amber-100 text-amber-600",
       // 잔액 카드는 충전이 아니라 "어떻게 충전·사용됐는지" 로그로 — 충전은 quickActions의 토큰 충전
       href: "/mypage/billing",
     },
@@ -166,83 +164,69 @@ export default function MyPageDashboard() {
       description: "AI 인테리어 견적 시작",
       icon: Plus,
       href: "/workflow",
-      bg: "bg-primary-500 text-white hover:bg-primary-600",
+      primary: true,
     },
     {
       label: "업체 찾기",
       description: "검증된 시공업체 탐색",
       icon: Search,
       href: "/find-contractors",
-      bg: "bg-primary-900 text-white hover:bg-primary-800",
+      primary: false,
     },
     {
       label: "토큰 충전",
       description: "AI 이미지 생성 토큰",
       icon: Zap,
       href: "/account/tokens",
-      bg: "bg-amber-500 text-white hover:bg-amber-600",
+      primary: false,
     },
     {
       label: "고객센터",
       description: "도움이 필요하신가요?",
       icon: HelpCircle,
       href: "/mypage/support",
-      bg: "bg-zinc-700 text-white hover:bg-zinc-800",
+      primary: false,
     },
   ];
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
-      {/* 인사 배너 — InPick 톤 */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary-500 via-primary-400 to-amber-400 p-7 text-white shadow-card">
-        <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/15 blur-2xl" />
-        <div className="absolute -left-8 -bottom-8 h-40 w-40 rounded-full bg-amber-200/30 blur-2xl" />
-        <div className="relative">
-          <p className="text-[0.7rem] font-bold uppercase tracking-[0.2em] text-white/70">
-            마이페이지
-          </p>
-          <h1 className="mt-2 text-3xl font-extrabold tracking-tightest">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-7 sm:px-6 sm:py-10 lg:px-10">
+      <section className="flex flex-col justify-between gap-6 rounded-[28px] border border-black/[0.07] bg-white p-6 sm:flex-row sm:items-end sm:p-8">
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">MY INPICK</p>
+          <h1 className="mt-3 text-[30px] font-medium leading-tight tracking-[-0.055em] sm:text-[38px]">
             안녕하세요, {displayName}님
           </h1>
-          <p className="mt-2 text-sm text-white/85">
-            인테리어 프로젝트를 관리하고 진행 상황을 확인하세요.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-3 text-[0.78rem]">
-            <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur">
-              <span className="font-bold tabular">{balance}</span> 토큰 보유
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur">
-              누적 사용 <span className="font-bold tabular">{totalUsed}</span>
-            </span>
-            <span className="rounded-full bg-white/15 px-3 py-1 backdrop-blur">
-              누적 충전 <span className="font-bold tabular">{totalPurchased}</span>
-            </span>
+          <p className="mt-2 text-sm leading-6 text-black/48">프로젝트와 계약 진행 상황을 한눈에 확인하세요.</p>
+          <div className="mt-5 flex flex-wrap gap-2 text-xs text-black/58">
+            <span className="rounded-full bg-[#f4f4f2] px-3 py-1.5"><b className="font-semibold text-black">{balance}</b> 토큰 보유</span>
+            <span className="rounded-full bg-[#f4f4f2] px-3 py-1.5">누적 사용 <b className="font-semibold text-black">{totalUsed}</b></span>
+            <span className="rounded-full bg-[#f4f4f2] px-3 py-1.5">누적 충전 <b className="font-semibold text-black">{totalPurchased}</b></span>
           </div>
         </div>
-      </div>
+        <Link href="/workflow" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-full bg-[#0d0d0d] px-5 text-sm font-medium text-white transition hover:bg-black/80">
+          <Plus className="h-4 w-4" />무료 인테리어 디자인
+        </Link>
+      </section>
 
       {/* 4개 요약 카드 */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {summaryCards.map((card) => (
           <Link
             key={card.label}
             href={card.href}
-            className="group rounded-2xl border border-primary-100 bg-white px-5 py-5 shadow-card transition-all hover:border-primary-300 hover:shadow-card-hover"
+            className="group rounded-[22px] border border-black/[0.07] bg-white p-5 transition hover:-translate-y-0.5 hover:border-black/20"
           >
             <div className="flex items-center justify-between mb-3">
-              <span
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-xl ${card.iconBg}`}
-              >
-                <card.icon className="h-4 w-4" />
-              </span>
-              <ChevronRight className="h-3.5 w-3.5 text-primary-900/30 group-hover:text-primary-500 transition-colors" />
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4f4f2] text-black/70"><card.icon className="h-4 w-4" strokeWidth={1.8} /></span>
+              <ChevronRight className="h-3.5 w-3.5 text-black/20 transition-colors group-hover:text-black/70" />
             </div>
-            <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/40">
+            <p className="text-[11px] font-medium text-black/42">
               {card.label}
             </p>
-            <p className="mt-1 text-2xl font-extrabold tabular tracking-tighter text-primary-900">
+            <p className="mt-1 text-2xl font-semibold tabular-nums tracking-[-0.04em]">
               {loading ? (
-                <span className="inline-block w-10 h-7 bg-primary-100 rounded animate-pulse" />
+                <span className="inline-block h-7 w-10 animate-pulse rounded bg-black/[0.07]" />
               ) : (
                 card.value.toLocaleString()
               )}
@@ -251,16 +235,16 @@ export default function MyPageDashboard() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid gap-5 lg:grid-cols-2">
         {/* 최근 알림 */}
-        <div className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-primary-100 flex items-center justify-between">
-            <h2 className="text-sm font-bold tracking-tight text-primary-900">
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
+          <div className="flex items-center justify-between border-b border-black/[0.06] px-5 py-4">
+            <h2 className="text-sm font-semibold tracking-[-0.02em]">
               최근 알림
             </h2>
             <Link
               href="/mypage/notifications"
-              className="text-xs font-semibold text-primary-600 hover:text-primary-700"
+              className="text-xs font-medium text-black/46 hover:text-black"
             >
               전체 보기 →
             </Link>
@@ -268,36 +252,36 @@ export default function MyPageDashboard() {
           {loading ? (
             <div className="p-5 space-y-2">
               {[1, 2, 3].map((i) => (
-                <div key={i} className="h-12 bg-primary-50 rounded-lg animate-pulse" />
+                <div key={i} className="h-12 animate-pulse rounded-xl bg-black/[0.045]" />
               ))}
             </div>
           ) : recentNotifications.length === 0 ? (
             <div className="p-10 text-center">
-              <Bell className="w-8 h-8 mx-auto mb-2 text-primary-200" />
-              <p className="text-sm text-primary-900/40">새 알림이 없습니다</p>
+              <Bell className="mx-auto mb-2 h-8 w-8 text-black/18" strokeWidth={1.5} />
+              <p className="text-sm text-black/40">새 알림이 없습니다</p>
             </div>
           ) : (
-            <div className="divide-y divide-primary-50">
+            <div className="divide-y divide-black/[0.05]">
               {recentNotifications.map((n) => (
                 <Link
                   key={n.id}
                   href={n.link || "/mypage/notifications"}
-                  className={`px-5 py-3 flex items-center gap-3 hover:bg-primary-50/50 transition-colors ${
-                    !n.isRead ? "bg-amber-50/30" : ""
+                  className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-black/[0.025] ${
+                    !n.isRead ? "bg-[#f7f7f5]" : ""
                   }`}
                 >
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-sm truncate ${!n.isRead ? "font-bold text-primary-900" : "text-primary-900/70"}`}
+                      className={`truncate text-sm ${!n.isRead ? "font-semibold" : "text-black/64"}`}
                     >
                       {n.title}
                     </p>
-                    <p className="text-xs text-primary-900/40 mt-0.5">
+                    <p className="mt-0.5 text-xs text-black/36">
                       {timeAgo(n.createdAt)}
                     </p>
                   </div>
                   {!n.isRead && (
-                    <span className="w-2 h-2 rounded-full bg-primary-500 flex-shrink-0" />
+                    <span className="h-2 w-2 flex-shrink-0 rounded-full bg-[#0d0d0d]" />
                   )}
                 </Link>
               ))}
@@ -306,18 +290,18 @@ export default function MyPageDashboard() {
         </div>
 
         {/* 빠른 액션 */}
-        <div className="rounded-2xl border border-primary-100 bg-white shadow-card overflow-hidden">
-          <div className="px-5 py-4 border-b border-primary-100">
-            <h2 className="text-sm font-bold tracking-tight text-primary-900">
+        <div className="overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
+          <div className="border-b border-black/[0.06] px-5 py-4">
+            <h2 className="text-sm font-semibold tracking-[-0.02em]">
               빠른 액션
             </h2>
           </div>
-          <div className="p-4 grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-2 gap-2.5 p-4">
             {quickActions.map((action) => (
               <Link
                 key={action.label}
                 href={action.href}
-                className={`relative rounded-xl p-4 transition-all hover:scale-[1.02] ${action.bg}`}
+                className={`relative rounded-2xl border p-4 transition hover:-translate-y-0.5 ${action.primary ? "border-[#0d0d0d] bg-[#0d0d0d] text-white" : "border-black/[0.07] bg-[#f7f7f5] text-[#0d0d0d] hover:border-black/20"}`}
               >
                 <action.icon className="w-5 h-5 mb-2" />
                 <p className="text-sm font-bold">{action.label}</p>
