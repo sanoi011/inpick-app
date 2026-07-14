@@ -29,7 +29,22 @@ import {
 // 빠른 진입 모드 — 평수 프리셋
 const QUICK_PYEONG_PRESETS = [10, 15, 20, 24, 30, 34, 40, 50];
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 3;
+
+function sanitizeRestoredStep1(state: Step1Data): Step1Data {
+  // 네트워크 요청 중 저장된 일시 상태를 그대로 복원하면 새로고침 후 영구 로딩에 빠진다.
+  // 처리 결과가 없는 경우에만 normalizing을 내려 AddressMode가 요청을 한 번 다시 시작하게 한다.
+  if (!state.basicInfo.normalizing || state.basicInfo.cleanedImageUrl) return state;
+  return {
+    ...state,
+    basicInfo: {
+      ...state.basicInfo,
+      normalizing: false,
+      normalizationStartedAt: undefined,
+      normalizationWarning: undefined,
+    },
+  };
+}
 
 export default function WorkflowPage() {
   const router = useRouter();
@@ -132,7 +147,7 @@ export default function WorkflowPage() {
         const s1raw = sessionStorage.getItem("workflow_step1");
         const s2raw = sessionStorage.getItem("workflow_step2");
         const stepRaw = sessionStorage.getItem("workflow_step");
-        if (s1raw) s1 = JSON.parse(s1raw) as Step1Data;
+        if (s1raw) s1 = sanitizeRestoredStep1(JSON.parse(s1raw) as Step1Data);
         if (s2raw) s2 = JSON.parse(s2raw) as Step2Data;
         if (stepRaw === "2") lastStep = 2;
       } catch (e) {
@@ -170,7 +185,9 @@ export default function WorkflowPage() {
           if (dbRow?.exists && dbRow.workflowState) {
             const ws = dbRow.workflowState;
             // sessionStorage가 비어있으면 DB 사용 / 있으면 둘 다 활용
-            if (!s1 && ws.step1) s1 = ws.step1 as unknown as Step1Data;
+            if (!s1 && ws.step1) {
+              s1 = sanitizeRestoredStep1(ws.step1 as unknown as Step1Data);
+            }
             if (!s2 && ws.step2) s2 = ws.step2 as unknown as Step2Data;
             if (lastStep === 1 && ws.lastStep === 2) lastStep = 2;
           }
@@ -313,6 +330,14 @@ export default function WorkflowPage() {
       return;
     }
 
+    // 주소에서 받은 원본 도면으로 이미 진행 가능 상태가 됐다면 AI 분석을 다시 기다리지 않는다.
+    // 백그라운드 정밀 분석이 늦거나 실패해도 Step2에서 원본 도면을 그대로 사용할 수 있다.
+    if (bi.mode === "address" && bi.normalizedImageUrl) {
+      if (bi.normalizationWarning) setNormalizeError(bi.normalizationWarning);
+      setStep(2);
+      return;
+    }
+
     setNormalizing(true);
     setNormalizeError(null);
     try {
@@ -367,14 +392,14 @@ export default function WorkflowPage() {
 
   if (!workflowReady) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,#FFF6F5_0%,#FDE5DF_48%,#EFE8DC_100%)] px-6 text-primary-900">
-        <div className="w-full max-w-sm rounded-[28px] border border-white/70 bg-white/80 p-7 text-center shadow-card-hover backdrop-blur">
+      <main className="flex min-h-screen items-center justify-center bg-white px-6 text-black">
+        <div className="w-full max-w-sm rounded-[28px] border border-black/[0.07] bg-white p-7 text-center shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
           <div className="relative mx-auto h-14 w-14">
-            <div className="absolute inset-0 rounded-full border-4 border-primary-100" />
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-primary-500 border-r-primary-500" />
+            <div className="absolute inset-0 rounded-full border-4 border-black/[0.06]" />
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-r-primary-500 border-t-primary-500" />
           </div>
-          <p className="mt-4 text-base font-extrabold">디자인 작업을 불러오는 중</p>
-          <p className="mt-1 text-xs text-primary-900/55">저장된 Step 2 화면으로 바로 돌아갑니다.</p>
+          <p className="mt-4 text-base font-semibold">디자인 작업을 불러오는 중</p>
+          <p className="mt-1 text-xs text-black/45">저장된 디자인 화면으로 바로 돌아갑니다.</p>
         </div>
       </main>
     );
@@ -382,35 +407,7 @@ export default function WorkflowPage() {
 
   return (
     <LenisProvider>
-      <main className="relative min-h-screen overflow-hidden bg-[#FFF6F5] text-primary-900">
-        {/* STEP 01 — 이미지 배경 + 메인 톤 오버랩 */}
-        {step === 1 && (
-          <div className="pointer-events-none absolute inset-0" aria-hidden>
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: "url(/images/workflow-step1-bg.jpg)" }}
-            />
-            {/* 메인 톤 오버랩 (오렌지-레드 #F73B20 + 살구 그라데이션) */}
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(247,59,32,0.55)_0%,rgba(255,107,53,0.45)_45%,rgba(253,203,196,0.55)_100%)]" />
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(255,246,245,0.35),transparent_55%)]" />
-            <div className="absolute -right-[15%] top-[5%] h-[520px] w-[520px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.32),transparent_70%)] blur-3xl" />
-            <div className="absolute -left-[10%] top-[40%] h-[460px] w-[460px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.28),transparent_70%)] blur-3xl" />
-          </div>
-        )}
-
-        {/* STEP 02 — 이미지 배경 + 메인 톤 오버랩 */}
-        {step === 2 && (
-          <div className="pointer-events-none absolute inset-0" aria-hidden>
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: "url(/images/workflow-step2-bg.jpg)" }}
-            />
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(247,59,32,0.50)_0%,rgba(253,203,196,0.55)_55%,rgba(255,246,245,0.65)_100%)]" />
-            <div className="absolute inset-x-0 top-0 h-[60%] bg-[radial-gradient(ellipse_at_top,rgba(255,246,245,0.30),transparent_60%)]" />
-            <div className="absolute right-[-10%] top-[10%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.20),transparent_70%)] blur-3xl" />
-            <div className="absolute left-[-12%] top-[40%] h-[360px] w-[360px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.18),transparent_70%)] blur-3xl" />
-          </div>
-        )}
+      <main className="relative min-h-screen overflow-hidden bg-[#f7f7f5] text-[#0d0d0d]">
 
         <Notch step={step} total={TOTAL_STEPS} />
 
@@ -445,25 +442,23 @@ export default function WorkflowPage() {
 
         {/* 헤더 */}
         <header
-          className={`relative z-30 mx-auto flex items-center justify-between px-4 lg:px-6 ${
-            step === 2 ? "max-w-screen-2xl pt-4 lg:pt-5" : "max-w-7xl px-6 pt-12 lg:px-8 lg:pt-14"
+          className={`relative z-30 mx-auto flex items-center justify-between ${
+            step === 2 ? "max-w-[1600px] px-4 pt-4 lg:px-6 lg:pt-5" : "max-w-[1500px] px-5 pt-4 sm:px-8 lg:px-10 lg:pt-5"
           }`}
         >
           <div className="flex items-center gap-3">
             {step === 2 ? (
               <button
                 onClick={goPrev}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-primary-200 bg-white/80 text-primary-900 backdrop-blur hover:bg-white"
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black/65 transition hover:bg-black/[0.035]"
                 aria-label="이전 단계"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
             ) : (
-              <a
-                href="/"
-                className="text-[1.3rem] font-extrabold tracking-tightest text-primary-900"
-              >
-                In<span className="text-primary-500">Pick</span>
+              <a href="/" className="flex items-center gap-2.5">
+                <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+                <span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
               </a>
             )}
           </div>
@@ -474,8 +469,8 @@ export default function WorkflowPage() {
         <section
           className={`relative z-20 mx-auto ${
             step === 2
-              ? "max-w-screen-2xl px-4 lg:px-6 py-3 lg:py-4"
-              : "max-w-7xl px-6 lg:px-8 py-12 lg:py-16"
+              ? "max-w-[1600px] px-4 py-4 lg:px-6 lg:py-5"
+              : "max-w-[1500px] px-5 pb-20 pt-16 sm:px-8 lg:px-10 lg:pt-20"
           }`}
         >
           <AnimatePresence mode="wait">
@@ -488,20 +483,18 @@ export default function WorkflowPage() {
                 transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
               >
                 <div className="max-w-3xl">
-                  <p className="text-[0.78rem] font-semibold uppercase tracking-widest text-primary-600">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
                     STEP 01
                   </p>
-                  <h1 className="mt-3 text-[2.4rem] font-extrabold leading-[1.02] tracking-tightest text-primary-900 sm:text-[3.4rem] lg:text-[4rem]">
-                    주소·예산·시공범위만
-                    <br />
-                    <span className="text-gradient-primary">알려주세요.</span>
+                  <h1 className="mt-3 break-keep text-[32px] font-medium leading-[1.08] tracking-[-0.06em] text-black sm:text-[44px] lg:text-[52px]">
+                    어떤 공간을 바꾸고 싶으세요?
                   </h1>
-                  <p className="mt-5 max-w-xl text-[0.98rem] leading-relaxed text-primary-900/70">
-                    이 세 가지로 평면도 자동 인식·공식 단가 적용·공간별 디자인 시안까지 다 자동입니다.
+                  <p className="mt-4 max-w-xl text-[13px] leading-6 text-black/48 sm:text-[14px]">
+                    주소·도면·사진 중 편한 방법으로 시작하세요. 공간 정보부터 AI 디자인과 견적까지 이어집니다.
                   </p>
                 </div>
 
-                <div className="mt-12">
+                <div className="mt-10 lg:mt-12">
                   <Step1Cards
                     value={step1}
                     onChange={setStep1}
@@ -569,13 +562,13 @@ export default function WorkflowPage() {
                 transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
               >
                 {/* Step2 — 한 줄 압축 헤더 (큰 여백 제거) */}
-                <div className="mb-3 flex items-center gap-3 flex-wrap">
-                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-primary-600">
+                <div className="mb-4 flex flex-wrap items-center gap-3 px-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
                     STEP 02
                   </p>
-                  <span className="text-primary-300">·</span>
-                  <h1 className="text-base font-bold tracking-tight text-primary-900">
-                    실별 AI 디자인 → <span className="text-gradient-primary">자재 견적 자동 흐름</span>
+                  <span className="text-black/15">·</span>
+                  <h1 className="text-[15px] font-semibold tracking-[-0.03em] text-black sm:text-[17px]">
+                    공간별 AI 디자인과 자재 편집
                   </h1>
                   {normalizeError && (
                     <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[0.65rem] text-amber-700">
@@ -808,7 +801,7 @@ export default function WorkflowPage() {
 
         {/* 하단 stepper — jeton walkthrough 패턴 (활성 dot width 확장) */}
         <footer className="sticky bottom-[calc(1.5rem+env(safe-area-inset-bottom))] z-30 mx-auto flex max-w-md items-center justify-center px-6 pb-6">
-          <div className="inline-flex items-center gap-2 rounded-full border border-primary-200/60 bg-white/85 px-4 py-2 backdrop-blur-md">
+          <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/90 px-4 py-2 backdrop-blur-md">
             {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
               const idx = i + 1;
               const active = idx === step;
@@ -818,15 +811,15 @@ export default function WorkflowPage() {
                   key={i}
                   className={`h-1.5 rounded-full transition-all duration-500 ${
                     active
-                      ? "w-7 bg-primary-500"
+                      ? "w-7 bg-black"
                       : done
-                      ? "w-3 bg-primary-300"
-                      : "w-3 bg-primary-100"
+                      ? "w-3 bg-black/35"
+                      : "w-3 bg-black/10"
                   }`}
                 />
               );
             })}
-            <span className="ml-2 text-[0.7rem] font-semibold tabular text-primary-900/60">
+            <span className="ml-2 text-[0.7rem] font-semibold tabular text-black/48">
               {step}/{TOTAL_STEPS}
             </span>
           </div>

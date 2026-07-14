@@ -1275,12 +1275,12 @@ export default function Step2Designer({
   return (
     // 캡처 레퍼런스 레이아웃: 좌측 베이지 사이드바 + 메인 흰색(#F8F9F6) 캔버스
     // 채팅 무한 늘어남 X — 화면 높이 고정, 메시지 영역만 스크롤
-    <div className="grid gap-3 lg:grid-cols-[260px_1fr] items-stretch min-h-[calc(100vh-180px)] rounded-2xl bg-[#EFE8DC] p-3">
+    <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-[#eeece8] p-3 lg:grid-cols-[268px_1fr]">
       {/* ─── 좌측 툴바 (베이지 톤 — 대표 지시) ─── */}
       <aside className="flex flex-col gap-3">
         {/* 전체 인테리어 이미지 한번에 생성 — 좌측 상단 (방 선택 위) */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
-          <p className="text-xs font-bold text-primary-700 mb-2">
+        <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
+          <p className="mb-2 text-xs font-semibold text-black">
             전체 인테리어 이미지 한번에 생성
           </p>
           <div className="grid grid-cols-2 gap-1.5">
@@ -1294,22 +1294,22 @@ export default function Step2Designer({
                   );
                 }}
                 disabled={generating}
-                className="rounded-lg border border-primary-100 bg-primary-50/50 px-2 py-1.5 text-[0.7rem] font-semibold text-primary-900 hover:bg-primary-100 hover:border-primary-300 disabled:opacity-30 transition-all"
+                className="rounded-lg border border-black/[0.07] bg-[#f7f7f5] px-2 py-1.5 text-[0.7rem] font-semibold text-black/60 transition hover:bg-black/[0.06] hover:text-black disabled:opacity-30"
               >
                 {preset}
               </button>
             ))}
           </div>
-          <p className="mt-1.5 text-[0.65rem] text-primary-900/50 leading-snug">
+          <p className="mt-1.5 text-[0.65rem] leading-snug text-black/38">
             클릭 시 프롬프트에 추가 → 입력 완료 후 [전체 일괄 생성] 클릭
           </p>
         </div>
 
         {/* 방 선택 */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
+        <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <div className="flex items-center justify-between mb-2 px-1">
-            <p className="text-xs font-bold text-primary-700">방 선택</p>
-            <span className="text-[0.6rem] tabular text-primary-900/50">{pyeongLabel}</span>
+            <p className="text-xs font-semibold text-black">방 선택</p>
+            <span className="text-[0.6rem] tabular text-black/38">{pyeongLabel}</span>
           </div>
           <div className="space-y-1">
             {availableTabs.map((t) => {
@@ -1342,15 +1342,15 @@ export default function Step2Designer({
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all ${
                       isGeneratingThis
-                        ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white shadow-cta ring-2 ring-amber-300 ring-offset-1 animate-pulse"
+                        ? "animate-pulse bg-primary-500 text-white ring-2 ring-primary-200 ring-offset-1"
                         : sel
                         ? isAll
-                          ? "bg-gradient-to-r from-primary-500 to-amber-400 text-white shadow-cta"
-                          : "bg-primary-500 text-white shadow-cta"
+                          ? "bg-black text-white"
+                          : "bg-black text-white"
                         : isAll
-                          ? "bg-gradient-to-r from-primary-50 to-amber-50 text-primary-900 border border-primary-200 hover:from-primary-100 hover:to-amber-100"
+                          ? "border border-black/[0.08] bg-[#f7f7f5] text-black hover:bg-black/[0.06]"
                           : isSelectedInStep1
-                            ? "bg-primary-50/30 text-primary-900/70 hover:bg-primary-100 hover:text-primary-900"
+                            ? "bg-white text-black/58 hover:bg-black/[0.035] hover:text-black"
                             : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
                     }`}
                   >
@@ -1431,7 +1431,7 @@ export default function Step2Designer({
             })}
             {/* 사용자 실 추가 — 모든 모드 공통 */}
             {showAddTabInput ? (
-              <div className="flex items-center gap-1.5 rounded-lg border border-primary-200 bg-primary-50/40 px-2 py-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-[#f7f7f5] px-2 py-1.5">
                 <input
                   type="text"
                   value={newTabLabel}
@@ -1445,12 +1445,12 @@ export default function Step2Designer({
                   }}
                   placeholder="실 이름 입력 (예: 서재, 다용도실)"
                   autoFocus
-                  className="flex-1 rounded bg-white border border-primary-200 px-2 py-1 text-xs outline-none focus:border-primary-400"
+                  className="flex-1 rounded border border-black/10 bg-white px-2 py-1 text-xs outline-none focus:border-black/30"
                 />
                 <button
                   type="button"
                   onClick={addCustomTab}
-                  className="rounded bg-primary-500 px-2 py-1 text-xs font-bold text-white hover:bg-primary-600"
+                  className="rounded bg-black px-2 py-1 text-xs font-bold text-white hover:bg-black/75"
                 >
                   추가
                 </button>
@@ -1459,7 +1459,7 @@ export default function Step2Designer({
               <button
                 type="button"
                 onClick={() => setShowAddTabInput(true)}
-                className="w-full rounded-lg border border-dashed border-primary-300 bg-white/50 px-3 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50 hover:border-primary-400"
+                className="w-full rounded-lg border border-dashed border-black/15 bg-white px-3 py-1.5 text-xs font-semibold text-black/48 hover:bg-black/[0.035] hover:text-black"
               >
                 + 실 추가
               </button>
@@ -1468,20 +1468,20 @@ export default function Step2Designer({
         </div>
 
         {/* 보유 토큰 */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-amber-200/60 p-3 shadow-sm">
+        <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-bold text-amber-700">보유 토큰</p>
-            <span className="text-lg tabular font-extrabold text-amber-700">
+            <p className="text-xs font-semibold text-black">보유 토큰</p>
+            <span className="text-lg tabular font-semibold text-primary-500">
               ⬢ {tokenBalance}
             </span>
           </div>
-          <p className="mt-1 text-[0.65rem] text-amber-700/70 leading-snug">
+          <p className="mt-1 text-[0.65rem] leading-snug text-black/38">
             1차 미리보기 무료 · 부위 선택 무료 · 자재 재렌더 2
           </p>
         </div>
 
         {/* 생성 결과 유무와 관계없이 항상 보이는 자재 수정 진입점 */}
-        <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
+        <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <input
             ref={materialFileInputRef}
             type="file"
@@ -1493,12 +1493,12 @@ export default function Step2Designer({
             }}
           />
           <div className="flex items-start gap-2">
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-emerald-500 text-white shadow-sm">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-500">
               <Crosshair className="h-4 w-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-extrabold text-primary-900">부위별 자재 선택·수정</p>
-              <p className="mt-0.5 text-[0.64rem] leading-snug text-primary-900/55">
+              <p className="text-xs font-semibold text-black">부위별 자재 선택·수정</p>
+              <p className="mt-0.5 text-[0.64rem] leading-snug text-black/42">
                 바닥·벽을 클릭해 경계를 확인하고 원하는 자재로 변경
               </p>
             </div>
@@ -1527,7 +1527,7 @@ export default function Step2Designer({
               다른 사진 업로드
             </button>
           )}
-          <p className="mt-2 text-center text-[0.58rem] font-medium text-primary-900/45">
+          <p className="mt-2 text-center text-[0.58rem] font-medium text-black/35">
             영역 선택 무료 · 실제 자재 재렌더 2토큰
           </p>
         </div>
@@ -1537,8 +1537,8 @@ export default function Step2Designer({
           layout
           className={`relative mt-auto min-h-[154px] overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
             estimateTransitioning
-              ? "border-primary-400 bg-gradient-to-br from-primary-600 via-primary-500 to-amber-500 text-white shadow-cta"
-              : "border-amber-200/60 bg-white/80 backdrop-blur"
+              ? "border-black bg-black text-white shadow-[0_14px_35px_rgba(0,0,0,0.16)]"
+              : "border-black/[0.07] bg-white"
           }`}
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -1581,24 +1581,24 @@ export default function Step2Designer({
                 exit={{ opacity: 0 }}
               >
                 <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-xs font-bold text-primary-700">진행 상황</p>
-                  <span className="text-[0.65rem] tabular font-bold text-primary-900">
+                  <p className="text-xs font-semibold text-black">진행 상황</p>
+                  <span className="text-[0.65rem] tabular font-bold text-black">
                     {completedCount}/{totalCount}
                   </span>
                 </div>
-                <div className="h-1.5 rounded-full bg-primary-50 overflow-hidden">
+                <div className="h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
                   <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
                     transition={{ duration: 0.5 }}
-                    className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
+                    className="h-full bg-primary-500"
                   />
                 </div>
                 <button
                   type="button"
                   onClick={() => void handleEstimateTransition()}
-                  className={`relative z-10 mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-lg bg-primary-500 px-3 py-2.5 text-xs font-bold text-white shadow-cta transition-all hover:bg-primary-600 ${
-                    allRoomsDecided ? "ring-2 ring-primary-200" : ""
+                  className={`relative z-10 mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-full bg-black px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-black/75 ${
+                    allRoomsDecided ? "ring-2 ring-black/10" : ""
                   }`}
                 >
                   {allRoomsDecided ? "디자인 완료 → 견적 요청" : "디자인 완료 · 견적 요청 (계속)"}
@@ -1609,7 +1609,7 @@ export default function Step2Designer({
                     {estimateTransitionError} 다시 시도해 주세요.
                   </p>
                 )}
-                <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-primary-900/45">
+                <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-black/35">
                   누르면 카드가 진행 상태로 바뀐 뒤 견적서로 이동합니다.
                 </p>
               </motion.div>
@@ -1620,10 +1620,10 @@ export default function Step2Designer({
 
       {/* ─── 메인 캔버스: 흰색 톤(#F8F9F6) — 대표 지시 ─── */}
       <section className="relative flex flex-col">
-        <div className="relative rounded-3xl bg-[#F8F9F6] border border-amber-200/40 shadow-sm flex-1 min-h-[480px] max-h-[calc(100vh-220px)] flex flex-col overflow-hidden">
+        <div className="relative flex max-h-[calc(100vh-220px)] min-h-[480px] flex-1 flex-col overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
           {/* Step1 선택 정보 — 캔버스 최상단 (주소/단지/평형/면적/확장형/예산) */}
           {(basicInfo.selectedAddress || basicInfo.selectedComplex || basicInfo.selectedPyeong) && (
-            <div className="px-5 py-2 bg-[#EFE8DC]/40 border-b border-amber-100/60 text-[0.7rem] text-primary-900/70 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/[0.06] bg-[#f7f7f5] px-5 py-2 text-[0.7rem] text-black/55">
               {basicInfo.selectedAddress?.roadAddress && (
                 <span className="inline-flex items-center gap-1">
                   <span className="text-primary-900/40">주소</span>
@@ -1696,10 +1696,10 @@ export default function Step2Designer({
             );
           })()}
           {/* 채팅 헤더 (단조롭게 — 캡처 레퍼런스 스타일) */}
-          <div className="px-5 py-3 border-b border-amber-100/60 flex items-center justify-between gap-3 flex-wrap bg-[#F8F9F6]/80">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-5 py-3">
             <div className="flex items-center gap-2 min-w-0">
               <Sparkles className="h-4 w-4 text-primary-500 shrink-0" />
-              <p className="text-sm font-bold text-primary-900 truncate">
+              <p className="truncate text-sm font-semibold text-black">
                 {ROOM_TABS.find((t) => t.v === activeRoom)?.label} · AI 디자인 챗
               </p>
               <span className="hidden sm:inline text-[0.65rem] text-primary-900/50 tabular ml-1">
@@ -1713,14 +1713,14 @@ export default function Step2Designer({
               </span>
             </div>
             {/* 모드 토글 — 크게 + 시각적 강조 */}
-            <div className="inline-flex items-center gap-1 rounded-full border-2 border-primary-300 bg-white p-1 shadow-sm">
+            <div className="inline-flex items-center gap-1 rounded-full bg-[#f1f1ef] p-1">
               <button
                 type="button"
                 onClick={() => setChatMode(false)}
                 className={`px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-1.5 transition-all ${
                   !chatMode
-                    ? "bg-primary-500 text-white shadow-cta"
-                    : "text-primary-900/60 hover:text-primary-900 hover:bg-primary-50"
+                    ? "bg-black text-white"
+                    : "text-black/50 hover:bg-white hover:text-black"
                 }`}
               >
                 <Send className="h-3.5 w-3.5" />
@@ -1731,8 +1731,8 @@ export default function Step2Designer({
                 onClick={() => setChatMode(true)}
                 className={`px-4 py-2 rounded-full text-sm font-bold inline-flex items-center gap-1.5 transition-all ${
                   chatMode
-                    ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white shadow-cta"
-                    : "text-primary-900/60 hover:text-primary-900 hover:bg-primary-50"
+                    ? "bg-black text-white"
+                    : "text-black/50 hover:bg-white hover:text-black"
                 }`}
               >
                 <Sparkles className="h-3.5 w-3.5" />
@@ -2419,9 +2419,10 @@ export default function Step2Designer({
       )}
 
       {/* 생성 이미지 위 버튼으로 여는 부위별 자재 수정 작업실 */}
-      <AnimatePresence>
-        {materialEditorOpen && activeRender && selectedIdx != null && typeof document !== "undefined" && createPortal(
-          <>
+      {typeof document !== "undefined" && createPortal(
+        <AnimatePresence>
+          {materialEditorOpen && activeRender && selectedIdx != null && (
+            <>
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -2464,10 +2465,11 @@ export default function Step2Designer({
                 />
               </div>
             </motion.section>
-          </>,
-          document.body,
-        )}
-      </AnimatePresence>
+            </>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
 
       {/* 토큰 부족 모달 */}
       <AnimatePresence>

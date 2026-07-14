@@ -52,6 +52,7 @@ import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseM
 // community v2 (2026-05-14): 커뮤니티 견적 공유
 import EstimateShareModal from "@/components/community/EstimateShareModal";
 import MaterialShopDrawer from "@/components/workflow/MaterialShopDrawer";
+import Notch from "@/components/workflow/Notch";
 // 2026-05-31: 오늘 만든 견적서 4문서 폼으로 교체 (Vision 분석 견적 → 우리 양식)
 import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
 import { constructionEstimateToDetailLines } from "@/lib/estimate-pro/detail-model";
@@ -317,9 +318,9 @@ export default function EstimatePageWithSuspense() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-[#FDF7F4] flex items-center justify-center">
-          <div className="flex items-center gap-3 text-primary-900">
-            <Loader2 className="h-5 w-5 animate-spin" />
+        <main className="flex min-h-screen items-center justify-center bg-white">
+          <div className="flex items-center gap-3 text-black">
+            <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
             <span className="text-sm font-semibold">견적서 불러오는 중…</span>
           </div>
         </main>
@@ -1294,23 +1295,24 @@ function EstimatePage() {
 
   return (
     <LenisProvider>
-      <main className="relative min-h-screen bg-[#FDF7F4] text-primary-900">
+      <main className="relative min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
+        <Notch step={3} total={3} />
         <div className="flex min-h-screen">
           {/* 좌측 아이콘 사이드바 */}
-          <aside className="hidden lg:flex w-16 shrink-0 flex-col items-center gap-1 border-r border-primary-100 bg-white py-6">
+          <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 border-r border-black/[0.07] bg-white py-5 lg:flex">
             <button
               onClick={goBackToDesign}
-              className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-500 text-white shadow-cta hover:bg-primary-600"
+              className="mb-4 inline-flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-500 transition hover:bg-primary-100"
               aria-label="디자인 단계로 돌아가기"
             >
-              <span className="font-extrabold text-sm">iP</span>
+              <span className="hex-mask h-5 w-5 text-primary-500" />
             </button>
             <button
               onClick={() => setFilterRoom(null)}
               className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
                 !filterRoom
-                  ? "bg-primary-500 text-white"
-                  : "text-primary-900/50 hover:bg-primary-50"
+                  ? "bg-black text-white"
+                  : "text-black/40 hover:bg-black/[0.04] hover:text-black"
               }`}
               title="모든 방"
             >
@@ -1326,7 +1328,7 @@ function EstimatePage() {
                   onClick={() => setFilterRoom(sel ? null : koreanName)}
                   title={koreanName}
                   className={`inline-flex h-10 w-10 items-center justify-center rounded-xl transition-colors ${
-                    sel ? "bg-primary-500 text-white" : "text-primary-900/50 hover:bg-primary-50"
+                    sel ? "bg-black text-white" : "text-black/40 hover:bg-black/[0.04] hover:text-black"
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -1337,17 +1339,17 @@ function EstimatePage() {
             <button
               onClick={() => router.push("/account/tokens")}
               title="토큰"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-primary-900/50 hover:bg-primary-50"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-black/40 hover:bg-black/[0.04] hover:text-black"
             >
               <Wallet className="h-4 w-4" />
             </button>
           </aside>
 
           <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between gap-3 px-6 lg:px-10 pt-8 pb-4">
+            <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-20 sm:px-6 lg:px-10">
               <button
                 onClick={goBackToDesign}
-                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-primary-100 bg-white px-3 text-primary-900 shadow-sm transition hover:bg-primary-50"
+                className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full border border-black/10 bg-white px-3 text-black/60 transition hover:bg-black/[0.035] hover:text-black"
                 aria-label="디자인 단계로 돌아가기"
               >
                 <ArrowLeft className="h-4 w-4" />
@@ -1357,7 +1359,7 @@ function EstimatePage() {
                 <button
                   onClick={() => step1 && step2 && runEstimate(step1, step2)}
                   disabled={loading}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-3 py-1.5 text-[0.78rem] font-semibold text-primary-900 hover:bg-primary-50 disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 py-2 text-[0.78rem] font-semibold text-black/60 transition hover:bg-black/[0.035] hover:text-black disabled:opacity-50"
                 >
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                   재산출
@@ -1365,51 +1367,51 @@ function EstimatePage() {
                 <button
                   onClick={() => router.push("/workflow/bidding")}
                   disabled={loading || estimates.length === 0}
-                  className="inline-flex items-center gap-1 rounded-full bg-primary-500 px-4 py-2 text-sm font-semibold tracking-tight text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 rounded-full bg-black px-4 py-2 text-sm font-semibold tracking-tight text-white transition hover:bg-black/75 disabled:opacity-35"
                 >
                   업체 매칭으로 <ArrowRight className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>
 
-            <div className="px-6 lg:px-10">
+            <div className="px-4 sm:px-6 lg:px-10">
               {/* 영어 1개만 — Invoice */}
-              <p className="text-[0.7rem] font-bold uppercase tracking-[0.3em] text-primary-500">
-                Invoice
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
+                STEP 03 · Estimate
               </p>
-              <h1 className="mt-1 text-[2.4rem] lg:text-[3rem] font-extrabold tracking-tightest text-primary-900 leading-none">
-                견적서
+              <h1 className="mt-2 text-[32px] font-medium leading-none tracking-[-0.06em] text-black sm:text-[42px]">
+                디자인 견적 확인
               </h1>
-              <div className="mt-4 inline-flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border border-primary-100 bg-white px-4 py-2.5 max-w-full">
-                <span className="text-sm font-semibold text-primary-900/70 break-keep">
+              <div className="mt-5 inline-flex max-w-full flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[20px] border border-black/[0.07] bg-white px-4 py-3">
+                <span className="break-keep text-sm font-semibold text-black/55">
                   {step1?.basicInfo.selectedAddress?.buildingName || "선택한 공간"}
                 </span>
-                <span className="inline-flex items-center gap-1.5 text-[1.6rem] sm:text-[2rem] font-extrabold tabular leading-none tracking-tight text-primary-900">
+                <span className="inline-flex items-center gap-1.5 text-[1.6rem] font-medium leading-none tracking-[-0.04em] text-black tabular sm:text-[2rem]">
                   ₩ {finalTotal.toLocaleString()}
-                  <ChevronDown className="h-3.5 w-3.5 text-primary-900/40" />
+                  <ChevronDown className="h-3.5 w-3.5 text-black/30" />
                 </span>
               </div>
               {step1 && (
-                <div className="mt-3 flex flex-wrap gap-2 text-[0.78rem] text-primary-900/60">
+                <div className="mt-3 flex flex-wrap gap-2 text-[0.78rem] text-black/48">
                   {step1.basicInfo.selectedPyeong && (
-                    <span className="rounded-full bg-white px-3 py-1 border border-primary-100">
+                    <span className="rounded-full border border-black/[0.07] bg-white px-3 py-1">
                       {step1.basicInfo.selectedPyeong.pyeongName} · 전용 {step1.basicInfo.selectedPyeong.exclusiveArea}㎡
                     </span>
                   )}
                   {step1.basicInfo.expansionType && (
-                    <span className="rounded-full bg-white px-3 py-1 border border-primary-100">
+                    <span className="rounded-full border border-black/[0.07] bg-white px-3 py-1">
                       {step1.basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
                     </span>
                   )}
-                  <span className="rounded-full bg-primary-50 px-3 py-1 border border-primary-200 font-bold tabular text-primary-700">
+                  <span className="rounded-full border border-primary-100 bg-primary-50 px-3 py-1 font-bold text-primary-700 tabular">
                     목표 {budgetMan.toLocaleString()}만원
                   </span>
                 </div>
               )}
             </div>
 
-            <div className="grid gap-5 px-6 lg:px-10 py-8 lg:grid-cols-12">
-              <div className="lg:col-span-8">
+            <div className="grid gap-5 px-4 py-8 sm:px-6 lg:grid-cols-12 lg:px-10">
+              <div className="min-w-0 lg:col-span-8">
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                   <div className="relative">
                     <button
@@ -1417,9 +1419,9 @@ function EstimatePage() {
                         setFilterOpen(!filterOpen);
                         setSortOpen(false);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-[0.85rem] font-semibold text-primary-900 hover:bg-primary-50"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-4 py-2 text-[0.85rem] font-semibold text-black/60 hover:bg-black/[0.035] hover:text-black"
                     >
-                      <Filter className="h-3.5 w-3.5 text-primary-500" />
+                      <Filter className="h-3.5 w-3.5 text-black/45" />
                       필터
                       {filterCat !== "all" && (
                         <span className="ml-1 rounded-full bg-primary-500 px-1.5 py-0.5 text-[0.65rem] text-white">
@@ -1454,9 +1456,9 @@ function EstimatePage() {
                         setSortOpen(!sortOpen);
                         setFilterOpen(false);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-white px-4 py-1.5 text-[0.85rem] font-semibold text-primary-900 hover:bg-primary-50"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-4 py-2 text-[0.85rem] font-semibold text-black/60 hover:bg-black/[0.035] hover:text-black"
                     >
-                      <ArrowUpDown className="h-3.5 w-3.5 text-primary-500" />
+                      <ArrowUpDown className="h-3.5 w-3.5 text-black/45" />
                       정렬
                       {sortBy !== "default" && (
                         <span className="ml-1 text-[0.65rem] text-primary-700">
@@ -1492,12 +1494,12 @@ function EstimatePage() {
                     )}
                   </div>
 
-                  <div className="inline-flex items-center gap-2 rounded-full border border-primary-200 bg-white px-3 py-1.5">
-                    <span className="text-[0.78rem] font-semibold text-primary-900">VAT</span>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-3 py-2">
+                    <span className="text-[0.78rem] font-semibold text-black">VAT</span>
                     <button
                       onClick={() => setVatIncl((v) => !v)}
                       className={`relative h-4 w-7 rounded-full transition-colors ${
-                        vatIncl ? "bg-primary-500" : "bg-neutral-300"
+                        vatIncl ? "bg-black" : "bg-neutral-300"
                       }`}
                     >
                       <span
@@ -2192,7 +2194,7 @@ function EstimatePage() {
                 )}
               </div>
 
-              <aside className="lg:col-span-4">
+              <aside className="min-w-0 lg:col-span-4">
                 <div className="space-y-4 lg:sticky lg:top-6">
                   {!loading && !error && estimates.length > 0 && (
                     <div className="rounded-2xl border border-primary-100 bg-white p-5 shadow-card">

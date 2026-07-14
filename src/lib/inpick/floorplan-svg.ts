@@ -45,9 +45,9 @@ export function buildDimensionOverlaySvg(input: DimensionOverlayInput): string {
     .room-label-bg { fill: rgba(255,255,255,0.92); }
     .room-label { font-size: ${labelFs}px; font-weight: 700; fill: #1a1a1a; text-anchor: middle; }
     .room-dim { font-size: ${dimFs}px; font-weight: 500; fill: #555; text-anchor: middle; }
-    .outer-dim-line { stroke: #F73B20; stroke-width: 6; }
-    .outer-dim-tick { stroke: #F73B20; stroke-width: 6; }
-    .outer-dim-text { font-size: ${labelFs}px; font-weight: 700; fill: #F73B20; text-anchor: middle; }
+    .outer-dim-line { stroke: #111111; stroke-width: 6; }
+    .outer-dim-tick { stroke: #111111; stroke-width: 6; }
+    .outer-dim-text { font-size: ${labelFs}px; font-weight: 700; fill: #111111; text-anchor: middle; }
   </style>`;
 
   if (showRoomLabels || showRoomDimensions) {

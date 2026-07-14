@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureFloorplanBucketExists } from "@/lib/inpick/floorplan-storage";
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "유효하지 않은 URL" }, { status: 400 });
     }
 
+    await ensureFloorplanBucketExists();
     const supa = createAdminClient();
 
     // SHA-256 해시 — 동일 URL은 한 번만 저장
@@ -106,6 +108,16 @@ export async function POST(req: NextRequest) {
       .upload(fileName, imgBuf, { contentType, upsert: true });
     if (uploadErr) {
       console.warn("[floorplan-cache] upload failed:", uploadErr.message);
+      // Storage 버킷이 아직 배포되지 않았어도 네이버 원본 도면 수신 자체는 성공이다.
+      // 캐시는 건너뛰고 원본 URL을 반환해 이후 AI 분석과 사용자 진행을 막지 않는다.
+      if (uploadErr.message.toLowerCase().includes("bucket not found")) {
+        return NextResponse.json({
+          url: sourceUrl,
+          cached: false,
+          sizeBytes: imgBuf.length,
+          storageSkipped: true,
+        });
+      }
       return NextResponse.json(
         { error: "Storage 업로드 실패", detail: uploadErr.message.slice(0, 200) },
         { status: 502 },

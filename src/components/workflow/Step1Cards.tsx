@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "motion/react";
 import { Layers, Check, ChevronDown, Building2, Home, Store, Box, RotateCcw } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import BasicInfoCard, { BasicInfoData } from "./BasicInfoCard";
 
 type BuildingType = "apartment" | "house" | "store" | "etc";
@@ -161,7 +162,9 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   // 기본정보 완료 — 아파트 도면 모드일 때만 강제
   const addressInputDone =
     (value.basicInfo.mode === "address" &&
-      (!!value.basicInfo.selectedPyeong || !!value.basicInfo.selectedAddress)) ||
+      !!value.basicInfo.selectedPyeong &&
+      !!value.basicInfo.cleanedImageUrl &&
+      !value.basicInfo.normalizationWarning) ||
     (value.basicInfo.mode === "upload" && !!value.basicInfo.uploadedFloorplan?.dataUrl) ||
     (value.basicInfo.mode === "lidar" && !!value.basicInfo.lidarScan?.dataUrl);
   const inputDone = isApartmentDrawingMode ? addressInputDone : true;
@@ -182,7 +185,11 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
 
   // P6-2: 도면 정형화 진행 중이면 "내 공간 꾸미기" 버튼 비활성 — Step2에서 도면 기반 생성이 보장되도록
   const normalizing = !!value.basicInfo.normalizing;
-  const allOk = basicDone && scopeOk && !normalizing;
+  const floorplanProcessingFailed =
+    isApartmentDrawingMode &&
+    value.basicInfo.mode === "address" &&
+    !!value.basicInfo.normalizationWarning;
+  const allOk = basicDone && scopeOk && !normalizing && !floorplanProcessingFailed;
   // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
   const missing: string[] = [];
   if (!inputDone) missing.push("주소·평형 또는 도면");
@@ -191,6 +198,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
   if (normalizing) missing.push("도면 정리 완료 대기");
+  if (floorplanProcessingFailed) missing.push("고화질 도면 다시 처리");
 
   // 3-mode entry card 선택 시 workflowEntry + buildingType 함께 세팅
   const selectMode = (entry: WorkflowEntry) => {
@@ -208,7 +216,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   };
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* 상단 — 처음부터 다시 버튼 */}
       {onReset && (
         <div className="flex justify-end">
@@ -222,7 +230,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                 onReset();
               }
             }}
-            className="inline-flex items-center gap-1.5 rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-700 hover:border-primary-400 hover:text-primary-600 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-full border border-black/10 bg-white px-3 py-2 text-[11px] font-semibold text-black/55 transition hover:bg-black/[0.035] hover:text-black"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             처음부터 다시
@@ -232,17 +240,17 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
 
       {/* 3-mode entry — 어떻게 시작할까요? (MD plan §3-1) */}
       {!value.workflowEntry && (
-        <div className="rounded-[28px] border border-primary-100 bg-white/85 p-6 shadow-card backdrop-blur-2xl">
-          <p className="text-[0.7rem] font-bold uppercase tracking-widest text-primary-500">
-            INPICK 시작하기
+        <div className="rounded-[26px] border border-black/[0.07] bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] sm:p-6">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/32">
+            Start with InPick
           </p>
-          <h3 className="mt-2 text-lg font-extrabold tracking-tight text-primary-900">
+          <h3 className="mt-2 text-[20px] font-medium tracking-[-0.045em] text-black">
             어떻게 시작할까요?
           </h3>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
             <ModeEntryCard
               onClick={() => selectMode("apartment_drawing")}
-              bgImage="/mode-cards/apartment-drawing.jpg"
+              bgImage="/mode-cards/apartment-drawing-v2.webp"
               fallbackEmoji="🏢"
               accent="from-blue-500/70 to-blue-700/80"
               title="아파트 도면으로"
@@ -250,7 +258,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             />
             <ModeEntryCard
               onClick={() => selectMode("photo_residential")}
-              bgImage="/mode-cards/photo-residential.jpg"
+              bgImage="/mode-cards/photo-residential-v2.webp"
               fallbackEmoji="🏠"
               accent="from-amber-500/70 to-amber-700/80"
               title="내 공간 사진으로"
@@ -258,7 +266,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             />
             <ModeEntryCard
               onClick={() => selectMode("photo_commercial")}
-              bgImage="/mode-cards/photo-commercial.jpg"
+              bgImage="/mode-cards/photo-commercial-v2.webp"
               fallbackEmoji="☕"
               accent="from-emerald-500/70 to-emerald-700/80"
               title="상가·사무실"
@@ -268,10 +276,10 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         </div>
       )}
       {value.workflowEntry && (
-        <div className="flex items-center justify-between rounded-2xl border border-primary-100 bg-white/70 px-4 py-2">
-          <span className="text-[0.72rem] text-primary-900/70">
+        <div className="flex items-center justify-between rounded-2xl border border-black/[0.07] bg-white px-4 py-3">
+          <span className="text-[11px] text-black/48">
             현재 모드 ·{" "}
-            <span className="font-bold text-primary-700">
+            <span className="font-semibold text-black">
               {value.workflowEntry === "apartment_drawing"
                 ? "아파트 도면"
                 : value.workflowEntry === "photo_residential"
@@ -282,7 +290,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
           <button
             type="button"
             onClick={() => onChange({ ...value, workflowEntry: undefined })}
-            className="text-[0.7rem] font-semibold text-primary-600 hover:underline"
+            className="text-[11px] font-semibold text-black/48 underline decoration-black/20 underline-offset-4 hover:text-black"
           >
             모드 변경
           </button>
@@ -302,7 +310,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
 
       {/* Card 2: 시공범위 (건물유형별 동적 UI) */}
       <Card title="시공 범위" icon={Layers} done={scopeOk}>
-        <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">
           건물 유형
         </p>
         <div className="mt-2.5 grid grid-cols-4 gap-1.5">
@@ -325,8 +333,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                 }
                 className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[0.78rem] font-semibold tracking-tight transition-all ${
                   sel
-                    ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                    : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
+                    ? "border-black bg-black text-white"
+                    : "border-black/[0.08] bg-white text-black/55 hover:bg-black/[0.035] hover:text-black"
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -358,7 +366,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         {/* 상가·기타 → 용도 + 층수 */}
         {(value.buildingType === "store" || value.buildingType === "etc") && (
           <>
-            <p className="mt-5 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+            <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">
               용도
             </p>
             <div className="mt-2.5 grid grid-cols-2 gap-1.5">
@@ -370,8 +378,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                     onClick={() => update("storeUsage", u)}
                     className={`rounded-lg border px-2 py-2 text-[0.78rem] font-semibold tracking-tight transition-all ${
                       sel
-                        ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                        : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
+                        ? "border-black bg-black text-white"
+                        : "border-black/[0.08] bg-white text-black/55 hover:bg-black/[0.035] hover:text-black"
                     }`}
                   >
                     {u}
@@ -385,7 +393,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                 value={value.storeUsageEtc || ""}
                 onChange={(e) => update("storeUsageEtc", e.target.value)}
                 placeholder="용도 직접 입력 (예: 스튜디오, 공방)"
-                className="mt-2 w-full rounded-xl border border-primary-100 bg-white/90 px-3 py-2 text-sm text-primary-900 outline-none placeholder:text-primary-900/30 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+                className="mt-2 h-[46px] w-full rounded-xl border border-black/10 bg-white px-3 text-sm text-black outline-none placeholder:text-black/28 focus:border-black/30 focus:shadow-[0_0_0_4px_rgba(247,59,32,0.06)]"
               />
             )}
             <FloorLevelInput
@@ -408,7 +416,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
           whileTap={allOk ? { scale: 0.98 } : undefined}
           className={`mt-6 inline-flex w-full items-center justify-center gap-1.5 rounded-full px-4 py-3 text-sm font-semibold transition-all ${
             allOk
-              ? "bg-primary-500 text-white shadow-cta hover:bg-primary-600 cursor-pointer"
+              ? "cursor-pointer bg-black text-white hover:bg-black/75"
               : "bg-zinc-200 text-zinc-500 cursor-not-allowed"
           }`}
         >
@@ -419,7 +427,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             </>
           ) : normalizing ? (
             <>
-              도면 정리 중… 잠시만 기다려주세요
+              고화질 흑백 도면 생성 중… 잠시만 기다려주세요
             </>
           ) : (
             <>다음 단계 — 입력 필요: {missing.join(" · ")}</>
@@ -462,7 +470,7 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
 
   return (
     <>
-      <p className="mt-5 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+      <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">
         공사할 공간
       </p>
       <div className="mt-2.5 grid grid-cols-3 gap-1.5">
@@ -476,9 +484,9 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
               className={`rounded-lg border px-2 py-2 text-[0.78rem] font-semibold tracking-tight transition-all ${
                 sel
                   ? isAll
-                    ? "border-amber-500 bg-amber-500 text-white shadow-cta"
-                    : "border-primary-500 bg-primary-500 text-white shadow-cta"
-                  : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
+                    ? "border-black bg-black text-white"
+                    : "border-black bg-black text-white"
+                  : "border-black/[0.08] bg-white text-black/55 hover:bg-black/[0.035] hover:text-black"
               }`}
             >
               {r.label}
@@ -490,7 +498,7 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
       {/* 실별 가구·붙박이 옵션 — 선택된 실에 한해 노출 */}
       {expandedRooms.length > 0 && (
         <div className="mt-4 space-y-2">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">
             추가 시공 옵션 (가구·붙박이)
           </p>
           {expandedRooms.map((roomKey) => {
@@ -500,9 +508,9 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
             return (
               <div
                 key={roomKey}
-                className="rounded-xl border border-primary-100 bg-primary-50/30 p-2.5"
+                className="rounded-xl border border-black/[0.07] bg-[#f7f7f5] p-2.5"
               >
-                <p className="text-[0.7rem] font-bold text-primary-700 mb-1.5">
+                <p className="mb-1.5 text-[11px] font-semibold text-black/60">
                   ▸ {roomLabel}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -514,8 +522,8 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
                         onClick={() => toggleFurnishing(roomKey, opt.v)}
                         className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold tracking-tight transition-all ${
                           isSel
-                            ? "border-primary-500 bg-primary-500 text-white shadow-sm"
-                            : "border-primary-200 bg-white text-primary-900/70 hover:border-primary-400 hover:text-primary-900"
+                            ? "border-black bg-black text-white"
+                            : "border-black/10 bg-white text-black/55 hover:bg-black/[0.035] hover:text-black"
                         }`}
                       >
                         {opt.label}
@@ -548,7 +556,7 @@ function FloorLevelInput({
 }) {
   return (
     <>
-      <p className="mt-5 text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50">
+      <p className="mt-5 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/35">
         {label}
       </p>
       <input
@@ -556,9 +564,9 @@ function FloorLevelInput({
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="mt-2 w-full rounded-xl border border-primary-100 bg-white/90 px-3 py-2.5 text-sm text-primary-900 outline-none placeholder:text-primary-900/30 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+        className="mt-2 h-[46px] w-full rounded-xl border border-black/10 bg-white px-3 text-sm text-black outline-none placeholder:text-black/28 focus:border-black/30 focus:shadow-[0_0_0_4px_rgba(247,59,32,0.06)]"
       />
-      <p className="mt-1 text-[0.7rem] text-primary-900/40">{hint}</p>
+      <p className="mt-1 text-[11px] text-black/35">{hint}</p>
     </>
   );
 }
@@ -571,7 +579,7 @@ function Card({
   children,
 }: {
   title: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: LucideIcon;
   done: boolean;
   children: React.ReactNode;
 }) {
@@ -580,36 +588,24 @@ function Card({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: [0.2, 0, 0, 1] }}
-      className={`relative overflow-hidden rounded-[28px] border bg-white/75 p-7 shadow-card backdrop-blur-2xl transition-all ${
+      className={`relative overflow-hidden rounded-[26px] border bg-white p-5 shadow-[0_10px_35px_rgba(0,0,0,0.04)] transition sm:p-7 ${
         done
-          ? "border-primary-400 shadow-card-hover"
-          : "border-primary-100 hover:border-primary-200"
+          ? "border-black/15"
+          : "border-black/[0.07] hover:border-black/15"
       }`}
     >
-      <div
-        className={`pointer-events-none absolute inset-x-0 top-0 h-px transition-opacity ${
-          done ? "opacity-100" : "opacity-50"
-        }`}
-        style={{
-          background: "linear-gradient(90deg, transparent, #F73B20, transparent)",
-        }}
-      />
       <div className="flex items-center justify-between">
         <div className="inline-flex items-center gap-2.5">
-          <span
-            className={`inline-flex h-9 w-9 items-center justify-center rounded-xl transition-colors ${
-              done ? "bg-primary-500 text-white" : "bg-primary-50 text-primary-600"
-            }`}
-          >
-            <Icon className="h-4 w-4" />
+          <span className="inline-flex h-8 w-8 items-center justify-center text-black">
+            <Icon className="h-5 w-5" strokeWidth={1.7} />
           </span>
-          <p className="text-[0.92rem] font-bold tracking-tight text-primary-900">{title}</p>
+          <p className="text-[15px] font-semibold tracking-[-0.025em] text-black">{title}</p>
         </div>
         {done && (
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary-500 text-white"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-black text-white"
           >
             <Check className="h-3.5 w-3.5" strokeWidth={3} />
           </motion.span>
@@ -620,7 +616,7 @@ function Card({
   );
 }
 
-// ─── 3-mode 진입 카드 — 배경 이미지 + 텍스트 오버레이 ───
+// ─── 3-mode 진입 카드 — 원본 이미지와 설명을 분리해 사진 품질을 그대로 노출 ───
 function ModeEntryCard({
   onClick,
   bgImage,
@@ -641,30 +637,28 @@ function ModeEntryCard({
     <button
       type="button"
       onClick={onClick}
-      className="group relative h-72 w-full overflow-hidden rounded-2xl border-2 border-primary-100 text-left transition hover:border-primary-500 hover:shadow-lg"
+      className="group w-full overflow-hidden rounded-[20px] border border-black/[0.08] bg-white text-left transition hover:border-black/25 hover:shadow-lg"
     >
-      {!imgFailed && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={bgImage}
-          alt={title}
-          onError={() => setImgFailed(true)}
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-        />
-      )}
-      {imgFailed && (
-        <div className={`absolute inset-0 bg-gradient-to-br ${accent} flex items-center justify-center text-6xl`}>
-          <span aria-hidden>{fallbackEmoji}</span>
-        </div>
-      )}
-      {/* 가독성을 위한 그라데이션 오버레이 (하단 어둡게) */}
-      <div className={`absolute inset-0 bg-gradient-to-t ${accent}`} style={{ mixBlendMode: "multiply", opacity: 0.55 }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/30 to-transparent" />
-      {/* 텍스트 */}
-      <div className="absolute inset-x-0 bottom-0 p-4 text-white">
-        <p className="text-base font-bold tracking-tight drop-shadow-md">{title}</p>
-        <p className="mt-1 text-[0.72rem] leading-relaxed text-white/90 drop-shadow">
+      <div className="relative h-48 overflow-hidden bg-[#ececea] sm:h-52">
+        {!imgFailed && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={bgImage}
+            alt={title}
+            onError={() => setImgFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.025]"
+            loading="lazy"
+          />
+        )}
+        {imgFailed && (
+          <div className={`absolute inset-0 flex items-center justify-center bg-gradient-to-br ${accent} text-6xl`}>
+            <span aria-hidden>{fallbackEmoji}</span>
+          </div>
+        )}
+      </div>
+      <div className="border-t border-black/[0.06] bg-white px-4 py-3.5">
+        <p className="text-[15px] font-semibold tracking-[-0.025em] text-black">{title}</p>
+        <p className="mt-1 text-[0.7rem] leading-relaxed text-black/46">
           {description}
         </p>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -10,8 +10,21 @@ export default function AdminLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberLogin, setRememberLogin] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    try {
+      const rememberedEmail = localStorage.getItem("inpick_remembered_admin_email");
+      if (rememberedEmail) {
+        setEmail(rememberedEmail);
+        setRememberLogin(true);
+      }
+    } catch {
+      /* private mode */
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,6 +47,11 @@ export default function AdminLoginPage() {
         localStorage.setItem("admin_email", data.email);
         localStorage.setItem("admin_name", data.name);
         localStorage.setItem("admin_role", data.role);
+        if (rememberLogin) {
+          localStorage.setItem("inpick_remembered_admin_email", data.email || email.trim());
+        } else {
+          localStorage.removeItem("inpick_remembered_admin_email");
+        }
         router.push("/admin");
       }
     } catch {
@@ -101,6 +119,7 @@ export default function AdminLoginPage() {
                 <input
                   id="admin-email"
                   type="email"
+                  name="username"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="admin@inpick.kr"
@@ -114,6 +133,7 @@ export default function AdminLoginPage() {
                 <input
                   id="admin-password"
                   type="password"
+                  name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="비밀번호를 입력해 주세요"
@@ -122,6 +142,26 @@ export default function AdminLoginPage() {
                   className="h-[52px] w-full rounded-2xl border border-black/10 bg-white px-4 text-[14px] outline-none transition placeholder:text-black/28 focus:border-black/30 focus:shadow-[0_0_0_4px_rgba(247,59,32,0.06)]"
                 />
               </div>
+
+              <label className="flex cursor-pointer items-center gap-2.5 px-0.5 py-0.5 text-left">
+                <input
+                  type="checkbox"
+                  checked={rememberLogin}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setRememberLogin(checked);
+                    if (!checked) {
+                      try {
+                        localStorage.removeItem("inpick_remembered_admin_email");
+                      } catch {
+                        /* private mode */
+                      }
+                    }
+                  }}
+                  className="h-4 w-4 rounded border-black/20 accent-black"
+                />
+                <span className="text-[12px] font-semibold text-black/62">로그인 저장</span>
+              </label>
 
               {error && (
                 <p role="alert" className="rounded-2xl bg-primary-50 px-4 py-3 text-[13px] font-medium text-primary-700">{error}</p>

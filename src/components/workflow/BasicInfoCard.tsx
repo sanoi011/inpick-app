@@ -25,6 +25,7 @@ import {
 import type { AddressSearchResult } from "@/types/address";
 
 type InputMode = "address" | "upload" | "lidar";
+const FLOORPLAN_PIPELINE_VERSION = 2;
 
 export interface BasicInfoData {
   mode: InputMode;
@@ -53,6 +54,13 @@ export interface BasicInfoData {
   totalWidthMm?: number;
   totalDepthMm?: number;
   normalizing?: boolean;
+  normalizationStartedAt?: number;
+  normalizationPipelineVersion?: number;
+  /** 고화질 도면 생성 실패 시 사용자 안내 */
+  normalizationWarning?: string;
+  floorplanModel?: string;
+  floorplanQuality?: "high";
+  layoutVariant?: "basic" | "extended";
   normalizedRooms?: Array<{
     name: string;
     widthMm: number;
@@ -75,22 +83,22 @@ export default function BasicInfoCard({ value, onChange }: Props) {
   const setMode = (m: InputMode) => onChange({ ...value, mode: m });
 
   const inputDone =
-    (mode === "address" && !!value.selectedPyeong?.grandPlanUrl) ||
+    (mode === "address" && !!value.cleanedImageUrl && !value.normalizing && !value.normalizationWarning) ||
     (mode === "upload" && !!value.uploadedFloorplan?.dataUrl) ||
     (mode === "lidar" && !!value.lidarScan?.dataUrl);
   const budgetDone = value.budget > 0;
   const isComplete = inputDone && budgetDone;
 
   return (
-    <div className="rounded-2xl border border-primary-100 bg-white/95 p-5 shadow-sm">
+    <div className="rounded-[20px] border border-black/[0.07] bg-[#fafafa] p-4 sm:p-5">
       <div className="flex items-center gap-2 mb-3">
-        <MapPin className="h-4 w-4 text-primary-500" />
-        <h3 className="text-base font-bold tracking-tight text-primary-900">기본정보 입력</h3>
+        <MapPin className="h-4 w-4 text-black" />
+        <h3 className="text-[14px] font-semibold tracking-[-0.025em] text-black">기본정보 입력</h3>
         {isComplete && (
           <motion.span
             initial={{ opacity: 0, scale: 0.8 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="ml-auto text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full"
+            className="ml-auto rounded-full bg-black px-2 py-0.5 text-xs font-semibold text-white"
           >
             ✓ 완료
           </motion.span>
@@ -98,7 +106,7 @@ export default function BasicInfoCard({ value, onChange }: Props) {
       </div>
 
       {/* 탭: 3 옵션 */}
-      <div className="grid grid-cols-3 gap-2 mb-4 p-1 bg-primary-50/50 rounded-xl">
+      <div className="mb-4 grid grid-cols-3 gap-1 rounded-xl bg-[#eeeeec] p-1">
         <TabBtn
           active={mode === "address"}
           icon={Search}
@@ -124,52 +132,65 @@ export default function BasicInfoCard({ value, onChange }: Props) {
       {mode === "upload" && <UploadMode value={value} onChange={onChange} />}
       {mode === "lidar" && <LidarMode value={value} onChange={onChange} />}
 
-      {/* ── 시공 형태 (기본형/확장형) — 예산은 견적 단계에서 자동 산출 ── */}
-      <div className="mt-5 pt-5 border-t border-primary-100">
-        <div className="flex items-center gap-2 mb-3">
-          <Wallet className="h-4 w-4 text-primary-500" />
-          <span className="text-sm font-bold tracking-tight text-primary-900">시공 형태</span>
-        </div>
+      {mode !== "address" && <ConstructionTypeSelector value={value} onChange={onChange} />}
 
-        <div className="grid grid-cols-2 gap-2">
-          {[
-            { v: "basic", label: "기본형", desc: "발코니 미확장" },
-            { v: "extended", label: "확장형", desc: "발코니 확장 시공" },
-          ].map((r) => {
-            const sel = value.expansionType === r.v;
-            return (
-              <button
-                key={r.v}
-                onClick={() => {
-                  // 가이드: 기본/확장 변경 시 cleanedImageUrl 리셋 → AddressMode useEffect가 도면 재호출
-                  onChange({
-                    ...value,
-                    expansionType: r.v as "basic" | "extended",
-                    cleanedImageUrl: undefined,
-                    dimensionOverlaySvg: undefined,
-                  });
-                }}
-                className={`rounded-xl border px-3 py-3 text-left transition-all ${
-                  sel
-                    ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                    : "border-primary-100 bg-white/90 text-primary-900/70 hover:border-primary-300 hover:text-primary-900"
-                }`}
-              >
-                <div className="text-sm font-bold tracking-tight">{r.label}</div>
-                <div className={`mt-0.5 text-[0.7rem] ${sel ? "text-white/85" : "text-primary-900/50"}`}>
-                  {r.desc}
-                </div>
-              </button>
-            );
-          })}
-        </div>
+    </div>
+  );
+}
+
+function ConstructionTypeSelector({ value, onChange }: Props) {
+  return (
+    <div className="mt-5 border-t border-black/[0.07] pt-5">
+      <div className="mb-3 flex items-center gap-2">
+        <Wallet className="h-4 w-4 text-black" />
+        <span className="text-sm font-semibold tracking-tight text-black">시공 형태</span>
       </div>
-
-      <p className="mt-4 text-xs text-primary-900/50 leading-relaxed">
-        세 가지 입력 방법 중 하나만 선택해도 다음 단계로 진행 가능합니다.
-        AI 가 자동으로 평면도를 정형화하고 실별 치수를 추출합니다.
-        견적 금액은 자재 선택 후 한국물가협회 단가 + 표준품셈으로 자동 산출됩니다.
-      </p>
+      <div className="grid grid-cols-2 gap-2">
+        {[
+          { v: "basic", label: "기본형", desc: "발코니 미확장" },
+          { v: "extended", label: "확장형", desc: "발코니 확장 시공" },
+        ].map((item) => {
+          const selected = value.expansionType === item.v;
+          return (
+            <button
+              key={item.v}
+              type="button"
+              onClick={() =>
+                onChange({
+                  ...value,
+                  expansionType: item.v as "basic" | "extended",
+                  cleanedImageUrl: undefined,
+                  normalizedImageUrl: undefined,
+                  floorplanPropertyId: undefined,
+                  dimensionOverlaySvg: undefined,
+                  totalWidthMm: undefined,
+                  totalDepthMm: undefined,
+                  normalizedRooms: undefined,
+                  normalizedOpenings: undefined,
+                  normalizedNotes: undefined,
+                  normalizedPyeong: undefined,
+                  floorplanModel: undefined,
+                  floorplanQuality: undefined,
+                  layoutVariant: undefined,
+                  normalizing: false,
+                  normalizationStartedAt: undefined,
+                  normalizationWarning: undefined,
+                })
+              }
+              className={`rounded-xl border px-3 py-3 text-left transition-all ${
+                selected
+                  ? "border-black bg-black text-white"
+                  : "border-black/[0.08] bg-white text-black/55 hover:bg-black/[0.035] hover:text-black"
+              }`}
+            >
+              <div className="text-sm font-bold tracking-tight">{item.label}</div>
+              <div className={`mt-0.5 text-[0.7rem] ${selected ? "text-white/65" : "text-black/38"}`}>
+                {item.desc}
+              </div>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -191,8 +212,8 @@ function TabBtn({
       onClick={onClick}
       className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-semibold transition-all ${
         active
-          ? "bg-white text-primary-900 shadow-sm"
-          : "text-primary-900/50 hover:text-primary-900/80"
+          ? "bg-white text-black shadow-sm"
+          : "text-black/42 hover:text-black"
       }`}
     >
       <Icon className="h-4 w-4" />
@@ -257,6 +278,51 @@ function AddressMode({ value, onChange }: Props) {
     }>
   >([]);
   const [loadingBuilding, setLoadingBuilding] = useState(false);
+  const [showAllPyeong, setShowAllPyeong] = useState(false);
+  const valueRef = useRef(value);
+  const activeNormalizeKeyRef = useRef<string | null>(null);
+  const attemptedNormalizeKeysRef = useRef(new Set<string>());
+  valueRef.current = value;
+
+  // Fast Refresh/새로고침 또는 구 파이프라인에서 비동기 호출만 끊긴 경우 자동 복구.
+  useEffect(() => {
+    if (
+      !value.normalizing ||
+      (value.normalizationStartedAt &&
+        value.normalizationPipelineVersion === FLOORPLAN_PIPELINE_VERSION) ||
+      !value.selectedPyeong?.grandPlanUrl ||
+      !value.expansionType
+    ) {
+      return;
+    }
+    const normalizeKey = `${value.selectedPyeong.pyeongNo}:${value.selectedPyeong.grandPlanUrl}:${value.expansionType}`;
+    attemptedNormalizeKeysRef.current.delete(normalizeKey);
+    if (activeNormalizeKeyRef.current === normalizeKey) activeNormalizeKeyRef.current = null;
+    onChange({
+      ...value,
+      normalizing: false,
+      normalizationStartedAt: undefined,
+      normalizationWarning: undefined,
+    });
+  }, [onChange, value]);
+
+  // 네트워크 함수가 비정상적으로 유실돼도 무한 로딩 상태는 남기지 않는다.
+  useEffect(() => {
+    if (!value.normalizing || !value.normalizationStartedAt) return;
+    const elapsed = Date.now() - value.normalizationStartedAt;
+    const remaining = Math.max(0, 125_000 - elapsed);
+    const timer = window.setTimeout(() => {
+      const current = valueRef.current;
+      if (!current.normalizing || current.normalizationStartedAt !== value.normalizationStartedAt) return;
+      onChange({
+        ...current,
+        normalizing: false,
+        normalizationStartedAt: undefined,
+        normalizationWarning: "고화질 도면 처리 시간이 초과되었습니다. 다시 시도해주세요.",
+      });
+    }, remaining);
+    return () => window.clearTimeout(timer);
+  }, [onChange, value.normalizationStartedAt, value.normalizing]);
 
   // ─── 가이드: 평형 + expansion 둘 다 결정되면 자동 호출 ───
   // 흐름: 주소 → 평형 클릭 (저장만) → 기본/확장형 클릭 → 도면 정리 시작
@@ -266,7 +332,8 @@ function AddressMode({ value, onChange }: Props) {
       value.selectedPyeong?.grandPlanUrl &&
       value.expansionType &&
       !value.cleanedImageUrl &&
-      !value.normalizing
+      !value.normalizing &&
+      !value.normalizationWarning
     ) {
       // 자동 트리거 — runNormalize는 아래 정의됨
       void runNormalizeRef.current?.(value.selectedPyeong, value.expansionType);
@@ -277,6 +344,7 @@ function AddressMode({ value, onChange }: Props) {
     value.expansionType,
     value.cleanedImageUrl,
     value.normalizing,
+    value.normalizationWarning,
   ]);
 
   // runNormalize ref — useEffect 안에서 최신 함수 참조 (closure 회피)
@@ -312,10 +380,34 @@ function AddressMode({ value, onChange }: Props) {
     async (addr: AddressSearchResult) => {
       saveRecent(addr);
       setRecent(loadRecent());
-      onChange({ ...value, mode: "address", selectedAddress: addr });
+      onChange({
+        ...value,
+        mode: "address",
+        selectedAddress: addr,
+        selectedPyeong: undefined,
+        expansionType: null,
+        cleanedImageUrl: undefined,
+        normalizedImageUrl: undefined,
+        floorplanPropertyId: undefined,
+        dimensionOverlaySvg: undefined,
+        totalWidthMm: undefined,
+        totalDepthMm: undefined,
+        normalizedRooms: undefined,
+        normalizedOpenings: undefined,
+        normalizedNotes: undefined,
+        normalizedPyeong: undefined,
+        floorplanModel: undefined,
+        floorplanQuality: undefined,
+        layoutVariant: undefined,
+        normalizing: false,
+        normalizationStartedAt: undefined,
+        normalizationWarning: undefined,
+      });
       setKeyword(addr.roadAddress);
       setResults([]);
       setFocused(false);
+      setPyeongList([]);
+      setShowAllPyeong(false);
       setLoadingBuilding(true);
       try {
         const params = new URLSearchParams({
@@ -357,67 +449,99 @@ function AddressMode({ value, onChange }: Props) {
     },
     expansion: "basic" | "extended",
   ) => {
-    if (!pyeong.grandPlanUrl) return;
+    const sourceUrl = pyeong.grandPlanUrl;
+    if (!sourceUrl) return;
+    const normalizeKey = `${pyeong.pyeongNo}:${sourceUrl}:${expansion}`;
+    if (
+      activeNormalizeKeyRef.current === normalizeKey ||
+      attemptedNormalizeKeysRef.current.has(normalizeKey)
+    ) {
+      return;
+    }
+    activeNormalizeKeyRef.current = normalizeKey;
+    attemptedNormalizeKeysRef.current.add(normalizeKey);
+
+    const p = pyeong;
+    const isCurrentSelection = () => {
+      const current = valueRef.current;
+      return (
+        current.selectedPyeong?.pyeongNo === pyeong.pyeongNo &&
+        current.expansionType === expansion
+      );
+    };
+    const finishWithError = (message: string) => {
+      if (!isCurrentSelection()) return;
+      const current = valueRef.current;
+      onChange({
+        ...current,
+        selectedPyeong: p,
+        expansionType: expansion,
+        cleanedImageUrl: undefined,
+        normalizedImageUrl: undefined,
+        normalizing: false,
+        normalizationStartedAt: undefined,
+        normalizationWarning: message,
+      });
+    };
+
     onChange({
-      ...value,
+      ...valueRef.current,
       selectedPyeong: pyeong,
       expansionType: expansion,
       cleanedImageUrl: undefined,
+      normalizedImageUrl: undefined,
       dimensionOverlaySvg: undefined,
+      normalizedRooms: undefined,
+      normalizedOpenings: undefined,
+      floorplanPropertyId: undefined,
+      floorplanModel: undefined,
+      floorplanQuality: undefined,
+      layoutVariant: undefined,
       normalizing: true,
+      normalizationStartedAt: Date.now(),
+      normalizationPipelineVersion: FLOORPLAN_PIPELINE_VERSION,
+      normalizationWarning: undefined,
     });
     try {
-      // STEP 1: 네이버 CDN → Supabase Storage 캐시
-      let stableUrl = pyeong.grandPlanUrl;
-      let p = pyeong;
+      // 서버가 네이버 원본 다운로드·영구 저장·정규화를 한 요청에서 처리한다.
+      // 중간 캐시 요청을 없애 브라우저가 단계 사이에서 멈추는 문제를 방지한다.
+      const current = valueRef.current;
+      const aptName = current.selectedAddress?.buildingName || "";
+      const address =
+        current.selectedAddress?.roadAddress ||
+        current.selectedAddress?.jibunAddress ||
+        aptName;
+      const normalizeController = new AbortController();
+      const normalizeTimer = window.setTimeout(() => normalizeController.abort(), 120_000);
+      let res: Response;
       try {
-        const cacheRes = await fetch("/api/inpick/floorplan-cache", {
+        res = await fetch("/api/inpick/normalize-floorplan", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ sourceUrl: p.grandPlanUrl }),
+          body: JSON.stringify({
+            imageUrl: sourceUrl,
+            exclusiveAreaM2: p.exclusiveArea,
+            unitName: aptName,
+            address,
+            aptName,
+            skipImageClean: false,
+            expansion: expansion === "extended",
+          }),
+          signal: normalizeController.signal,
         });
-        if (cacheRes.ok) {
-          const cacheData = await cacheRes.json();
-          if (cacheData.url) {
-            stableUrl = cacheData.url;
-            p = { ...p, grandPlanUrl: stableUrl };
-          }
-        }
-      } catch (e) {
-        console.warn("[floorplan-cache] failed:", e);
+      } finally {
+        window.clearTimeout(normalizeTimer);
       }
-
-      // STEP 2: 평면도 정형화 — P6-1 빠른 모드
-      //   skipImageClean=true → Vision(방/치수)만 받음, ~8-15초 (clean 포함 시 40초+)
-      //   클리닝(워터마크 제거+바닥 매핑)은 백그라운드로 fire-and-forget — 사용자는 즉시 Step2 진입 가능
-      const aptName = value.selectedAddress?.buildingName || "";
-      const address =
-        value.selectedAddress?.roadAddress ||
-        value.selectedAddress?.jibunAddress ||
-        aptName;
-      const res = await fetch("/api/inpick/normalize-floorplan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: stableUrl,
-          exclusiveAreaM2: p.exclusiveArea,
-          unitName: aptName,
-          address,
-          aptName,
-          skipImageClean: true, // P6-1: 빠른 응답 — vision 결과만 받고 즉시 진행 가능
-          expansion: expansion === "extended",
-        }),
-      });
       const data = await res.json();
-      if (res.ok) {
+      if (res.ok && data.cleanedImageUrl) {
+        if (!isCurrentSelection()) return;
         onChange({
-          ...value,
+          ...valueRef.current,
           selectedPyeong: p,
           expansionType: expansion,
           floorplanPropertyId: data.property_id,
-          // cleanedImageUrl이 없으면 원본 그대로 사용 (Step2에서도 동일 fallback)
-          cleanedImageUrl: data.cleanedImageUrl || stableUrl,
-          normalizedImageUrl: data.normalizedImageUrl || stableUrl,
+          cleanedImageUrl: data.cleanedImageUrl,
+          normalizedImageUrl: data.normalizedImageUrl || data.cleanedImageUrl,
           dimensionOverlaySvg: data.dimensionOverlaySvg,
           totalWidthMm: data.totalWidthMm,
           totalDepthMm: data.totalDepthMm,
@@ -425,37 +549,43 @@ function AddressMode({ value, onChange }: Props) {
           normalizedOpenings: data.openings,
           normalizedNotes: data.notes,
           normalizedPyeong: data.pyeong,
+          floorplanModel: data.cleanModel,
+          floorplanQuality: data.cleanQuality === "high" ? "high" : undefined,
+          layoutVariant: data.layoutVariant || expansion,
           normalizing: false,
+          normalizationStartedAt: undefined,
+          normalizationWarning: undefined,
         });
-        // P6-1: 백그라운드 클리닝 (워터마크 제거 + 바닥 매핑) — 완료해도 사용자 진행 안 막음.
-        //       완료되면 normalized.png가 storage에 저장돼 다음 호출부터 즉시 활용됨.
-        if (!data.cleanedImageUrl) {
-          void fetch("/api/inpick/normalize-floorplan", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageUrl: stableUrl,
-              exclusiveAreaM2: p.exclusiveArea,
-              unitName: aptName,
-              address,
-              aptName,
-              skipImageClean: false,
-              expansion: expansion === "extended",
-              propertyId: data.property_id, // 같은 propertyId로 호출 → storage normalized.png 갱신
-            }),
-          }).catch((e) => console.warn("[floorplan-clean] background failed (non-fatal):", e));
-        }
       } else {
-        onChange({ ...value, selectedPyeong: p, expansionType: expansion, normalizing: false });
+        console.warn("[floorplan-normalize] unavailable:", data.error || res.status);
+        finishWithError("고화질 도면을 완성하지 못했습니다. 잠시 후 다시 시도해주세요.");
       }
     } catch (e) {
       console.error("normalize fail", e);
-      onChange({ ...value, selectedPyeong: pyeong, expansionType: expansion, normalizing: false });
+      finishWithError(
+        e instanceof DOMException && e.name === "AbortError"
+          ? "고화질 도면 처리 시간이 초과되었습니다. 다시 시도해주세요."
+          : "고화질 도면을 완성하지 못했습니다. 다시 시도해주세요.",
+      );
+    } finally {
+      if (activeNormalizeKeyRef.current === normalizeKey) {
+        activeNormalizeKeyRef.current = null;
+      }
     }
   };
 
   // useEffect가 평형+expansion 둘 다 결정될 때 자동 trigger하므로 최신 함수를 ref에 저장
   runNormalizeRef.current = runNormalize;
+
+  const retryNormalize = () => {
+    const pyeong = valueRef.current.selectedPyeong;
+    const expansion = valueRef.current.expansionType;
+    if (!pyeong?.grandPlanUrl || !expansion) return;
+    const normalizeKey = `${pyeong.pyeongNo}:${pyeong.grandPlanUrl}:${expansion}`;
+    attemptedNormalizeKeysRef.current.delete(normalizeKey);
+    if (activeNormalizeKeyRef.current === normalizeKey) activeNormalizeKeyRef.current = null;
+    void runNormalizeRef.current?.(pyeong, expansion);
+  };
 
   /**
    * 평형 클릭 → 저장만. useEffect가 expansion까지 셋되면 자동 호출.
@@ -471,9 +601,23 @@ function AddressMode({ value, onChange }: Props) {
     onChange({
       ...value,
       selectedPyeong: p,
+      expansionType: null,
       cleanedImageUrl: undefined,
+      normalizedImageUrl: undefined,
+      floorplanPropertyId: undefined,
       dimensionOverlaySvg: undefined,
+      totalWidthMm: undefined,
+      totalDepthMm: undefined,
+      normalizedRooms: undefined,
+      normalizedOpenings: undefined,
+      normalizedNotes: undefined,
+      normalizedPyeong: undefined,
+      floorplanModel: undefined,
+      floorplanQuality: undefined,
+      layoutVariant: undefined,
       normalizing: false,
+      normalizationStartedAt: undefined,
+      normalizationWarning: undefined,
     });
     // expansion 이미 셋된 상태에서 평형 클릭 → useEffect가 자동 호출
   };
@@ -481,7 +625,7 @@ function AddressMode({ value, onChange }: Props) {
   return (
     <div>
       <div className="relative">
-        <Search className="absolute left-3 top-3 h-4 w-4 text-primary-900/40" />
+        <Search className="absolute left-3 top-3.5 h-4 w-4 text-black/30" />
         <input
           type="text"
           value={keyword}
@@ -489,10 +633,10 @@ function AddressMode({ value, onChange }: Props) {
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="아파트 단지명 또는 도로명 주소 (예: 대전, 잠실)"
-          className="w-full rounded-xl border border-primary-100 bg-white pl-10 pr-4 py-3 text-sm font-medium tracking-tight text-primary-900 outline-none placeholder:text-primary-900/30 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
+          className="h-[48px] w-full rounded-xl border border-black/10 bg-white pl-10 pr-4 text-sm font-medium tracking-tight text-black outline-none placeholder:text-black/28 focus:border-black/30 focus:shadow-[0_0_0_4px_rgba(247,59,32,0.06)]"
         />
         {loading && (
-          <Loader2 className="absolute right-3 top-3 h-4 w-4 text-primary-500 animate-spin" />
+          <Loader2 className="absolute right-3 top-4 h-4 w-4 animate-spin text-primary-500" />
         )}
       </div>
 
@@ -566,11 +710,11 @@ function AddressMode({ value, onChange }: Props) {
       )}
 
       {value.selectedAddress && (
-        <div className="mt-3 p-3 rounded-xl bg-primary-50/50 border border-primary-100">
-          <div className="text-sm font-semibold text-primary-900">
+        <div className="mt-3 rounded-xl border border-black/[0.07] bg-white p-3">
+          <div className="text-sm font-semibold text-black">
             {value.selectedAddress.buildingName || "선택된 주소"}
           </div>
-          <div className="text-xs text-primary-900/60 mt-0.5">
+          <div className="mt-0.5 text-xs text-black/45">
             {value.selectedAddress.roadAddress}
           </div>
         </div>
@@ -586,7 +730,7 @@ function AddressMode({ value, onChange }: Props) {
         <div className="mt-3">
           <div className="text-xs font-semibold text-primary-900/70 mb-2">평형 선택</div>
           <div className="grid grid-cols-2 gap-2">
-            {pyeongList.map((p) => {
+            {(showAllPyeong ? pyeongList : pyeongList.slice(0, 4)).map((p) => {
               const sel = value.selectedPyeong?.pyeongNo === p.pyeongNo;
               return (
                 <button
@@ -594,14 +738,14 @@ function AddressMode({ value, onChange }: Props) {
                   onClick={() => handleSelectPyeong(p)}
                   className={`text-left p-3 rounded-xl border transition-all ${
                     sel
-                      ? "border-primary-500 bg-primary-50 shadow-sm"
-                      : "border-primary-100 bg-white hover:border-primary-300"
+                      ? "border-black bg-black text-white"
+                      : "border-black/[0.08] bg-white hover:bg-black/[0.035]"
                   }`}
                 >
-                  <div className="text-sm font-bold text-primary-900">
+                  <div className={`text-sm font-bold ${sel ? "text-white" : "text-black"}`}>
                     {p.pyeongName} ({p.exclusiveArea}m²)
                   </div>
-                  <div className="text-xs text-primary-900/60 mt-0.5">
+                  <div className={`mt-0.5 text-xs ${sel ? "text-white/65" : "text-black/45"}`}>
                     {p.roomCnt ? `${p.roomCnt}룸` : ""}
                     {p.grandPlanUrl ? " · 평면도 있음" : " · 평면도 없음"}
                   </div>
@@ -609,54 +753,64 @@ function AddressMode({ value, onChange }: Props) {
               );
             })}
           </div>
+          {pyeongList.length > 4 && (
+            <button
+              type="button"
+              onClick={() => setShowAllPyeong((current) => !current)}
+              aria-expanded={showAllPyeong}
+              className="mt-2 flex h-10 w-full items-center justify-center rounded-xl border border-black/[0.08] bg-white text-xs font-semibold text-black transition hover:bg-black/[0.035]"
+            >
+              {showAllPyeong
+                ? "평형 접기"
+                : `평형 더보기 (${pyeongList.length - 4}개)`}
+            </button>
+          )}
         </div>
       )}
 
-      {value.selectedPyeong?.grandPlanUrl && (
+      {value.selectedPyeong && (
+        <ConstructionTypeSelector value={value} onChange={onChange} />
+      )}
+
+      {value.selectedPyeong?.grandPlanUrl && value.expansionType && (
         <div className="mt-3">
-          <div className="text-xs font-semibold text-primary-900/70 mb-2 flex items-center gap-2 flex-wrap">
-            평면도 + AI 치수 추출
-            {value.normalizing && (
-              <span className="inline-flex items-center gap-1 text-primary-500">
-                <Loader2 className="h-3 w-3 animate-spin" />
-                도면 정리 중
-              </span>
-            )}
-            {value.dimensionOverlaySvg && !value.normalizing && (
-              <span className="text-emerald-600 text-[0.65rem] font-bold bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                ✓ {value.normalizedRooms?.length ?? 0}개 실 치수
-              </span>
-            )}
-            {!value.normalizing && value.selectedPyeong && !value.cleanedImageUrl && value.dimensionOverlaySvg && (
-              <span className="text-amber-600 text-[0.65rem] font-bold bg-amber-50 px-1.5 py-0.5 rounded-full">
-                ⓘ 원본 도면 사용 (정리 스킵)
-              </span>
-            )}
-          </div>
-          <div className="relative w-full rounded-xl border border-primary-100 bg-white overflow-hidden">
-            <img
-              src={value.cleanedImageUrl || value.selectedPyeong.grandPlanUrl}
-              alt="평면도"
-              className="w-full"
-            />
-            {value.dimensionOverlaySvg && (
-              <div
-                className="absolute inset-0 pointer-events-none"
-                dangerouslySetInnerHTML={{ __html: value.dimensionOverlaySvg }}
-              />
-            )}
-            {value.normalizing && (
-              <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                <div className="text-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
-                  <p className="mt-2 text-xs text-primary-900/70 font-semibold">치수 추출 중…</p>
+          <div className="relative w-full overflow-hidden rounded-xl border border-black/[0.08] bg-white">
+            {value.normalizing ? (
+              <div className="flex min-h-[330px] flex-col items-center justify-center bg-[#f7f7f5] px-6 py-10 text-center sm:min-h-[390px]">
+                <div className="relative h-16 w-16" aria-hidden>
+                  <div className="absolute inset-0 rounded-full border-[3px] border-black/10" />
+                  <div className="absolute inset-0 animate-[spin_3s_linear_infinite] rounded-full border-[3px] border-transparent border-r-black border-t-black" />
+                  <div className="absolute inset-[9px] animate-[spin_5s_linear_infinite_reverse] rounded-full border-2 border-transparent border-b-black/35" />
                 </div>
               </div>
+            ) : value.cleanedImageUrl && !value.normalizationWarning ? (
+              <div className="relative bg-white">
+                <img
+                  src={value.cleanedImageUrl}
+                  alt={`${value.layoutVariant === "extended" ? "확장형" : "기본형"} 고화질 흑백 건축도면`}
+                  className="w-full object-contain"
+                />
+                {value.dimensionOverlaySvg && (
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    dangerouslySetInnerHTML={{ __html: value.dimensionOverlaySvg }}
+                  />
+                )}
+              </div>
+            ) : value.normalizationWarning ? (
+              <div className="flex min-h-[260px] flex-col items-center justify-center bg-[#f7f7f5] px-6 py-10 text-center">
+                <button
+                  type="button"
+                  onClick={retryNormalize}
+                  className="rounded-full bg-black px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-black/75"
+                >
+                  다시 처리
+                </button>
+              </div>
+            ) : (
+              <div className="min-h-[220px] bg-[#f7f7f5]" />
             )}
           </div>
-          <p className="mt-2 text-xs text-primary-900/50">
-            추출된 실별 mm 치수가 다음 단계 인테리어 렌더링의 기반 데이터로 사용됩니다.
-          </p>
         </div>
       )}
     </div>
@@ -716,14 +870,14 @@ function UploadMode({ value, onChange }: Props) {
 
   return (
     <div>
-      <label className="flex flex-col items-center justify-center w-full h-40 rounded-xl border-2 border-dashed border-primary-200 bg-primary-50/30 hover:bg-primary-50/50 cursor-pointer transition-colors">
+      <label className="flex h-40 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-black/15 bg-white transition hover:bg-black/[0.025]">
         <FileImage className="h-8 w-8 text-primary-400 mb-2" />
-        <span className="text-sm font-semibold text-primary-900">평면도 이미지 업로드</span>
-        <span className="text-xs text-primary-900/60 mt-1">JPG·PNG·HEIC (손도면 OK)</span>
+        <span className="text-sm font-semibold text-black">평면도 이미지 업로드</span>
+        <span className="mt-1 text-xs text-black/42">JPG·PNG·HEIC (손도면 OK)</span>
         <input type="file" accept="image/*" onChange={handleFile} className="hidden" />
       </label>
 
-      <label className="mt-3 flex items-center gap-2 text-sm text-primary-900/80">
+      <label className="mt-3 flex items-center gap-2 text-sm text-black/62">
         <input
           type="checkbox"
           checked={isHand}

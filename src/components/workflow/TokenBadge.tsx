@@ -31,14 +31,14 @@ export default function TokenBadge({ balance, className, onClick }: Props) {
       onClick={onClick}
       whileHover={{ scale: 1.04 }}
       whileTap={{ scale: 0.96 }}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-bold backdrop-blur transition-colors ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-2 text-[12px] font-semibold backdrop-blur transition-colors ${
         low
-          ? "border-danger-text/30 bg-danger-bg text-danger-text"
-          : "border-token-200 bg-token-50 text-token-400"
+          ? "border-primary-200 bg-primary-50 text-primary-700"
+          : "border-black/10 bg-white text-black/65 hover:bg-black/[0.035]"
       } ${className ?? ""}`}
     >
       <Hexagon
-        className={`h-3.5 w-3.5 ${pulse ? "animate-token-deduct" : ""} ${low ? "fill-danger-text" : "fill-token-400"}`}
+        className={`h-3.5 w-3.5 ${pulse ? "animate-token-deduct" : ""} ${low ? "fill-primary-500 text-primary-500" : "fill-primary-500 text-primary-500"}`}
       />
       <span className={`tabular ${pulse ? "animate-token-deduct" : ""}`}>{balance}</span>
     </motion.button>

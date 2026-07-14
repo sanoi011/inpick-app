@@ -2,12 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowRight,
-  ArrowUp,
   ArrowUpRight,
   Calculator,
   Camera,
@@ -15,7 +14,6 @@ import {
   ImagePlus,
   Layers3,
   Menu,
-  Plus,
   Sparkles,
   X,
 } from "lucide-react";
@@ -49,6 +47,15 @@ const QUICK_ACTIONS = [
     prompt: "원하는 디자인과 예산에 맞는 인테리어 견적을 알려줘",
     icon: Calculator,
   },
+];
+
+const TREND_PROMPTS = [
+  "웜 어스 팔레트와 자연스러운 질감",
+  "드라마틱 천연석과 깊은 우드 톤",
+  "컬러 드렌칭과 포인트 천장",
+  "웰니스 룸과 바이오필릭 디자인",
+  "빈티지 믹스와 장인 디테일",
+  "톤온톤 뉴트럴과 에스프레소 브라운",
 ];
 
 const SHOWCASES = [
@@ -123,7 +130,7 @@ const FOOTER_LINKS = [
     links: [
       { label: "사업자 서비스", href: "/contractor" },
       { label: "사업자 등록", href: "/contractor/register" },
-      { label: "사업자 로그인", href: "/contractor/login" },
+      { label: "사업자 로그인", href: "/auth?type=contractor" },
       { label: "AIOD 소개", href: "/aiod" },
     ],
   },
@@ -140,21 +147,22 @@ const FOOTER_LINKS = [
 
 export default function Home() {
   const router = useRouter();
-  const [prompt, setPrompt] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
-  const [searchActivated, setSearchActivated] = useState(false);
+  const [trendIndex, setTrendIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setTrendIndex((current) => (current + 1) % TREND_PROMPTS.length);
+    }, 2800);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const startDesign = (value?: string) => {
-    const nextPrompt = (value ?? prompt).trim();
+    const nextPrompt = value?.trim();
     if (typeof window !== "undefined" && nextPrompt) {
       sessionStorage.setItem("inpick_home_prompt", nextPrompt);
     }
     router.push("/workflow");
-  };
-
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    startDesign();
   };
 
   return (
@@ -241,58 +249,39 @@ export default function Home() {
             사진이나 주소만 알려주세요. AI 인테리어 디자인부터 자재와 견적까지 무료로 시작할 수 있어요.
           </p>
 
-          <form onSubmit={handleSubmit} className="mx-auto mt-9 max-w-[760px] text-left">
-            <div
-              onClick={() => setSearchActivated(true)}
-              className="rounded-[30px] border border-black/[0.08] bg-white p-3 shadow-[0_1px_2px_rgba(0,0,0,0.05),0_12px_38px_rgba(0,0,0,0.06)] transition focus-within:border-black/20"
-            >
-              <textarea
-                value={prompt}
-                onChange={(event) => setPrompt(event.target.value)}
-                onFocus={() => setSearchActivated(true)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
-                    event.preventDefault();
-                    startDesign();
-                  }
-                }}
-                rows={2}
-                placeholder="원하는 공간과 분위기를 설명해 주세요"
-                className="min-h-[70px] w-full resize-none bg-transparent px-3 pb-2 pt-2 text-[14px] leading-6 tracking-[-0.02em] outline-none placeholder:text-black/36 sm:text-[15px]"
-              />
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => router.push("/workflow")}
-                  className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-black/10 bg-white text-black transition hover:bg-black/[0.04]"
-                  aria-label="사진 또는 도면 추가"
-                >
-                  <Plus className="h-5 w-5" />
-                </button>
-                <div className="flex items-center gap-2">
-                  <span className="hidden text-[12px] font-medium text-black/40 sm:block">첫 디자인 무료</span>
-                  {searchActivated ? (
-                    <button
-                      type="submit"
-                      className="inline-flex h-10 items-center justify-center gap-1.5 whitespace-nowrap rounded-full bg-black px-3.5 text-[12px] font-semibold text-white transition hover:bg-black/70 sm:gap-2 sm:px-4 sm:text-[13px]"
+          <div className="mx-auto mt-8 max-w-[760px] text-left">
+            <div className="rounded-[26px] border border-black/[0.08] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_10px_30px_rgba(0,0,0,0.055)] sm:px-5 sm:py-4">
+              <div className="flex min-h-8 items-center gap-2.5 overflow-hidden px-1">
+                <span className="shrink-0 rounded-full bg-[#f4f4f2] px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-black/42">
+                  2026 trend
+                </span>
+                <div className="relative h-6 min-w-0 flex-1 overflow-hidden">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.p
+                      key={trendIndex}
+                      initial={{ y: 16, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: -16, opacity: 0 }}
+                      transition={{ duration: 0.38, ease: [0.4, 0, 0.2, 1] }}
+                      className="absolute inset-x-0 top-0 truncate text-[13px] font-medium leading-6 tracking-[-0.025em] text-black/58 sm:text-[14px]"
                     >
-                      인테리어 디자인 하기
-                      <ArrowUpRight className="h-4 w-4" strokeWidth={2.1} />
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => setSearchActivated(true)}
-                      className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-black text-white transition hover:bg-black/70"
-                      aria-label="인테리어 디자인 시작"
-                    >
-                      <ArrowUp className="h-[18px] w-[18px]" strokeWidth={2.2} />
-                    </button>
-                  )}
+                      {TREND_PROMPTS[trendIndex]}
+                    </motion.p>
+                  </AnimatePresence>
                 </div>
               </div>
+              <div className="mt-2 flex items-center justify-end">
+                <button
+                  type="button"
+                  onClick={() => startDesign()}
+                  className="inline-flex h-10 items-center justify-center gap-2 whitespace-nowrap rounded-full bg-black px-4 text-[12px] font-semibold text-white transition hover:bg-black/72 sm:px-5 sm:text-[13px]"
+                >
+                  무료 인테리어 디자인
+                  <ArrowUpRight className="h-4 w-4" strokeWidth={2.1} />
+                </button>
+              </div>
             </div>
-          </form>
+          </div>
 
           <div className="mx-auto mt-4 flex max-w-[800px] flex-wrap justify-center gap-2">
             {QUICK_ACTIONS.map((action) => {
@@ -302,7 +291,6 @@ export default function Home() {
                   key={action.label}
                   type="button"
                   onClick={() => {
-                    setPrompt(action.prompt);
                     startDesign(action.prompt);
                   }}
                   className="inline-flex items-center gap-1.5 rounded-full border border-black/[0.09] bg-white px-3.5 py-2 text-[12px] font-medium tracking-[-0.02em] transition hover:bg-black/[0.04] sm:text-[13px]"

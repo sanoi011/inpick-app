@@ -138,6 +138,7 @@ function ConsumerAuthForm() {
   const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberLogin, setRememberLogin] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
@@ -153,6 +154,18 @@ function ConsumerAuthForm() {
       setError("네이버 로그인에 실패했습니다. 다시 시도해주세요.");
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    try {
+      const rememberedEmail = localStorage.getItem("inpick_remembered_consumer_email");
+      if (rememberedEmail) {
+        setEmail(rememberedEmail);
+        setRememberLogin(true);
+      }
+    } catch {
+      /* private mode */
+    }
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -192,6 +205,15 @@ function ConsumerAuthForm() {
       trackClientEvent(AnalyticsEvents.LoginCompleted, {
         props: { provider: "email", method: "password" },
       });
+      try {
+        if (rememberLogin) {
+          localStorage.setItem("inpick_remembered_consumer_email", normalizedEmail);
+        } else {
+          localStorage.removeItem("inpick_remembered_consumer_email");
+        }
+      } catch {
+        /* private mode */
+      }
       // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
       window.location.href = returnUrl || "/";
     } catch (err) {
@@ -482,22 +504,45 @@ function ConsumerAuthForm() {
         <Field label="이메일">
           <Input
             type="email"
+            name="username"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="이메일을 입력하세요"
+            autoComplete="username"
             required
           />
         </Field>
         <Field label="비밀번호">
           <Input
             type="password"
+            name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="비밀번호를 입력하세요"
+            autoComplete="current-password"
             required
             minLength={6}
           />
         </Field>
+        <label className="flex cursor-pointer items-center gap-2.5 px-0.5 py-0.5 text-left">
+          <input
+            type="checkbox"
+            checked={rememberLogin}
+            onChange={(e) => {
+              const checked = e.target.checked;
+              setRememberLogin(checked);
+              if (!checked) {
+                try {
+                  localStorage.removeItem("inpick_remembered_consumer_email");
+                } catch {
+                  /* private mode */
+                }
+              }
+            }}
+            className="h-4 w-4 rounded border-black/20 accent-black"
+          />
+          <span className="text-[12px] font-semibold text-black/62">로그인 저장</span>
+        </label>
         <PrimaryButton type="submit" loading={loading}>
           로그인 <ArrowRight className="h-3.5 w-3.5" />
         </PrimaryButton>
@@ -689,19 +734,6 @@ function ContractorAuthForm() {
     <FormFrame>
       {error && <Alert kind="danger">{error}</Alert>}
 
-      {/* 안내 배너 — 소셜 로그인 후 사업자 정보 등록 안내 */}
-      <div className="mb-5 rounded-2xl border border-primary-200 bg-primary-50/70 p-4">
-        <p className="text-[12px] font-bold uppercase tracking-widest text-primary-500">
-          간편 로그인
-        </p>
-        <p className="mt-1 text-[14px] font-bold tracking-tight text-ink">
-          소셜 계정으로 즉시 시작
-        </p>
-        <p className="mt-0.5 text-[12px] text-ink-60 leading-relaxed">
-          로그인 후 첫 화면에서 사업자등록번호·대표자명 등 입찰 조건 정보를 등록하면 즉시 입찰 참여 가능합니다.
-        </p>
-      </div>
-
       <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} />
 
       <p className="mt-5 text-center text-[12px] text-ink-60">
@@ -865,7 +897,7 @@ function AuthContent() {
               <p className="mt-3 text-[13px] leading-6 text-black/48">
                 {activeTab === "consumer"
                   ? "로그인하고 저장된 디자인과 견적을 이어서 확인하세요."
-                  : "간편 로그인 후 사업자 정보를 등록하고 입찰·매칭을 시작하세요."}
+                  : "소셜 계정으로 로그인하고 사업자 정보를 등록해 입찰·매칭을 시작하세요."}
               </p>
             </div>
 

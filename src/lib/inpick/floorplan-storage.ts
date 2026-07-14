@@ -29,6 +29,36 @@ const STORAGE_MODE: StorageMode =
 const LOCAL_ROOT = process.env.FLOORPLAN_LOCAL_ROOT || "E:/inpick-storage";
 const SUPABASE_BUCKET = "floorplans";
 
+let floorplanBucketPromise: Promise<boolean> | null = null;
+
+/** 배포 환경에 floorplans 버킷이 빠져 있어도 서비스 요청 시 한 번만 자동 복구한다. */
+export function ensureFloorplanBucketExists(): Promise<boolean> {
+  if (floorplanBucketPromise) return floorplanBucketPromise;
+  floorplanBucketPromise = (async () => {
+    try {
+      const supa = createAdminClient();
+      const { data: buckets, error: listError } = await supa.storage.listBuckets();
+      if (listError) throw listError;
+      if ((buckets || []).some((bucket) => bucket.name === SUPABASE_BUCKET)) return true;
+      const { error: createError } = await supa.storage.createBucket(SUPABASE_BUCKET, {
+        public: true,
+        fileSizeLimit: 20 * 1024 * 1024,
+      });
+      if (createError) throw createError;
+      console.info(`[FLOORPLAN] bucket "${SUPABASE_BUCKET}" auto-created`);
+      return true;
+    } catch (error) {
+      console.warn(
+        "[FLOORPLAN] bucket ensure failed:",
+        error instanceof Error ? error.message : String(error),
+      );
+      floorplanBucketPromise = null;
+      return false;
+    }
+  })();
+  return floorplanBucketPromise;
+}
+
 export type FloorplanFileType = "original" | "normalized";
 
 export interface FloorplanData {
@@ -189,6 +219,7 @@ async function saveToSupabase(
   filename: string,
   data: FloorplanData,
 ): Promise<string> {
+  await ensureFloorplanBucketExists();
   const supa = createAdminClient();
   const filePath = `${propertyId}/${filename}`;
   const { error } = await supa.storage
