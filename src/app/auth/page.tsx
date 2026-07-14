@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Loader2,
   User,
@@ -10,6 +11,7 @@ import {
   Mail,
   Lock,
   ArrowRight,
+  ArrowUpRight,
   Hexagon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -114,7 +116,7 @@ function OAuthRow({
             type="button"
             onClick={() => !it.disabled && !loadingProvider && onProvider(it.key)}
             disabled={!!loadingProvider || it.disabled}
-            className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-all ${it.bg} ${it.fg} ${it.border ?? ""} disabled:opacity-50`}
+            className="inline-flex h-[50px] w-full items-center justify-center gap-2.5 rounded-full border border-black/10 bg-white text-[13px] font-semibold text-black transition hover:bg-black/[0.035] disabled:cursor-not-allowed disabled:opacity-45"
           >
             {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : it.icon}
             <span>{it.label}</span>
@@ -455,10 +457,10 @@ function ConsumerAuthForm() {
 
       <Divider>또는 이메일로</Divider>
 
-      <div className="mb-5 flex rounded-full bg-primary-50 p-1">
+      <div className="mb-5 flex rounded-full bg-[#f4f4f2] p-1">
         <button
           type="button"
-          className="flex-1 rounded-full bg-white py-2 text-[13px] font-semibold text-ink shadow-sm"
+          className="flex-1 rounded-full bg-white py-2 text-[13px] font-semibold text-black shadow-sm"
           aria-current="page"
         >
           로그인
@@ -470,7 +472,7 @@ function ConsumerAuthForm() {
             setMessage("");
             setShowSignupModal(true);
           }}
-          className="flex-1 rounded-full py-2 text-[13px] font-semibold text-ink-60 transition-colors hover:text-ink"
+          className="flex-1 rounded-full py-2 text-[13px] font-semibold text-black/48 transition-colors hover:text-black"
         >
           회원가입
         </button>
@@ -750,10 +752,10 @@ function Divider({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative my-5">
       <div className="absolute inset-0 flex items-center">
-        <div className="w-full border-t border-primary-100" />
+        <div className="w-full border-t border-black/[0.08]" />
       </div>
-      <div className="font-mono relative flex justify-center text-[11px] uppercase tracking-[0.16em]">
-        <span className="bg-white px-2 text-ink-40">{children}</span>
+      <div className="relative flex justify-center text-[10px] uppercase tracking-[0.14em]">
+        <span className="bg-white px-2 text-black/32">{children}</span>
       </div>
     </div>
   );
@@ -769,7 +771,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-[12px] font-bold tracking-tight text-ink-60">
+      <label className="mb-2 block text-[12px] font-semibold tracking-tight text-black/62">
         {label}
       </label>
       <div className="relative">
@@ -786,7 +788,7 @@ function Input({
   return (
     <input
       {...props}
-      className={`w-full rounded-2xl border border-primary-100 bg-white py-3 text-[14px] tracking-tight text-ink outline-none transition-all placeholder:text-ink-40 focus:border-primary-400 focus:ring-2 focus:ring-primary-100 ${
+      className={`h-[50px] w-full rounded-2xl border border-black/10 bg-white py-3 text-[14px] tracking-tight text-black outline-none transition placeholder:text-black/28 focus:border-black/30 focus:shadow-[0_0_0_4px_rgba(247,59,32,0.06)] ${
         hasIcon ? "pl-10 pr-4" : "px-4"
       }`}
     />
@@ -801,7 +803,7 @@ function PrimaryButton({
     <button
       {...props}
       disabled={props.disabled || loading}
-      className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-primary-500 text-[14px] font-semibold tracking-tight text-white shadow-cta transition-colors hover:bg-primary-600 disabled:bg-primary-100 disabled:text-ink-40 disabled:shadow-none"
+      className="inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-black text-[14px] font-semibold tracking-tight text-white transition hover:bg-black/75 disabled:cursor-not-allowed disabled:opacity-35"
     >
       {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
     </button>
@@ -816,97 +818,87 @@ function AuthContent() {
   const [activeTab, setActiveTab] = useState<"consumer" | "contractor">(initialTab);
 
   return (
-    <div className="font-kr relative flex min-h-screen items-center justify-center overflow-hidden bg-burgundy px-4 py-12 text-ink">
-      {/* 백그라운드 인테리어 콜라주 */}
-      <InteriorCollage />
-      {/* 살구 그라데이션 오버랩 (가독성) */}
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(54,8,2,0.55)_0%,rgba(247,59,32,0.32)_45%,rgba(54,8,2,0.65)_100%)]" />
-        <div className="absolute inset-x-0 top-0 h-[40%] bg-[radial-gradient(ellipse_at_top,rgba(253,203,196,0.30),transparent_60%)]" />
-        <div className="absolute -right-[15%] top-[15%] h-[480px] w-[480px] rounded-full bg-[radial-gradient(circle,rgba(247,59,32,0.30),transparent_70%)] blur-3xl" />
-        <div className="absolute -left-[12%] top-[45%] h-[420px] w-[420px] rounded-full bg-[radial-gradient(circle,rgba(122,39,57,0.40),transparent_70%)] blur-3xl" />
-      </div>
+    <main className="min-h-screen bg-white font-kr text-[#0d0d0d]">
+      <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between px-5 sm:px-8 lg:h-20 lg:px-10">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="InPick 홈">
+          <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+          <span className="font-en text-[21px] font-bold tracking-[-0.055em]">inpick</span>
+        </Link>
+        <Link href="/" className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
+          메인으로 <ArrowUpRight className="h-4 w-4" />
+        </Link>
+      </header>
 
-      <div className="relative w-full max-w-[440px]">
-        {/* 브랜드 배지 (Archisketch 패턴) */}
-        <div className="mx-auto mb-6 flex w-fit items-center gap-2 rounded-full bg-white px-5 py-2.5 shadow-card ring-1 ring-primary-100">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-[18px] font-extrabold tracking-[-0.04em] text-ink"
-          >
-            <span className="hex-mask h-5 w-5 text-primary-500" />
-            <span className="font-en">inpick</span>
-          </Link>
-        </div>
-        <p className="mb-6 text-center text-[13px] font-medium tracking-tight text-offwhite/85">
-          {activeTab === "consumer"
-            ? "한 계정으로 인테리어의 모든 단계를."
-            : "사업자로 입찰·매칭을 받아보세요."}
-        </p>
-
-        {/* 소비자 / 사업자 탭 */}
-        <div className="mb-5 flex gap-2.5">
-          <TabButton
-            active={activeTab === "consumer"}
-            onClick={() => setActiveTab("consumer")}
-            icon={<User className="h-4 w-4" />}
-            title="소비자"
-            sub="견적·디자인·계약"
-          />
-          <TabButton
-            active={activeTab === "contractor"}
-            onClick={() => setActiveTab("contractor")}
-            icon={<Building2 className="h-4 w-4" />}
-            title="사업자"
-            sub="입찰·매칭·시공"
-          />
-        </div>
-
-        {/* 카드 */}
-        <div className="relative overflow-hidden rounded-[28px] border border-primary-100 bg-white p-7 shadow-card">
-          <div
-            className="pointer-events-none absolute inset-x-0 top-0 h-px"
-            style={{
-              background: "linear-gradient(90deg, transparent, #F73B20, transparent)",
-            }}
-          />
-          {activeTab === "consumer" ? <ConsumerAuthForm /> : <ContractorAuthForm />}
-        </div>
-
-        <p className="font-mono mt-6 text-center text-[11px] tracking-[0.08em] text-offwhite/60">
-          로그인 시 <span className="underline">서비스 이용약관</span> 및{" "}
-          <span className="underline">개인정보처리방침</span>에 동의합니다.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-/* ─── 인테리어 백그라운드 콜라주 (Archisketch 결) ─── */
-function InteriorCollage() {
-  // 12장 그리드. 화면 사이즈 기준 4×3 (데스크톱) / 3×4 (모바일)
-  const tiles = Array.from({ length: 12 }, (_, i) => ({
-    src: `/auth-bg/${i + 1}.jpg`,
-    rot: [-3, 2, -1.5, 1.8, -2.4, 1.2, -1.6, 2.6, -2, 1.4, -1.8, 2.2][i],
-  }));
-  return (
-    <div className="pointer-events-none absolute inset-0">
-      <div className="grid h-full w-full grid-cols-2 grid-rows-6 gap-[6px] p-[6px] sm:grid-cols-3 sm:grid-rows-4 lg:grid-cols-4 lg:grid-rows-3">
-        {tiles.map((t, i) => (
-          <div
-            key={i}
-            className="relative overflow-hidden rounded-[14px] shadow-[0_10px_24px_-8px_rgba(54,8,2,0.5)]"
-            style={{ transform: `rotate(${t.rot}deg) scale(1.04)` }}
-          >
-            <div
-              className="absolute inset-0 bg-cover bg-center"
-              style={{ backgroundImage: `url(${t.src})` }}
+      <div className="grid min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
+        <section className="relative hidden min-h-screen overflow-hidden p-5 lg:block">
+          <div className="relative h-full min-h-[720px] overflow-hidden rounded-[28px] bg-[#eee]">
+            <Image
+              src="/images/feature-fireplace.jpg"
+              alt="InPick AI 인테리어"
+              fill
+              priority
+              sizes="54vw"
+              className="object-cover"
             />
-            <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(54,8,2,0.10),rgba(247,59,32,0.08))]" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/72 via-black/5 to-black/10" />
+            <div className="absolute inset-x-0 bottom-0 p-10 text-white xl:p-14">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">Imagine your space</p>
+              <h1 className="mt-4 max-w-xl break-keep text-[44px] font-medium leading-[1.04] tracking-[-0.06em] xl:text-[56px]">
+                내 공간의 가능성을 인픽에서 만나보세요.
+              </h1>
+              <p className="mt-5 max-w-lg break-keep text-[14px] leading-7 text-white/68">
+                AI 디자인부터 실제 자재와 견적까지, 하나의 계정으로 인테리어의 모든 단계를 이어갑니다.
+              </p>
+            </div>
           </div>
-        ))}
+        </section>
+
+        <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-24 sm:px-8 lg:py-24">
+          <div className="w-full max-w-[430px]">
+            <div className="mb-7">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">
+                {activeTab === "consumer" ? "Welcome to InPick" : "InPick for business"}
+              </p>
+              <h2 className="mt-2 break-keep text-[28px] font-medium tracking-[-0.055em] sm:text-[34px]">
+                {activeTab === "consumer" ? "다시 만나서 반가워요." : "인픽과 함께 사업을 시작하세요."}
+              </h2>
+              <p className="mt-3 text-[13px] leading-6 text-black/48">
+                {activeTab === "consumer"
+                  ? "로그인하고 저장된 디자인과 견적을 이어서 확인하세요."
+                  : "간편 로그인 후 사업자 정보를 등록하고 입찰·매칭을 시작하세요."}
+              </p>
+            </div>
+
+            <div className="mb-6 flex gap-2">
+              <TabButton
+                active={activeTab === "consumer"}
+                onClick={() => setActiveTab("consumer")}
+                icon={<User className="h-4 w-4" />}
+                title="소비자"
+                sub="디자인·견적"
+              />
+              <TabButton
+                active={activeTab === "contractor"}
+                onClick={() => setActiveTab("contractor")}
+                icon={<Building2 className="h-4 w-4" />}
+                title="사업자"
+                sub="입찰·매칭"
+              />
+            </div>
+
+            <div>{activeTab === "consumer" ? <ConsumerAuthForm /> : <ContractorAuthForm />}</div>
+
+            <p className="mt-7 border-t border-black/[0.07] pt-5 text-center text-[10px] leading-5 text-black/35">
+              로그인 시{" "}
+              <Link href="/terms" className="underline decoration-black/20 underline-offset-2 hover:text-black">서비스 이용약관</Link>
+              {" 및 "}
+              <Link href="/privacy" className="underline decoration-black/20 underline-offset-2 hover:text-black">개인정보처리방침</Link>
+              에 동의합니다.
+            </p>
+          </div>
+        </section>
       </div>
-    </div>
+    </main>
   );
 }
 
@@ -926,16 +918,17 @@ function TabButton({
   return (
     <button
       onClick={onClick}
-      className={`flex flex-1 items-center justify-center gap-2.5 rounded-2xl border-2 py-3.5 transition-all ${
+      type="button"
+      className={`flex flex-1 items-center justify-center gap-2.5 rounded-2xl border py-3.5 transition ${
         active
-          ? "border-primary-500 bg-primary-50 text-primary-700 shadow-cta"
-          : "border-primary-100 bg-white text-ink-60 hover:border-primary-300"
+          ? "border-black bg-black text-white"
+          : "border-black/10 bg-white text-black/52 hover:bg-black/[0.035] hover:text-black"
       }`}
     >
       {icon}
       <div className="text-left">
-        <p className="text-[14px] font-bold tracking-tight">{title}</p>
-        <p className="text-[11px] opacity-70">{sub}</p>
+        <p className="text-[13px] font-semibold tracking-tight">{title}</p>
+        <p className="text-[10px] opacity-60">{sub}</p>
       </div>
     </button>
   );

@@ -43,13 +43,15 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
   icon: React.ElementType; label: string; value: string; sub?: string; color: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5">
-      <div className="flex items-center justify-between mb-3">
-        <Icon className={`w-6 h-6 ${color}`} />
-        {sub && <span className="text-xs text-gray-400">{sub}</span>}
+    <div className="min-w-0 rounded-[20px] border border-black/[0.07] bg-white p-4 sm:p-5">
+      <div className="mb-5 flex items-center justify-between">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f4f4f2]">
+          <Icon className={`h-[17px] w-[17px] ${color}`} strokeWidth={1.8} />
+        </span>
+        {sub && <span className="text-[10px] text-black/35">{sub}</span>}
       </div>
-      <p className="text-2xl font-bold text-gray-900">{value}</p>
-      <p className="text-sm text-gray-500 mt-0.5">{label}</p>
+      <p className="truncate text-[24px] font-medium tracking-[-0.05em] text-black sm:text-[27px]">{value}</p>
+      <p className="mt-1 text-[12px] font-medium text-black/42">{label}</p>
     </div>
   );
 }
@@ -107,26 +109,53 @@ export default function AdminDashboardPage() {
 
   if (!authChecked) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-5 w-5 animate-spin text-primary-500" />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">대시보드 개요</h2>
+    <div className="mx-auto max-w-[1500px] space-y-5 p-4 sm:p-6 lg:space-y-6 lg:p-8">
+      <section className="flex flex-col gap-8 overflow-hidden rounded-[26px] bg-black px-6 py-8 text-white sm:px-8 sm:py-10 lg:flex-row lg:items-end lg:justify-between lg:px-10">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.17em] text-white/45">InPick operation overview</p>
+          <h1 className="mt-3 text-[28px] font-medium leading-tight tracking-[-0.055em] sm:text-[38px]">오늘의 인픽 운영 현황</h1>
+          <p className="mt-3 max-w-2xl text-[12px] leading-6 text-white/52 sm:text-[13px]">
+            사용자부터 AI 렌더링, 프로젝트와 견적까지 주요 운영 지표를 실시간으로 확인하세요.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            void loadStats();
+            void loadCoverage();
+          }}
+          className="inline-flex h-10 w-fit items-center gap-2 rounded-full bg-white px-4 text-[12px] font-semibold text-black transition hover:bg-white/80"
+        >
+          <RefreshCw className="h-3.5 w-3.5" /> 데이터 새로고침
+        </button>
+      </section>
 
       {/* 주요 통계 */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-        <StatCard icon={Users} label="소비자" value={`${stats.consumers}명`} color="text-blue-600" />
-        <StatCard icon={FolderKanban} label="진행 프로젝트" value={`${stats.projects}건`} color="text-green-600" />
-        <StatCard icon={FileText} label="견적·계약" value={`${stats.estimates}건`} color="text-purple-600" />
-        <StatCard icon={Hexagon} label="총 보유 토큰" value={`${stats.totalCredits.toLocaleString()}`} color="text-amber-600" />
-        <StatCard icon={Bot} label="AI 호출 누적" value={`${stats.aiConversations}건`} color="text-pink-600" />
-      </div>
+      <section>
+        <div className="mb-3 flex items-end justify-between px-1">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/30">Core metrics</p>
+            <h2 className="mt-1 text-[17px] font-semibold tracking-[-0.035em]">핵심 운영 지표</h2>
+          </div>
+          <span className="text-[10px] font-medium text-black/32">실시간 집계</span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          <StatCard icon={Users} label="소비자" value={`${stats.consumers}명`} color="text-blue-600" />
+          <StatCard icon={FolderKanban} label="진행 프로젝트" value={`${stats.projects}건`} color="text-green-600" />
+          <StatCard icon={FileText} label="견적·계약" value={`${stats.estimates}건`} color="text-purple-600" />
+          <StatCard icon={Hexagon} label="총 보유 토큰" value={`${stats.totalCredits.toLocaleString()}`} color="text-amber-600" />
+          <StatCard icon={Bot} label="AI 호출 누적" value={`${stats.aiConversations}건`} color="text-pink-600" />
+        </div>
+      </section>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard icon={Users} label="등록 업체" value={`${stats.contractors}개`} color="text-teal-600" />
         <StatCard icon={Package} label="자재 단가 DB" value={`${stats.materials}건`} color="text-indigo-600" />
         <StatCard icon={TrendingUp} label="크롤 로그" value={`${stats.crawlLogs}건`} color="text-amber-600" />
@@ -134,42 +163,42 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* AI 시스템 현황 — 현재 사용 중인 모델·엔드포인트 */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5">
-        <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-amber-500" />
+      <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold tracking-[-0.025em] text-black">
+          <Sparkles className="h-[18px] w-[18px] text-primary-500" />
           AI 시스템 현황 (2026-05)
         </h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
-            <p className="font-bold text-amber-700">이미지 생성</p>
-            <p className="text-amber-900/80 mt-1">gpt-image-2 단일 (폴백 없음 · 실패 시 토큰 차감 X)</p>
-            <p className="text-amber-700/60 mt-1 tabular">/api/inpick/render-room</p>
+        <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
+            <p className="font-bold text-primary-600">이미지 생성</p>
+            <p className="mt-1.5 leading-5 text-black/62">gpt-image-2 단일 (폴백 없음 · 실패 시 토큰 차감 X)</p>
+            <p className="mt-2 break-all text-[10px] text-black/32">/api/inpick/render-room</p>
           </div>
-          <div className="p-3 rounded-lg bg-blue-50 border border-blue-100">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
             <p className="font-bold text-blue-700">Vision 분석</p>
-            <p className="text-blue-900/80 mt-1">GPT-4o (정형화 + 자재 영역)</p>
-            <p className="text-blue-700/60 mt-1 tabular">normalize-floorplan / extract-regions</p>
+            <p className="mt-1.5 leading-5 text-black/62">GPT-4o (정형화 + 자재 영역)</p>
+            <p className="mt-2 break-all text-[10px] text-black/32">normalize-floorplan / extract-regions</p>
           </div>
-          <div className="p-3 rounded-lg bg-purple-50 border border-purple-100">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
             <p className="font-bold text-purple-700">고화질 재렌더</p>
-            <p className="text-purple-900/80 mt-1">gpt-image-2 inpaint (마스크 기반 · 폴백 없음)</p>
-            <p className="text-purple-700/60 mt-1 tabular">/api/inpick/refine-render</p>
+            <p className="mt-1.5 leading-5 text-black/62">gpt-image-2 inpaint (마스크 기반 · 폴백 없음)</p>
+            <p className="mt-2 break-all text-[10px] text-black/32">/api/inpick/refine-render</p>
           </div>
-          <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-100">
+          <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
             <p className="font-bold text-emerald-700">견적 산출</p>
-            <p className="text-emerald-900/80 mt-1">Vision 자재 추출 + MOLIT 일위대가 + 부자재 10%</p>
-            <p className="text-emerald-700/60 mt-1 tabular">/api/inpick/build-estimate</p>
+            <p className="mt-1.5 leading-5 text-black/62">Vision 자재 추출 + MOLIT 일위대가 + 부자재 10%</p>
+            <p className="mt-2 break-all text-[10px] text-black/32">/api/inpick/build-estimate</p>
           </div>
         </div>
-        <div className="mt-3 text-xs text-gray-500 flex items-center gap-2">
-          <ImageIcon className="w-3.5 h-3.5" />
+        <div className="mt-4 flex items-start gap-2 text-[11px] leading-5 text-black/42">
+          <ImageIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
           <span>1차 미리보기 무료 → 자재 분석 1토큰 → 고화질 재렌더 2토큰 (사용자 명시)</span>
         </div>
       </div>
 
       {/* 데이터 커버리지 */}
       {coverage && coverage.totalComplexes > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900 flex items-center gap-2">
               <Database className="w-5 h-5 text-blue-600" />
@@ -242,40 +271,40 @@ export default function AdminDashboardPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
         {/* 빠른 작업 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">빠른 작업</h3>
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
+          <h3 className="mb-4 text-[15px] font-semibold tracking-[-0.025em] text-black">빠른 작업</h3>
           <div className="space-y-2">
             <button onClick={() => runCrawler("all")} disabled={crawling}
-              className="w-full flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm text-left disabled:opacity-50">
+              className="flex w-full items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-left text-[12px] transition hover:bg-black/[0.06] disabled:opacity-50">
               {crawling ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4 text-blue-600" />}
-              <span className="font-medium text-gray-900">전체 단가 갱신</span>
-              <span className="text-gray-400 ml-auto">3대 기관 크롤링</span>
+              <span className="font-medium text-black">전체 단가 갱신</span>
+              <span className="ml-auto hidden text-black/35 sm:inline">3대 기관 크롤링</span>
             </button>
-            <Link href="/admin/materials" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+            <Link href="/admin/materials" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Package className="w-4 h-4 text-indigo-600" />
-              <span className="font-medium text-gray-900">자재 단가 직접 편집</span>
-              <span className="text-gray-400 ml-auto">인라인 게시판</span>
+              <span className="font-medium text-black">자재 단가 직접 편집</span>
+              <span className="ml-auto hidden text-black/35 sm:inline">인라인 게시판</span>
             </Link>
-            <Link href="/admin/credits" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+            <Link href="/admin/credits" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Hexagon className="w-4 h-4 text-amber-600" />
-              <span className="font-medium text-gray-900">사용자 토큰 충전·환급</span>
+              <span className="font-medium text-black">사용자 토큰 충전·환급</span>
             </Link>
-            <Link href="/admin/drawing-logs" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+            <Link href="/admin/drawing-logs" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Bot className="w-4 h-4 text-pink-600" />
-              <span className="font-medium text-gray-900">도면 인식 로그 (GPT-4o Vision)</span>
+              <span className="font-medium text-black">도면 인식 로그 (GPT-4o Vision)</span>
             </Link>
-            <Link href="/contractor" target="_blank" className="flex items-center gap-2 px-4 py-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors text-sm">
+            <Link href="/contractor" target="_blank" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Users className="w-4 h-4 text-purple-600" />
-              <span className="font-medium text-gray-900">사업자 대시보드 (새 탭)</span>
+              <span className="font-medium text-black">사업자 대시보드 (새 탭)</span>
             </Link>
           </div>
         </div>
 
         {/* 최근 크롤 로그 */}
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">최근 크롤 로그</h3>
+        <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
+          <h3 className="mb-4 text-[15px] font-semibold tracking-[-0.025em] text-black">최근 크롤 로그</h3>
           {recentCrawls.length === 0 ? (
             <p className="text-sm text-gray-400 py-4 text-center">크롤 기록이 없습니다</p>
           ) : (

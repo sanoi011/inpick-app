@@ -34,7 +34,7 @@ function PolicyLink({ href, children }: { href: string; children: React.ReactNod
           void openOAuthExternal(`${window.location.origin}${href}`);
         }
       }}
-      className="text-gray-500 underline hover:text-gray-700"
+      className="text-black/48 underline decoration-black/20 underline-offset-2 hover:text-black"
     >
       {children}
     </a>
@@ -253,25 +253,26 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-3 backdrop-blur-sm sm:p-5"
       onClick={onClose}
     >
       <div
-        className="relative max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-2xl"
+        className="relative max-h-[94vh] w-full max-w-[460px] overflow-y-auto rounded-[28px] bg-white shadow-[0_24px_80px_rgba(0,0,0,0.18)]"
         onClick={(e) => e.stopPropagation()}
       >
         <button
           onClick={onClose}
-          className="absolute right-4 top-4 z-10 rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+          className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 text-black/42 transition hover:bg-black/[0.04] hover:text-black"
           aria-label="닫기"
         >
           <X className="h-5 w-5" />
         </button>
 
-        <div className="px-7 pt-7 pb-2">
-          <h2 className="text-xl font-extrabold tracking-tight text-gray-900">회원가입</h2>
-          <p className="mt-1 text-[13px] text-gray-500">
-            INPICK 가입 시 <span className="font-semibold text-orange-600">+5 토큰</span> 증정
+        <div className="px-6 pb-2 pt-7 sm:px-7">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/32">Create your account</p>
+          <h2 className="mt-2 text-[26px] font-medium tracking-[-0.05em] text-black">회원가입</h2>
+          <p className="mt-2 text-[13px] text-black/45">
+            INPICK 가입 시 <span className="font-semibold text-primary-500">+5 토큰</span> 증정
           </p>
         </div>
 
@@ -309,7 +310,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
             onConfirm={handleFinalSubmit}
           />
         ) : (
-          <form onSubmit={handleProceedToConfirm} className="px-7 pb-7 pt-4">
+          <form onSubmit={handleProceedToConfirm} className="px-6 pb-7 pt-4 sm:px-7">
             {/* OAuth — 카카오 활성화 완료(2026-06). 애플은 심사 통과 후 복구 */}
             <div className="flex flex-col gap-2.5">
               <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
@@ -322,10 +323,10 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
 
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
+                <div className="w-full border-t border-black/[0.08]" />
               </div>
               <div className="relative flex justify-center">
-                <span className="bg-white px-2 text-[11px] uppercase tracking-widest text-gray-400">
+                <span className="bg-white px-2 text-[10px] uppercase tracking-[0.14em] text-black/32">
                   또는 이메일로
                 </span>
               </div>
@@ -475,7 +476,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
             </div>
 
             {/* 약관 동의 */}
-            <div className="mt-4 space-y-1.5 rounded-xl bg-gray-50 p-3 text-[13px]">
+            <div className="mt-4 space-y-1.5 rounded-2xl bg-[#f7f7f5] p-3 text-[13px]">
               <CheckRow
                 checked={agreeAll}
                 onChange={setAgreeAll}
@@ -522,7 +523,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
             <button
               type="submit"
               disabled={!canSubmit}
-              className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-orange-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:bg-gray-200 disabled:text-gray-400"
+              className="mt-5 inline-flex h-[50px] w-full items-center justify-center gap-2 rounded-full bg-black text-sm font-semibold text-white transition hover:bg-black/75 disabled:bg-black/10 disabled:text-black/30"
             >
               다음: 개인정보 수집·이용 확인
             </button>
@@ -535,7 +536,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
                   onClose();
                   onSwitchToLogin?.();
                 }}
-                className="font-semibold text-orange-600 hover:underline"
+                className="font-semibold text-black underline decoration-black/20 underline-offset-4"
               >
                 로그인
               </button>
@@ -564,7 +565,7 @@ function Field({
 }) {
   return (
     <div>
-      <label className="mb-1 block text-[12px] font-semibold tracking-tight text-gray-700">
+      <label className="mb-1.5 block text-[12px] font-semibold tracking-tight text-black/62">
         {label}
         {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
@@ -576,7 +577,7 @@ function Field({
 
 function InputWithIcon({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
   return (
-    <div className="relative rounded-lg border border-gray-200 bg-white focus-within:border-orange-400 focus-within:ring-2 focus-within:ring-orange-100">
+    <div className="relative rounded-2xl border border-black/10 bg-white focus-within:border-black/30 focus-within:shadow-[0_0_0_4px_rgba(247,59,32,0.06)]">
       <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
         {icon}
       </span>
@@ -694,7 +695,7 @@ function FinalConsentStep({
           type="button"
           onClick={onConfirm}
           disabled={!finalConsent || loading}
-          className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-orange-500 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-orange-600 disabled:bg-gray-200 disabled:text-gray-400"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-black py-3 text-sm font-semibold text-white transition hover:bg-black/75 disabled:bg-black/10 disabled:text-black/30"
         >
           {loading && <Loader2 className="h-4 w-4 animate-spin" />}
           {loading ? "처리 중…" : "동의 후 가입 완료"}
@@ -738,16 +739,16 @@ function OAuthBtn({
   onClick: () => void;
 }) {
   const config = {
-    google: { label: "Google", bg: "bg-white border border-gray-200 text-gray-800 hover:bg-gray-50" },
-    kakao: { label: "카카오", bg: "bg-[#FEE500] text-[#3C1E1E] hover:brightness-95" },
-    naver: { label: "네이버", bg: "bg-[#03C75A] text-white hover:brightness-95" },
-    apple: { label: "Apple", bg: "bg-black text-white hover:bg-gray-900" },
+    google: { label: "Google", bg: "border-black/10 bg-white text-black hover:bg-black/[0.035]" },
+    kakao: { label: "카카오", bg: "border-black/10 bg-white text-black hover:bg-black/[0.035]" },
+    naver: { label: "네이버", bg: "border-black/10 bg-white text-black hover:bg-black/[0.035]" },
+    apple: { label: "Apple", bg: "border-black/10 bg-white text-black hover:bg-black/[0.035]" },
   }[provider];
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-11 w-full items-center justify-center gap-2 rounded-full text-[13px] font-semibold transition-colors ${config.bg}`}
+      className={`inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-full border text-[13px] font-semibold transition ${config.bg}`}
     >
       {OAUTH_ICONS[provider]}
       <span>{config.label}</span>

@@ -3,11 +3,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
+import Link from "next/link";
 import {
   Loader2,
-  Shield,
   Building2,
   ArrowLeft,
+  ArrowUpRight,
+  ShieldCheck,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
@@ -55,56 +58,57 @@ export default function ContractorLoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F4F6FA] flex flex-col">
-      {/* 정부기관 스타일 상단 바 */}
-      <div className="bg-[#1B3556] text-white">
-        <div className="max-w-7xl mx-auto px-6 flex items-center justify-between text-[0.7rem] py-1.5">
-          <span className="opacity-80">대한민국 인테리어 사업자 종합 시스템</span>
-          <span className="opacity-70">사업자 로그인</span>
-        </div>
-      </div>
-
-      <header className="bg-white border-b-2 border-[#1B3556]">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <button
-            onClick={() => router.push("/")}
-            className="inline-flex h-9 w-9 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-          <div className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-[#1B3556]" />
-            <span className="text-lg font-extrabold tracking-tight text-zinc-900">
-              In<span className="text-primary-500">Pick</span>
-              <span className="ml-2 text-[0.7rem] font-bold tracking-widest text-zinc-500 uppercase">
-                사업자
-              </span>
-            </span>
-          </div>
-          <div className="w-9" />
-        </div>
+    <main className="min-h-screen bg-white text-[#0d0d0d]">
+      <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between px-5 sm:px-8 lg:h-20 lg:px-10">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="InPick 홈">
+          <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+          <span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
+          <span className="rounded-full border border-black/10 px-2 py-1 text-[9px] font-bold tracking-[0.08em] text-black/48">BUSINESS</span>
+        </Link>
+        <Link href="/" className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
+          메인으로 <ArrowUpRight className="h-4 w-4" />
+        </Link>
       </header>
 
-      <main className="flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-md">
-          <div className="bg-white border border-zinc-200 rounded shadow-sm">
-            <div className="px-7 py-6 border-b border-zinc-200">
-              <div className="inline-flex items-center justify-center h-12 w-12 rounded-full bg-[#1B3556]/10 text-[#1B3556] mb-3">
-                <Building2 className="h-6 w-6" />
-              </div>
-              <h1 className="text-2xl font-extrabold tracking-tight text-zinc-900">
-                사업자 로그인
+      <div className="grid min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
+        <section className="relative hidden min-h-screen overflow-hidden p-5 lg:block">
+          <div className="relative h-full min-h-[700px] overflow-hidden rounded-[28px] bg-[#eee]">
+            <Image
+              src="/mode-cards/photo-commercial.jpg"
+              alt="InPick 사업자 서비스"
+              fill
+              priority
+              sizes="54vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/76 via-black/10 to-black/10" />
+            <div className="absolute inset-x-0 bottom-0 p-10 text-white xl:p-14">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/60">InPick for business</p>
+              <h1 className="mt-4 max-w-xl break-keep text-[44px] font-medium leading-[1.04] tracking-[-0.06em] xl:text-[56px]">
+                좋은 시공사와 좋은 고객이 만나는 곳.
               </h1>
-              <p className="mt-1 text-sm text-zinc-600">
-                간편 소셜 로그인 후 사업자 정보를 등록할 수 있습니다.
+              <p className="mt-5 max-w-lg break-keep text-[14px] leading-7 text-white/68">
+                검증된 프로젝트와 투명한 견적을 기반으로 새로운 시공 기회를 만나보세요.
               </p>
             </div>
+          </div>
+        </section>
 
-            <div className="px-7 py-6 space-y-3">
+        <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-24 sm:px-8 lg:py-24">
+          <div className="w-full max-w-[420px]">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary-500">
+              <Building2 className="h-5 w-5" strokeWidth={1.8} />
+            </span>
+            <p className="mt-7 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">Partner access</p>
+            <h2 className="mt-2 text-[28px] font-medium tracking-[-0.055em] sm:text-[34px]">사업자 로그인</h2>
+            <p className="mt-3 text-[13px] leading-6 text-black/48">간편 소셜 로그인 후 사업자 정보를 등록할 수 있습니다.</p>
+
+            <div className="mt-8 space-y-2.5">
               <button
+                type="button"
                 onClick={() => handleOAuth("google")}
                 disabled={!!oauthLoading}
-                className="w-full inline-flex items-center justify-center gap-3 h-12 rounded border border-zinc-300 bg-white text-sm font-bold text-zinc-800 hover:bg-zinc-50 disabled:opacity-50"
+                className="inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-full border border-black/10 bg-white text-[13px] font-semibold text-black transition hover:bg-black/[0.035] disabled:opacity-45"
               >
                 {oauthLoading === "google" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -119,61 +123,70 @@ export default function ContractorLoginPage() {
                 Google로 로그인
               </button>
               <button
+                type="button"
                 onClick={() => handleOAuth("kakao")}
                 disabled={!!oauthLoading}
-                className="w-full inline-flex items-center justify-center gap-3 h-12 rounded bg-[#FEE500] text-sm font-bold text-[#3C1E1E] hover:bg-[#FDD800] disabled:opacity-50"
+                className="inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-full border border-black/10 bg-white text-[13px] font-semibold text-black transition hover:bg-black/[0.035] disabled:opacity-45"
               >
                 {oauthLoading === "kakao" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <span className="text-base font-extrabold">K</span>
+                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#FEE500] text-[10px] font-extrabold text-[#3C1E1E]">K</span>
                 )}
                 카카오로 로그인
               </button>
               {NAVER_LOGIN_ENABLED && (
                 <button
+                  type="button"
                   onClick={() => handleOAuth("naver")}
                   disabled={!!oauthLoading}
-                  className="w-full inline-flex items-center justify-center gap-3 h-12 rounded bg-[#03C75A] text-sm font-bold text-white hover:bg-[#02b552] disabled:opacity-50"
+                  className="inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-full border border-black/10 bg-white text-[13px] font-semibold text-black transition hover:bg-black/[0.035] disabled:opacity-45"
                 >
                   {oauthLoading === "naver" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    <span className="text-base font-extrabold">N</span>
+                    <span className="inline-flex h-4 w-4 items-center justify-center bg-[#03C75A] text-[10px] font-extrabold text-white">N</span>
                   )}
                   네이버로 로그인
                 </button>
               )}
               <button
+                type="button"
                 onClick={() => handleOAuth("apple")}
                 disabled={!!oauthLoading}
-                className="w-full inline-flex items-center justify-center gap-3 h-12 rounded bg-black text-sm font-bold text-white hover:bg-zinc-800 disabled:opacity-50"
+                className="inline-flex h-[50px] w-full items-center justify-center gap-3 rounded-full border border-black/10 bg-white text-[13px] font-semibold text-black transition hover:bg-black/[0.035] disabled:opacity-45"
               >
                 {oauthLoading === "apple" ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
-                  <span className="text-base"></span>
+                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <path d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.09-2.01-3.76-2.04-1.6-.16-3.12.94-3.93.94-.81 0-2.06-.92-3.39-.89-1.74.03-3.35 1.01-4.25 2.57-1.81 3.14-.46 7.79 1.3 10.34.86 1.25 1.89 2.65 3.23 2.6 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.28-1.27 3.13-2.53.99-1.45 1.4-2.85 1.42-2.93-.03-.01-2.72-1.04-2.75-4.13zM14.6 4.7c.71-.86 1.19-2.06 1.06-3.25-1.02.04-2.26.68-2.99 1.54-.66.76-1.23 1.98-1.08 3.15 1.14.09 2.3-.58 3.01-1.44z" />
+                  </svg>
                 )}
                 Apple로 로그인
               </button>
               {error && (
-                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+                <p role="alert" className="rounded-2xl bg-primary-50 px-4 py-3 text-[12px] font-medium text-primary-700">
                   {error}
                 </p>
               )}
             </div>
 
-            <div className="px-7 py-4 border-t border-zinc-200 bg-zinc-50 text-[0.7rem] text-zinc-600 leading-relaxed">
-              로그인 후 첫 화면에서 <b>사업자등록번호</b> · <b>대표자명</b> · 사업장 주소
-              등 입찰 조건 정보를 등록하면 즉시 입찰 참여 가능합니다.
+            <div className="mt-6 flex items-start gap-2.5 border-t border-black/[0.07] pt-5 text-[11px] leading-5 text-black/42">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>로그인 후 사업자등록번호·대표자명·사업장 주소를 등록하면 입찰에 참여할 수 있습니다.</p>
             </div>
-          </div>
 
-          <p className="mt-4 text-center text-[0.7rem] text-zinc-500">
-            소비자 회원이신가요? <a href="/auth?type=consumer" className="text-[#1B3556] font-semibold hover:underline">소비자 로그인 →</a>
-          </p>
-        </div>
-      </main>
-    </div>
+            <p className="mt-6 text-center text-[11px] text-black/42">
+              소비자 회원이신가요?{" "}
+              <Link href="/auth?type=consumer" className="font-semibold text-black underline decoration-black/20 underline-offset-4">소비자 로그인</Link>
+            </p>
+            <Link href="/" className="mt-7 inline-flex items-center gap-1.5 text-[12px] font-medium text-black/42 transition hover:text-black lg:hidden">
+              <ArrowLeft className="h-3.5 w-3.5" /> 홈으로 돌아가기
+            </Link>
+          </div>
+        </section>
+      </div>
+    </main>
   );
 }
