@@ -14,9 +14,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   samClickSegment,
-  samConceptSegment,
+  sam31ConceptSegment,
   isSamRunPodConfigured,
-  isSam3RunPodConfigured,
+  isSam31RunPodConfigured,
+  SamRunPodError,
 } from "@/lib/inpick/sam-runpod-client";
 import {
   getSamSurfaceConcept,
@@ -65,11 +66,11 @@ async function uploadMaskToStorage(maskB64: string, prefix: string): Promise<str
 }
 
 export async function POST(req: NextRequest) {
-  if (!isSamRunPodConfigured() && !isSam3RunPodConfigured()) {
+  if (!isSamRunPodConfigured() && !isSam31RunPodConfigured()) {
     return NextResponse.json(
       {
         error: "영역 분할 서비스가 아직 활성화되지 않았습니다",
-        hint: "관리자에게 RunPod SAM 3 또는 SAM 2.1 엔드포인트 등록 요청",
+        hint: "관리자에게 RunPod SAM 3.1 또는 SAM 2.1 엔드포인트 등록 요청",
       },
       { status: 503 },
     );
@@ -91,23 +92,25 @@ export async function POST(req: NextRequest) {
     const targetSurface: SamSurfaceTarget | null = isSamSurfaceTarget(body.targetSurface)
       ? body.targetSurface
       : null;
-    let engine: "sam3" | "sam2.1" = "sam2.1";
+    let engine: "sam3.1" | "sam2.1" = "sam2.1";
     let fallbackUsed = false;
+    let fallbackReason: string | undefined;
     let result;
 
-    if (targetSurface && isSam3RunPodConfigured()) {
+    if (targetSurface && isSam31RunPodConfigured()) {
       try {
-        result = await samConceptSegment(
+        result = await sam31ConceptSegment(
           imageB64,
           getSamSurfaceConcept(targetSurface),
           body.x,
           body.y,
         );
-        engine = "sam3";
+        engine = "sam3.1";
       } catch (error) {
         if (!isSamRunPodConfigured()) throw error;
+        fallbackReason = error instanceof SamRunPodError ? error.code : "SAM31_UNKNOWN_ERROR";
         console.warn(
-          "[sam/click] SAM 3 concept segmentation failed; falling back to SAM 2.1:",
+          `[sam/click] SAM 3.1 failed (${fallbackReason}); falling back to SAM 2.1:`,
           error instanceof Error ? error.message : String(error),
         );
         result = await samClickSegment(imageB64, body.x, body.y);
@@ -148,6 +151,7 @@ export async function POST(req: NextRequest) {
       engine,
       semantic_label: targetSurface || undefined,
       fallback_used: fallbackUsed,
+      fallback_reason: fallbackReason,
       // mask_b64 그대로 반환은 안 함 — 용량 큼
       candidates: candidatesOut,
     });

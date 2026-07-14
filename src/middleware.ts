@@ -36,7 +36,9 @@ export async function middleware(request: NextRequest) {
     "/api/inpick/editable-render/",
     "/api/inpick/sam/",
   ];
-  const requireUserForApi = AI_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
+  const requireUserForApi =
+    pathname !== "/api/inpick/sam/health" &&
+    AI_PROTECTED_PREFIXES.some((p) => pathname.startsWith(p));
 
   return await updateSession(request, { requireUserForApi });
 }

@@ -5,7 +5,7 @@
  *
  * 입력: { estimateId, region: { sido, gugun }, deadline, ... }
  * 동작:
- *  1. estimates.status = 'open' (rfq_published)
+ *  1. estimates.status = 'confirmed' (rfq_published)
  *  2. specialty_contractors WHERE region matches → notifications insert
  *  3. 응답: { ok, fanoutCount }
  */
@@ -33,6 +33,7 @@ interface Body {
   visitPreference?: string;
   notes?: string;
   drawingOptions?: string[];
+  designRenders?: Array<{ roomName?: string; roomKey?: string; url: string; refinedUrl?: string }>;
 }
 
 /** region을 {sido,gugun}로 정규화 (문자열 "대전 유성구" → {sido:"대전", gugun:"유성구"}) */
@@ -79,6 +80,16 @@ export async function POST(req: NextRequest) {
       visitPreference: body.visitPreference,
       notes: body.notes?.slice(0, 2000),
       drawingOptions: Array.isArray(body.drawingOptions) ? body.drawingOptions.slice(0, 12) : [],
+      designRenders: Array.isArray(body.designRenders)
+        ? body.designRenders
+            .filter((render) => render && typeof render.url === "string" && /^https?:\/\//i.test(render.url))
+            .slice(0, 6)
+            .map((render) => ({
+              roomName: render.roomName || render.roomKey || "디자인 시안",
+              url: render.url,
+              refinedUrl: render.refinedUrl,
+            }))
+        : [],
       comparisonFields: ["total", "included_scope", "materials", "schedule", "warranty"],
       addressVisibility: "district_until_visit_confirmed",
     };
@@ -99,7 +110,7 @@ export async function POST(req: NextRequest) {
       const { error: updErr } = await admin
         .from("estimates")
         .update({
-          status: "open",
+          status: "confirmed",
           region: region.sido,
           space_type: body.spaceType ?? null,
           address: body.addressText ?? null,
@@ -116,9 +127,13 @@ export async function POST(req: NextRequest) {
         .from("estimates")
         .insert({
           user_id: user.id,
-          status: "open",
+          title: `${region.sido} ${region.gugun} ${body.exclusiveAreaM2 ? `${Math.round(body.exclusiveAreaM2)}㎡ ` : ""}${body.spaceType || "인테리어"} 공사`.trim(),
+          project_type: body.spaceType === "상업" ? "commercial" : "residential",
+          status: "confirmed",
           region: region.sido,
           space_type: body.spaceType ?? null,
+          total_area_m2: body.exclusiveAreaM2 ?? 0,
+          grand_total: 0,
           address: body.addressText ?? null,
           rfq_data: rfqData,
           consumer_project_id: body.consumerProjectId ?? (projectRef && !projectRef.startsWith("temp-") ? projectRef : null),

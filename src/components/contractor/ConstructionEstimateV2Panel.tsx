@@ -53,12 +53,12 @@ const SOURCE_LABEL_KO: Record<string, string> = {
 };
 
 const SOURCE_COLOR: Record<string, string> = {
-  user_selected_material: "bg-emerald-100 text-emerald-800",
-  vision_confirmed_material: "bg-blue-100 text-blue-800",
-  vision_recommended_material: "bg-sky-100 text-sky-800",
-  prompt_extracted_material: "bg-amber-100 text-amber-800",
-  standard_fallback_material: "bg-gray-100 text-gray-700",
-  ai_inferred_quantity: "bg-purple-100 text-purple-800",
+  user_selected_material: "bg-black text-white",
+  vision_confirmed_material: "bg-black/[0.08] text-black",
+  vision_recommended_material: "bg-black/[0.08] text-black",
+  prompt_extracted_material: "bg-black/[0.08] text-black",
+  standard_fallback_material: "bg-black/[0.05] text-black/60",
+  ai_inferred_quantity: "bg-black/[0.08] text-black",
 };
 
 export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props) {
@@ -122,7 +122,7 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
       <button
         onClick={load}
         disabled={loading}
-        className="flex items-center gap-1.5 rounded-lg bg-indigo-100 px-4 py-2 text-sm font-medium text-indigo-800 transition-colors hover:bg-indigo-200 disabled:opacity-50"
+        className="flex items-center gap-1.5 rounded-full border border-black/[0.09] bg-white px-4 py-2 text-xs font-bold text-black transition hover:bg-black hover:text-white disabled:opacity-50"
       >
         {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
         {estimate ? (expanded ? "v2 17공종 접기" : "v2 17공종 펼치기") : "v2 17공종 견적 보기"}
@@ -131,18 +131,18 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
       {error && <p className="mt-2 text-xs text-gray-500">{error}</p>}
 
       {estimate && expanded && (
-        <div className="mt-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4">
+        <div className="mt-3 rounded-2xl border border-black/[0.08] bg-[#f5f5f3] p-4">
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-[10px] font-semibold text-white">
+            <span className="rounded-full bg-black px-2.5 py-0.5 text-[10px] font-semibold text-white">
               v2 정밀 견적
             </span>
             {estimate.precision_level && (
-              <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold text-indigo-900 ring-1 ring-indigo-300">
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-[10px] font-semibold text-black ring-1 ring-black/10">
                 <Lock className="mr-1 inline h-3 w-3" />
                 {estimate.precision_level}
               </span>
             )}
-            <span className="ml-auto text-sm font-bold text-indigo-900">
+            <span className="ml-auto text-sm font-bold text-black">
               총 {Number(estimate.total_amount).toLocaleString("ko-KR")}원
             </span>
           </div>
@@ -150,10 +150,10 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
           {/* 공종별 합계 */}
           <div className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
             {tradeSummary.map((t) => (
-              <div key={t.code} className="rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-indigo-100">
+              <div key={t.code} className="rounded-lg bg-white px-2.5 py-1.5 ring-1 ring-black/[0.06]">
                 <div className="text-[10px] text-gray-500">{t.code}공종 · {t.lineCount}건</div>
                 <div className="truncate text-xs font-semibold text-gray-900">{t.name}</div>
-                <div className="text-xs font-bold text-indigo-700">
+                <div className="text-xs font-bold text-black">
                   {Math.round(t.total).toLocaleString("ko-KR")}원
                 </div>
               </div>
@@ -166,7 +166,7 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
               <span
                 key={src}
                 className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                  SOURCE_COLOR[src] ?? "bg-gray-100 text-gray-700"
+                  SOURCE_COLOR[src] ?? "bg-black/[0.05] text-black/60"
                 }`}
               >
                 {SOURCE_LABEL_KO[src] ?? src} · {count}건
@@ -175,9 +175,9 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
           </div>
 
           {/* Top 10 라인 */}
-          <div className="overflow-hidden rounded-lg ring-1 ring-indigo-100">
+          <div className="overflow-hidden rounded-lg ring-1 ring-black/[0.07]">
             <table className="w-full text-xs">
-              <thead className="bg-indigo-100 text-indigo-900">
+              <thead className="bg-black text-white">
                 <tr>
                   <th className="px-2 py-1.5 text-left">공종</th>
                   <th className="px-2 py-1.5 text-left">품명</th>
@@ -192,7 +192,7 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
                   .sort((a, b) => Number(b.total_amount) - Number(a.total_amount))
                   .slice(0, 10)
                   .map((l) => (
-                    <tr key={l.id} className="border-t border-indigo-100 bg-white">
+                    <tr key={l.id} className="border-t border-black/[0.06] bg-white">
                       <td className="px-2 py-1 text-gray-700">{l.trade_name_ko}</td>
                       <td className="px-2 py-1 text-gray-900">{l.item_name_ko}</td>
                       <td className="px-2 py-1 text-right tabular-nums">
@@ -202,13 +202,13 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
                       <td className="px-2 py-1 text-right tabular-nums text-gray-600">
                         {Math.round(Number(l.material_unit_price) + Number(l.labor_unit_price)).toLocaleString("ko-KR")}
                       </td>
-                      <td className="px-2 py-1 text-right font-semibold tabular-nums text-indigo-700">
+                      <td className="px-2 py-1 text-right font-semibold tabular-nums text-black">
                         {Math.round(Number(l.total_amount)).toLocaleString("ko-KR")}
                       </td>
                       <td className="px-2 py-1">
                         <span
                           className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                            SOURCE_COLOR[l.source] ?? "bg-gray-100 text-gray-700"
+                            SOURCE_COLOR[l.source] ?? "bg-black/[0.05] text-black/60"
                           }`}
                         >
                           {SOURCE_LABEL_KO[l.source]?.slice(0, 6) ?? l.source.slice(0, 6)}

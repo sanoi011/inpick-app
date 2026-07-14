@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 interface ContractorAuth {
@@ -30,19 +30,19 @@ export function useContractorAuth(): ContractorAuth {
     setAuthChecked(true);
   }, [router]);
 
-  const logout = () => {
+  const logout = useCallback(() => {
     localStorage.removeItem("contractor_token");
     localStorage.removeItem("contractor_id");
     localStorage.removeItem("contractor_name");
     router.replace("/contractor/login");
-  };
+  }, [router]);
 
-  const authFetch = (url: string, options?: RequestInit): Promise<Response> => {
+  const authFetch = useCallback((url: string, options?: RequestInit): Promise<Response> => {
     const token = localStorage.getItem("contractor_token");
     const headers = new Headers(options?.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
     return fetch(url, { ...options, headers });
-  };
+  }, []);
 
   return { contractorId, contractorName, authChecked, logout, authFetch };
 }

@@ -9,9 +9,9 @@
 import { NextResponse } from "next/server";
 import {
   samAutoSegment,
-  sam3Warmup,
+  sam31Warmup,
   isSamRunPodConfigured,
-  isSam3RunPodConfigured,
+  isSam31RunPodConfigured,
 } from "@/lib/inpick/sam-runpod-client";
 
 export const runtime = "nodejs";
@@ -19,7 +19,7 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  if (!isSamRunPodConfigured() && !isSam3RunPodConfigured()) {
+  if (!isSamRunPodConfigured() && !isSam31RunPodConfigured()) {
     return NextResponse.json(
       {
         warmed_up: false,
@@ -34,16 +34,16 @@ export async function POST() {
     "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAfElEQVR4nNXOQREAIADDsFL/nocIHlyjIGcbZRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncf4OvLpyqgN9ZSiDcwAAAABJRU5ErkJggg==";
   try {
     const start = Date.now();
-    const [sam2, sam3] = await Promise.all([
+    const [sam2, sam31] = await Promise.all([
       isSamRunPodConfigured()
         ? samAutoSegment(tinyPng).then((result) => ({ ok: true, result })).catch(() => ({ ok: false, result: null }))
         : Promise.resolve({ ok: false, result: null }),
-      isSam3RunPodConfigured() ? sam3Warmup() : Promise.resolve(false),
+      isSam31RunPodConfigured() ? sam31Warmup() : Promise.resolve(false),
     ]);
     return NextResponse.json({
-      warmed_up: sam2.ok || sam3,
+      warmed_up: sam2.ok || sam31,
       elapsed_ms: Date.now() - start,
-      engines: { sam3, sam2_1: sam2.ok },
+      engines: { sam3_1: sam31, sam2_1: sam2.ok },
       total_regions: sam2.result?.total_regions,
       image_size: sam2.result?.image_size,
     });
@@ -55,7 +55,7 @@ export async function POST() {
     if (lower.includes("401") || lower.includes("unauthor")) {
       hint = "RUNPOD_API_KEY 인증 실패 — 키 갱신";
     } else if (lower.includes("404") || lower.includes("endpoint not found") || lower.includes("not found")) {
-      hint = "RUNPOD_SAM_ENDPOINT_ID 잘못됨 또는 endpoint 미존재";
+      hint = "RunPod SAM 엔드포인트 ID가 잘못됐거나 엔드포인트가 없습니다";
     } else if (lower.includes("worker") && lower.includes("error")) {
       hint = "RunPod 워커 내부 에러 — 콘솔에서 worker logs 확인";
     } else if (lower.includes("timeout") || lower.includes("abort")) {

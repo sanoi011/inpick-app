@@ -175,6 +175,10 @@ export default function BiddingPage() {
         visitPreference,
         notes,
         drawingOptions: pickedOptions,
+        designRenders: selectedRenders.map((render) => ({
+          roomName: render.roomKey,
+          url: render.url,
+        })),
       };
       const response = await fetch("/api/rfq/publish", {
         method: "POST",

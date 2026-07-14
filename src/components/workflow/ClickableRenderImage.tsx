@@ -442,7 +442,7 @@ export default function ClickableRenderImage({
         {/* 신뢰도 뱃지 */}
         {selected && !loading && (
           <div className="absolute top-2 right-2 rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-[0.65rem] font-bold text-black shadow-sm backdrop-blur inline-flex items-center gap-1">
-            {selected.engine === "sam3" ? "의미 선택" : "정밀 선택"} · 신뢰도 {Math.round(selected.confidence * 100)}%
+            {selected.engine === "sam3.1" ? "SAM 3.1 의미 선택" : "정밀 선택"} · 신뢰도 {Math.round(selected.confidence * 100)}%
           </div>
         )}
       </div>

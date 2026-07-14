@@ -16,9 +16,10 @@ export interface SamPolygonResult {
   area_pixels: number;
   image_size: [number, number];
   mask_url: string | null; // Supabase Storage public URL (자재 교체 시 재사용)
-  engine?: "sam3" | "sam2.1";
+  engine?: "sam3.1" | "sam2.1";
   semantic_label?: string;
   fallback_used?: boolean;
+  fallback_reason?: string;
   /** 단일 클릭이 모호할 때 SAM이 제안하는 다중 마스크 후보 */
   candidates?: Array<{
     polygon: number[][];

@@ -25,7 +25,7 @@ function deriveStage(estStatus: string, bids: Array<{ status: string }>): BidSta
   if (estStatus === "cancelled") return "cancelled";
   if (estStatus === "closed") return "bidding_closed";
   if (bids.length > 0) return "bidding_open";
-  if (estStatus === "open") return "rfq_published";
+  if (estStatus === "open" || estStatus === "confirmed") return "rfq_published";
   return "draft";
 }
 
@@ -55,6 +55,7 @@ interface EstimateLite {
 
 const STATUS_LABELS: Record<string, string> = {
   open: "입찰 진행 중",
+  confirmed: "입찰 진행 중",
   closed: "마감",
   selected: "낙찰 완료",
   rejected: "유찰",
@@ -62,6 +63,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   open: "bg-[#0d0d0d] text-white",
+  confirmed: "bg-[#0d0d0d] text-white",
   closed: "bg-zinc-100 text-zinc-600",
   selected: "bg-emerald-100 text-emerald-700",
   rejected: "bg-red-100 text-red-700",
