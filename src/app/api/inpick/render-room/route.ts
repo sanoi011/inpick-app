@@ -53,7 +53,7 @@ export const dynamic = "force-dynamic";
 interface RenderBody extends RenderRoomInput {
   /** 가이드 §3 — propertyId로 Storage에서 normalized.png 자동 로드 */
   propertyId?: string;
-  /** v2 §5-1 quality tier — 기본 "low" (1차 미리보기 1토큰), "high"는 2토큰 */
+  /** v2 §5-1 quality tier — 거실 5토큰, 그 외 공간 1토큰, "high"는 2토큰 */
   quality?: "low" | "medium" | "high";
   /** 모드 검증 — apartment 외 모드에서 잘못 호출되는 것 차단 (mode_mismatch) */
   projectMode?: "residential" | "commercial" | "photo_only" | string;
@@ -124,8 +124,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── v2 §4-2 토큰 차감 (모든 validation 통과 후) ──
+    const isLivingRoom = /거실|living\s*room/i.test(body.roomName);
     const feature: CreditFeature =
-      body.quality === "high" ? "render-room-high" : "render-room";
+      body.quality === "high"
+        ? "render-room-high"
+        : isLivingRoom
+          ? "render-room-living"
+          : "render-room";
     try {
       charge = await enforceConsume(feature, {
         propertyId: body.propertyId,

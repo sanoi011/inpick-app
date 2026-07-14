@@ -19,7 +19,14 @@ export const dynamic = "force-dynamic";
 
 interface Body {
   amount: number;
-  feature: "ai_render" | "ar_session" | "drawing_option" | "welcome" | "manual";
+  feature:
+    | "ai_render"
+    | "image_unlock"
+    | "estimate_details"
+    | "ar_session"
+    | "drawing_option"
+    | "welcome"
+    | "manual";
 }
 
 const MAX_RETRIES = 3;

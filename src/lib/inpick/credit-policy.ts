@@ -17,9 +17,11 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * 변경 시 모든 endpoint가 동일 정책 사용 (단일 진실원).
  */
 export const CREDIT_COSTS = {
-  "render-room": 1, // 1차 미리보기 (low/medium quality)
+  "render-room": 1, // 거실 외 공간 이미지 1장 생성·공개
+  "render-room-living": 5, // 대표 거실 이미지 1장 생성
   "render-room-high": 2, // 고화질 재생성
   "refine-render": 2, // 정밀 영역 선택 후 GPT Image 2 자재 재렌더
+  "unlock-estimate-details": 10, // Step3 세부 견적 1회 공개
   "normalize-floorplan": 1, // 캐시 miss 시 (정형화)
   "extract-material": 0, // 자동 분석 무료
   "design-chat": 0, // 채팅 무료 (rate limit으로 보호)

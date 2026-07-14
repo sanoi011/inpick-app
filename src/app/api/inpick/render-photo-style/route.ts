@@ -129,9 +129,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── 토큰 차감 (validation 통과 후) ──────────────────────
-    // 정책상 render-room과 동일하게 1토큰 차감 (cost 매트릭스는 동일)
+    // 대표 거실은 5토큰, 그 외 공간/상업 공간은 이미지 1장당 1토큰.
+    const isLivingRoom =
+      /거실|living/i.test(body.spaceType || "") ||
+      (body.projectMode !== "commercial" && !body.spaceType);
     try {
-      charge = await enforceConsume("render-room", {
+      charge = await enforceConsume(isLivingRoom ? "render-room-living" : "render-room", {
         feature: "render-photo-style",
         projectMode: body.projectMode,
         businessType: body.businessType,
@@ -203,7 +206,7 @@ export async function POST(req: NextRequest) {
     let usedModel = "";
     const errors: string[] = [];
     try {
-      for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+      for (const modelName of ["gpt-image-2"]) {
         const res = await fetch(`${OPENAI_BASE}/images/generations`, {
           method: "POST",
           headers: {
@@ -231,16 +234,8 @@ export async function POST(req: NextRequest) {
           continue;
         }
         const errText = await res.text();
-        const lower = errText.toLowerCase();
-        const recoverable =
-          res.status === 404 ||
-          lower.includes("model_not_found") ||
-          lower.includes("does not have access") ||
-          lower.includes("invalid_value");
         errors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
-        if (!recoverable) {
-          throw new Error(`OpenAI generations 실패 (non-recoverable) — ${errors.join(" | ")}`);
-        }
+        throw new Error(`GPT Image 2 generations 실패 — ${errors.join(" | ")}`);
       }
     } finally {
       clearTimeout(timeoutId);

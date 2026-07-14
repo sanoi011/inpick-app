@@ -56,6 +56,7 @@ import Notch from "@/components/workflow/Notch";
 // 2026-05-31: 오늘 만든 견적서 4문서 폼으로 교체 (Vision 분석 견적 → 우리 양식)
 import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
 import { constructionEstimateToDetailLines } from "@/lib/estimate-pro/detail-model";
+import { useTokens } from "@/hooks/useTokens";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -247,6 +248,8 @@ async function downloadEstimatePdf(input: {
   constructionEstimate: ConstructionEstimate | null;
   /** AI 디자인 이미지 — PDF 부록 첨부 (2026-07-04) */
   designImages?: Array<{ url: string; label: string }>;
+  /** 9,900원 계약견적서 패키지일 때만 공정위 공식 표준계약서 원본을 앞에 합친다. */
+  includeStandardContract?: boolean;
 }) {
   const res = await fetch("/api/inpick/estimate-documents", {
     method: "POST",
@@ -288,11 +291,14 @@ async function downloadEstimatePdf(input: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     package: data.package as any,
     designImages: input.designImages,
+    includeStandardContract: input.includeStandardContract,
   });
   const url = URL.createObjectURL(pdfBlob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `INPICK_견적서_${data.documentNo || "draft"}.pdf`;
+  a.download = input.includeStandardContract
+    ? `INPICK_계약견적서_${data.documentNo || "draft"}.pdf`
+    : `INPICK_세부견적서_${data.documentNo || "draft"}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -334,6 +340,7 @@ export default function EstimatePageWithSuspense() {
 function EstimatePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { balance: tokenBalance, refresh: refreshTokens } = useTokens();
   // P2: workflow page의 finalize가 발급한 contextId — 있으면 evidence 기반 견적 합성
   const contextId = searchParams?.get("contextId") ?? null;
   const [resolvedContextId, setResolvedContextId] = useState<string | null>(contextId);
@@ -383,6 +390,11 @@ function EstimatePage() {
   // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
   const [pdfPurchaseOpen, setPdfPurchaseOpen] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
+  const [detailsProjectId, setDetailsProjectId] = useState<string | null>(null);
+  const [detailsUnlocked, setDetailsUnlocked] = useState(false);
+  const [detailsAccessChecked, setDetailsAccessChecked] = useState(false);
+  const [detailsUnlocking, setDetailsUnlocking] = useState(false);
+  const [detailsAccessError, setDetailsAccessError] = useState<string | null>(null);
   // community v2 (2026-05-14): 커뮤니티 공유 모달
   const [shareModalOpen, setShareModalOpen] = useState(false);
   // 자재 라인 → 실구매/카탈로그/미리보기 드로어
@@ -400,6 +412,66 @@ function EstimatePage() {
   useEffect(() => {
     router.prefetch("/workflow?step=2");
   }, [router]);
+
+  useEffect(() => {
+    const projectId = searchParams?.get("projectId") || getOrCreateWorkflowProjectId();
+    if (!projectId) {
+      setDetailsAccessChecked(true);
+      return;
+    }
+    setDetailsProjectId(projectId);
+    let cancelled = false;
+    fetch(
+      `/api/inpick/estimate-details-access?projectId=${encodeURIComponent(projectId)}`,
+      { cache: "no-store" },
+    )
+      .then(async (response) => {
+        const data = (await response.json().catch(() => ({}))) as { granted?: boolean };
+        if (!cancelled && response.ok && data.granted) setDetailsUnlocked(true);
+      })
+      .finally(() => {
+        if (!cancelled) setDetailsAccessChecked(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
+
+  const unlockEstimateDetails = async () => {
+    if (!detailsProjectId || detailsUnlocking) return;
+    setDetailsUnlocking(true);
+    setDetailsAccessError(null);
+    try {
+      const response = await fetch("/api/inpick/estimate-details-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: detailsProjectId }),
+      });
+      const data = (await response.json().catch(() => ({}))) as {
+        granted?: boolean;
+        error?: string;
+        creditsBalance?: number;
+      };
+      if (response.status === 401) {
+        setDetailsAccessError("로그인 후 세부견적을 열 수 있습니다.");
+        return;
+      }
+      if (response.status === 402) {
+        setDetailsAccessError(
+          `토큰이 부족합니다. 필요 10토큰 · 보유 ${data.creditsBalance ?? tokenBalance}토큰`,
+        );
+        return;
+      }
+      if (!response.ok || !data.granted) {
+        setDetailsAccessError("세부견적을 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      setDetailsUnlocked(true);
+      await refreshTokens();
+    } finally {
+      setDetailsUnlocking(false);
+    }
+  };
 
   async function finalizeEstimateContext(s1: Step1Data): Promise<string | null> {
     const projectId = getOrCreateWorkflowProjectId();
@@ -1410,7 +1482,15 @@ function EstimatePage() {
               )}
             </div>
 
-            <div className="grid gap-5 px-4 py-8 sm:px-6 lg:grid-cols-12 lg:px-10">
+            <div className="relative">
+              <div
+                className={`grid gap-5 px-4 py-8 transition sm:px-6 lg:grid-cols-12 lg:px-10 ${
+                  !detailsUnlocked
+                    ? "pointer-events-none max-h-[760px] select-none overflow-hidden opacity-45 blur-[9px]"
+                    : ""
+                }`}
+                aria-hidden={!detailsUnlocked}
+              >
               <div className="min-w-0 lg:col-span-8">
                 <div className="flex items-center gap-2 mb-4 flex-wrap">
                   <div className="relative">
@@ -2346,8 +2426,48 @@ function EstimatePage() {
                       </p>
                     </div>
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-primary-900/60">
-                      베타테스트 — 현재 자체 검증 업체를 선별 중에 있습니다. 해당 견적서를 다운받아 진행 가능한 업체에 세부 견적 의뢰를 맡기세요.
+                      공개한 세부견적은 PDF로 내려받을 수 있습니다. 계약 단계에서는 공정위 공식 표준계약서와 전체 견적 부속서류를 한 세트로 발급합니다.
                     </p>
+                    <button
+                      type="button"
+                      disabled={pdfDownloading || !detailsUnlocked}
+                      onClick={async () => {
+                        const projectId = detailsProjectId || getOrCreateWorkflowProjectId() || "preview";
+                        try {
+                          setPdfDownloading(true);
+                          await downloadEstimatePdf({
+                            projectId,
+                            step1,
+                            estimates,
+                            grandTotal,
+                            matchMetaByRoom,
+                            constructionEstimate,
+                            designImages: designOutputsForGallery.map((output) => ({
+                              url: output.imageUrl,
+                              label: output.targetName,
+                            })),
+                            includeStandardContract: false,
+                          });
+                        } catch (downloadError) {
+                          alert(
+                            "PDF 생성 실패: " +
+                              (downloadError instanceof Error
+                                ? downloadError.message
+                                : String(downloadError)),
+                          );
+                        } finally {
+                          setPdfDownloading(false);
+                        }
+                      }}
+                      className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-bold text-white transition hover:bg-black/75 disabled:opacity-50"
+                    >
+                      {pdfDownloading ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Download className="h-3.5 w-3.5" />
+                      )}
+                      세부견적 PDF 다운로드
+                    </button>
                     <button
                       type="button"
                       disabled={pdfDownloading}
@@ -2392,6 +2512,7 @@ function EstimatePage() {
                               url: o.imageUrl,
                               label: o.targetName,
                             })),
+                            includeStandardContract: true,
                           });
                         } catch (e) {
                           console.error("[estimate] PDF download failed:", e);
@@ -2400,17 +2521,17 @@ function EstimatePage() {
                           setPdfDownloading(false);
                         }
                       }}
-                      className="mt-3 inline-flex items-center justify-center gap-2 w-full rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-2.5 text-sm font-bold text-white shadow-md hover:opacity-95 transition disabled:opacity-50"
+                      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold text-black transition hover:bg-zinc-50 disabled:opacity-50"
                     >
                       {pdfDownloading ? (
                         <Loader2 className="h-3.5 w-3.5 animate-spin" />
                       ) : (
                         <Download className="h-3.5 w-3.5" />
                       )}
-                      견적서 PDF 다운로드 (9,900원)
+                      계약견적서 패키지 (9,900원)
                     </button>
                     <p className="mt-2 text-[0.65rem] text-primary-900/50 text-center">
-                      건축공사 업체용 형식 (갑지 / 총괄표 / 총괄내역 / 공종별)
+                      공정위 표준계약서 갑·을지 + 견적 갑지·총괄표·세부내역·이미지·특기사항·서명란
                     </p>
                     <button
                       type="button"
@@ -2575,6 +2696,47 @@ function EstimatePage() {
                 </div>
               </aside>
             </div>
+              {!detailsUnlocked && (
+                <div className="absolute inset-0 z-20 flex items-start justify-center overflow-hidden bg-gradient-to-b from-[#f7f7f5]/55 via-[#f7f7f5]/80 to-[#f7f7f5] px-4 pt-16 sm:pt-24">
+                  <div className="w-full max-w-md rounded-[26px] border border-black/10 bg-white/95 p-6 text-center shadow-[0_24px_70px_rgba(0,0,0,0.14)] backdrop-blur-xl sm:p-8">
+                    <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-black text-white">
+                      {detailsAccessChecked ? (
+                        <Lock className="h-5 w-5" />
+                      ) : (
+                        <Loader2 className="h-5 w-5 animate-spin" />
+                      )}
+                    </div>
+                    <h2 className="mt-5 text-xl font-semibold tracking-[-0.04em] text-black sm:text-2xl">
+                      세부견적 공개
+                    </h2>
+                    <p className="mt-2 text-sm leading-relaxed text-black/52">
+                      총 견적금액은 무료로 확인할 수 있습니다.
+                      <br />
+                      공종별·자재별 세부내역과 PDF는 10토큰으로 열립니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => void unlockEstimateDetails()}
+                      disabled={!detailsAccessChecked || detailsUnlocking}
+                      className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-5 py-3.5 text-sm font-semibold text-white transition hover:bg-black/75 disabled:opacity-45"
+                    >
+                      {detailsUnlocking ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Lock className="h-4 w-4" />
+                      )}
+                      10토큰으로 세부견적 보기
+                    </button>
+                    <p className="mt-3 text-xs text-black/40">현재 보유 {tokenBalance}토큰</p>
+                    {detailsAccessError && (
+                      <p className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                        {detailsAccessError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </main>
@@ -2631,6 +2793,7 @@ function EstimatePage() {
                 url: o.imageUrl,
                 label: o.targetName,
               })),
+              includeStandardContract: true,
             });
           } finally {
             setPdfDownloading(false);

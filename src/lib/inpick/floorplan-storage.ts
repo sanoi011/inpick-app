@@ -143,6 +143,17 @@ export async function hasFloorplan(
   propertyId: string,
   type: FloorplanFileType,
 ): Promise<boolean> {
+  if (STORAGE_MODE === "supabase") {
+    const publicUrl = getFloorplanUrl(propertyId, type);
+    if (publicUrl) {
+      try {
+        const response = await fetch(publicUrl, { method: "HEAD", cache: "no-store" });
+        if (response.ok) return true;
+      } catch {
+        // SDK download fallback below
+      }
+    }
+  }
   const buf = await loadFloorplan(propertyId, type);
   return buf !== null;
 }
@@ -243,8 +254,16 @@ async function loadFromSupabase(
     const { data, error } = await supa.storage
       .from(SUPABASE_BUCKET)
       .download(`${propertyId}/${filename}`);
-    if (error || !data) return null;
-    return Buffer.from(await data.arrayBuffer());
+    if (!error && data) return Buffer.from(await data.arrayBuffer());
+
+    // Public bucket fallback: prevent a valid cached file from being regenerated
+    // when the Storage SDK download path transiently fails in Node.
+    const { data: publicData } = supa.storage
+      .from(SUPABASE_BUCKET)
+      .getPublicUrl(`${propertyId}/${filename}`);
+    const response = await fetch(publicData.publicUrl, { cache: "no-store" });
+    if (!response.ok) return null;
+    return Buffer.from(await response.arrayBuffer());
   } catch {
     return null;
   }

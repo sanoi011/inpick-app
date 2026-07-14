@@ -24,7 +24,14 @@ const SIGNUP_BONUS = 5;
 export interface TokenTransaction {
   id: string;
   type: "signup_bonus" | "purchase" | "use" | "refund" | "admin_adjust";
-  feature?: "ai_render" | "ar_session" | "drawing_option" | "welcome" | "manual";
+  feature?:
+    | "ai_render"
+    | "image_unlock"
+    | "estimate_details"
+    | "ar_session"
+    | "drawing_option"
+    | "welcome"
+    | "manual";
   amount: number;
   balance_after: number;
   payment_id?: string | null;

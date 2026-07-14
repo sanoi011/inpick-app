@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * EstimatePdfPurchaseModal — 견적서 PDF 다운로드 결제 모달.
+ * EstimatePdfPurchaseModal — 계약견적서 패키지 결제 모달.
  * 가이드: 2026-05-14 pricing v2 — 9,900원 (부가세 포함) 단발 결제
  *
  * 흐름:
@@ -182,7 +182,7 @@ export default function EstimatePdfPurchaseModal({
         <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
           <div className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary-600" />
-            <h2 className="text-base font-bold text-gray-900">견적서 PDF 다운로드</h2>
+            <h2 className="text-base font-bold text-gray-900">계약견적서 패키지</h2>
           </div>
           <button onClick={onClose} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700">
             <X className="h-5 w-5" />
@@ -191,7 +191,7 @@ export default function EstimatePdfPurchaseModal({
 
         <div className="px-5 py-5">
           <div className="rounded-xl border border-primary-100 bg-primary-50/40 p-4">
-            <p className="text-xs font-bold text-primary-900">선택한 견적서</p>
+            <p className="text-xs font-bold text-primary-900">공사 계약·견적 서류 세트</p>
             <p className="mt-1 text-[0.75rem] text-primary-900/60">
               {estimateId
                 ? `견적 ID ${estimateId.slice(0, 8)}…`
@@ -222,9 +222,9 @@ export default function EstimatePdfPurchaseModal({
               </div>
             )}
             <ul className="mt-3 space-y-1 text-[0.75rem] text-primary-900/70">
-              <li>· 갑지 + 총괄표 + 공종별 내역서 + 자재집계표</li>
-              <li>· 공정 순서(선행공정) 분석 + 공정위 표준계약서 양식</li>
-              <li>· AI 디자인 이미지 부록 포함 (A4 가로 PDF)</li>
+              <li>· 공정위 제10079호 표준계약서 공식 원본 갑지·을지</li>
+              <li>· 견적 갑지 + 총괄표 + 공종별 세부내역 + 자재집계표</li>
+              <li>· AI 디자인 이미지 + 특기사항 기입 공간 + 서명란</li>
               <li>· 1회 다운로드 권한 (재발급 가능)</li>
             </ul>
           </div>
@@ -267,9 +267,9 @@ export default function EstimatePdfPurchaseModal({
                 <Loader2 className="h-4 w-4 animate-spin" /> {native ? "발급 진행 중…" : "결제 진행 중…"}
               </>
             ) : native ? (
-              <>{pdfTokenCost ? `${pdfTokenCost}토큰으로 발급하고 다운로드` : "토큰으로 발급하고 다운로드"}</>
+              <>{pdfTokenCost ? `${pdfTokenCost}토큰으로 패키지 발급` : "토큰으로 패키지 발급"}</>
             ) : (
-              <>{ESTIMATE_PDF_PRICE_KRW.toLocaleString()}원 결제하고 다운로드</>
+              <>{ESTIMATE_PDF_PRICE_KRW.toLocaleString()}원 결제하고 패키지 발급</>
             )}
           </button>
           <button onClick={onClose} className="mt-2 w-full text-xs text-gray-500 hover:text-gray-700">

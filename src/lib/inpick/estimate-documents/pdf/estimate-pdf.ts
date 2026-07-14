@@ -1,5 +1,5 @@
 /**
- * A4 가로 견적서 PDF — 7페이지 양식 (P13-1 확장).
+ * A4 가로 견적서 PDF — 공종 세부내역 분량에 따라 페이지 수가 달라지는 양식.
  *
  * 가이드:
  *   - inpick-construction-estimate-drawing-package-plan-20260511.md §7
@@ -19,7 +19,7 @@ import type { EstimateDocumentPackage } from "../types";
 import { PAGE, loadNanumGothicFont, fmtWon, fmtDate, truncate, fmtQuantity } from "./format";
 import {
   drawSchedulePage,
-  drawStandardContractPages,
+  drawSpecialNotesSignaturePage,
   drawDesignImagePages,
   type DesignImageInput,
 } from "./pages-extra";
@@ -28,6 +28,8 @@ export async function renderEstimatePackagePdf(input: {
   package: EstimateDocumentPackage;
   /** 프로젝트 AI 디자인 이미지 — 부록 페이지로 첨부 (2026-07-04 확장) */
   designImages?: DesignImageInput[];
+  /** true면 공정위 제10079호 공식 PDF 6쪽을 맨 앞에 원본 그대로 병합 */
+  includeStandardContract?: boolean;
 }): Promise<{ pdfBlob: Blob; pageCount: number }> {
   const pkg = input.package;
   const doc = new jsPDF({
@@ -66,21 +68,19 @@ export async function renderEstimatePackagePdf(input: {
   drawComputationBasisPage(doc, pkg);
   doc.addPage("a4", "landscape");
 
-  // ─── 7. 특기사항/제외사항 (P13-1 신규) ───
-  drawAssumptionsExclusionsPage(doc, pkg);
-
-  // ─── 8. 공정 순서·선행공정 분석 (2026-07-04 확장) ───
-  doc.addPage("a4", "landscape");
+  // ─── 7. 공정 순서·선행공정 분석 ───
   drawSchedulePage(doc, pkg);
 
-  // ─── 9. 공정위 표준계약서 양식 (참고용 — 업체 매칭 시 상세 계약서 별도 제공) ───
-  doc.addPage("a4", "landscape");
-  drawStandardContractPages(doc, pkg);
-
-  // ─── 10+. AI 디자인 이미지 부록 ───
+  // ─── 8+. AI 디자인 이미지 ───
   if (input.designImages && input.designImages.length > 0) {
     await drawDesignImagePages(doc, input.designImages);
   }
+
+  // ─── 후첨: 특기사항/제외사항 + 실제 기입·서명란 ───
+  doc.addPage("a4", "landscape");
+  drawAssumptionsExclusionsPage(doc, pkg);
+  doc.addPage("a4", "landscape");
+  drawSpecialNotesSignaturePage(doc, pkg);
 
   // 페이지 번호 + footer
   const total = doc.getNumberOfPages();
@@ -89,8 +89,40 @@ export async function renderEstimatePackagePdf(input: {
     drawFooter(doc, pkg, i, total);
   }
 
-  const pdfBlob = doc.output("blob");
-  return { pdfBlob, pageCount: total };
+  if (!input.includeStandardContract) {
+    const pdfBlob = doc.output("blob");
+    return { pdfBlob, pageCount: total };
+  }
+
+  // 공정거래위원회 제10079호 공식 원본(6쪽)을 갑지·을지로 그대로 유지하고,
+  // 그 뒤에 인픽 견적 갑지/총괄/세부/이미지/특기사항/서명란을 병합한다.
+  const contractResponse = await fetch("/legal/ftc-standard-contract-10079.pdf");
+  if (!contractResponse.ok) {
+    throw new Error("공정위 공식 표준계약서 원본을 불러오지 못했습니다.");
+  }
+  const [{ PDFDocument }, contractBytes, estimateBytes] = await Promise.all([
+    import("pdf-lib"),
+    contractResponse.arrayBuffer(),
+    Promise.resolve(doc.output("arraybuffer")),
+  ]);
+  const merged = await PDFDocument.create();
+  const officialContract = await PDFDocument.load(contractBytes);
+  const estimateDocument = await PDFDocument.load(estimateBytes);
+  const contractPages = await merged.copyPages(
+    officialContract,
+    officialContract.getPageIndices(),
+  );
+  contractPages.forEach((page) => merged.addPage(page));
+  const estimatePages = await merged.copyPages(
+    estimateDocument,
+    estimateDocument.getPageIndices(),
+  );
+  estimatePages.forEach((page) => merged.addPage(page));
+  const mergedBytes = await merged.save();
+  return {
+    pdfBlob: new Blob([new Uint8Array(mergedBytes)], { type: "application/pdf" }),
+    pageCount: contractPages.length + total,
+  };
 }
 
 // ─── 1. 갑지 ───

@@ -98,7 +98,7 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 - 명시 치수 우선, 미표시면 표준 비율 추정
 - 욕실/침실 2개+면 "욕실1","욕실2"`;
 
-/** 평면도 raster cleaning — 모델 폴백 체인 (gpt-image-2 우선, 5/8 워킹 상태 복원) */
+/** 평면도 raster cleaning — GPT Image 2 단일 */
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
@@ -127,14 +127,13 @@ async function cleanFloorplanRaster(
     "치수 텍스트, 한글 라벨, 화살표, 가구 일러스트는 그리지 마세요 (별도 SVG 오버레이로 처리). " +
     "어떤 브랜드 로고나 워터마크도 추가하지 말고 검정 건축선 외 컬러 요소를 만들지 마세요.";
 
-  // ─── 모델 폴백 체인: gpt-image-2 (우선) → gpt-image-1 (차선) ───
-  // dall-e-3는 edits API 미지원 → 폴백 제외
+  // GPT Image 2만 사용한다. 지원하지 않는 input_fidelity를 보내면 400으로 거절되므로 제외.
   const errors: string[] = [];
   const inputMimeType = options.imageMimeType?.startsWith("image/")
     ? options.imageMimeType
     : "image/png";
   const inputFilename = inputMimeType.includes("jpeg") ? "image.jpg" : "image.png";
-  for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
+  for (const modelName of ["gpt-image-2"]) {
     const form = new FormData();
     form.append("model", modelName);
     form.append(
@@ -145,7 +144,6 @@ async function cleanFloorplanRaster(
     form.append("prompt", prompt);
     form.append("size", "1536x1024");
     form.append("quality", "high");
-    form.append("input_fidelity", "high");
     form.append("output_format", "png");
 
     const res = await fetch(`${OPENAI_BASE}/images/edits`, {
@@ -166,16 +164,10 @@ async function cleanFloorplanRaster(
     }
 
     const errText = await res.text();
-    const lower = errText.toLowerCase();
-    const recoverable =
-      res.status === 404 ||
-      lower.includes("model_not_found") ||
-      lower.includes("does not have access") ||
-      lower.includes("invalid_value");
     errors.push(`${modelName} ${res.status}: ${errText.slice(0, 200)}`);
-    if (!recoverable) break; // billing/auth/rate-limit → 다른 모델도 동일
+    break;
   }
-  throw new Error(`평면도 클리닝 모든 모델 실패 — ${errors.join(" | ")}`);
+  throw new Error(`GPT Image 2 평면도 클리닝 실패 — ${errors.join(" | ")}`);
 }
 
 export async function POST(req: NextRequest) {

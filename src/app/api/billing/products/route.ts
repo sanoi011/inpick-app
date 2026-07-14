@@ -15,6 +15,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 function getAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -22,6 +23,10 @@ function getAdmin() {
   if (!url || !key) return null;
   return createServiceClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
+    global: {
+      // 운영 상품 메타데이터 변경은 앱·웹 결제 화면에 즉시 보여야 한다.
+      fetch: (input, init) => fetch(input, { ...init, cache: "no-store" }),
+    },
   });
 }
 

@@ -25,6 +25,8 @@ import {
   Crosshair,
   Paperclip,
   ImagePlus,
+  Lock,
+  Eye,
 } from "lucide-react";
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
@@ -232,9 +234,21 @@ export interface Step2Data {
   chatMessages?: ChatMessage[];
   /** chat 모드 활성 여부 */
   chatMode?: boolean;
+  /** 대표 거실 생성 시 확정된 전체 공간 컨셉 — 잠긴 공간 생성에 재사용 */
+  conceptPrompt?: string;
+  /** 거실 외 이미지별 공개 키(timestamp 우선). 기존 세션 이미지도 1장 단위로 잠근다. */
+  unlockedRenderKeys?: Record<string, string[]>;
 }
 
-type ConsumeFeature = "ai_render" | "drawing_option";
+type ConsumeFeature = "ai_render" | "image_unlock" | "drawing_option";
+
+function isLivingRoom(roomKey: string, roomLabel?: string): boolean {
+  return roomKey === "living" || /거실|living/i.test(roomLabel || "");
+}
+
+function renderUnlockKey(render: RenderItem, index: number): string {
+  return render.timestamp || `render-${index}`;
+}
 
 interface Props {
   rooms: string[];
@@ -366,6 +380,7 @@ export default function Step2Designer({
   const [openMaterialWhenReady, setOpenMaterialWhenReady] = useState(false);
   const [openRoomPopup, setOpenRoomPopup] = useState<string | null>(null);
   const [imageMinimized, setImageMinimized] = useState(false);
+  const [unlockingImage, setUnlockingImage] = useState(false);
   // 채팅 모드 + 메시지는 local useState로 — 스트리밍 빈번 갱신 시 closure stale 회피
   // 정책 (대표 지시): default = chat 모드. 사용자는 AI와 대화 후 명시적으로
   // "이 컨셉으로 디자인 생성하기" 버튼을 눌러야 이미지 생성. 즉시생성은 토글로 옵션.
@@ -536,6 +551,13 @@ export default function Step2Designer({
   const selectedIdx =
     value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
+  const activeTab = availableTabs.find((tab) => tab.v === activeRoom);
+  const activeRoomIsLiving = isLivingRoom(activeRoom, activeTab?.label);
+  const activeRenderKey =
+    activeRender && selectedIdx != null ? renderUnlockKey(activeRender, selectedIdx) : null;
+  const activeRenderUnlocked =
+    activeRoomIsLiving ||
+    (!!activeRenderKey && (value.unlockedRenderKeys?.[activeRoom] || []).includes(activeRenderKey));
   const hasGenerated = renders.length > 0;
   const allRoomsDecided = realRoomTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
   const firstGeneratedRoom = availableTabs.find(
@@ -545,6 +567,10 @@ export default function Step2Designer({
 
   const openMaterialWorkspace = () => {
     if (activeRender && selectedIdx != null) {
+      if (!activeRenderUnlocked) {
+        setErrorMsg("잠긴 이미지를 먼저 1토큰으로 공개한 뒤 자재를 수정할 수 있습니다.");
+        return;
+      }
       setMaterialEditorOpen(true);
       return;
     }
@@ -595,6 +621,13 @@ export default function Step2Designer({
           ...value.selectedByRoom,
           [roomKey]: existing.length,
         },
+        unlockedRenderKeys: {
+          ...(value.unlockedRenderKeys || {}),
+          [roomKey]: [
+            ...(value.unlockedRenderKeys?.[roomKey] || []),
+            renderUnlockKey(uploadedRender, existing.length),
+          ],
+        },
       });
     };
     reader.onerror = () => setErrorMsg("이미지를 읽지 못했습니다. 다른 파일로 다시 시도해주세요.");
@@ -602,10 +635,15 @@ export default function Step2Designer({
   };
 
   useEffect(() => {
-    if (!openMaterialWhenReady || !activeRender || selectedIdx == null) return;
+    if (
+      !openMaterialWhenReady ||
+      !activeRender ||
+      selectedIdx == null ||
+      !activeRenderUnlocked
+    ) return;
     setMaterialEditorOpen(true);
     setOpenMaterialWhenReady(false);
-  }, [activeRender, openMaterialWhenReady, selectedIdx]);
+  }, [activeRender, activeRenderUnlocked, openMaterialWhenReady, selectedIdx]);
 
   // 채팅 히스토리 자동 스크롤
   useEffect(() => {
@@ -886,7 +924,11 @@ export default function Step2Designer({
   // 사진/상가 모드: 도면 없을 때 단일 이미지 생성 (render-photo-style)
   // MD plan §5-1, §6 — propertyId 없는 사용자가 render-room에 잘못 태워지는 것 차단
   const handlePhotoStyleGenerate = async (stylePrompt: string) => {
-    if (tokenBalance < 1) {
+    const targetKey = activeRoom === "all" ? "living" : activeRoom;
+    const targetTab = ROOM_TABS.find((t) => t.v === targetKey);
+    const targetIsLiving = isLivingRoom(targetKey, targetTab?.label);
+    const requiredTokens = targetIsLiving ? 5 : 1;
+    if (tokenBalance < requiredTokens) {
       setInsufficientOpen(true);
       return;
     }
@@ -905,8 +947,11 @@ export default function Step2Designer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          projectMode: "photo_only",
+          projectMode: currentProjectMode === "commercial" ? "commercial" : "photo_only",
           stylePrompt,
+          spaceType: targetTab?.label,
+          businessType: commercialBusiness,
+          zoneName: currentProjectMode === "commercial" ? targetTab?.label : undefined,
           areaM2,
           budgetTier,
           quality: "low",
@@ -917,7 +962,6 @@ export default function Step2Designer({
         throw new Error(data.hint || data.error || "이미지 생성 실패");
       }
       // 결과를 현재 활성 탭(또는 "all")에 추가 — 기존 UI 호환
-      const targetKey = activeRoom === "all" ? "living" : activeRoom;
       const item: RenderItem = {
         url: data.imageUrl,
         prompt: stylePrompt,
@@ -931,10 +975,24 @@ export default function Step2Designer({
           ...value.rendersByRoom,
           [targetKey]: [...(value.rendersByRoom[targetKey] || []), item],
         },
+        selectedByRoom: {
+          ...value.selectedByRoom,
+          [targetKey]: (value.rendersByRoom[targetKey] || []).length,
+        },
+        conceptPrompt: value.conceptPrompt || stylePrompt,
+        unlockedRenderKeys: targetIsLiving
+          ? value.unlockedRenderKeys
+          : {
+              ...(value.unlockedRenderKeys || {}),
+              [targetKey]: [
+                ...(value.unlockedRenderKeys?.[targetKey] || []),
+                renderUnlockKey(item, (value.rendersByRoom[targetKey] || []).length),
+              ],
+            },
       });
       setProgress(100);
+      await onTokensChanged?.();
       // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
-      const targetTab = ROOM_TABS.find((t) => t.v === targetKey);
       void saveDesignOutputAfterRender({
         projectMode: currentProjectMode,
         targetType: currentProjectMode === "commercial" ? "zone" : "whole",
@@ -997,30 +1055,31 @@ export default function Step2Designer({
     }
   };
 
-  const handleGenerate = async () => {
-    if (!currentPrompt.trim()) {
+  const handleGenerate = async (promptOverride?: string) => {
+    const promptToUse = (promptOverride ?? currentPrompt).trim();
+    if (!promptToUse) {
       setErrorMsg("프롬프트를 입력해주세요. 예: '모던 미니멀, 화이트 + 라이트 우드'");
       return;
     }
     // "전체" 탭에서는 모든 방에 일괄 생성
     if (activeRoom === "all") {
-      const promptToUse = currentPrompt;
       setPrompt("");
       await handleBulkGenerate(promptToUse);
       return;
     }
     setErrorMsg(null);
 
-    // 1차는 무료, 2차+(수정)은 1토큰
     const isFirstGen = renders.length === 0;
-    if (!isFirstGen && tokenBalance < 1) {
+    const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
+    const roomIsLiving = isLivingRoom(activeRoom, tab?.label);
+    const requiredTokens = roomIsLiving ? 5 : 1;
+    if (tokenBalance < requiredTokens) {
       setInsufficientOpen(true);
       return;
     }
 
     setGenerating(true);
     try {
-      const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
       const dim = roomDims[tab.dimKey] || roomDims["거실"];
       const struct = inferStructure(tab.label);
       const wallLayout = buildWallLayout(tab.label);  // 가이드 Q1 — 자연어 wall layout
@@ -1040,7 +1099,7 @@ export default function Step2Designer({
         widthMm: dim.widthMm,
         depthMm: dim.depthMm,
         heightMm: dim.heightMm,
-        style: currentPrompt,
+        style: promptToUse,
         expansion: basicInfo.expansionType === "extended",
         size: "1024x1024",
         quality,                                          // Q2 — 1차 low / 재생성 high
@@ -1075,7 +1134,7 @@ export default function Step2Designer({
       }
       const item: RenderItem = {
         url: result.imageUrl,
-        prompt: currentPrompt,
+        prompt: promptToUse,
         revisedPrompt: result.revisedPrompt,
         costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
@@ -1091,7 +1150,7 @@ export default function Step2Designer({
         renderKind:
           currentProjectMode === "commercial" ? "zone_render" : "room_render",
         imageUrl: result.imageUrl,
-        prompt: result.revisedPrompt || currentPrompt,
+        prompt: result.revisedPrompt || promptToUse,
       });
       // Launch-critical: renderSpec 응답 저장
       if (result.renderSpec) {
@@ -1104,15 +1163,8 @@ export default function Step2Designer({
           },
         }));
       }
-      // 2차+ 시 토큰 차감 (성공 후에만 — 실패 시 차감 없음)
-      if (!isFirstGen) {
-        const ok = await onConsumeToken(1, "ai_render");
-        if (!ok) {
-          // 이미지는 생성됐지만 토큰 차감 실패 — 사용자에게 알림 (이미지는 그대로 표시)
-          setErrorMsg("이미지 생성은 완료됐지만 토큰 차감에 실패했습니다. 관리자에게 문의해주세요.");
-        }
-      }
       const nextRenders = [...renders, item];
+      const nextRenderKey = renderUnlockKey(item, nextRenders.length - 1);
       onChange({
         ...value,
         rendersByRoom: { ...value.rendersByRoom, [activeRoom]: nextRenders },
@@ -1121,8 +1173,19 @@ export default function Step2Designer({
           ...value.generations,
           [activeRoom]: (value.generations[activeRoom] ?? 0) + 1,
         },
+        conceptPrompt: value.conceptPrompt || promptToUse,
+        unlockedRenderKeys: roomIsLiving
+          ? value.unlockedRenderKeys
+          : {
+              ...(value.unlockedRenderKeys || {}),
+              [activeRoom]: [
+                ...(value.unlockedRenderKeys?.[activeRoom] || []),
+                nextRenderKey,
+              ],
+            },
         promptByRoom: { ...(value.promptByRoom || {}), [activeRoom]: "" },
       });
+      await onTokensChanged?.();
       setImageMinimized(false); // 생성 후 큰 이미지로
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
@@ -1132,10 +1195,18 @@ export default function Step2Designer({
   };
 
   const handleBulkGenerate = async (conceptPrompt: string) => {
-    // Step1 선택 방 중 비어있는 것만 (없으면 전체)
-    const emptyTabs = realRoomTabs.filter((t) => (value.rendersByRoom[t.v] || []).length === 0);
+    // 대표 컨셉 생성은 거실 1장만 만든다. 다른 공간은 각 탭에서 1토큰으로 개별 생성·공개한다.
+    const livingTab =
+      availableTabs.find((t) => t.v !== "all" && isLivingRoom(t.v, t.label)) ||
+      realRoomTabs[0];
+    const emptyTabs =
+      livingTab && (value.rendersByRoom[livingTab.v] || []).length === 0 ? [livingTab] : [];
     if (emptyTabs.length === 0) {
-      setErrorMsg("이미 모든 방에 시안이 있습니다");
+      setErrorMsg("대표 거실 디자인이 이미 있습니다. 다른 공간은 해당 탭에서 1토큰으로 열 수 있습니다.");
+      return;
+    }
+    if (tokenBalance < 5) {
+      setInsufficientOpen(true);
       return;
     }
     setErrorMsg(null);
@@ -1237,6 +1308,7 @@ export default function Step2Designer({
       next.selectedByRoom = { ...next.selectedByRoom };
       next.generations = { ...next.generations };
       next.promptByRoom = { ...(next.promptByRoom || {}) };
+      next.conceptPrompt = conceptPrompt;
       const failures: string[] = [];
       for (const r of results) {
         if (r.ok) {
@@ -1249,12 +1321,53 @@ export default function Step2Designer({
         }
       }
       onChange(next);
+      await onTokensChanged?.();
       if (failures.length > 0) {
         setErrorMsg(`일부 방 실패: ${failures.slice(0, 2).join(" / ")}`);
       }
     } finally {
       setGenerating(false);
       setBulkProgress(null);
+    }
+  };
+
+  const handleUnlockActiveImage = async () => {
+    if (activeRoom === "all" || activeRoomIsLiving || unlockingImage) return;
+    if (tokenBalance < 1) {
+      setInsufficientOpen(true);
+      return;
+    }
+
+    setUnlockingImage(true);
+    setErrorMsg(null);
+    try {
+      if (!activeRender || selectedIdx == null || !activeRenderKey) {
+        const prompt =
+          value.conceptPrompt ||
+          currentPrompt.trim() ||
+          "거실과 동일한 2026 컨템포러리 인테리어 컨셉";
+        await handleGenerate(prompt);
+        return;
+      }
+
+      const ok = await onConsumeToken(1, "image_unlock");
+      if (!ok) {
+        setInsufficientOpen(true);
+        return;
+      }
+      const currentKeys = value.unlockedRenderKeys?.[activeRoom] || [];
+      onChange({
+        ...value,
+        unlockedRenderKeys: {
+          ...(value.unlockedRenderKeys || {}),
+          [activeRoom]: currentKeys.includes(activeRenderKey)
+            ? currentKeys
+            : [...currentKeys, activeRenderKey],
+        },
+      });
+      await onTokensChanged?.();
+    } finally {
+      setUnlockingImage(false);
     }
   };
 
@@ -1278,10 +1391,10 @@ export default function Step2Designer({
     <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-[#eeece8] p-3 lg:grid-cols-[268px_1fr]">
       {/* ─── 좌측 툴바 (베이지 톤 — 대표 지시) ─── */}
       <aside className="flex flex-col gap-3">
-        {/* 전체 인테리어 이미지 한번에 생성 — 좌측 상단 (방 선택 위) */}
+        {/* 대표 거실 디자인 생성 — 좌측 상단 (방 선택 위) */}
         <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <p className="mb-2 text-xs font-semibold text-black">
-            전체 인테리어 이미지 한번에 생성
+            대표 거실 디자인 생성
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {STYLE_PRESETS.map((preset) => (
@@ -1301,7 +1414,7 @@ export default function Step2Designer({
             ))}
           </div>
           <p className="mt-1.5 text-[0.65rem] leading-snug text-black/38">
-            클릭 시 프롬프트에 추가 → 입력 완료 후 [전체 일괄 생성] 클릭
+            컨셉 선택 후 거실 1장을 먼저 생성 · 5토큰
           </p>
         </div>
 
@@ -1317,6 +1430,17 @@ export default function Step2Designer({
               const sel = activeRoom === t.v;
               const count = (value.rendersByRoom[t.v] || []).length;
               const decided = !isAll && count > 0;
+              const tabIsLiving = isLivingRoom(t.v, t.label);
+              const tabSelectedIndex =
+                value.selectedByRoom[t.v] ?? (count > 0 ? count - 1 : null);
+              const tabSelectedRender =
+                tabSelectedIndex != null ? value.rendersByRoom[t.v]?.[tabSelectedIndex] : null;
+              const tabUnlocked =
+                tabIsLiving ||
+                (!!tabSelectedRender &&
+                  (value.unlockedRenderKeys?.[t.v] || []).includes(
+                    renderUnlockKey(tabSelectedRender, tabSelectedIndex ?? 0),
+                  ));
               // Step1에서 선택한 방인지
               const isSelectedInStep1 = isAll || selectedRoomKeys.includes(t.v);
               const Icon = t.icon;
@@ -1362,6 +1486,14 @@ export default function Step2Designer({
                       <span className="inline-flex items-center gap-1 rounded bg-white/25 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
                         <Loader2 className="h-2.5 w-2.5 animate-spin" />
                         생성중
+                      </span>
+                    ) : !isAll && !tabUnlocked ? (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[0.6rem] font-bold ${
+                          sel ? "bg-white/20 text-white" : "bg-black/[0.05] text-black/45"
+                        }`}
+                      >
+                        <Lock className="h-2.5 w-2.5" /> 1
                       </span>
                     ) : decided ? (
                       <span
@@ -1476,7 +1608,7 @@ export default function Step2Designer({
             </span>
           </div>
           <p className="mt-1 text-[0.65rem] leading-snug text-black/38">
-            1차 미리보기 무료 · 부위 선택 무료 · 자재 재렌더 2
+            거실 5 · 추가 공간 1 · 자재 재렌더 2토큰
           </p>
         </div>
 
@@ -1766,10 +1898,10 @@ export default function Step2Designer({
                       </>
                     ) : activeRoom === "all" ? (
                       <>
-                        하나의 컨셉으로 <span className="font-bold text-primary-700">모든 방</span>에
-                        같은 스타일로 일괄 생성됩니다.
+                        먼저 <span className="font-bold text-primary-700">거실 대표 이미지 1장</span>을
+                        생성합니다.
                         <br />
-                        프롬프트 입력 또는 좌측 프리셋 클릭.
+                        다른 공간은 원하는 이미지만 1토큰으로 열 수 있어요.
                       </>
                     ) : (
                       <>
@@ -2088,7 +2220,7 @@ export default function Step2Designer({
                         ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요 (비워두고 전송도 OK)"
                         : "어떤 공간을 꾸미고 싶으세요? 사진을 첨부하면 더 정확해요"
                       : activeRoom === "all"
-                        ? "전체 컨셉 입력 — 모든 방에 같은 스타일로 일괄 생성. 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
+                        ? "대표 거실 컨셉 입력 — 예) 모던 미니멀, 화이트 + 라이트 우드, 따뜻한 톤"
                         : hasGenerated
                           ? "수정 요청: 예) 소파를 회색 패브릭으로, TV 뒷벽 우드 패널..."
                           : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
@@ -2099,7 +2231,7 @@ export default function Step2Designer({
               </div>
               <button
                 type="button"
-                onClick={chatMode ? handleChatSend : handleGenerate}
+                onClick={chatMode ? handleChatSend : () => void handleGenerate()}
                 disabled={
                   chatMode
                     ? chatStreaming || (!currentPrompt.trim() && pendingAttachments.length === 0)
@@ -2121,30 +2253,27 @@ export default function Step2Designer({
                 ) : generating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : activeRoom === "all" ? (
-                  // "전체" 탭은 항상 일괄 1차 생성 (비어있는 방만)
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>전체 일괄 생성</span>
-                    <span className="rounded bg-emerald-500/30 px-1.5 py-0.5 text-[0.6rem] font-bold">
-                      무료
+                    <span>거실 생성</span>
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
+                      <Hexagon className="h-2.5 w-2.5 fill-white/30" />5
                     </span>
                   </>
                 ) : renders.length === 0 ? (
-                  // 1차 생성 — 무료
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>1차 생성</span>
-                    <span className="rounded bg-emerald-500/30 px-1.5 py-0.5 text-[0.6rem] font-bold">
-                      무료
+                    <span>{activeRoomIsLiving ? "거실 생성" : "이미지 열기"}</span>
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
+                      <Hexagon className="h-2.5 w-2.5 fill-white/30" />{activeRoomIsLiving ? 5 : 1}
                     </span>
                   </>
                 ) : (
-                  // 2차+ 수정 — 1토큰
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>수정 생성</span>
+                    <span>새 이미지 생성</span>
                     <span className="rounded bg-amber-400/40 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
-                      <Hexagon className="h-2.5 w-2.5 fill-amber-600" />1
+                      <Hexagon className="h-2.5 w-2.5 fill-amber-600" />{activeRoomIsLiving ? 5 : 1}
                     </span>
                   </>
                 )}
@@ -2202,7 +2331,7 @@ export default function Step2Designer({
                     <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
                       {bulkProgress ? (
                         <>
-                          전체 방을 순차 생성하고 있습니다.
+                          대표 거실 이미지를 생성하고 있습니다.
                           <br />
                           <span className="font-bold text-primary-700 tabular">
                             {bulkProgress.current}/{bulkProgress.total}
@@ -2308,11 +2437,68 @@ export default function Step2Designer({
               </motion.div>
             )}
           </AnimatePresence>
+
+          {/* 거실 외 이미지는 1장 단위로 불투명 블라인드 처리 후 1토큰으로 공개 */}
+          <AnimatePresence>
+            {activeRoom !== "all" &&
+              !activeRoomIsLiving &&
+              (!activeRender || !activeRenderUnlocked) &&
+              !generating && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-3 z-40 overflow-hidden rounded-2xl border border-black/10 bg-[#f1f0ed] shadow-2xl"
+                >
+                  {activeRender ? (
+                    <img
+                      src={activeRender.refinedUrl || activeRender.url}
+                      alt="잠긴 디자인 이미지"
+                      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-[28px]"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 opacity-50">
+                      <div className="absolute left-[8%] top-[12%] h-[50%] w-[55%] rounded-[32px] bg-white blur-xl" />
+                      <div className="absolute bottom-[10%] right-[8%] h-[42%] w-[48%] rounded-full bg-black/10 blur-2xl" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 bg-white/60 backdrop-blur-md" />
+                  <div className="relative flex h-full items-center justify-center p-6 text-center">
+                    <div className="w-full max-w-sm rounded-[24px] border border-black/10 bg-white/95 p-6 shadow-xl">
+                      <div className="mx-auto inline-flex h-11 w-11 items-center justify-center rounded-full bg-black text-white">
+                        <Lock className="h-4 w-4" />
+                      </div>
+                      <h3 className="mt-4 text-lg font-semibold tracking-[-0.03em] text-black">
+                        {activeTab?.label || "추가 공간"} 디자인
+                      </h3>
+                      <p className="mt-1.5 text-xs leading-relaxed text-black/52">
+                        {activeRender
+                          ? "이미지가 준비되어 있습니다. 1토큰으로 선명하게 공개할 수 있어요."
+                          : "거실과 같은 컨셉으로 이 공간 이미지를 만들고 바로 공개합니다."}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => void handleUnlockActiveImage()}
+                        disabled={unlockingImage}
+                        className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-5 py-3 text-sm font-semibold text-white transition hover:bg-black/75 disabled:opacity-50"
+                      >
+                        {unlockingImage ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                        {activeRender ? "1토큰으로 이미지 보기" : "1토큰으로 생성하고 보기"}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+          </AnimatePresence>
         </div>
 
         {/* 우측 미니 thumbnail (minimized 상태) */}
         <AnimatePresence>
-          {imageMinimized && activeRender && (
+          {imageMinimized && activeRender && activeRenderUnlocked && (
             <motion.button
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -2337,7 +2523,7 @@ export default function Step2Designer({
         </AnimatePresence>
 
         {/* 자재 수정 (세그멘테이션) — 선택된 시안 아래. 잠금 시 준비 중 안내로 대체 */}
-        {activeRender && selectedIdx != null && hasGenerated && (
+        {activeRender && selectedIdx != null && hasGenerated && activeRenderUnlocked && (
           PARTIAL_MATERIAL_VIEW_ENABLED ? (
             <div className="mt-4">
               {/* Phase 7 — Vision Material Picker trigger (이미지 전체 분석 → Top-3 후보) */}
@@ -2421,7 +2607,7 @@ export default function Step2Designer({
       {/* 생성 이미지 위 버튼으로 여는 부위별 자재 수정 작업실 */}
       {typeof document !== "undefined" && createPortal(
         <AnimatePresence>
-          {materialEditorOpen && activeRender && selectedIdx != null && (
+          {materialEditorOpen && activeRender && selectedIdx != null && activeRenderUnlocked && (
             <>
             <motion.div
               initial={{ opacity: 0 }}
@@ -2483,7 +2669,7 @@ export default function Step2Designer({
                 토큰이 부족합니다
               </h3>
               <p className="mt-2 text-sm text-primary-900/70">
-                자재 영역 분석 1토큰 / 고화질 재렌더 2토큰이 필요합니다.
+                영역 선택은 무료이며 실제 자재 재렌더에는 2토큰이 필요합니다.
                 <br />
                 현재 보유: <span className="font-bold">{tokenBalance}</span>
               </p>

@@ -1,12 +1,12 @@
 /**
  * 견적서 PDF 확장 페이지 (2026-07-04 대표 지시):
  *   8. 공정 순서·선행공정 분석
- *   9. 공정거래위원회 표준계약서 양식 (참고용 — 업체 매칭 시 상세 계약서 별도 제공)
+ *   9. 특기사항 기입·서명란
  *  10+. 프로젝트 AI 디자인 이미지 부록
  */
 import type jsPDF from "jspdf";
 import type { EstimateDocumentPackage } from "../types";
-import { PAGE, fmtWon } from "./format";
+import { PAGE } from "./format";
 
 const M = 14; // 좌우 여백(mm)
 
@@ -76,75 +76,72 @@ export function drawSchedulePage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   doc.setTextColor(0);
 }
 
-/* ── 9. 공정거래위원회 표준계약서 양식 ── */
-const CONTRACT_CLAUSES: Array<{ title: string; text: string }> = [
-  { title: "제1조 (총칙)", text: "본 계약은 갑(소비자)이 을(시공사)에게 실내건축공사를 도급함에 있어 필요한 사항을 정함을 목적으로 한다." },
-  { title: "제2조 (공사 범위)", text: "을은 본 계약서 및 첨부 설계도서(도면, 시방서, 내역서 등)에 따라 공사를 성실히 수행하여야 한다." },
-  { title: "제3조 (공사기간)", text: "① 을은 약정한 기간 내에 공사를 완료하여야 한다. ② 천재지변, 갑의 사정 등 부득이한 사유로 공사기간의 변경이 필요한 경우, 갑·을 합의 하에 변경할 수 있다." },
-  { title: "제4조 (공사대금의 지급)", text: "① 갑은 공사대금을 공사 진행에 따라 분할 지급한다. ② 선급금은 계약 체결 시, 중도금은 공정률 50% 시점, 잔금은 준공 검사 후 지급한다." },
-  { title: "제5조 (설계 변경)", text: "① 갑이 설계 변경을 요구할 경우, 을과 협의하여 추가 비용 및 공기 변경 사항을 서면으로 합의한다. ② 을은 갑의 서면 승인 없이 설계를 임의로 변경할 수 없다." },
-  { title: "제6조 (자재)", text: "① 을은 내역서에 명시된 자재를 사용하여야 한다. ② 동등 이상의 자재로 대체할 경우 갑의 사전 승인을 받아야 한다." },
-  { title: "제7조 (하자보수)", text: "① 을은 공사 완료 후 1년간 하자보수 책임을 진다. ② 방수공사는 3년, 구조체는 5년의 하자보수 기간을 적용한다. ③ 갑의 귀책 사유로 발생한 하자는 제외한다." },
-  { title: "제8조 (준공 검사)", text: "을은 공사 완료 시 갑에게 통지하고, 갑은 통지 받은 날로부터 7일 이내에 준공 검사를 실시한다." },
-  { title: "제9조 (지체 배상)", text: "을의 귀책 사유로 공사가 지연될 경우, 지체일수 1일당 공사대금의 1/1000에 해당하는 지체배상금을 갑에게 지급한다." },
-  { title: "제10조 (계약의 해제·해지)", text: "① 갑·을 일방이 계약 조건을 위반한 경우 상대방은 서면 최고 후 계약을 해제·해지할 수 있다. ② 해제·해지 시 기성 부분에 대한 정산은 갑·을 합의에 의한다." },
-  { title: "제11조 (분쟁해결)", text: "본 계약에 관한 분쟁은 갑·을 합의에 의해 해결하되, 합의가 이루어지지 않을 경우 관할 법원의 판결에 따른다." },
-];
-
-export function drawStandardContractPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
-  // ── 표지·계약 정보 ──
+/* ── 9. 특기사항·서명란 ── */
+export function drawSpecialNotesSignaturePage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   doc.setFont("NanumGothic", "bold");
-  doc.setFontSize(16);
-  doc.text("실내건축·창호 공사 표준계약서 (양식)", PAGE.width / 2, 22, { align: "center" });
+  doc.setFontSize(15);
+  doc.text("특기사항 · 계약 확인", M, 20);
   doc.setFont("NanumGothic", "normal");
   doc.setFontSize(8.5);
-  doc.setTextColor(120);
-  doc.text("공정거래위원회 표준약관(제10096호)을 참고한 양식입니다. 업체 매칭 완료 시 당사자 정보가 기입된 상세 계약서가 별도 제공됩니다.", PAGE.width / 2, 29, { align: "center" });
+  doc.setTextColor(110);
+  doc.text(
+    "현장 확인 후 변경되는 공사범위·자재·추가금액은 반드시 아래 특기사항에 기재하고 당사자가 서명합니다.",
+    M,
+    27,
+  );
   doc.setTextColor(0);
 
-  const rows: Array<[string, string]> = [
-    ["공 사 명", pkg.project.projectName || "________________________"],
-    ["공사 장소", pkg.project.addressMaskedText || pkg.project.addressText || "________________________"],
-    ["공사 기간", "20___년 ___월 ___일  ~  20___년 ___월 ___일"],
-    ["계약 금액", `${fmtWon(pkg.summary.totalAmount)} 원 (본 견적 기준 · VAT 포함)`],
-    ["발주자 (갑)", "성명: ______________   연락처: ______________   (서명/인)"],
-    ["시공자 (을)", "상호: ______________   대표: ______________   (서명/인)"],
-  ];
-  let y = 42;
-  doc.setFontSize(9.5);
-  for (const [k, v] of rows) {
-    doc.setFillColor(240, 240, 240);
-    doc.rect(M, y - 5.5, 34, 9, "F");
-    doc.setDrawColor(200);
-    doc.rect(M, y - 5.5, PAGE.width - M * 2, 9);
-    doc.setFont("NanumGothic", "bold");
-    doc.text(k, M + 3, y);
-    doc.setFont("NanumGothic", "normal");
-    doc.text(v, M + 40, y);
-    y += 9;
+  const notesTop = 35;
+  const notesHeight = 80;
+  doc.setDrawColor(185);
+  doc.rect(M, notesTop, PAGE.width - M * 2, notesHeight);
+  doc.setFont("NanumGothic", "bold");
+  doc.setFontSize(9);
+  doc.text("특기사항", M + 3, notesTop + 7);
+  doc.setDrawColor(225);
+  for (let y = notesTop + 16; y < notesTop + notesHeight; y += 10) {
+    doc.line(M + 3, y, PAGE.width - M - 3, y);
   }
 
-  // ── 일반조건 (2단) ──
-  y += 8;
-  doc.setFont("NanumGothic", "bold");
-  doc.setFontSize(11);
-  doc.text("계약 일반조건", M, y);
-  y += 6;
-  doc.setFontSize(7.5);
-  const colW = (PAGE.width - M * 2 - 8) / 2;
-  let colYs = [y, y];
-  CONTRACT_CLAUSES.forEach((c, idx) => {
-    const col = idx < 6 ? 0 : 1;
-    const x = M + col * (colW + 8);
-    const lines = doc.splitTextToSize(c.text, colW) as string[];
+  const signedAt = "20____년 ____월 ____일";
+  doc.setFont("NanumGothic", "normal");
+  doc.setFontSize(9);
+  doc.text(`계약 확인일: ${signedAt}`, PAGE.width / 2, 128, { align: "center" });
+
+  const boxY = 138;
+  const boxW = (PAGE.width - M * 2 - 8) / 2;
+  const parties: Array<{ title: string; lines: string[] }> = [
+    {
+      title: "발주자 (갑)",
+      lines: [
+        `성명: ${pkg.consumer.displayName || "________________________"}`,
+        "연락처: ________________________",
+        "주소: __________________________",
+        "서명 또는 인: __________________",
+      ],
+    },
+    {
+      title: "시공자 (을)",
+      lines: [
+        `상호: ${pkg.contractor?.companyName || "________________________"}`,
+        `대표자: ${pkg.contractor?.ceoName || "______________________"}`,
+        "사업자등록번호: _________________",
+        "서명 또는 인: __________________",
+      ],
+    },
+  ];
+  parties.forEach((party, index) => {
+    const x = M + index * (boxW + 8);
+    doc.setDrawColor(185);
+    doc.rect(x, boxY, boxW, 46);
+    doc.setFillColor(242, 242, 242);
+    doc.rect(x, boxY, boxW, 9, "F");
     doc.setFont("NanumGothic", "bold");
-    doc.text(c.title, x, colYs[col]);
-    colYs[col] += 4;
+    doc.text(party.title, x + 3, boxY + 6);
     doc.setFont("NanumGothic", "normal");
-    doc.setTextColor(70);
-    doc.text(lines, x, colYs[col]);
-    doc.setTextColor(0);
-    colYs[col] += lines.length * 3.4 + 3;
+    party.lines.forEach((line, lineIndex) => {
+      doc.text(line, x + 4, boxY + 16 + lineIndex * 7);
+    });
   });
 }
 
