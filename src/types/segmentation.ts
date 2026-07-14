@@ -71,6 +71,9 @@ export interface SegRegion {
   /** 사용자가 선택한 자재 (없으면 null) */
   current_material: string | null;
   current_material_sku: string | null;
+  current_material_product_id?: string | null;
+  current_material_thumbnail_url?: string | null;
+  current_material_brand?: string | null;
 
   /** 면적 — Vision/SAM 파이프라인이 산출 */
   area_normalized: number; // polygon 면적 / 전체 (0~1)
@@ -118,6 +121,13 @@ export interface CatalogMaterial {
   texture?: string;
   finish?: string;
   thumbnail_url?: string;
+  /** material_products DB의 실제 업체 제품 연결 정보 */
+  source_product_id?: string;
+  model_number?: string;
+  specification?: string;
+  reference_image_url?: string;
+  installed_photo_url?: string;
+  is_verified?: boolean;
   color_hex?: string;
 
   /** @deprecated material_price + labor_price로 대체 — 호환 위해 유지 */

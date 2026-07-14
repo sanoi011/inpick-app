@@ -76,6 +76,8 @@ interface Body {
   materialColor?: string;
   materialTexture?: string;
   materialFinish?: string;
+  /** material_products DB의 검증된 업체 제품. 서버가 실제 제품 이미지를 조회해 참조로 사용한다. */
+  materialProductId?: string;
   /** 가이드 v2 §5-1 — refine은 자재 미리보기 용도라 기본 medium 권장 (high는 명시 시) */
   quality?: "low" | "medium" | "high";
 }
@@ -85,6 +87,39 @@ interface PreparedMask {
   openAiMask: Buffer;
   /** 최종 합성 용: 변경 영역 255, 보존 영역 0 */
   targetAlpha: Buffer;
+}
+
+async function loadMaterialReference(productId?: string): Promise<Buffer | null> {
+  if (!productId) return null;
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("material_products")
+    .select("thumbnail_url, texture_url, installed_photo_urls")
+    .eq("id", productId)
+    .maybeSingle();
+  if (error || !data) return null;
+  const installed = Array.isArray(data.installed_photo_urls)
+    ? data.installed_photo_urls.find((url): url is string => typeof url === "string" && url.startsWith("https://"))
+    : undefined;
+  const referenceUrl = data.texture_url || data.thumbnail_url || installed;
+  if (!referenceUrl || !referenceUrl.startsWith("https://")) return null;
+  try {
+    const response = await fetch(referenceUrl, { signal: AbortSignal.timeout(15_000) });
+    if (!response.ok) return null;
+    const source = Buffer.from(await response.arrayBuffer());
+    if (source.length > 25 * 1024 * 1024) return null;
+    return await sharp(source)
+      .rotate()
+      .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
+      .png()
+      .toBuffer();
+  } catch (error) {
+    console.warn(
+      "[refine-render] material reference unavailable:",
+      error instanceof Error ? error.message : String(error),
+    );
+    return null;
+  }
 }
 
 async function prepareSelectionMask(
@@ -257,6 +292,7 @@ export async function POST(req: NextRequest) {
         body.materialColor ?? "",
         body.materialTexture ?? "",
         body.materialFinish ?? "",
+        body.materialProductId ?? "",
         body.prompt,
       ].join("|"),
     });
@@ -302,6 +338,7 @@ export async function POST(req: NextRequest) {
     const imageHeight = imageMetadata.height;
     if (!imageWidth || !imageHeight) throw new Error("원본 이미지 크기 확인 실패");
     const preparedMask = await prepareSelectionMask(body, imageWidth, imageHeight);
+    const materialReference = await loadMaterialReference(body.materialProductId);
 
     // 3) 가이드 §2-2 build_replacement_prompt — [변경] + [보존 rules] + [스타일] 3블록 패턴
     const targetEn = body.regionCategoryEn || "target area";
@@ -313,6 +350,9 @@ export async function POST(req: NextRequest) {
       body.materialColor ? `- Color: ${body.materialColor}` : null,
       body.materialTexture ? `- Texture: ${body.materialTexture}` : null,
       body.materialFinish ? `- Finish: ${body.materialFinish}` : null,
+      materialReference
+        ? "- Image 2 is the selected vendor product reference. Match its color, grain, pattern, scale and finish as closely as possible."
+        : null,
       "",
       "Critical preservation rules:",
       "- Keep ALL other elements unchanged: furniture, lighting fixtures, windows, ceiling, walls (except the target area), decor items, plants, artwork",
@@ -342,7 +382,12 @@ export async function POST(req: NextRequest) {
     try {
       const form = new FormData();
       form.append("model", usedModel);
-      form.append("image", new Blob([new Uint8Array(preparedImage)], { type: "image/png" }), "image.png");
+      if (materialReference) {
+        form.append("image[]", new Blob([new Uint8Array(preparedImage)], { type: "image/png" }), "room.png");
+        form.append("image[]", new Blob([new Uint8Array(materialReference)], { type: "image/png" }), "material-reference.png");
+      } else {
+        form.append("image", new Blob([new Uint8Array(preparedImage)], { type: "image/png" }), "image.png");
+      }
       form.append("mask", new Blob([new Uint8Array(preparedMask.openAiMask)], { type: "image/png" }), "mask.png");
       form.append("prompt", refinedPrompt);
       const requestedSize = imageWidth / imageHeight > 1.2

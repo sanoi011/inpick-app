@@ -7,18 +7,23 @@
  * 가이드 §2 RunPodSAMClient.warmup 동등.
  */
 import { NextResponse } from "next/server";
-import { samAutoSegment, isSamRunPodConfigured } from "@/lib/inpick/sam-runpod-client";
+import {
+  samAutoSegment,
+  sam3Warmup,
+  isSamRunPodConfigured,
+  isSam3RunPodConfigured,
+} from "@/lib/inpick/sam-runpod-client";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 export async function POST() {
-  if (!isSamRunPodConfigured()) {
+  if (!isSamRunPodConfigured() && !isSam3RunPodConfigured()) {
     return NextResponse.json(
       {
         warmed_up: false,
-        hint: "영역 분할 서비스 미활성 (RUNPOD_API_KEY/RUNPOD_SAM_ENDPOINT_ID 미등록)",
+        hint: "영역 분할 서비스 미활성 (RunPod SAM 엔드포인트 미등록)",
       },
       { status: 200 },
     );
@@ -29,12 +34,18 @@ export async function POST() {
     "iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAIAAAAlC+aJAAAAfElEQVR4nNXOQREAIADDsFL/nocIHlyjIGcbZRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncRIncf4OvLpyqgN9ZSiDcwAAAABJRU5ErkJggg==";
   try {
     const start = Date.now();
-    const result = await samAutoSegment(tinyPng);
+    const [sam2, sam3] = await Promise.all([
+      isSamRunPodConfigured()
+        ? samAutoSegment(tinyPng).then((result) => ({ ok: true, result })).catch(() => ({ ok: false, result: null }))
+        : Promise.resolve({ ok: false, result: null }),
+      isSam3RunPodConfigured() ? sam3Warmup() : Promise.resolve(false),
+    ]);
     return NextResponse.json({
-      warmed_up: true,
+      warmed_up: sam2.ok || sam3,
       elapsed_ms: Date.now() - start,
-      total_regions: result.total_regions,
-      image_size: result.image_size,
+      engines: { sam3, sam2_1: sam2.ok },
+      total_regions: sam2.result?.total_regions,
+      image_size: sam2.result?.image_size,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

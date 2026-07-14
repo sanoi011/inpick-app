@@ -28,6 +28,11 @@ interface Body {
   spaceType?: string;
   exclusiveAreaM2?: number;
   addressText?: string;
+  shortlistSize?: 3 | 5;
+  preferredStart?: string;
+  visitPreference?: string;
+  notes?: string;
+  drawingOptions?: string[];
 }
 
 /** region을 {sido,gugun}로 정규화 (문자열 "대전 유성구" → {sido:"대전", gugun:"유성구"}) */
@@ -57,6 +62,7 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient();
+    const shortlistSize: 3 | 5 = body.shortlistSize === 5 ? 5 : 3;
 
     // 1) estimates 행 확보 — 없으면 생성(upsert). 워크플로우는 construction_estimates에만
     //    저장하므로 RFQ용 estimates 행이 없을 수 있음(2026-07-05 H2: 공고가 실제로 안 올라가던 원인).
@@ -68,6 +74,13 @@ export async function POST(req: NextRequest) {
       spaceType: body.spaceType,
       exclusiveAreaM2: body.exclusiveAreaM2,
       budgetWon: body.budgetWon,
+      shortlistSize,
+      preferredStart: body.preferredStart,
+      visitPreference: body.visitPreference,
+      notes: body.notes?.slice(0, 2000),
+      drawingOptions: Array.isArray(body.drawingOptions) ? body.drawingOptions.slice(0, 12) : [],
+      comparisonFields: ["total", "included_scope", "materials", "schedule", "warranty"],
+      addressVisibility: "district_until_visit_confirmed",
     };
 
     let estimateId: string | null = null;
@@ -118,7 +131,7 @@ export async function POST(req: NextRequest) {
       estimateId = (inserted as { id: string }).id;
     }
 
-    // 2) 지역 매칭 사업자 조회 — sido 또는 '전국' 사업자
+    // 2) 지역 매칭 사업자 조회 — 전체 발송 대신 인증·평점·실적 기반 shortlist
     const sidoKeys = [
       region.sido,
       region.sido.replace(/(특별시|광역시|특별자치시|도|특별자치도)/g, ""),
@@ -127,12 +140,53 @@ export async function POST(req: NextRequest) {
     ];
     const { data: contractors } = await admin
       .from("specialty_contractors")
-      .select("id, email, company_name, region")
+      .select(
+        "id, email, company_name, region, rating, total_reviews, completed_projects, is_verified, is_public, min_project_budget, max_project_budget",
+      )
       .in("region", sidoKeys)
       .eq("is_active", true)
       .limit(500);
 
-    const targets = contractors || [];
+    const eligible = (contractors || [])
+      .map((contractor) => {
+        const rating = Number(contractor.rating || 0);
+        const reviews = Number(contractor.total_reviews || 0);
+        const completed = Number(contractor.completed_projects || 0);
+        const minBudget = Number(contractor.min_project_budget || 0);
+        const maxBudget = Number(contractor.max_project_budget || 0);
+        const budget = Number(body.budgetWon || 0);
+        const budgetFit =
+          budget <= 0 ||
+          ((!minBudget || budget >= minBudget) && (!maxBudget || budget <= maxBudget));
+        const local = contractor.region === region.sido;
+        const score =
+          (contractor.is_verified ? 500 : 0) +
+          (contractor.is_public === false ? -1000 : 0) +
+          rating * 50 +
+          Math.min(reviews, 100) * 1.5 +
+          Math.min(completed, 100) * 2 +
+          (budgetFit ? 80 : -60) +
+          (local ? 40 : 0);
+        return { ...contractor, score, budgetFit };
+      })
+      .filter((contractor) => contractor.is_public !== false)
+      .sort((a, b) => b.score - a.score);
+    const targets = eligible.slice(0, shortlistSize);
+
+    // shortlist를 RFQ 스냅샷에 남겨 이후 비교·감사에 같은 매칭 집합을 사용한다.
+    if (estimateId) {
+      await admin
+        .from("estimates")
+        .update({
+          rfq_data: {
+            ...rfqData,
+            matchedContractorIds: targets.map((contractor) => contractor.id),
+            matchingAlgorithm: "verified_local_shortlist_v1",
+          },
+        })
+        .eq("id", estimateId)
+        .eq("user_id", user.id);
+    }
 
     // 3) notifications fanout (실패해도 RFQ 등록은 성공)
     let fanoutCount = 0;
@@ -149,6 +203,8 @@ export async function POST(req: NextRequest) {
           noticeNo: body.noticeNo,
           region,
           deadlineAt: body.deadlineAt,
+          matchingRank: targets.findIndex((target) => target.id === c.id) + 1,
+          shortlistSize,
         },
       }));
       const { error: nErr } = await admin.from("notifications").insert(rows);
@@ -160,7 +216,8 @@ export async function POST(req: NextRequest) {
       ok: true,
       estimateId,
       fanoutCount,
-      targetContractors: targets.length,
+      targetContractors: eligible.length,
+      shortlistSize,
     });
   } catch (e) {
     return NextResponse.json(

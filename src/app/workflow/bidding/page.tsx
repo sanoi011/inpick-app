@@ -1,51 +1,39 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
-  Building2,
-  FileCheck2,
-  Calendar,
-  Paperclip,
-  Hexagon,
+  CalendarDays,
   Check,
-  Shield,
-  AlertTriangle,
-  MapPin,
+  ChevronRight,
+  CircleCheck,
+  EyeOff,
   FileText,
+  Hexagon,
   Loader2,
+  MapPin,
+  Paperclip,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  Users,
 } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
-import { getOrCreateWorkflowProjectId, fetchWorkflowState } from "@/lib/inpick/estimate-context/client";
+import {
+  fetchWorkflowState,
+  getOrCreateWorkflowProjectId,
+} from "@/lib/inpick/estimate-context/client";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
 import type { Step2Data } from "@/components/workflow/Step2Designer";
 
-const REQUIRED_CONDITIONS = [
-  {
-    id: "biz_address",
-    title: "사업자등록증 사업장 주소지 확인",
-    desc: "페이퍼 업체 차단을 위해 사업장 실주소를 확인합니다.",
-  },
-  {
-    id: "std_contract",
-    title: "실내건축 표준계약서 시행 동의",
-    desc: "국토부 고시 표준계약서 시행에 동의해야 합니다.",
-  },
-  {
-    id: "fair_bid",
-    title: "공정한 경쟁 입찰 시행 동의",
-    desc: "입찰 기간 동안 사업자에게 가격 공개·비교를 허용합니다.",
-  },
-];
-
 const PERIOD_OPTIONS = [
-  { v: 3, label: "3일" },
-  { v: 7, label: "7일", recommended: true },
-  { v: 14, label: "14일" },
-  { v: 21, label: "21일" },
+  { value: 3, label: "3일" },
+  { value: 7, label: "7일", note: "추천" },
+  { value: 14, label: "14일" },
+  { value: 21, label: "21일" },
 ];
 
 const DRAWING_OPTIONS = [
@@ -58,47 +46,73 @@ const DRAWING_OPTIONS = [
 ];
 
 const AUTO_ATTACHMENTS = [
-  "실내건축 표준계약서 (국토부 고시)",
-  "부위별 요구조건 명세서",
-  "AI 디자인 렌더 이미지",
-  "상세 견적서 (한국물가협회 단가 기준)",
-  "2D 평면도 + 치수",
+  "선택한 AI 디자인 렌더",
+  "2D 평면도와 공간 정보",
+  "부위별 자재 요구조건",
+  "인픽 기준 견적 총괄표",
+  "공정거래위원회 표준계약서 안내",
 ];
+
+const REQUIRED_CONDITIONS = [
+  {
+    id: "verified_only",
+    title: "검증된 사업자에게만 공고 전달",
+    description: "활성 상태, 사업자 정보, 지역, 평점과 시공 실적을 기준으로 매칭합니다.",
+  },
+  {
+    id: "standard_contract",
+    title: "표준 계약서 사용",
+    description: "업체 선정 후 공정거래위원회 표준계약서 기준으로 계약 단계를 진행합니다.",
+  },
+  {
+    id: "fair_compare",
+    title: "동일 조건으로 입찰 비교",
+    description: "총액뿐 아니라 포함 공사, 자재, 일정, 보증 조건을 같은 형식으로 비교합니다.",
+  },
+];
+
+const FLOW = ["공고 작성", "검증 업체 매칭", "입찰 비교", "업체 선정"];
+
+function formatDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
 
 export default function BiddingPage() {
   const router = useRouter();
   const { balance } = useTokens();
-
   const [step1, setStep1] = useState<Step1Data | null>(null);
   const [step2, setStep2] = useState<Step2Data | null>(null);
-  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
-  const [period, setPeriod] = useState<number>(7);
-  const [pickedOpts, setPickedOpts] = useState<string[]>([]);
+  const [period, setPeriod] = useState(7);
+  const [shortlistSize, setShortlistSize] = useState<3 | 5>(3);
+  const [preferredStart, setPreferredStart] = useState("1개월 이내");
+  const [visitPreference, setVisitPreference] = useState("현장 방문 가능");
+  const [pickedOptions, setPickedOptions] = useState<string[]>([]);
   const [notes, setNotes] = useState("");
+  const [accepted, setAccepted] = useState<Record<string, boolean>>({});
   const [posting, setPosting] = useState(false);
+  const [noticeNo, setNoticeNo] = useState("INPICK-RFQ");
+  const [today] = useState(() => new Date());
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let cancelled = false;
-    // sessionStorage 우선(빠름), 비어있으면 DB workflow_state 폴백 —
-    // 재로그인/새 세션/다른 탭 진입 시 지역 '—'·예산 0으로 RFQ 발송되던 것 방지(2026-07-05 M2)
-    try {
-      const s1 = sessionStorage.getItem("workflow_step1");
-      const s2 = sessionStorage.getItem("workflow_step2");
-      if (s1) setStep1(JSON.parse(s1));
-      if (s2) setStep2(JSON.parse(s2));
-      if (s1) return; // sessionStorage로 충분
-    } catch {
-      /* ignore */
-    }
     const projectId = getOrCreateWorkflowProjectId();
+    setNoticeNo(`INPICK-${formatDate(new Date()).replaceAll("-", "")}-${projectId?.slice(-6).toUpperCase() || "RFQ"}`);
+    try {
+      const savedStep1 = sessionStorage.getItem("workflow_step1");
+      const savedStep2 = sessionStorage.getItem("workflow_step2");
+      if (savedStep1) setStep1(JSON.parse(savedStep1));
+      if (savedStep2) setStep2(JSON.parse(savedStep2));
+      if (savedStep1) return;
+    } catch {
+      // DB 복원으로 계속 진행
+    }
     if (!projectId) return;
     void fetchWorkflowState(projectId)
       .then((row) => {
         if (cancelled || !row?.exists || !row.workflowState) return;
-        const ws = row.workflowState;
-        if (ws.step1) setStep1(ws.step1 as unknown as Step1Data);
-        if (ws.step2) setStep2(ws.step2 as unknown as Step2Data);
+        if (row.workflowState.step1) setStep1(row.workflowState.step1 as unknown as Step1Data);
+        if (row.workflowState.step2) setStep2(row.workflowState.step2 as unknown as Step2Data);
       })
       .catch(() => {});
     return () => {
@@ -107,459 +121,468 @@ export default function BiddingPage() {
   }, []);
 
   const region = useMemo(() => {
-    const ra = step1?.basicInfo.selectedAddress?.roadAddress || "";
-    // 도로명 주소에서 시·도 + 시·군·구 추출
-    const parts = ra.split(" ");
-    const sido = parts[0] || "—";
-    const gugun = parts[1] || "—";
-    return { sido, gugun, fullAddress: ra };
+    const fullAddress = step1?.basicInfo.selectedAddress?.roadAddress || "";
+    const parts = fullAddress.split(" ").filter(Boolean);
+    return {
+      sido: parts[0] || "지역 미확인",
+      gugun: parts[1] || "",
+      fullAddress,
+    };
   }, [step1]);
 
-  const allRequired = REQUIRED_CONDITIONS.every((c) => accepted[c.id]);
   const optionTokenCost = useMemo(
     () =>
-      pickedOpts.reduce((s, id) => {
-        const opt = DRAWING_OPTIONS.find((o) => o.id === id);
-        return s + (opt?.cost ?? 0);
-      }, 0),
-    [pickedOpts],
+      pickedOptions.reduce(
+        (total, id) => total + (DRAWING_OPTIONS.find((option) => option.id === id)?.cost || 0),
+        0,
+      ),
+    [pickedOptions],
   );
+  const allRequired = REQUIRED_CONDITIONS.every((condition) => accepted[condition.id]);
+  const hasEnoughTokens = optionTokenCost <= balance;
+  const deadlineDate = formatDate(new Date(today.getTime() + period * 86_400_000));
+  const selectionDate = formatDate(new Date(today.getTime() + (period + 3) * 86_400_000));
+  const budgetWon = (step1?.basicInfo.budget || 0) * 10_000;
 
-  const today = new Date();
-  const fmt = (d: Date) =>
-    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-  const postedDate = fmt(today);
-  const deadlineDate = fmt(new Date(today.getTime() + period * 86400000));
-  const selectionDate = fmt(new Date(today.getTime() + (period + 3) * 86400000));
-
-  // 공고번호 자동 생성 (정부기관 스타일)
-  const noticeNo = useMemo(() => {
-    const ymd = fmt(today).replace(/-/g, "");
-    const seq = Math.floor(Math.random() * 9000 + 1000);
-    return `INPICK-${ymd}-${seq}`;
-  }, [today]);
+  const selectedRenders = useMemo(() => {
+    if (!step2?.rendersByRoom) return [];
+    return Object.entries(step2.rendersByRoom).flatMap(([roomKey, items]) => {
+      const selectedIndex = step2.selectedByRoom?.[roomKey];
+      const selected = selectedIndex != null ? items[selectedIndex] : items[items.length - 1];
+      return selected ? [{ roomKey, url: selected.refinedUrl || selected.url }] : [];
+    });
+  }, [step2]);
 
   const handlePost = async () => {
-    if (!allRequired || posting) return;
+    if (!allRequired || !hasEnoughTokens || posting) return;
     setPosting(true);
     try {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(
-          "bidding_post",
-          JSON.stringify({
-            noticeNo,
-            period,
-            pickedOpts,
-            optionTokenCost,
-            notes,
-            region,
-            postedDate,
-            deadlineDate,
-            selectionDate,
-          }),
-        );
-      }
-
-      // 실제 RFQ 등록 + 지역 사업자 자동 fanout
-      // estimateId 대신 안정적인 워크플로우 projectId를 보내 estimates 행을 upsert(2026-07-05 H2).
       const consumerProjectId = getOrCreateWorkflowProjectId();
-      let publishOk = false;
-      try {
-        const res = await fetch("/api/rfq/publish", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            consumerProjectId,
-            noticeNo,
-            region,
-            addressText: region.fullAddress,
-            deadlineAt: new Date(today.getTime() + period * 86400000).toISOString(),
-            budgetWon: (step1?.basicInfo.budget ?? 0) * 10000,
-            spaceType: step1?.buildingType === "apartment" ? "주거" : step1?.buildingType === "store" ? "상업" : "주거",
-            exclusiveAreaM2: step1?.basicInfo.selectedPyeong?.exclusiveArea,
-          }),
-        });
-        publishOk = res.ok;
-        if (!res.ok) {
-          const d = await res.json().catch(() => ({}));
-          console.warn("[bidding] rfq publish failed:", d);
-        }
-      } catch (e) {
-        console.warn("[bidding] rfq publish error:", e);
-      }
-      if (!publishOk) {
-        alert("공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.");
+      const payload = {
+        consumerProjectId,
+        noticeNo,
+        region,
+        addressText: region.fullAddress,
+        deadlineAt: new Date(today.getTime() + period * 86_400_000).toISOString(),
+        budgetWon,
+        spaceType:
+          step1?.buildingType === "store"
+            ? "상업"
+            : "주거",
+        exclusiveAreaM2: step1?.basicInfo.selectedPyeong?.exclusiveArea,
+        shortlistSize,
+        preferredStart,
+        visitPreference,
+        notes,
+        drawingOptions: pickedOptions,
+      };
+      const response = await fetch("/api/rfq/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        alert(result.error || "공고 등록에 실패했어요. 잠시 후 다시 시도해주세요.");
         return;
       }
-      // 마이페이지 계약 진행으로 이동 (입찰 비교)
+      sessionStorage.setItem(
+        "bidding_post",
+        JSON.stringify({
+          ...payload,
+          period,
+          optionTokenCost,
+          postedDate: formatDate(today),
+          deadlineDate,
+          selectionDate,
+          matchedContractors: result.fanoutCount || 0,
+        }),
+      );
       router.push("/mypage/contracts/progress");
+    } catch (error) {
+      console.warn("[bidding] publish failed:", error);
+      alert("공고 등록에 실패했어요. 네트워크 상태를 확인하고 다시 시도해주세요.");
     } finally {
       setPosting(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-[#F4F6FA] text-zinc-900 font-sans">
-      {/* 정부기관 스타일 상단 바 */}
-      <div className="bg-[#1B3556] text-white">
-        <div className="max-w-6xl mx-auto px-6 py-2 flex items-center justify-between text-[0.7rem]">
-          <span className="opacity-80">대한민국 인테리어 표준 입찰 시스템</span>
-          <span className="tabular opacity-70">{postedDate}</span>
-        </div>
-      </div>
-
-      <header className="bg-white border-b-2 border-[#1B3556]">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
+    <main className="min-h-screen bg-[#f7f7f5] text-black">
+      <header className="sticky top-0 z-30 bg-[#f7f7f5]/90 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
+              type="button"
               onClick={() => router.push("/workflow/estimate")}
-              className="inline-flex h-9 w-9 items-center justify-center rounded border border-zinc-300 bg-white text-zinc-700 hover:bg-zinc-50"
-              aria-label="이전"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-black/10 bg-white transition hover:bg-black hover:text-white"
+              aria-label="견적 페이지로 돌아가기"
             >
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div className="flex items-center gap-2">
-              <Shield className="h-5 w-5 text-[#1B3556]" />
-              <span className="text-lg font-extrabold tracking-tight text-zinc-900">
-                In<span className="text-primary-500">Pick</span>
-                <span className="ml-2 text-[0.7rem] font-bold tracking-widest text-zinc-500 uppercase">
-                  표준 입찰 공고
-                </span>
-              </span>
+              <Hexagon className="h-5 w-5 fill-[#f15b4a] text-[#f15b4a]" />
+              <span className="text-base font-black tracking-tight">InPick</span>
+              <span className="hidden text-xs text-black/45 sm:inline">입찰 공고</span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="hidden sm:inline-flex items-center gap-1 rounded border border-zinc-300 bg-white px-3 py-1.5 text-[0.78rem] font-bold tabular text-zinc-700">
-              <Hexagon className="h-3 w-3 fill-amber-500 text-amber-500" />
-              {balance}
-            </span>
+          <div className="flex items-center gap-2 rounded-full border border-black/[0.08] bg-white px-3 py-1.5 text-xs font-bold">
+            <Hexagon className="h-3 w-3 fill-black text-black" />
+            <span className="tabular-nums">{balance}</span>
+            <span className="text-black/45">토큰</span>
           </div>
         </div>
       </header>
 
-      <section className="max-w-6xl mx-auto px-6 py-8">
-        {/* 공고 헤더 */}
-        <div className="bg-white border border-zinc-300 shadow-sm">
-          <div className="px-6 py-4 border-b border-zinc-200 bg-zinc-50">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="flex items-center gap-2">
-                <span className="rounded bg-[#1B3556] px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-widest text-white">
-                  STEP 05
+      <div className="mx-auto max-w-[1240px] px-4 pb-24 pt-6 sm:px-6 sm:pt-10 lg:px-8">
+        <section className="max-w-3xl">
+          <p className="text-xs font-semibold tracking-[0.16em] text-black/45">MATCH & COMPARE</p>
+          <h1 className="mt-3 text-3xl font-semibold tracking-[-0.04em] sm:text-4xl lg:text-5xl">
+            잘 맞는 업체에게만<br className="hidden sm:block" /> 공사를 제안하세요
+          </h1>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-black/55 sm:text-base">
+            프로젝트 정보를 한 번 확인하면 인픽이 지역, 인증, 평점과 시공 실적을 기준으로 업체를 추려 같은 조건의 입찰을 받습니다.
+          </p>
+        </section>
+
+        <section className="mt-8 overflow-hidden rounded-[24px] border border-black/[0.07] bg-white px-4 py-5 sm:px-6">
+          <div className="grid grid-cols-4 gap-2">
+            {FLOW.map((label, index) => (
+              <div key={label} className="relative text-center">
+                {index < FLOW.length - 1 && (
+                  <span className="absolute left-[55%] top-3 h-px w-[90%] bg-black/10" />
+                )}
+                <span
+                  className={`relative mx-auto inline-flex h-6 w-6 items-center justify-center rounded-full text-[0.68rem] font-bold ${
+                    index === 0 ? "bg-black text-white" : "border border-black/15 bg-white text-black/40"
+                  }`}
+                >
+                  {index + 1}
                 </span>
-                <span className="text-[0.7rem] font-bold uppercase tracking-widest text-zinc-500">
-                  경쟁 입찰 공고 등록
-                </span>
+                <p className={`mt-2 text-[0.62rem] font-semibold sm:text-xs ${index === 0 ? "text-black" : "text-black/40"}`}>
+                  {label}
+                </p>
               </div>
-              <span className="font-mono text-[0.78rem] tabular text-zinc-700">
-                공고번호 · {noticeNo}
-              </span>
-            </div>
-            <h1 className="mt-3 text-[1.6rem] font-extrabold tracking-tight text-zinc-900">
-              {step1?.basicInfo.selectedAddress?.buildingName ||
-                step1?.basicInfo.selectedPyeong?.pyeongName ||
-                "InPick"}{" "}
-              실내건축 시공 입찰
-            </h1>
-            <p className="mt-1 text-[0.78rem] text-zinc-600">
-              지역별 사업자에게 자동 노출되어 공정한 가격으로 경쟁 입찰됩니다.
-            </p>
-          </div>
-
-          {/* 공고 메타 — 정부기관 표 스타일 */}
-          <table className="w-full text-[0.85rem] border-b border-zinc-200">
-            <tbody>
-              <MetaRow label="입찰 지역" icon={MapPin}>
-                <span className="font-bold text-[#1B3556]">
-                  {region.sido} &gt; {region.gugun}
-                </span>
-                <span className="ml-2 text-zinc-500">{region.fullAddress}</span>
-              </MetaRow>
-              <MetaRow label="입찰 대상">
-                {step1?.basicInfo.selectedPyeong?.pyeongName} · 전용{" "}
-                {step1?.basicInfo.selectedPyeong?.exclusiveArea ?? "—"}㎡
-                {step1?.basicInfo.expansionType && (
-                  <span className="ml-2 rounded bg-zinc-100 px-2 py-0.5 text-[0.7rem]">
-                    {step1.basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
-                  </span>
-                )}
-              </MetaRow>
-              <MetaRow label="목표 예산">
-                <span className="font-bold tabular">
-                  ₩ {((step1?.basicInfo.budget ?? 0) * 10000).toLocaleString()}
-                </span>
-              </MetaRow>
-              <MetaRow label="공고 일시" icon={Calendar}>
-                <span className="tabular">{postedDate}</span>
-              </MetaRow>
-              <MetaRow label="입찰 마감">
-                <span className="tabular font-bold text-red-600">
-                  {deadlineDate}
-                </span>
-                <span className="ml-2 text-[0.78rem] text-zinc-500">
-                  ({period}일 후)
-                </span>
-              </MetaRow>
-              <MetaRow label="낙찰 발표 예정">
-                <span className="tabular">{selectionDate}</span>
-              </MetaRow>
-              <MetaRow label="첨부 자료" icon={Paperclip}>
-                <ul className="space-y-0.5">
-                  {AUTO_ATTACHMENTS.map((a) => (
-                    <li key={a} className="text-[0.78rem] text-zinc-700">
-                      · {a}
-                    </li>
-                  ))}
-                </ul>
-              </MetaRow>
-            </tbody>
-          </table>
-        </div>
-
-        {/* 입찰 기간 선택 */}
-        <div className="mt-5 bg-white border border-zinc-300">
-          <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200">
-            <h2 className="text-sm font-bold tracking-tight text-zinc-900">
-              ① 입찰 진행 기간 선택
-            </h2>
-          </div>
-          <div className="px-6 py-5 flex flex-wrap gap-2">
-            {PERIOD_OPTIONS.map((p) => (
-              <button
-                key={p.v}
-                onClick={() => setPeriod(p.v)}
-                className={`relative rounded border px-4 py-2 text-sm font-bold transition-colors ${
-                  period === p.v
-                    ? "border-[#1B3556] bg-[#1B3556] text-white"
-                    : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
-                }`}
-              >
-                {p.label}
-                {p.recommended && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded bg-amber-500 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
-                    추천
-                  </span>
-                )}
-              </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* 도면 옵션 */}
-        <div className="mt-5 bg-white border border-zinc-300">
-          <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200 flex items-center justify-between">
-            <h2 className="text-sm font-bold tracking-tight text-zinc-900">
-              ② 추가 도면 옵션 (선택)
-            </h2>
-            {pickedOpts.length > 0 && (
-              <span className="text-[0.78rem] tabular font-bold text-[#1B3556]">
-                ⬢ {optionTokenCost} 토큰
-              </span>
-            )}
-          </div>
-          <div className="px-6 py-5 grid grid-cols-2 lg:grid-cols-3 gap-2">
-            {DRAWING_OPTIONS.map((o) => {
-              const sel = pickedOpts.includes(o.id);
-              return (
-                <button
-                  key={o.id}
-                  onClick={() =>
-                    setPickedOpts((prev) =>
-                      prev.includes(o.id)
-                        ? prev.filter((x) => x !== o.id)
-                        : [...prev, o.id],
-                    )
-                  }
-                  className={`flex items-center justify-between rounded border px-3 py-2 text-sm transition-colors ${
-                    sel
-                      ? "border-[#1B3556] bg-[#1B3556]/5 text-[#1B3556]"
-                      : "border-zinc-300 bg-white text-zinc-700 hover:border-zinc-400"
-                  }`}
-                >
-                  <span className={sel ? "font-bold" : "font-medium"}>{o.label}</span>
-                  <span className="inline-flex items-center gap-0.5 text-[0.7rem] tabular text-amber-700">
-                    <Hexagon className="h-2.5 w-2.5 fill-amber-500" />
-                    {o.cost}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <div className="mt-6 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="space-y-5">
+            <SectionCard number="01" title="프로젝트 브리프" description="워크플로우에서 만든 정보를 확인합니다.">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <InfoItem icon={<MapPin className="h-4 w-4" />} label="공사 지역" value={`${region.sido} ${region.gugun}`.trim()} />
+                <InfoItem
+                  icon={<FileText className="h-4 w-4" />}
+                  label="공간"
+                  value={`${step1?.basicInfo.selectedPyeong?.pyeongName || "평형 미확인"} · 전용 ${step1?.basicInfo.selectedPyeong?.exclusiveArea || "—"}㎡`}
+                />
+                <InfoItem
+                  icon={<Sparkles className="h-4 w-4" />}
+                  label="형태"
+                  value={step1?.basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
+                />
+                <InfoItem
+                  icon={<CalendarDays className="h-4 w-4" />}
+                  label="목표 예산"
+                  value={budgetWon > 0 ? `${budgetWon.toLocaleString()}원` : "협의"}
+                />
+              </div>
+              <div className="mt-3 flex items-start gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3">
+                <EyeOff className="mt-0.5 h-4 w-4 shrink-0 text-black/55" />
+                <p className="text-xs leading-5 text-black/55">
+                  초기 업체 알림에는 시·군·구, 면적, 예산과 공사 조건만 전달됩니다. 상세 주소는 현장 방문을 합의한 업체에게 공개합니다.
+                </p>
+              </div>
+            </SectionCard>
 
-        {/* 추가 요청사항 */}
-        <div className="mt-5 bg-white border border-zinc-300">
-          <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200">
-            <h2 className="text-sm font-bold tracking-tight text-zinc-900">
-              ③ 추가 요청사항 (선택)
-            </h2>
-          </div>
-          <div className="px-6 py-4">
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={4}
-              placeholder="예) 평일 오후 시공 필수 / 펫 알러지 자재 회피 / 친환경 마감 우선"
-              className="w-full rounded border border-zinc-300 px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#1B3556]"
-            />
-          </div>
-        </div>
+            <SectionCard number="02" title="매칭 방식" description="검토할 업체 수와 일정을 정합니다.">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ChoiceGroup label="입찰 받을 업체 수">
+                  <ChoiceButton selected={shortlistSize === 3} onClick={() => setShortlistSize(3)} label="3개 업체" note="추천" />
+                  <ChoiceButton selected={shortlistSize === 5} onClick={() => setShortlistSize(5)} label="5개 업체" />
+                </ChoiceGroup>
+                <ChoiceGroup label="입찰 진행 기간">
+                  {PERIOD_OPTIONS.map((option) => (
+                    <ChoiceButton
+                      key={option.value}
+                      selected={period === option.value}
+                      onClick={() => setPeriod(option.value)}
+                      label={option.label}
+                      note={option.note}
+                    />
+                  ))}
+                </ChoiceGroup>
+                <ChoiceGroup label="공사 시작 희망">
+                  {["2주 이내", "1개월 이내", "일정 협의"].map((value) => (
+                    <ChoiceButton key={value} selected={preferredStart === value} onClick={() => setPreferredStart(value)} label={value} />
+                  ))}
+                </ChoiceGroup>
+                <ChoiceGroup label="상담 방식">
+                  {["현장 방문 가능", "영상·전화 우선", "모두 가능"].map((value) => (
+                    <ChoiceButton key={value} selected={visitPreference === value} onClick={() => setVisitPreference(value)} label={value} />
+                  ))}
+                </ChoiceGroup>
+              </div>
+              <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                {[
+                  [ShieldCheck, "사업자 확인", "활성·인증 정보"],
+                  [Star, "품질 순위", "평점·완료 실적"],
+                  [Users, "지역 적합도", "시공 가능 지역"],
+                ].map(([Icon, title, detail]) => {
+                  const MatchIcon = Icon as typeof ShieldCheck;
+                  return (
+                    <div key={String(title)} className="rounded-2xl border border-black/[0.07] px-3 py-3">
+                      <MatchIcon className="h-4 w-4" />
+                      <p className="mt-2 text-xs font-bold">{String(title)}</p>
+                      <p className="mt-0.5 text-[0.68rem] text-black/45">{String(detail)}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </SectionCard>
 
-        {/* 필수 동의 */}
-        <div className="mt-5 bg-white border border-zinc-300">
-          <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200">
-            <h2 className="text-sm font-bold tracking-tight text-zinc-900">
-              ④ 필수 시행 동의
-            </h2>
-          </div>
-          <div className="px-6 py-4 space-y-3">
-            {REQUIRED_CONDITIONS.map((c) => {
-              const isAccepted = accepted[c.id];
-              return (
-                <button
-                  key={c.id}
-                  onClick={() =>
-                    setAccepted((prev) => ({ ...prev, [c.id]: !prev[c.id] }))
-                  }
-                  className={`flex w-full items-start gap-3 text-left rounded border px-4 py-3 transition-colors ${
-                    isAccepted
-                      ? "border-[#1B3556] bg-[#1B3556]/5"
-                      : "border-zinc-300 bg-white hover:border-zinc-400"
-                  }`}
-                >
-                  <span
-                    className={`flex-shrink-0 inline-flex h-5 w-5 items-center justify-center rounded border-2 ${
-                      isAccepted
-                        ? "border-[#1B3556] bg-[#1B3556] text-white"
-                        : "border-zinc-300 bg-white"
-                    }`}
-                  >
-                    {isAccepted && <Check className="h-3 w-3" strokeWidth={3} />}
-                  </span>
-                  <div className="flex-1">
-                    <p
-                      className={`text-sm font-bold ${
-                        isAccepted ? "text-[#1B3556]" : "text-zinc-900"
+            <SectionCard number="03" title="추가 자료" description="필요한 도면만 선택합니다. 기본 자료는 자동 첨부됩니다.">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {DRAWING_OPTIONS.map((option) => {
+                  const selected = pickedOptions.includes(option.id);
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() =>
+                        setPickedOptions((current) =>
+                          current.includes(option.id)
+                            ? current.filter((id) => id !== option.id)
+                            : [...current, option.id],
+                        )
+                      }
+                      className={`rounded-2xl border px-3 py-3 text-left transition ${
+                        selected ? "border-black bg-black text-white" : "border-black/[0.08] bg-white hover:border-black/25"
                       }`}
                     >
-                      {c.title}
+                      <span className="block text-xs font-bold">{option.label}</span>
+                      <span className={`mt-1 block text-[0.68rem] ${selected ? "text-white/60" : "text-black/40"}`}>
+                        {option.cost}토큰
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-4 rounded-2xl bg-[#f7f7f5] p-4">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-4 w-4" />
+                  <p className="text-xs font-bold">자동 첨부 자료</p>
+                </div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {AUTO_ATTACHMENTS.map((attachment) => (
+                    <p key={attachment} className="flex items-center gap-2 text-xs text-black/55">
+                      <Check className="h-3 w-3" /> {attachment}
                     </p>
-                    <p className="mt-1 text-[0.78rem] text-zinc-600 leading-relaxed">
-                      {c.desc}
-                    </p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  ))}
+                </div>
+              </div>
+            </SectionCard>
 
-        {/* 등록 버튼 */}
-        <div className="mt-6 bg-white border border-zinc-300 px-6 py-5 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-start gap-2 text-[0.78rem] text-zinc-600">
-            {!allRequired ? (
-              <>
-                <AlertTriangle className="h-4 w-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <span>모든 필수 시행 동의를 완료해야 입찰 공고를 등록할 수 있습니다.</span>
-              </>
-            ) : (
-              <>
-                <FileCheck2 className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
-                <span>
-                  공고 등록 즉시 <b>{region.gugun}</b> 지역 사업자 풀에 노출됩니다. 마감일까지 입찰 가능.
-                </span>
-              </>
+            <SectionCard number="04" title="업체에게 전할 내용" description="견적에 꼭 반영할 조건을 적어주세요.">
+              <textarea
+                value={notes}
+                onChange={(event) => setNotes(event.target.value)}
+                rows={5}
+                placeholder="예: 반려동물이 있어 친환경 마감재를 우선하고, 평일 오후 공사를 희망합니다."
+                className="w-full resize-none rounded-2xl border border-black/[0.09] bg-[#f7f7f5] px-4 py-3 text-sm leading-6 outline-none transition placeholder:text-black/30 focus:border-black/35 focus:bg-white"
+              />
+            </SectionCard>
+
+            {selectedRenders.length > 0 && (
+              <SectionCard number="05" title="디자인 시안" description="선택한 렌더가 공고에 함께 전달됩니다.">
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {selectedRenders.slice(0, 6).map((render) => (
+                    <div key={render.roomKey} className="group relative aspect-[4/3] overflow-hidden rounded-2xl bg-[#ececea]">
+                      <img src={render.url} alt={render.roomKey} className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.02]" />
+                      <span className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2 py-1 text-[0.65rem] font-bold backdrop-blur">
+                        {render.roomKey}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
             )}
+
+            <SectionCard number={selectedRenders.length > 0 ? "06" : "05"} title="등록 전 확인" description="세 조건을 확인하면 공고를 등록할 수 있습니다.">
+              <div className="space-y-2">
+                {REQUIRED_CONDITIONS.map((condition) => {
+                  const selected = Boolean(accepted[condition.id]);
+                  return (
+                    <button
+                      key={condition.id}
+                      type="button"
+                      onClick={() => setAccepted((current) => ({ ...current, [condition.id]: !selected }))}
+                      className={`flex w-full items-start gap-3 rounded-2xl border px-4 py-3 text-left transition ${
+                        selected ? "border-black bg-black text-white" : "border-black/[0.08] bg-white hover:border-black/25"
+                      }`}
+                    >
+                      <span className={`mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-white bg-white text-black" : "border-black/20"}`}>
+                        {selected && <Check className="h-3 w-3" strokeWidth={3} />}
+                      </span>
+                      <span>
+                        <span className="block text-sm font-bold">{condition.title}</span>
+                        <span className={`mt-1 block text-xs leading-5 ${selected ? "text-white/60" : "text-black/50"}`}>
+                          {condition.description}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </SectionCard>
           </div>
-          <button
-            onClick={handlePost}
-            disabled={!allRequired || posting}
-            className={`inline-flex items-center gap-2 rounded px-6 py-3 text-sm font-bold transition-all ${
-              !allRequired || posting
-                ? "bg-zinc-200 text-zinc-400 cursor-not-allowed"
-                : "bg-[#1B3556] text-white hover:bg-[#2a4870]"
-            }`}
-          >
-            {posting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                공고 등록 중…
-              </>
-            ) : (
-              <>
-                <FileText className="h-4 w-4" />
-                경쟁 입찰 공고 등록
-                <ArrowRight className="h-4 w-4" />
-              </>
-            )}
+
+          <aside className="lg:sticky lg:top-24">
+            <div className="rounded-[26px] border border-black/[0.07] bg-white p-5 shadow-[0_16px_50px_rgba(0,0,0,0.05)] sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-[0.68rem] font-semibold tracking-[0.14em] text-black/40">PROJECT REQUEST</p>
+                  <h2 className="mt-2 text-xl font-semibold tracking-tight">
+                    {step1?.basicInfo.selectedAddress?.buildingName || step1?.basicInfo.selectedPyeong?.pyeongName || "인테리어 프로젝트"}
+                  </h2>
+                </div>
+                <span className="rounded-full bg-[#f7f7f5] px-2.5 py-1 text-[0.62rem] font-semibold text-black/50">작성 중</span>
+              </div>
+              <div className="mt-5 space-y-3 border-y border-black/[0.07] py-4">
+                <SummaryRow label="공고번호" value={noticeNo} />
+                <SummaryRow label="매칭 지역" value={`${region.sido} ${region.gugun}`.trim()} />
+                <SummaryRow label="검토 업체" value={`${shortlistSize}곳`} />
+                <SummaryRow label="입찰 마감" value={deadlineDate} />
+                <SummaryRow label="선정 예정" value={selectionDate} />
+                <SummaryRow label="추가 자료" value={optionTokenCost > 0 ? `${optionTokenCost}토큰` : "선택 없음"} />
+              </div>
+              <div className="mt-5 rounded-2xl bg-[#f7f7f5] p-4">
+                <div className="flex items-center gap-2">
+                  <CircleCheck className="h-4 w-4" />
+                  <p className="text-xs font-bold">등록 후 진행</p>
+                </div>
+                <ol className="mt-3 space-y-2 text-xs leading-5 text-black/55">
+                  <li>1. 조건에 맞는 검증 업체를 우선 매칭</li>
+                  <li>2. 포함 항목·일정·보증을 같은 형식으로 접수</li>
+                  <li>3. 마이페이지에서 입찰을 나란히 비교 후 선정</li>
+                </ol>
+              </div>
+              {!hasEnoughTokens && (
+                <p className="mt-3 text-xs font-semibold text-black">추가 자료에 필요한 토큰이 부족합니다.</p>
+              )}
+              <button
+                type="button"
+                onClick={handlePost}
+                disabled={!allRequired || !hasEnoughTokens || posting}
+                className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-black px-5 py-3.5 text-sm font-bold text-white transition hover:bg-black/80 disabled:cursor-not-allowed disabled:bg-black/10 disabled:text-black/35"
+              >
+                {posting ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" /> 검증 업체 매칭 중
+                  </>
+                ) : (
+                  <>
+                    공고 등록하고 업체 매칭 <ArrowRight className="h-4 w-4" />
+                  </>
+                )}
+              </button>
+              <p className="mt-3 text-center text-[0.66rem] leading-5 text-black/40">
+                필수 확인을 완료한 뒤 등록할 수 있습니다.
+              </p>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <footer className="border-t border-black/[0.06] bg-white py-6">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-2 px-4 text-xs text-black/45 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>© 주식회사 아이오드 · 사업자등록번호 384-81-04107</p>
+          <button type="button" onClick={() => router.push("/mypage/contracts/progress")} className="inline-flex items-center gap-1 text-left font-semibold text-black/65 hover:text-black">
+            진행 중인 입찰 보기 <ChevronRight className="h-3 w-3" />
           </button>
-        </div>
-
-        <div className="mt-4 px-6 py-3 bg-zinc-100 border border-zinc-200 text-[0.7rem] text-zinc-500 text-center">
-          본 공고는 <b>대한민국 실내건축 표준계약서</b>(국토교통부 고시) 시행을 전제로 등록됩니다.
-          허위 공고·페이퍼 사업자는 InPick 서비스 이용 제한 및 관계 법령에 따라 처벌받을 수 있습니다.
-        </div>
-
-        {/* Step2 시안 미리보기 */}
-        {step2 && Object.keys(step2.rendersByRoom || {}).length > 0 && (
-          <div className="mt-6 bg-white border border-zinc-300">
-            <div className="px-6 py-3 bg-zinc-50 border-b border-zinc-200">
-              <h2 className="text-sm font-bold tracking-tight text-zinc-900">
-                첨부 — AI 디자인 렌더 (자동 첨부됨)
-              </h2>
-            </div>
-            <div className="px-6 py-4 grid grid-cols-3 lg:grid-cols-6 gap-2">
-              {Object.entries(step2.rendersByRoom).map(([roomKey, items]) => {
-                const idx = step2.selectedByRoom?.[roomKey];
-                const sel = idx != null ? items[idx] : items[items.length - 1];
-                if (!sel) return null;
-                return (
-                  <div
-                    key={roomKey}
-                    className="relative aspect-square overflow-hidden rounded border border-zinc-200"
-                  >
-                    <img
-                      src={sel.refinedUrl || sel.url}
-                      alt={roomKey}
-                      className="h-full w-full object-cover"
-                    />
-                    <span className="absolute bottom-0 inset-x-0 bg-black/60 text-white text-[0.6rem] font-bold p-1 text-center">
-                      {roomKey}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <footer className="border-t border-zinc-200 bg-white py-4">
-        <div className="max-w-6xl mx-auto px-6 text-center text-[0.7rem] text-zinc-500">
-          ⓒ 주식회사 아이오드 · 사업자등록번호 384-81-04107 · 대전광역시
         </div>
       </footer>
     </main>
   );
 }
 
-function MetaRow({
-  label,
-  icon: Icon,
+function SectionCard({
+  number,
+  title,
+  description,
   children,
 }: {
-  label: string;
-  icon?: typeof Building2;
-  children: React.ReactNode;
+  number: string;
+  title: string;
+  description: string;
+  children: ReactNode;
 }) {
   return (
-    <tr className="border-b border-zinc-200 last:border-0">
-      <td className="w-40 bg-zinc-50/50 px-6 py-3 text-[0.78rem] font-bold uppercase tracking-widest text-zinc-600 align-top">
-        <span className="inline-flex items-center gap-1.5">
-          {Icon && <Icon className="h-3.5 w-3.5" />}
-          {label}
-        </span>
-      </td>
-      <td className="px-6 py-3 text-zinc-900 align-top">{children}</td>
-    </tr>
+    <section className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
+      <div className="flex gap-3">
+        <span className="mt-0.5 text-xs font-bold text-black/35">{number}</span>
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">{title}</h2>
+          <p className="mt-1 text-xs leading-5 text-black/45">{description}</p>
+        </div>
+      </div>
+      <div className="mt-5">{children}</div>
+    </section>
+  );
+}
+
+function InfoItem({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-black/[0.07] p-4">
+      <div className="flex items-center gap-2 text-black/45">
+        {icon}
+        <span className="text-[0.68rem] font-semibold">{label}</span>
+      </div>
+      <p className="mt-2 text-sm font-bold leading-5">{value}</p>
+    </div>
+  );
+}
+
+function ChoiceGroup({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div>
+      <p className="mb-2 text-xs font-bold">{label}</p>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
+
+function ChoiceButton({
+  selected,
+  onClick,
+  label,
+  note,
+}: {
+  selected: boolean;
+  onClick: () => void;
+  label: string;
+  note?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full border px-3 py-2 text-xs font-bold transition ${
+        selected ? "border-black bg-black text-white" : "border-black/10 bg-white text-black/60 hover:border-black/30"
+      }`}
+    >
+      {label}
+      {note && <span className={`ml-1 text-[0.58rem] ${selected ? "text-white/55" : "text-black/35"}`}>{note}</span>}
+    </button>
+  );
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start justify-between gap-4 text-xs">
+      <span className="text-black/45">{label}</span>
+      <span className="text-right font-bold tabular-nums">{value}</span>
+    </div>
   );
 }

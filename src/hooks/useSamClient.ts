@@ -16,6 +16,9 @@ export interface SamPolygonResult {
   area_pixels: number;
   image_size: [number, number];
   mask_url: string | null; // Supabase Storage public URL (자재 교체 시 재사용)
+  engine?: "sam3" | "sam2.1";
+  semantic_label?: string;
+  fallback_used?: boolean;
   /** 단일 클릭이 모호할 때 SAM이 제안하는 다중 마스크 후보 */
   candidates?: Array<{
     polygon: number[][];
@@ -95,13 +98,19 @@ export function useSamClient() {
    * 일반적으로 1~3초 (cold start 시 30~60초).
    */
   const callClick = useCallback(
-    async (input: { imageUrl: string; x: number; y: number }): Promise<SamPolygonResult | null> => {
+    async (input: {
+      imageUrl: string;
+      x: number;
+      y: number;
+      targetSurface: string;
+    }): Promise<SamPolygonResult | null> => {
       setClick({ status: "loading", data: null, error: null, hint: null });
       try {
         const data = await postJson<SamPolygonResult>("/api/inpick/sam/click", {
           ...samImageInput(input.imageUrl),
           x: input.x,
           y: input.y,
+          targetSurface: input.targetSurface,
         });
         setClick({ status: "ok", data, error: null, hint: null });
         return data;

@@ -12,7 +12,17 @@
  *   mask_url = Supabase Storage public URL (자재 교체 시 재사용)
  */
 import { NextRequest, NextResponse } from "next/server";
-import { samClickSegment, isSamRunPodConfigured } from "@/lib/inpick/sam-runpod-client";
+import {
+  samClickSegment,
+  samConceptSegment,
+  isSamRunPodConfigured,
+  isSam3RunPodConfigured,
+} from "@/lib/inpick/sam-runpod-client";
+import {
+  getSamSurfaceConcept,
+  isSamSurfaceTarget,
+  type SamSurfaceTarget,
+} from "@/lib/inpick/sam-surface-prompts";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -24,6 +34,7 @@ interface Body {
   imageBase64?: string;
   x: number;
   y: number;
+  targetSurface?: string;
 }
 
 async function fetchImageAsBase64(imageUrl: string): Promise<string> {
@@ -54,11 +65,11 @@ async function uploadMaskToStorage(maskB64: string, prefix: string): Promise<str
 }
 
 export async function POST(req: NextRequest) {
-  if (!isSamRunPodConfigured()) {
+  if (!isSamRunPodConfigured() && !isSam3RunPodConfigured()) {
     return NextResponse.json(
       {
         error: "영역 분할 서비스가 아직 활성화되지 않았습니다",
-        hint: "관리자에게 RUNPOD_API_KEY / RUNPOD_SAM_ENDPOINT_ID 등록 요청",
+        hint: "관리자에게 RunPod SAM 3 또는 SAM 2.1 엔드포인트 등록 요청",
       },
       { status: 503 },
     );
@@ -77,7 +88,38 @@ export async function POST(req: NextRequest) {
       ? body.imageBase64.replace(/^data:.*;base64,/, "")
       : await fetchImageAsBase64(body.imageUrl!);
 
-    const result = await samClickSegment(imageB64, body.x, body.y);
+    const targetSurface: SamSurfaceTarget | null = isSamSurfaceTarget(body.targetSurface)
+      ? body.targetSurface
+      : null;
+    let engine: "sam3" | "sam2.1" = "sam2.1";
+    let fallbackUsed = false;
+    let result;
+
+    if (targetSurface && isSam3RunPodConfigured()) {
+      try {
+        result = await samConceptSegment(
+          imageB64,
+          getSamSurfaceConcept(targetSurface),
+          body.x,
+          body.y,
+        );
+        engine = "sam3";
+      } catch (error) {
+        if (!isSamRunPodConfigured()) throw error;
+        console.warn(
+          "[sam/click] SAM 3 concept segmentation failed; falling back to SAM 2.1:",
+          error instanceof Error ? error.message : String(error),
+        );
+        result = await samClickSegment(imageB64, body.x, body.y);
+        fallbackUsed = true;
+      }
+    } else {
+      if (!isSamRunPodConfigured()) {
+        throw new Error("RUNPOD_SAM_ENDPOINT_ID 미설정 — SAM 2.1 폴백 불가");
+      }
+      result = await samClickSegment(imageB64, body.x, body.y);
+      fallbackUsed = Boolean(targetSurface);
+    }
 
     // mask PNG를 Storage에 업로드 → URL 반환 (응답 body 작게 유지)
     const maskUrl = await uploadMaskToStorage(result.mask_b64, "sam-masks/click");
@@ -103,6 +145,9 @@ export async function POST(req: NextRequest) {
       area_pixels: result.area_pixels,
       image_size: result.image_size,
       mask_url: maskUrl,
+      engine,
+      semantic_label: targetSurface || undefined,
+      fallback_used: fallbackUsed,
       // mask_b64 그대로 반환은 안 함 — 용량 큼
       candidates: candidatesOut,
     });

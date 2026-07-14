@@ -18,12 +18,16 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Loader2, Eye, Crosshair, Plus, Minus, ChevronRight, RotateCcw, ScanLine, ShieldCheck } from "lucide-react";
 import { useSamClient, type SamPolygonResult, type SamPoint } from "@/hooks/useSamClient";
+import {
+  SAM_SURFACE_TARGETS,
+  type SamSurfaceTarget,
+} from "@/lib/inpick/sam-surface-prompts";
 
 interface Props {
   /** 분할 대상 이미지 URL */
   imageUrl: string;
   /** 사용자가 영역 확정 시 호출 — 자재 선택 모달 등 */
-  onConfirm?: (region: SamPolygonResult) => void;
+  onConfirm?: (region: SamPolygonResult, targetSurface: SamSurfaceTarget) => void;
   /** 모달이 외부에서 강제로 view 모드로 돌릴 때 */
   initialMode?: "view" | "select";
   /** 추가 안내 텍스트 */
@@ -121,6 +125,7 @@ export default function ClickableRenderImage({
   hint,
 }: Props) {
   const [mode, setMode] = useState<Mode>(initialMode);
+  const [targetSurface, setTargetSurface] = useState<SamSurfaceTarget>("floor");
   const [selected, setSelected] = useState<SamPolygonResult | null>(null);
   const [candidateOptions, setCandidateOptions] = useState<SamPolygonResult[]>([]);
   const [candidateIndex, setCandidateIndex] = useState(0);
@@ -187,6 +192,7 @@ export default function ClickableRenderImage({
       imageUrl,
       x: point.x,
       y: point.y,
+      targetSurface,
     });
     if (result) {
       const candidates = (result.candidates || [])
@@ -230,7 +236,7 @@ export default function ClickableRenderImage({
   };
 
   const handleConfirm = () => {
-    if (selected && onConfirm) onConfirm(selected);
+    if (selected && onConfirm) onConfirm(selected, targetSurface);
   };
 
   // SVG viewBox는 native 픽셀 기준 — preserveAspectRatio: none으로 displayed 영역에 정확 매핑
@@ -301,11 +307,49 @@ export default function ClickableRenderImage({
         )}
       </div>
 
+      {mode === "select" && (
+        <div className="rounded-2xl border border-black/[0.08] bg-[#f7f7f5] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold text-black">먼저 바꿀 부위를 고르세요</p>
+              <p className="mt-0.5 text-[0.68rem] text-black/50">
+                부위 이름과 클릭 위치를 함께 분석해 경계를 찾습니다.
+              </p>
+            </div>
+            <span className="shrink-0 rounded-full border border-black/10 bg-white px-2 py-1 text-[0.62rem] font-semibold text-black/55">
+              의미 + 위치 분석
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
+            {(Object.entries(SAM_SURFACE_TARGETS) as Array<
+              [SamSurfaceTarget, (typeof SAM_SURFACE_TARGETS)[SamSurfaceTarget]]
+            >).map(([value, config]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => {
+                  if (value !== targetSurface) handleReset();
+                  setTargetSurface(value);
+                  setMode("select");
+                }}
+                className={`rounded-full border px-2.5 py-2 text-xs font-bold transition-colors ${
+                  targetSurface === value
+                    ? "border-black bg-black text-white"
+                    : "border-black/10 bg-white text-black/65 hover:border-black/30"
+                }`}
+              >
+                {config.labelKo}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* 안내 문구 */}
       {mode === "select" && !selected && (
-        <div className="rounded-lg bg-primary-50 border border-primary-200 px-3 py-2 text-xs text-primary-900 leading-relaxed">
-          💡 바꾸고 싶은 부분(예: 안방 문짝, 거실 벽지, 바닥)을 클릭하세요. AI가 그 영역만 정확히 분할합니다.
-          {hint && <span className="block mt-1 text-primary-900/60">{hint}</span>}
+        <div className="rounded-xl border border-black/[0.08] bg-white px-3 py-2 text-xs leading-relaxed text-black/70">
+          사진에서 <strong className="text-black">{SAM_SURFACE_TARGETS[targetSurface].labelKo}</strong> 영역 안쪽을 클릭하세요.
+          {hint && <span className="mt-1 block text-black/45">{hint}</span>}
         </div>
       )}
 
@@ -386,9 +430,9 @@ export default function ClickableRenderImage({
             >
               <div className="text-center">
                 <Loader2 className="h-7 w-7 animate-spin text-primary-500 mx-auto" />
-                <p className="mt-2 text-sm font-bold text-primary-900">영역 분석 중…</p>
-                <p className="text-[0.65rem] text-primary-900/60">
-                  첫 호출 시 cold start 30~60초
+                <p className="mt-2 text-sm font-bold text-black">{SAM_SURFACE_TARGETS[targetSurface].labelKo} 경계 분석 중…</p>
+                <p className="text-[0.65rem] text-black/50">
+                  의미 분석 후 클릭 위치로 범위를 좁히고 있습니다
                 </p>
               </div>
             </motion.div>
@@ -397,9 +441,8 @@ export default function ClickableRenderImage({
 
         {/* 신뢰도 뱃지 */}
         {selected && !loading && (
-          <div className="absolute top-2 right-2 rounded-full bg-white/90 backdrop-blur border border-primary-200 px-2.5 py-1 text-[0.65rem] font-bold text-primary-900 shadow inline-flex items-center gap-1">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-            신뢰도 {Math.round(selected.confidence * 100)}%
+          <div className="absolute top-2 right-2 rounded-full border border-black/10 bg-white/90 px-2.5 py-1 text-[0.65rem] font-bold text-black shadow-sm backdrop-blur inline-flex items-center gap-1">
+            {selected.engine === "sam3" ? "의미 선택" : "정밀 선택"} · 신뢰도 {Math.round(selected.confidence * 100)}%
           </div>
         )}
       </div>
@@ -446,18 +489,18 @@ export default function ClickableRenderImage({
         <div
           className={`rounded-lg border px-3 py-2 text-xs leading-relaxed ${
             imageNatural && selected.area_pixels / Math.max(1, imageNatural.w * imageNatural.h) > 0.82
-              ? "border-amber-200 bg-amber-50 text-amber-900"
-              : "border-emerald-200 bg-emerald-50 text-emerald-900"
+              ? "border-black/15 bg-[#f7f7f5] text-black"
+              : "border-black/10 bg-white text-black"
           }`}
         >
           <p className="inline-flex items-center gap-1.5 font-bold">
             <ShieldCheck className="h-3.5 w-3.5" />
             {imageNatural && selected.area_pixels / Math.max(1, imageNatural.w * imageNatural.h) > 0.82
               ? "선택 범위가 너무 넓습니다"
-              : "붉은 경계 안쪽만 변경됩니다"}
+              : `${SAM_SURFACE_TARGETS[targetSurface].labelKo} 경계 안쪽만 변경됩니다`}
           </p>
           <p className="mt-1 text-[0.68rem] opacity-75">
-            걸레받이·벽·창호가 포함됐다면 <strong>제외</strong>를 누르고 잘못 포함된 부위를 찍어 경계를 보정하세요.
+            다른 부위가 포함됐다면 <strong>제외</strong>를 누르고 잘못 포함된 곳을 찍으세요. 빠진 곳은 <strong>추가</strong>로 보정할 수 있습니다.
           </p>
         </div>
       )}

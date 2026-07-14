@@ -16,7 +16,7 @@ import {
 } from "@/lib/inpick/bid-pipeline";
 
 /**
- * 견적·입찰·계약 진행 단계 시각화 (나라장터 + 하도급지킴이 패턴)
+ * 견적·입찰·계약 진행 단계 시각화
  * - 가로 stepper (PC) / 세로 timeline (모바일)
  * - 현재 단계 강조 + 완료/대기 구분
  * - 다음 액션 안내 (actor + CTA)
@@ -34,11 +34,11 @@ export default function BidProgressTracker({
   const next = getNextAction(currentStage);
 
   return (
-    <div className="bg-white border border-zinc-300 rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-[22px] border border-black/[0.07] bg-white">
       {/* 상단 — 현재 단계 + 다음 액션 */}
-      <div className="px-5 py-4 bg-[#1B3556] text-white flex items-center justify-between flex-wrap gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.07] px-5 py-4 text-black">
         <div>
-          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-white/70">
+          <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-black/40">
             현재 단계
           </p>
           <p className="mt-0.5 text-xl font-extrabold tracking-tight">
@@ -46,12 +46,12 @@ export default function BidProgressTracker({
           </p>
         </div>
         <div className="text-right">
-          <p className="text-[0.65rem] text-white/70">
+          <p className="text-[0.65rem] text-black/45">
             {next.actor === "consumer"
-              ? "👤 소비자 액션"
+              ? "소비자 확인"
               : next.actor === "contractor"
-                ? "🏢 사업자 액션"
-                : "⚙ 시스템 진행"}
+                ? "사업자 진행"
+                : "시스템 진행"}
           </p>
           <p className="mt-0.5 text-sm font-semibold max-w-md leading-tight">
             {next.action}
@@ -59,7 +59,7 @@ export default function BidProgressTracker({
           {next.cta && next.href && (
             <a
               href={next.href}
-              className="mt-2 inline-flex items-center gap-1 rounded bg-amber-500 px-3 py-1.5 text-xs font-bold text-white hover:bg-amber-600"
+              className="mt-2 inline-flex items-center gap-1 rounded-full bg-black px-3 py-1.5 text-xs font-bold text-white hover:bg-black/80"
             >
               {next.cta} <ChevronRight className="h-3 w-3" />
             </a>
@@ -79,9 +79,9 @@ export default function BidProgressTracker({
                 <div
                   className={`relative inline-flex h-8 w-8 items-center justify-center rounded-full border-2 ${
                     done
-                      ? "bg-emerald-500 border-emerald-500 text-white"
+                      ? "border-black bg-black text-white"
                       : active
-                        ? "bg-[#1B3556] border-[#1B3556] text-white ring-4 ring-[#1B3556]/20"
+                        ? "border-black bg-black text-white ring-4 ring-black/10"
                         : "bg-white border-zinc-300 text-zinc-400"
                   }`}
                 >
@@ -96,9 +96,9 @@ export default function BidProgressTracker({
                 <p
                   className={`mt-2 text-[0.7rem] font-bold leading-tight ${
                     active
-                      ? "text-[#1B3556]"
+                      ? "text-black"
                       : done
-                        ? "text-emerald-700"
+                        ? "text-black/70"
                         : "text-zinc-400"
                   }`}
                 >
@@ -114,7 +114,7 @@ export default function BidProgressTracker({
               {i < STAGE_ORDER.length - 1 && (
                 <div
                   className={`mt-4 h-0.5 flex-1 ${
-                    pending ? "bg-zinc-200" : done ? "bg-emerald-500" : "bg-gradient-to-r from-[#1B3556] to-zinc-200"
+                    pending ? "bg-zinc-200" : done ? "bg-black" : "bg-gradient-to-r from-black to-zinc-200"
                   }`}
                 />
               )}
@@ -138,9 +138,9 @@ export default function BidProgressTracker({
               <div
                 className={`shrink-0 inline-flex h-7 w-7 items-center justify-center rounded-full border-2 ${
                   done
-                    ? "bg-emerald-500 border-emerald-500 text-white"
+                    ? "border-black bg-black text-white"
                     : active
-                      ? "bg-[#1B3556] border-[#1B3556] text-white"
+                      ? "border-black bg-black text-white"
                       : "bg-white border-zinc-300 text-zinc-400"
                 }`}
               >
@@ -148,7 +148,7 @@ export default function BidProgressTracker({
               </div>
               <p
                 className={`text-sm font-semibold ${
-                  active ? "text-[#1B3556]" : done ? "text-emerald-700" : "text-zinc-400"
+                  active ? "text-black" : done ? "text-black/70" : "text-zinc-400"
                 }`}
               >
                 {STAGE_LABEL[stage]}
@@ -158,12 +158,10 @@ export default function BidProgressTracker({
         })}
       </div>
 
-      {/* 정부기관 표준 안내 */}
-      <div className="px-5 py-3 bg-zinc-50 border-t border-zinc-200 flex items-start gap-2">
+      <div className="flex items-start gap-2 border-t border-black/[0.07] bg-[#f7f7f5] px-5 py-3">
         <AlertCircle className="h-3.5 w-3.5 text-zinc-500 shrink-0 mt-0.5" />
         <p className="text-[0.7rem] text-zinc-600 leading-relaxed">
-          본 프로세스는 <b>국토교통부 실내건축 표준계약서</b> + <b>하도급지킴이 대금지급보증</b> + <b>건설산업기본법</b>을
-          기준으로 설계되었습니다. 각 단계는 InPick 플랫폼이 자동 검증·기록하며, 분쟁 시 한국공정거래조정원 → 건설분쟁조정위 절차를 따릅니다.
+          입찰은 총액, 포함 공사, 자재, 일정과 보증 조건을 같은 형식으로 비교합니다. 업체 선정 후 계약 단계에서 공정거래위원회 표준계약서 내용을 최종 확인하세요.
         </p>
       </div>
     </div>

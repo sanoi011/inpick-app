@@ -59,12 +59,12 @@ interface RunPodEnv {
   endpointId: string;
 }
 
-function getEnv(): RunPodEnv {
+function getEnv(endpointVariable = "RUNPOD_SAM_ENDPOINT_ID"): RunPodEnv {
   const apiKey = process.env.RUNPOD_API_KEY;
-  const endpointId = process.env.RUNPOD_SAM_ENDPOINT_ID;
+  const endpointId = process.env[endpointVariable];
   if (!apiKey || !endpointId) {
     throw new Error(
-      "RUNPOD_API_KEY 또는 RUNPOD_SAM_ENDPOINT_ID 미설정 — Vercel 환경변수 등록 필요",
+      `RUNPOD_API_KEY 또는 ${endpointVariable} 미설정 — Vercel 환경변수 등록 필요`,
     );
   }
   return { apiKey, endpointId };
@@ -85,8 +85,11 @@ function authHeaders(env: RunPodEnv): Record<string, string> {
  * runsync 호출 + timeout 시 비동기 fallback.
  * RunPod runsync는 60초 한계 (가이드 §2-2). 우리는 90초 timeout 후 async fallback.
  */
-async function callRunPod<T>(payload: Record<string, unknown>): Promise<T> {
-  const env = getEnv();
+async function callRunPod<T>(
+  payload: Record<string, unknown>,
+  endpointVariable = "RUNPOD_SAM_ENDPOINT_ID",
+): Promise<T> {
+  const env = getEnv(endpointVariable);
 
   // 1) runsync 시도
   const ctrl = new AbortController();
@@ -114,7 +117,7 @@ async function callRunPod<T>(payload: Record<string, unknown>): Promise<T> {
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
       // runsync timeout → async fallback
-      return callRunPodAsync<T>(payload);
+      return callRunPodAsync<T>(payload, endpointVariable);
     }
     throw e;
   } finally {
@@ -123,8 +126,11 @@ async function callRunPod<T>(payload: Record<string, unknown>): Promise<T> {
 }
 
 /** /run + /status polling */
-async function callRunPodAsync<T>(payload: Record<string, unknown>): Promise<T> {
-  const env = getEnv();
+async function callRunPodAsync<T>(
+  payload: Record<string, unknown>,
+  endpointVariable = "RUNPOD_SAM_ENDPOINT_ID",
+): Promise<T> {
+  const env = getEnv(endpointVariable);
 
   // 1) 작업 시작
   const startRes = await fetch(`${baseUrl(env)}/run`, {
@@ -198,6 +204,27 @@ export async function samClickSegment(
 }
 
 /**
+ * SAM 3 open-vocabulary 의미 분할.
+ * 먼저 부위 개념으로 후보를 찾고 클릭 지점을 포함하는 마스크를 우선 반환한다.
+ */
+export async function samConceptSegment(
+  imageB64: string,
+  concept: string,
+  x: number,
+  y: number,
+): Promise<ClickSegmentResult> {
+  return callRunPod<ClickSegmentResult>(
+    {
+      task: "concept_segment",
+      image_b64: imageB64,
+      concept,
+      click_point: [x, y],
+    },
+    "RUNPOD_SAM3_ENDPOINT_ID",
+  );
+}
+
+/**
  * 영역 미세 조정 — positive(포함할 점) + negative(제외할 점).
  * 가이드 §3-2 refine_selection 동등.
  */
@@ -246,4 +273,21 @@ export async function samWarmup(): Promise<boolean> {
 /** 환경 설정 여부 — 클라이언트가 호출 가능한지 사전 확인용 */
 export function isSamRunPodConfigured(): boolean {
   return !!process.env.RUNPOD_API_KEY && !!process.env.RUNPOD_SAM_ENDPOINT_ID;
+}
+
+export async function sam3Warmup(): Promise<boolean> {
+  try {
+    await callRunPod<{ ok: boolean }>(
+      { task: "warmup" },
+      "RUNPOD_SAM3_ENDPOINT_ID",
+    );
+    return true;
+  } catch (error) {
+    console.warn("[sam3-runpod] warmup failed:", error);
+    return false;
+  }
+}
+
+export function isSam3RunPodConfigured(): boolean {
+  return !!process.env.RUNPOD_API_KEY && !!process.env.RUNPOD_SAM3_ENDPOINT_ID;
 }

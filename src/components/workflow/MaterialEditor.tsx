@@ -29,6 +29,7 @@ import type {
 } from "@/types/segmentation";
 import ClickableRenderImage from "./ClickableRenderImage";
 import type { SamPolygonResult } from "@/hooks/useSamClient";
+import type { SamSurfaceTarget } from "@/lib/inpick/sam-surface-prompts";
 
 interface Props {
   roomLabel: string;
@@ -64,6 +65,7 @@ export default function MaterialEditor({
   // 가이드 권장: SAM 클릭이 더 정확하지만 RunPod 환경 필요. auto는 GPT-4o Vision으로 실행 가능.
   const [editMode, setEditMode] = useState<"auto" | "sam">("sam");
   const [samSelection, setSamSelection] = useState<SamPolygonResult | null>(null);
+  const [samSurfaceTarget, setSamSurfaceTarget] = useState<SamSurfaceTarget>("floor");
   const [samCategoryPicker, setSamCategoryPicker] = useState(false); // 카테고리 선택 모달
   // expensesRatio knob 제거 — spec §C는 고정 요율 (산안비 3.11% / 일반관리비 5% / 이윤 10%) 사용.
   // 사업자별 요율 수정은 Phase 2 `/business/bids/[bidId]/edit-rates`에서 처리.
@@ -117,6 +119,9 @@ export default function MaterialEditor({
               ...r,
               current_material: material.name,
               current_material_sku: material.sku,
+              current_material_product_id: material.source_product_id || null,
+              current_material_thumbnail_url: material.thumbnail_url || null,
+              current_material_brand: material.brand || null,
               guessed_color_hex: material.color_hex || r.guessed_color_hex,
             }
           : r,
@@ -127,8 +132,9 @@ export default function MaterialEditor({
   };
 
   // SAM 모드 — 클릭으로 선택한 영역 + 카테고리 선택 → 자재 라이브러리 → refine-render 직접 호출
-  const handleSamConfirm = (region: SamPolygonResult) => {
+  const handleSamConfirm = (region: SamPolygonResult, targetSurface: SamSurfaceTarget) => {
     setSamSelection(region);
+    setSamSurfaceTarget(targetSurface);
     setSamCategoryPicker(true); // 카테고리 선택 모달
   };
 
@@ -168,6 +174,7 @@ export default function MaterialEditor({
           materialColor: material.color,
           materialTexture: material.texture,
           materialFinish: material.finish,
+          materialProductId: material.source_product_id,
         }),
       });
       const data = await res.json();
@@ -229,6 +236,7 @@ export default function MaterialEditor({
             ? firstCat
             : undefined,
           materialName: editedRegions.map((r) => r.current_material).join(" + "),
+          materialProductId: editedRegions[0].current_material_product_id || undefined,
         }),
       });
       const data = await res.json();
@@ -511,6 +519,7 @@ export default function MaterialEditor({
       <AnimatePresence>
         {samCategoryPicker && samSelection && (
           <SamCategoryMaterialModal
+            initialCategory={samSurfaceTarget}
             onClose={() => {
               setSamCategoryPicker(false);
               setSamSelection(null);
@@ -550,11 +559,13 @@ function ModalPortal({ children }: { children: ReactNode }) {
 function SamCategoryMaterialModal({
   onClose,
   onSelect,
+  initialCategory,
 }: {
   onClose: () => void;
   onSelect: (category: InteriorCategory, material: CatalogMaterial) => void;
+  initialCategory: SamSurfaceTarget;
 }) {
-  const [category, setCategory] = useState<InteriorCategory>("floor");
+  const category: InteriorCategory = initialCategory;
   const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
@@ -601,7 +612,7 @@ function SamCategoryMaterialModal({
               선택한 영역의 자재 변경
             </h3>
             <p className="mt-1 text-xs text-primary-900/60">
-              먼저 카테고리(바닥/벽/창 등) 선택 → 자재 라이브러리에서 적용할 자재 선택
+              선택한 {REPLACEABLE_CATS.find((item) => item.v === category)?.label} 영역에 적용할 실제 제품을 고르세요
             </p>
           </div>
           <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
@@ -609,25 +620,16 @@ function SamCategoryMaterialModal({
           </button>
         </div>
 
-        {/* 카테고리 선택 */}
+        {/* 앞 단계에서 정한 부위 — 마스크와 자재 종류가 달라지지 않게 고정 */}
         <div className="mt-4">
-          <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50 mb-2">
-            카테고리
-          </p>
-          <div className="flex flex-wrap gap-1.5">
-            {REPLACEABLE_CATS.map((c) => (
-              <button
-                key={c.v}
-                onClick={() => setCategory(c.v)}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-colors ${
-                  category === c.v
-                    ? "bg-primary-500 text-white"
-                    : "bg-primary-50 text-primary-900/70 hover:bg-primary-100"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
+          <div className="flex items-center justify-between rounded-xl border border-black/[0.08] bg-[#f7f7f5] px-3 py-2.5">
+            <div>
+              <p className="text-[0.65rem] font-semibold uppercase tracking-widest text-black/40">선택 부위</p>
+              <p className="mt-0.5 text-sm font-bold text-black">
+                {REPLACEABLE_CATS.find((item) => item.v === category)?.label}
+              </p>
+            </div>
+            <span className="text-[0.68rem] text-black/45">부위를 바꾸려면 이전 화면에서 다시 선택</span>
           </div>
         </div>
 
@@ -656,15 +658,36 @@ function SamCategoryMaterialModal({
                         : "border-primary-100 bg-white hover:border-primary-300"
                     }`}
                   >
-                    <div
-                      className="aspect-square w-full rounded-lg border border-primary-100 mb-2"
-                      style={{ background: m.color_hex || "#eee" }}
-                    />
+                    {m.thumbnail_url ? (
+                      <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg border border-black/[0.08] bg-[#f7f7f5]">
+                        <img
+                          src={m.thumbnail_url}
+                          alt={`${m.brand || ""} ${m.name}`.trim()}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                        />
+                        {m.is_verified && (
+                          <span className="absolute left-1.5 top-1.5 rounded-full bg-black px-1.5 py-0.5 text-[0.55rem] font-bold text-white">
+                            제품 확인
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        className="mb-2 aspect-square w-full rounded-lg border border-black/[0.08]"
+                        style={{ background: m.color_hex || "#eee" }}
+                      />
+                    )}
                     <p className="text-xs font-bold text-primary-900 leading-tight truncate">
                       {m.name}
                     </p>
                     {m.brand && (
                       <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                    )}
+                    {(m.model_number || m.specification) && (
+                      <p className="mt-0.5 truncate text-[0.58rem] text-black/40">
+                        {[m.model_number, m.specification].filter(Boolean).join(" · ")}
+                      </p>
                     )}
                     <div className="mt-1 space-y-0.5">
                       <p className="text-[0.7rem] font-bold text-primary-700 tabular">
@@ -847,15 +870,36 @@ function MaterialLibraryModal({
                       : "border-primary-100 bg-white hover:border-primary-300"
                   }`}
                 >
-                  <div
-                    className="aspect-square w-full rounded-lg border border-primary-100 mb-2"
-                    style={{ background: m.color_hex || "#eee" }}
-                  />
+                  {m.thumbnail_url ? (
+                    <div className="relative mb-2 aspect-square w-full overflow-hidden rounded-lg border border-black/[0.08] bg-[#f7f7f5]">
+                      <img
+                        src={m.thumbnail_url}
+                        alt={`${m.brand || ""} ${m.name}`.trim()}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                      />
+                      {m.is_verified && (
+                        <span className="absolute left-1.5 top-1.5 rounded-full bg-black px-1.5 py-0.5 text-[0.55rem] font-bold text-white">
+                          제품 확인
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div
+                      className="mb-2 aspect-square w-full rounded-lg border border-black/[0.08]"
+                      style={{ background: m.color_hex || "#eee" }}
+                    />
+                  )}
                   <p className="text-xs font-bold text-primary-900 leading-tight truncate">
                     {m.name}
                   </p>
                   {m.brand && (
                     <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                  )}
+                  {(m.model_number || m.specification) && (
+                    <p className="mt-0.5 truncate text-[0.58rem] text-black/40">
+                      {[m.model_number, m.specification].filter(Boolean).join(" · ")}
+                    </p>
                   )}
                   <div className="mt-1 space-y-0.5">
                     <p className="text-[0.7rem] font-bold text-primary-700 tabular">
