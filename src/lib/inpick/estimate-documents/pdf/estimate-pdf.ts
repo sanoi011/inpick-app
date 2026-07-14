@@ -96,7 +96,20 @@ export async function renderEstimatePackagePdf(input: {
 
   // 공정거래위원회 제10079호 공식 원본(6쪽)을 갑지·을지로 그대로 유지하고,
   // 그 뒤에 인픽 견적 갑지/총괄/세부/이미지/특기사항/서명란을 병합한다.
-  const contractResponse = await fetch("/legal/ftc-standard-contract-10079.pdf");
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.replace(/\/$/, "");
+  const storageContractUrl = supabaseUrl
+    ? `${supabaseUrl}/storage/v1/object/public/floorplans/legal/ftc-standard-contract-10079.pdf`
+    : null;
+  let contractResponse = await fetch(
+    storageContractUrl || "/legal/ftc-standard-contract-10079.pdf",
+    { cache: "no-store" },
+  );
+  // Storage 장애에도 Vercel public 자산으로 발급을 완주한다.
+  if (!contractResponse.ok && storageContractUrl) {
+    contractResponse = await fetch("/legal/ftc-standard-contract-10079.pdf", {
+      cache: "no-store",
+    });
+  }
   if (!contractResponse.ok) {
     throw new Error("공정위 공식 표준계약서 원본을 불러오지 못했습니다.");
   }
