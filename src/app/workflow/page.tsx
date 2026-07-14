@@ -396,7 +396,7 @@ export default function WorkflowPage() {
         <div className="w-full max-w-sm rounded-[28px] border border-black/[0.07] bg-white p-7 text-center shadow-[0_20px_60px_rgba(0,0,0,0.08)]">
           <div className="relative mx-auto h-14 w-14">
             <div className="absolute inset-0 rounded-full border-4 border-black/[0.06]" />
-            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-r-primary-500 border-t-primary-500" />
+            <div className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-r-black border-t-black" />
           </div>
           <p className="mt-4 text-base font-semibold">디자인 작업을 불러오는 중</p>
           <p className="mt-1 text-xs text-black/45">저장된 디자인 화면으로 바로 돌아갑니다.</p>
@@ -418,20 +418,20 @@ export default function WorkflowPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 z-[90] flex items-center justify-center bg-primary-900/60 backdrop-blur-sm"
+              className="fixed inset-0 z-[90] flex items-center justify-center bg-black/60 backdrop-blur-sm"
             >
               <motion.div
                 initial={{ scale: 0.95, y: 12 }}
                 animate={{ scale: 1, y: 0 }}
                 className="rounded-[24px] bg-white p-7 shadow-card-hover max-w-sm w-full mx-6 text-center"
               >
-                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-primary-50 text-primary-500">
+                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#f7f7f5] text-black">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
-                <h3 className="mt-4 text-lg font-extrabold tracking-tight text-primary-900">
+                <h3 className="mt-4 text-lg font-extrabold tracking-tight text-black">
                   AI 평면도 정형화 중
                 </h3>
-                <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                <p className="mt-2 text-sm text-black/70 leading-relaxed">
                   실별 치수·구조·개구부를 자동 추출하고 있습니다.
                   <br />약 10–20초 소요
                 </p>
@@ -457,7 +457,7 @@ export default function WorkflowPage() {
               </button>
             ) : (
               <a href="/" className="flex items-center gap-2.5">
-                <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+                <span className="hex-mask h-[22px] w-[22px] text-black" />
                 <span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
               </a>
             )}
@@ -483,7 +483,7 @@ export default function WorkflowPage() {
                 transition={{ duration: 0.55, ease: [0.4, 0, 0.2, 1] }}
               >
                 <div className="max-w-3xl">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black">
                     STEP 01
                   </p>
                   <h1 className="mt-3 break-keep text-[32px] font-medium leading-[1.08] tracking-[-0.06em] text-black sm:text-[44px] lg:text-[52px]">
@@ -563,7 +563,7 @@ export default function WorkflowPage() {
               >
                 {/* Step2 — 한 줄 압축 헤더 (큰 여백 제거) */}
                 <div className="mb-4 flex flex-wrap items-center gap-3 px-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary-500">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black">
                     STEP 02
                   </p>
                   <span className="text-black/15">·</span>
@@ -571,7 +571,7 @@ export default function WorkflowPage() {
                     공간별 AI 디자인과 자재 편집
                   </h1>
                   {normalizeError && (
-                    <span className="ml-auto rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[0.65rem] text-amber-700">
+                    <span className="ml-auto rounded-full border border-black/10 bg-[#f7f7f5] px-2 py-0.5 text-[0.65rem] text-black">
                       ⚠ 평면도 정형화 실패 — 표준 치수로 진행
                     </span>
                   )}
@@ -606,28 +606,28 @@ export default function WorkflowPage() {
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={() => setQuickOpen(false)}
-                className="fixed inset-0 z-[85] bg-primary-900/55 backdrop-blur-sm"
+                className="fixed inset-0 z-[85] bg-black/55 backdrop-blur-sm"
               />
               <motion.div
                 initial={{ opacity: 0, scale: 0.96, y: 12 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: 12 }}
-                className="fixed left-1/2 top-1/2 z-[86] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+                className="fixed left-1/2 top-1/2 z-[86] w-[calc(100%-2rem)] max-w-md max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-black/10 bg-white p-7 shadow-card-hover"
               >
                 <button
                   onClick={() => setQuickOpen(false)}
-                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-primary-900/50 hover:bg-primary-50 hover:text-primary-900"
+                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-black/50 hover:bg-[#f7f7f5] hover:text-black"
                   aria-label="닫기"
                 >
                   <X className="h-4 w-4" />
                 </button>
-                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta">
+                <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-black to-black text-white shadow-cta">
                   <Camera className="h-6 w-6" />
                 </div>
-                <h3 className="mt-4 text-xl font-extrabold tracking-tight text-primary-900">
+                <h3 className="mt-4 text-xl font-extrabold tracking-tight text-black">
                   {!quickMode ? "어떤 공간이세요?" : "평수만 알려주세요"}
                 </h3>
-                <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                <p className="mt-2 text-sm text-black/70 leading-relaxed">
                   {!quickMode
                     ? "도면 없이 사진으로 시작합니다. 공간 유형을 먼저 선택해주세요."
                     : "사진 첨부와 함께 AI 상담으로 진행됩니다."}
@@ -639,20 +639,20 @@ export default function WorkflowPage() {
                     <button
                       type="button"
                       onClick={() => setQuickMode("photo_residential")}
-                      className="w-full rounded-2xl border-2 border-amber-200 bg-amber-50/50 p-4 text-left transition hover:border-primary-400 hover:bg-primary-50/50"
+                      className="w-full rounded-2xl border-2 border-black/10 bg-[#f7f7f5]/50 p-4 text-left transition hover:border-black/10 hover:bg-[#f7f7f5]/50"
                     >
-                      <p className="text-sm font-bold text-primary-900">🏠 내 집 (도면 없이)</p>
-                      <p className="mt-1 text-[0.72rem] text-primary-900/60">
+                      <p className="text-sm font-bold text-black">🏠 내 집 (도면 없이)</p>
+                      <p className="mt-1 text-[0.72rem] text-black/60">
                         원룸·투룸·아파트·주택 등. 도면이 없거나 못 찾는 경우.
                       </p>
                     </button>
                     <button
                       type="button"
                       onClick={() => setQuickMode("photo_commercial")}
-                      className="w-full rounded-2xl border-2 border-emerald-200 bg-emerald-50/50 p-4 text-left transition hover:border-primary-400 hover:bg-primary-50/50"
+                      className="w-full rounded-2xl border-2 border-black/10 bg-[#f7f7f5]/50 p-4 text-left transition hover:border-black/10 hover:bg-[#f7f7f5]/50"
                     >
-                      <p className="text-sm font-bold text-primary-900">☕ 상가·사무실</p>
-                      <p className="mt-1 text-[0.72rem] text-primary-900/60">
+                      <p className="text-sm font-bold text-black">☕ 상가·사무실</p>
+                      <p className="mt-1 text-[0.72rem] text-black/60">
                         카페·식당·미용실·학원·사무실 등. 업종별 zone 디자인.
                       </p>
                     </button>
@@ -662,7 +662,7 @@ export default function WorkflowPage() {
                 {/* 2단계: 모드별 세부 입력 */}
                 {quickMode === "photo_residential" && (
                   <div className="mt-5">
-                    <p className="text-xs font-bold text-primary-700 mb-2">공간 유형</p>
+                    <p className="text-xs font-bold text-black mb-2">공간 유형</p>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([
                         { v: "studio", label: "원룸" },
@@ -680,8 +680,8 @@ export default function WorkflowPage() {
                             onClick={() => setQuickPhotoSpace(s.v)}
                             className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
                               active
-                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                                : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
+                                ? "border-black/10 bg-black text-white shadow-cta"
+                                : "border-black/10 bg-white text-black hover:border-black/10"
                             }`}
                           >
                             {s.label}
@@ -694,7 +694,7 @@ export default function WorkflowPage() {
 
                 {quickMode === "photo_commercial" && (
                   <div className="mt-5">
-                    <p className="text-xs font-bold text-primary-700 mb-2">업종</p>
+                    <p className="text-xs font-bold text-black mb-2">업종</p>
                     <div className="grid grid-cols-3 gap-1.5">
                       {([
                         { v: "cafe", label: "카페" },
@@ -718,8 +718,8 @@ export default function WorkflowPage() {
                             onClick={() => setQuickBusiness(b.v)}
                             className={`rounded-lg border px-2 py-2 text-xs font-bold transition ${
                               active
-                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                                : "border-emerald-200 bg-white text-primary-900 hover:border-primary-300"
+                                ? "border-black/10 bg-black text-white shadow-cta"
+                                : "border-black/10 bg-white text-black hover:border-black/10"
                             }`}
                           >
                             {b.label}
@@ -733,7 +733,7 @@ export default function WorkflowPage() {
                 {/* 3단계: 평수 입력 (모드 선택 후) */}
                 {quickMode && (
                   <div className="mt-5">
-                    <p className="text-xs font-bold text-primary-700 mb-2">평형 선택</p>
+                    <p className="text-xs font-bold text-black mb-2">평형 선택</p>
                     <div className="grid grid-cols-4 gap-1.5">
                       {QUICK_PYEONG_PRESETS.map((p) => {
                         const active = quickPyeong === p;
@@ -744,8 +744,8 @@ export default function WorkflowPage() {
                             onClick={() => setQuickPyeong(p)}
                             className={`rounded-lg border px-2 py-2 text-sm font-bold transition ${
                               active
-                                ? "border-primary-500 bg-primary-500 text-white shadow-cta"
-                                : "border-amber-200 bg-white text-primary-900 hover:border-primary-300"
+                                ? "border-black/10 bg-black text-white shadow-cta"
+                                : "border-black/10 bg-white text-black hover:border-black/10"
                             }`}
                           >
                             {p}평
@@ -754,18 +754,18 @@ export default function WorkflowPage() {
                       })}
                     </div>
                     <div className="mt-3 flex items-center gap-2">
-                      <label className="text-xs font-bold text-primary-700">직접 입력</label>
+                      <label className="text-xs font-bold text-black">직접 입력</label>
                       <input
                         type="number"
                         min={5}
                         max={500}
                         value={quickPyeong}
                         onChange={(e) => setQuickPyeong(Number(e.target.value) || 0)}
-                        className="flex-1 rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-sm tabular text-primary-900 outline-none focus:border-primary-400"
+                        className="flex-1 rounded-lg border border-black/10 bg-white px-3 py-1.5 text-sm tabular text-black outline-none focus:border-black/10"
                       />
-                      <span className="text-xs text-primary-900/60">평</span>
+                      <span className="text-xs text-black/60">평</span>
                     </div>
-                    <p className="mt-1.5 text-[0.7rem] text-primary-900/50">
+                    <p className="mt-1.5 text-[0.7rem] text-black/50">
                       약 {Math.round((quickPyeong || 0) * 3.3058 * 10) / 10}m²
                     </p>
                   </div>
@@ -778,7 +778,7 @@ export default function WorkflowPage() {
                       if (quickMode) setQuickMode(null);
                       else setQuickOpen(false);
                     }}
-                    className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+                    className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
                   >
                     {quickMode ? "이전" : "취소"}
                   </button>
@@ -787,7 +787,7 @@ export default function WorkflowPage() {
                       type="button"
                       onClick={startQuickPhotoFlow}
                       disabled={!quickPyeong || quickPyeong < 5}
-                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40"
+                      className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-black to-black px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-40"
                     >
                       <Sparkles className="h-4 w-4" />
                       AI 상담 시작

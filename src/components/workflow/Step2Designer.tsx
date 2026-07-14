@@ -1388,7 +1388,7 @@ export default function Step2Designer({
   return (
     // 캡처 레퍼런스 레이아웃: 좌측 베이지 사이드바 + 메인 흰색(#F8F9F6) 캔버스
     // 채팅 무한 늘어남 X — 화면 높이 고정, 메시지 영역만 스크롤
-    <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-[#eeece8] p-3 lg:grid-cols-[268px_1fr]">
+    <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-[#f7f7f5] p-3 lg:grid-cols-[268px_1fr]">
       {/* ─── 좌측 툴바 (베이지 톤 — 대표 지시) ─── */}
       <aside className="flex flex-col gap-3">
         {/* 대표 거실 디자인 생성 — 좌측 상단 (방 선택 위) */}
@@ -1466,7 +1466,7 @@ export default function Step2Designer({
                     }}
                     className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all ${
                       isGeneratingThis
-                        ? "animate-pulse bg-primary-500 text-white ring-2 ring-primary-200 ring-offset-1"
+                        ? "animate-pulse bg-black text-white ring-2 ring-black/10 ring-offset-1"
                         : sel
                         ? isAll
                           ? "bg-black text-white"
@@ -1498,7 +1498,7 @@ export default function Step2Designer({
                     ) : decided ? (
                       <span
                         className={`text-[0.6rem] font-bold tabular px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
-                          sel ? "bg-white/25 text-white" : "bg-emerald-100 text-emerald-700"
+                          sel ? "bg-white/25 text-white" : "bg-[#f7f7f5] text-black"
                         }`}
                       >
                         <Check className="h-2 w-2" strokeWidth={3} />
@@ -1515,7 +1515,7 @@ export default function Step2Designer({
                         removeCustomTab(t.v);
                         if (sel) setActiveRoom(availableTabs[0]?.v ?? "living");
                       }}
-                      className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-red-600 shadow"
+                      className="absolute -right-1.5 -top-1.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black text-white opacity-100 sm:opacity-0 sm:group-hover:opacity-100 hover:bg-black shadow"
                       title="실 삭제"
                     >
                       <X className="h-3 w-3" />
@@ -1529,26 +1529,26 @@ export default function Step2Designer({
                         initial={{ opacity: 0, x: -8 }}
                         animate={{ opacity: 1, x: 0 }}
                         exit={{ opacity: 0, x: -8 }}
-                        className="absolute left-0 top-full mt-2 sm:left-full sm:top-0 sm:ml-3 sm:mt-0 z-30 min-w-[200px] max-w-[80vw] rounded-xl border border-primary-200 bg-white p-3 shadow-card-hover"
+                        className="absolute left-0 top-full mt-2 sm:left-full sm:top-0 sm:ml-3 sm:mt-0 z-30 min-w-[200px] max-w-[80vw] rounded-xl border border-black/10 bg-white p-3 shadow-card-hover"
                       >
-                        <div className="hidden sm:block absolute left-0 top-3 -translate-x-1 h-2 w-2 rotate-45 bg-white border-l border-b border-primary-200" />
+                        <div className="hidden sm:block absolute left-0 top-3 -translate-x-1 h-2 w-2 rotate-45 bg-white border-l border-b border-black/10" />
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-bold text-primary-700">{t.label}</p>
+                          <p className="text-xs font-bold text-black">{t.label}</p>
                           <button onClick={() => setOpenRoomPopup(null)}>
-                            <X className="h-3 w-3 text-primary-900/40 hover:text-primary-900" />
+                            <X className="h-3 w-3 text-black/40 hover:text-black" />
                           </button>
                         </div>
-                        <p className="text-sm font-bold text-primary-900">
+                        <p className="text-sm font-bold text-black">
                           {count > 0 ? (
                             <>
-                              <span className="text-emerald-600">{count}</span>
-                              <span className="text-primary-900/50 ml-1">장 생성됨</span>
+                              <span className="text-black">{count}</span>
+                              <span className="text-black/50 ml-1">장 생성됨</span>
                             </>
                           ) : (
-                            <span className="text-primary-900/40">아직 미생성</span>
+                            <span className="text-black/40">아직 미생성</span>
                           )}
                         </p>
-                        <p className="mt-1 text-[0.7rem] text-primary-900/60 tabular">
+                        <p className="mt-1 text-[0.7rem] text-black/60 tabular">
                           치수 ·{" "}
                           {(() => {
                             const d = roomDims[t.dimKey];
@@ -1603,7 +1603,7 @@ export default function Step2Designer({
         <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <div className="flex items-center justify-between">
             <p className="text-xs font-semibold text-black">보유 토큰</p>
-            <span className="text-lg tabular font-semibold text-primary-500">
+            <span className="text-lg tabular font-semibold text-black">
               ⬢ {tokenBalance}
             </span>
           </div>
@@ -1625,7 +1625,7 @@ export default function Step2Designer({
             }}
           />
           <div className="flex items-start gap-2">
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-500">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7f7f5] text-black">
               <Crosshair className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -1723,7 +1723,7 @@ export default function Step2Designer({
                     initial={{ width: 0 }}
                     animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
                     transition={{ duration: 0.5 }}
-                    className="h-full bg-primary-500"
+                    className="h-full bg-black"
                   />
                 </div>
                 <button
@@ -1758,40 +1758,40 @@ export default function Step2Designer({
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/[0.06] bg-[#f7f7f5] px-5 py-2 text-[0.7rem] text-black/55">
               {basicInfo.selectedAddress?.roadAddress && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-primary-900/40">주소</span>
-                  <span className="font-medium text-primary-900">
+                  <span className="text-black/40">주소</span>
+                  <span className="font-medium text-black">
                     {basicInfo.selectedAddress.roadAddress}
                   </span>
                 </span>
               )}
               {basicInfo.selectedComplex?.complexName && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-primary-900/40">단지</span>
-                  <span className="font-medium text-primary-900">
+                  <span className="text-black/40">단지</span>
+                  <span className="font-medium text-black">
                     {basicInfo.selectedComplex.complexName}
                   </span>
                 </span>
               )}
               {basicInfo.selectedPyeong && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-primary-900/40">평형</span>
-                  <span className="font-medium text-primary-900">
+                  <span className="text-black/40">평형</span>
+                  <span className="font-medium text-black">
                     {basicInfo.selectedPyeong.pyeongName}형 · {basicInfo.selectedPyeong.exclusiveArea}㎡
                   </span>
                 </span>
               )}
               {basicInfo.expansionType && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-primary-900/40">발코니</span>
-                  <span className="font-medium text-primary-900">
+                  <span className="text-black/40">발코니</span>
+                  <span className="font-medium text-black">
                     {basicInfo.expansionType === "extended" ? "확장형" : "기본형"}
                   </span>
                 </span>
               )}
               {typeof basicInfo.budget === "number" && basicInfo.budget > 0 && (
                 <span className="inline-flex items-center gap-1">
-                  <span className="text-primary-900/40">예산</span>
-                  <span className="font-medium text-primary-900">
+                  <span className="text-black/40">예산</span>
+                  <span className="font-medium text-black">
                     {basicInfo.budget.toLocaleString()}만원
                   </span>
                 </span>
@@ -1807,8 +1807,8 @@ export default function Step2Designer({
               <div
                 className={`px-5 py-2 border-b text-[0.7rem] ${
                   lowConf
-                    ? "bg-amber-50/80 border-amber-200/60 text-amber-900"
-                    : "bg-emerald-50/60 border-emerald-200/60 text-emerald-900"
+                    ? "bg-[#f7f7f5]/80 border-black/10 text-black"
+                    : "bg-[#f7f7f5]/60 border-black/10 text-black"
                 }`}
               >
                 <div className="flex items-center gap-2 flex-wrap">
@@ -1830,11 +1830,11 @@ export default function Step2Designer({
           {/* 채팅 헤더 (단조롭게 — 캡처 레퍼런스 스타일) */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-black/[0.06] bg-white px-5 py-3">
             <div className="flex items-center gap-2 min-w-0">
-              <Sparkles className="h-4 w-4 text-primary-500 shrink-0" />
+              <Sparkles className="h-4 w-4 text-black shrink-0" />
               <p className="truncate text-sm font-semibold text-black">
                 {ROOM_TABS.find((t) => t.v === activeRoom)?.label} · AI 디자인 챗
               </p>
-              <span className="hidden sm:inline text-[0.65rem] text-primary-900/50 tabular ml-1">
+              <span className="hidden sm:inline text-[0.65rem] text-black/50 tabular ml-1">
                 {activeRoom === "all" ? `${realRoomTabs.length}개 방` : (
                   (() => {
                     const tab = ROOM_TABS.find((t) => t.v === activeRoom);
@@ -1878,27 +1878,27 @@ export default function Step2Designer({
             {!hasGenerated && !generating && !(chatMode && chatMessages.length > 0) && (
               <div className="h-full flex items-center justify-center min-h-[40vh]">
                 <div className="text-center max-w-md">
-                  <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-50 text-primary-500 mb-4">
+                  <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f7f7f5] text-black mb-4">
                     <Sparkles className="h-8 w-8" />
                   </div>
-                  <h3 className="text-2xl font-extrabold tracking-tight text-primary-900">
+                  <h3 className="text-2xl font-extrabold tracking-tight text-black">
                     {chatMode
                       ? "어떤 공간을 꾸미고 싶으세요?"
                       : activeRoom === "all"
                         ? "전체 컨셉을 한 번에 만들어볼까요?"
                         : "무엇을 만들고 싶으세요?"}
                   </h3>
-                  <p className="mt-2 text-sm text-primary-900/60 leading-relaxed">
+                  <p className="mt-2 text-sm text-black/60 leading-relaxed">
                     {chatMode ? (
                       <>
                         AI 상담사와 4~5턴 대화하면 핵심 정보를 모아
                         <br />
-                        <span className="font-bold text-primary-700">한번에 디자인을 생성</span>해
+                        <span className="font-bold text-black">한번에 디자인을 생성</span>해
                         드립니다.
                       </>
                     ) : activeRoom === "all" ? (
                       <>
-                        먼저 <span className="font-bold text-primary-700">거실 대표 이미지 1장</span>을
+                        먼저 <span className="font-bold text-black">거실 대표 이미지 1장</span>을
                         생성합니다.
                         <br />
                         다른 공간은 원하는 이미지만 1토큰으로 열 수 있어요.
@@ -1908,7 +1908,7 @@ export default function Step2Designer({
                         스타일·자재·분위기를 자유롭게 적어주세요.
                         <br />
                         또는 좌측{" "}
-                        <span className="font-bold text-primary-700">전체 인테리어 이미지 한번에 생성</span>{" "}
+                        <span className="font-bold text-black">전체 인테리어 이미지 한번에 생성</span>{" "}
                         프리셋을 클릭하세요.
                       </>
                     )}
@@ -1918,7 +1918,7 @@ export default function Step2Designer({
                       <button
                         key={p}
                         onClick={() => setPrompt(currentPrompt ? `${currentPrompt}, ${p}` : p)}
-                        className="rounded-full border border-primary-200 bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 hover:bg-primary-50 hover:border-primary-400"
+                        className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#f7f7f5] hover:border-black/10"
                       >
                         + {p}
                       </button>
@@ -1937,8 +1937,8 @@ export default function Step2Designer({
                 <div
                   className={`max-w-md rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${
                     m.role === "user"
-                      ? "bg-primary-500 text-white rounded-tr-sm"
-                      : "bg-primary-50 text-primary-900 rounded-tl-sm border border-primary-100"
+                      ? "bg-black text-white rounded-tr-sm"
+                      : "bg-[#f7f7f5] text-black rounded-tl-sm border border-black/10"
                   }`}
                 >
                   {/* 첨부 이미지 (user 메시지) */}
@@ -1970,7 +1970,7 @@ export default function Step2Designer({
             ))}
             {chatMode && chatStreaming && chatMessages[chatMessages.length - 1]?.content === "" && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-tl-sm bg-primary-50 border border-primary-100 px-4 py-2.5 text-sm text-primary-900/70 inline-flex items-center gap-2">
+                <div className="rounded-2xl rounded-tl-sm bg-[#f7f7f5] border border-black/10 px-4 py-2.5 text-sm text-black/70 inline-flex items-center gap-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   AI 상담 중…
                 </div>
@@ -1982,7 +1982,7 @@ export default function Step2Designer({
               <div key={i} className="space-y-2">
                 {/* 사용자 메시지 — 내부 기술 프롬프트는 숨기고 친화적 라벨로 대체 */}
                 <div className="flex justify-end">
-                  <div className="max-w-md rounded-2xl rounded-tr-sm bg-primary-500 text-white px-4 py-2.5 text-sm shadow-sm">
+                  <div className="max-w-md rounded-2xl rounded-tr-sm bg-black text-white px-4 py-2.5 text-sm shadow-sm">
                     {isInternalRenderPrompt(r.prompt) ? "AI 추천 스타일로 디자인 생성" : r.prompt}
                   </div>
                 </div>
@@ -2009,8 +2009,8 @@ export default function Step2Designer({
                     }}
                     className={`group relative rounded-2xl rounded-tl-sm overflow-hidden border-2 transition-all ${
                       i === selectedIdx
-                        ? "border-primary-500 ring-2 ring-primary-200"
-                        : "border-primary-100 hover:border-primary-300"
+                        ? "border-black/10 ring-2 ring-black/10"
+                        : "border-black/10 hover:border-black/10"
                     }`}
                   >
                     <img
@@ -2018,11 +2018,11 @@ export default function Step2Designer({
                       alt={`design-${i}`}
                       className="block w-56 h-56 object-cover"
                     />
-                    <div className="absolute bottom-1.5 left-1.5 rounded-full bg-white/90 px-2 py-0.5 text-[0.65rem] font-bold tabular text-primary-900 backdrop-blur">
+                    <div className="absolute bottom-1.5 left-1.5 rounded-full bg-white/90 px-2 py-0.5 text-[0.65rem] font-bold tabular text-black backdrop-blur">
                       #{String(i + 1).padStart(2, "0")}
                     </div>
                     {r.refinedUrl && (
-                      <div className="absolute top-1.5 right-1.5 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.6rem] font-bold text-white">
+                      <div className="absolute top-1.5 right-1.5 rounded-full bg-black px-2 py-0.5 text-[0.6rem] font-bold text-white">
                         ✓ HD
                       </div>
                     )}
@@ -2034,10 +2034,10 @@ export default function Step2Designer({
             {/* 생성 중 — 게이지 */}
             {generating && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-tl-sm bg-primary-50 border border-primary-100 px-5 py-4 max-w-md">
+                <div className="rounded-2xl rounded-tl-sm bg-[#f7f7f5] border border-black/10 px-5 py-4 max-w-md">
                   <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin text-primary-500" />
-                    <p className="text-sm font-bold text-primary-900">
+                    <Loader2 className="h-4 w-4 animate-spin text-black" />
+                    <p className="text-sm font-bold text-black">
                       {bulkProgress
                         ? `${bulkProgress.roomLabel || "방"} 생성 중… (${bulkProgress.current}/${bulkProgress.total})`
                         : "AI 디자인 생성 중…"}
@@ -2051,10 +2051,10 @@ export default function Step2Designer({
                           : `${progress}%`,
                       }}
                       transition={{ duration: 0.3 }}
-                      className="h-full bg-gradient-to-r from-primary-500 to-amber-400"
+                      className="h-full bg-gradient-to-r from-black to-black"
                     />
                   </div>
-                  <p className="mt-1.5 text-[0.7rem] text-primary-900/60">
+                  <p className="mt-1.5 text-[0.7rem] text-black/60">
                     {bulkProgress ? (
                       <>
                         <span className="tabular font-bold">{bulkProgress.current}/{bulkProgress.total}</span> 방 완료
@@ -2082,14 +2082,14 @@ export default function Step2Designer({
                 ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
                 : "대화 충분 — 언제든 디자인 생성 가능";
             return (
-              <div className="px-4 py-3 border-t border-amber-200/60 bg-[#F8F9F6]">
+              <div className="px-4 py-3 border-t border-black/10 bg-[#F8F9F6]">
                 <button
                   type="button"
                   onClick={handleChatToImage}
                   disabled={!canGenerate}
                   className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-base font-bold shadow-cta transition-all ${
                     canGenerate
-                      ? "bg-gradient-to-r from-primary-500 to-amber-500 text-white hover:opacity-95 ring-2 ring-amber-300"
+                      ? "bg-gradient-to-r from-black to-black text-white hover:opacity-95 ring-2 ring-black/10"
                       : "bg-zinc-300 text-zinc-500 cursor-not-allowed"
                   }`}
                 >
@@ -2115,7 +2115,7 @@ export default function Step2Designer({
                     </>
                   )}
                 </button>
-                <p className="mt-1.5 text-[0.7rem] text-amber-900/70 text-center">
+                <p className="mt-1.5 text-[0.7rem] text-black/70 text-center">
                   💡 {helperText}
                 </p>
               </div>
@@ -2123,14 +2123,14 @@ export default function Step2Designer({
           })()}
 
           {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
-          <div className="border-t border-amber-100/40 bg-[#F8F9F6] p-4">
+          <div className="border-t border-black/10 bg-[#F8F9F6] p-4">
             {/* 첨부 이미지 미리보기 (chat 모드에서만) */}
             {chatMode && pendingAttachments.length > 0 && (
               <div className="mx-auto max-w-3xl mb-2 flex flex-wrap gap-1.5">
                 {pendingAttachments.map((img, idx) => (
                   <div
                     key={idx}
-                    className="relative h-16 w-16 rounded-lg overflow-hidden border border-amber-200 bg-white shadow-sm"
+                    className="relative h-16 w-16 rounded-lg overflow-hidden border border-black/10 bg-white shadow-sm"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -2151,21 +2151,21 @@ export default function Step2Designer({
               </div>
             )}
             {chatMode && attachmentError && (
-              <p className="mx-auto max-w-3xl mb-2 text-[0.7rem] text-amber-700 flex items-center gap-1">
+              <p className="mx-auto max-w-3xl mb-2 text-[0.7rem] text-black flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
                 {attachmentError}
               </p>
             )}
             {/* 참고 사진 첨부 안내 (chat 모드, 첨부 없을 때) — 업로드 가능함을 명확히 */}
             {chatMode && pendingAttachments.length === 0 && (
-              <p className="mx-auto max-w-3xl mb-1.5 flex items-center gap-1.5 text-[0.7rem] text-primary-900/50">
-                <ImagePlus className="h-3.5 w-3.5 text-amber-500" />
+              <p className="mx-auto max-w-3xl mb-1.5 flex items-center gap-1.5 text-[0.7rem] text-black/50">
+                <ImagePlus className="h-3.5 w-3.5 text-black" />
                 마음에 드는 인테리어 사진을 첨부하면 AI가 더 정확하게 추천해요 — 클립을 누르거나 여기로 끌어다 놓으세요
               </p>
             )}
             <div
               className={`mx-auto max-w-3xl flex items-end gap-2 rounded-2xl transition ${
-                isDraggingFile && chatMode ? "ring-2 ring-amber-400 ring-offset-2 bg-amber-50/40" : ""
+                isDraggingFile && chatMode ? "ring-2 ring-black/10 ring-offset-2 bg-[#f7f7f5]/40" : ""
               }`}
               onDragOver={(e) => {
                 if (!chatMode) return;
@@ -2195,7 +2195,7 @@ export default function Step2Designer({
                     type="button"
                     onClick={() => chatFileInputRef.current?.click()}
                     disabled={chatStreaming || pendingAttachments.length >= 4}
-                    className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full border border-amber-200 bg-white text-amber-700 shadow-sm hover:bg-amber-50 disabled:opacity-40 transition"
+                    className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-sm hover:bg-[#f7f7f5] disabled:opacity-40 transition"
                     aria-label="사진 첨부"
                     title="사진 첨부 (최대 4장 · 8MB 이하)"
                   >
@@ -2203,7 +2203,7 @@ export default function Step2Designer({
                   </button>
                 </>
               )}
-              <div className="flex-1 rounded-full border border-amber-200/70 bg-white px-5 py-3 shadow-sm focus-within:border-amber-300 focus-within:ring-2 focus-within:ring-amber-100">
+              <div className="flex-1 rounded-full border border-black/10 bg-white px-5 py-3 shadow-sm focus-within:border-black/10 focus-within:ring-2 focus-within:ring-black/10">
                 <textarea
                   value={currentPrompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -2226,7 +2226,7 @@ export default function Step2Designer({
                           : "원하는 스타일·자재·분위기를 입력하세요. (Shift+Enter 줄바꿈)"
                   }
                   rows={hasGenerated || chatMode ? 1 : 2}
-                  className="w-full resize-none bg-transparent text-sm text-primary-900 outline-none placeholder:text-primary-900/40"
+                  className="w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-black/40"
                 />
               </div>
               <button
@@ -2240,8 +2240,8 @@ export default function Step2Designer({
                 aria-label={chatMode ? "메시지 전송" : "이미지 생성"}
                 className={`shrink-0 inline-flex items-center justify-center rounded-full text-white shadow-md hover:opacity-95 disabled:opacity-30 transition-all ${
                   chatMode
-                    ? "h-12 w-12 bg-gradient-to-br from-amber-500 to-amber-700"
-                    : "h-12 gap-1.5 bg-gradient-to-br from-primary-500 to-primary-700 px-5 text-sm font-bold"
+                    ? "h-12 w-12 bg-gradient-to-br from-black to-black"
+                    : "h-12 gap-1.5 bg-gradient-to-br from-black to-black px-5 text-sm font-bold"
                 }`}
               >
                 {chatMode ? (
@@ -2272,15 +2272,15 @@ export default function Step2Designer({
                   <>
                     <Send className="h-3.5 w-3.5" />
                     <span>새 이미지 생성</span>
-                    <span className="rounded bg-amber-400/40 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
-                      <Hexagon className="h-2.5 w-2.5 fill-amber-600" />{activeRoomIsLiving ? 5 : 1}
+                    <span className="rounded bg-black/10 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
+                      <Hexagon className="h-2.5 w-2.5 fill-black" />{activeRoomIsLiving ? 5 : 1}
                     </span>
                   </>
                 )}
               </button>
             </div>
             {errorMsg && (
-              <div className="mt-2 flex items-start gap-1.5 text-[0.78rem] text-amber-700 leading-relaxed">
+              <div className="mt-2 flex items-start gap-1.5 text-[0.78rem] text-black leading-relaxed">
                 <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                 <span className="whitespace-pre-wrap">{errorMsg}</span>
               </div>
@@ -2294,7 +2294,7 @@ export default function Step2Designer({
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="absolute inset-3 rounded-2xl overflow-hidden bg-gradient-to-br from-primary-50 via-white to-amber-50 border-2 border-primary-300 shadow-2xl pointer-events-auto"
+                className="absolute inset-3 rounded-2xl overflow-hidden bg-gradient-to-br from-[#f7f7f5] via-white to-[#f7f7f5] border-2 border-black/10 shadow-2xl pointer-events-auto"
                 style={{ zIndex: 25 }}
               >
                 {/* 이전 이미지 (있으면 흐림 배경으로) */}
@@ -2319,21 +2319,21 @@ export default function Step2Designer({
                     <motion.div
                       animate={{ rotate: 360 }}
                       transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-                      className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-primary-500 to-amber-500 text-white shadow-cta"
+                      className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-black to-black text-white shadow-cta"
                     >
                       <Sparkles className="h-10 w-10" />
                     </motion.div>
-                    <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-primary-900">
+                    <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-black">
                       {bulkProgress
                         ? `${bulkProgress.roomLabel || "방"} AI 디자인 생성 중`
                         : "AI 디자인 생성 중"}
                     </h3>
-                    <p className="mt-2 text-sm text-primary-900/70 leading-relaxed">
+                    <p className="mt-2 text-sm text-black/70 leading-relaxed">
                       {bulkProgress ? (
                         <>
                           대표 거실 이미지를 생성하고 있습니다.
                           <br />
-                          <span className="font-bold text-primary-700 tabular">
+                          <span className="font-bold text-black tabular">
                             {bulkProgress.current}/{bulkProgress.total}
                           </span>
                           {" "}완료 — 잠시만 기다려주세요.
@@ -2342,12 +2342,12 @@ export default function Step2Designer({
                         <>
                           평면도·자재·치수를 분석해서
                           <br />
-                          <span className="font-bold text-primary-700">고해상도 인테리어 이미지</span>를 만들고 있어요.
+                          <span className="font-bold text-black">고해상도 인테리어 이미지</span>를 만들고 있어요.
                         </>
                       )}
                     </p>
                     <div className="mt-6 mx-auto max-w-xs">
-                      <div className="h-2.5 rounded-full bg-white/80 overflow-hidden shadow-inner border border-primary-100">
+                      <div className="h-2.5 rounded-full bg-white/80 overflow-hidden shadow-inner border border-black/10">
                         <motion.div
                           animate={{
                             width: bulkProgress
@@ -2355,16 +2355,16 @@ export default function Step2Designer({
                               : `${progress}%`,
                           }}
                           transition={{ duration: 0.4 }}
-                          className="h-full bg-gradient-to-r from-primary-500 to-amber-500"
+                          className="h-full bg-gradient-to-r from-black to-black"
                         />
                       </div>
-                      <p className="mt-2 text-xs font-bold tabular text-primary-700">
+                      <p className="mt-2 text-xs font-bold tabular text-black">
                         {bulkProgress
                           ? `${Math.round((bulkProgress.current / Math.max(1, bulkProgress.total)) * 100)}%`
                           : `${Math.round(progress)}%`}
                       </p>
                     </div>
-                    <div className="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-primary-900/60">
+                    <div className="mt-5 flex items-center justify-center gap-1.5 text-[0.7rem] text-black/60">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       <span>보통 20~40초 소요</span>
                     </div>
@@ -2381,12 +2381,12 @@ export default function Step2Designer({
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.96 }}
-                className="absolute inset-3 rounded-2xl overflow-hidden bg-white border border-primary-200 shadow-2xl pointer-events-auto"
+                className="absolute inset-3 rounded-2xl overflow-hidden bg-white border border-black/10 shadow-2xl pointer-events-auto"
                 style={{ zIndex: 20 }}
               >
                 <button
                   onClick={() => setImageMinimized(true)}
-                  className="absolute top-3 right-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 backdrop-blur border border-primary-200 text-primary-700 hover:bg-primary-50 shadow"
+                  className="absolute top-3 right-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 backdrop-blur border border-black/10 text-black hover:bg-[#f7f7f5] shadow"
                   title="우측으로 작게"
                 >
                   <Minimize2 className="h-3.5 w-3.5" />
@@ -2406,7 +2406,7 @@ export default function Step2Designer({
                   className="absolute inset-0 w-full h-full object-cover"
                 />
                 {activeRender.refinedUrl && (
-                  <div className="absolute top-3 left-3 rounded-full bg-emerald-500 px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
+                  <div className="absolute top-3 left-3 rounded-full bg-black px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
                     ✓ 고화질 재렌더
                   </div>
                 )}
@@ -2430,7 +2430,7 @@ export default function Step2Designer({
                 )}
                 {activeRender.metadata?.renderSpecKind === "text_only" &&
                   !activeRender.metadata?.floorplanUsed && (
-                    <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-amber-500 px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
+                    <div className="absolute bottom-3 left-3 inline-flex items-center gap-1 rounded-full bg-black px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
                       ⚠️ 도면 없이 생성됨
                     </div>
                   )}
@@ -2504,7 +2504,7 @@ export default function Step2Designer({
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
               onClick={() => setImageMinimized(false)}
-              className="fixed right-6 top-24 z-30 h-32 w-32 rounded-xl border-2 border-primary-500 overflow-hidden shadow-2xl bg-white hover:scale-105 transition-transform"
+              className="fixed right-6 top-24 z-30 h-32 w-32 rounded-xl border-2 border-black/10 overflow-hidden shadow-2xl bg-white hover:scale-105 transition-transform"
               title="중앙 큰 보기로"
             >
               <img
@@ -2512,7 +2512,7 @@ export default function Step2Designer({
                 alt="mini"
                 className="absolute inset-0 w-full h-full object-cover"
               />
-              <div className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-primary-700">
+              <div className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-black">
                 <Maximize2 className="h-2.5 w-2.5" />
               </div>
               <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[0.6rem] font-bold p-1 text-center">
@@ -2540,12 +2540,12 @@ export default function Step2Designer({
                     });
                     setVisionPickerOpen(true);
                   }}
-                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-emerald-500 to-primary-500 text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
+                  className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-black to-black text-white text-xs font-bold px-4 py-2 shadow hover:opacity-95 transition"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
                   부위별 자재 분석 재실행
                 </button>
-                <span className="text-[0.65rem] text-primary-900/60">
+                <span className="text-[0.65rem] text-black/60">
                   이미지 생성 시 자동 분석이 진행됩니다. 결과를 다시 보거나 특정 부위를 재분석할 때 사용하세요.
                 </span>
               </div>
@@ -2560,13 +2560,13 @@ export default function Step2Designer({
               />
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-primary-200 bg-primary-50/40 p-5 text-center">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[0.65rem] font-bold tracking-widest text-primary-500 border border-primary-200">
+            <div className="mt-4 rounded-2xl border border-dashed border-black/10 bg-[#f7f7f5]/40 p-5 text-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[0.65rem] font-bold tracking-widest text-black border border-black/10">
                 <Sparkles className="h-3 w-3" />
                 서비스 준비 중
               </span>
-              <p className="mt-3 text-sm font-bold text-primary-900">부위별 자재 수정 · 견적 산출</p>
-              <p className="mt-1 text-xs leading-relaxed text-primary-900/60">
+              <p className="mt-3 text-sm font-bold text-black">부위별 자재 수정 · 견적 산출</p>
+              <p className="mt-1 text-xs leading-relaxed text-black/60">
                 더 정확한 부위 인식과 자재 매칭을 위해 개선 작업 중이에요.
                 <br />
                 준비가 끝나면 이 자리에서 바로 사용하실 수 있습니다.
@@ -2614,7 +2614,7 @@ export default function Step2Designer({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setMaterialEditorOpen(false)}
-              className="fixed inset-0 z-[70] bg-primary-900/65 backdrop-blur-md"
+              className="fixed inset-0 z-[70] bg-black/65 backdrop-blur-md"
             />
             <motion.section
               initial={{ opacity: 0, scale: 0.97, y: 18 }}
@@ -2622,18 +2622,18 @@ export default function Step2Designer({
               exit={{ opacity: 0, scale: 0.97, y: 18 }}
               className="fixed inset-2 z-[71] overflow-y-auto rounded-[24px] border border-white/30 bg-[#FFFDFC] shadow-2xl sm:inset-5 lg:inset-8"
             >
-              <header className="sticky top-0 z-10 flex items-center justify-between border-b border-primary-100 bg-white/95 px-5 py-4 backdrop-blur">
+              <header className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white/95 px-5 py-4 backdrop-blur">
                 <div>
-                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-primary-500">Material edit</p>
-                  <h2 className="mt-0.5 text-lg font-extrabold tracking-tight text-primary-900">
+                  <p className="text-[0.65rem] font-bold uppercase tracking-[0.2em] text-black">Material edit</p>
+                  <h2 className="mt-0.5 text-lg font-extrabold tracking-tight text-black">
                     {ROOM_TABS.find((t) => t.v === activeRoom)?.label || activeRoom} · 부위별 자재 수정
                   </h2>
-                  <p className="mt-1 text-xs text-primary-900/55">이미지에서 바닥·벽을 클릭하고 경계를 확인한 뒤 자재를 선택하세요.</p>
+                  <p className="mt-1 text-xs text-black/55">이미지에서 바닥·벽을 클릭하고 경계를 확인한 뒤 자재를 선택하세요.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => setMaterialEditorOpen(false)}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-primary-200 bg-white text-primary-900 hover:bg-primary-50"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black hover:bg-[#f7f7f5]"
                   aria-label="자재 수정 닫기"
                 >
                   <X className="h-4 w-4" />
@@ -2665,10 +2665,10 @@ export default function Step2Designer({
               <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-danger-bg text-danger-text">
                 <Hexagon className="h-6 w-6" />
               </div>
-              <h3 className="mt-4 text-lg font-extrabold tracking-tight text-primary-900">
+              <h3 className="mt-4 text-lg font-extrabold tracking-tight text-black">
                 토큰이 부족합니다
               </h3>
-              <p className="mt-2 text-sm text-primary-900/70">
+              <p className="mt-2 text-sm text-black/70">
                 영역 선택은 무료이며 실제 자재 재렌더에는 2토큰이 필요합니다.
                 <br />
                 현재 보유: <span className="font-bold">{tokenBalance}</span>
@@ -2676,13 +2676,13 @@ export default function Step2Designer({
               <div className="mt-6 flex gap-2">
                 <button
                   onClick={() => setInsufficientOpen(false)}
-                  className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+                  className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
                 >
                   나중에
                 </button>
                 <a
                   href="/account/tokens?return=/workflow"
-                  className="flex-1 rounded-full bg-primary-500 px-4 py-2.5 text-center text-sm font-semibold text-white shadow-cta hover:bg-primary-600"
+                  className="flex-1 rounded-full bg-black px-4 py-2.5 text-center text-sm font-semibold text-white shadow-cta hover:bg-black"
                 >
                   토큰 충전하기
                 </a>
@@ -2705,13 +2705,13 @@ function Modal({ children, onClose }: { children: React.ReactNode; onClose: () =
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
       />
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-sm max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-primary-100 bg-white p-7 shadow-card-hover"
+        className="fixed left-1/2 top-1/2 z-[81] w-[calc(100%-2rem)] max-w-sm max-h-[92vh] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-[28px] border border-black/10 bg-white p-7 shadow-card-hover"
       >
         {children}
       </motion.div>

@@ -256,14 +256,14 @@ export default function MaterialEditor({
   };
 
   return (
-    <div className="mt-6 rounded-2xl border border-primary-100 bg-primary-50/30 p-5">
+    <div className="mt-6 rounded-2xl border border-black/10 bg-[#f7f7f5]/30 p-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <p className="text-sm font-bold tracking-tight text-primary-900 inline-flex items-center gap-2">
-            <Edit3 className="h-4 w-4 text-primary-500" />
+          <p className="text-sm font-bold tracking-tight text-black inline-flex items-center gap-2">
+            <Edit3 className="h-4 w-4 text-black" />
             자재 수정 + 견적 산출
           </p>
-          <p className="mt-0.5 text-[0.72rem] text-primary-900/50">
+          <p className="mt-0.5 text-[0.72rem] text-black/50">
             {editMode === "auto"
               ? "전체 영역 자동 분석 → 영역별 자재 선택 → 2토큰 재렌더"
               : "원하는 부위 클릭 → 경계 확인·보정 → 2토큰 재렌더"}
@@ -271,14 +271,14 @@ export default function MaterialEditor({
         </div>
 
         {/* 모드 토글 */}
-        <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-white p-0.5 text-[0.7rem] font-bold">
+        <div className="inline-flex items-center gap-0.5 rounded-full border border-black/10 bg-white p-0.5 text-[0.7rem] font-bold">
           <button
             type="button"
             onClick={() => setEditMode("auto")}
             className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
               editMode === "auto"
-                ? "bg-primary-500 text-white"
-                : "text-primary-900/60 hover:text-primary-900"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
             }`}
           >
             <Grid3x3 className="h-3 w-3" /> 전체 분석
@@ -288,8 +288,8 @@ export default function MaterialEditor({
             onClick={() => setEditMode("sam")}
             className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
               editMode === "sam"
-                ? "bg-primary-500 text-white"
-                : "text-primary-900/60 hover:text-primary-900"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
             }`}
           >
             <Crosshair className="h-3 w-3" /> 부위 선택 (정밀)
@@ -300,7 +300,7 @@ export default function MaterialEditor({
           <button
             onClick={handleExtract}
             disabled={extracting}
-            className="inline-flex items-center gap-1.5 rounded-full bg-primary-500 px-4 py-2 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-60"
+            className="inline-flex items-center gap-1.5 rounded-full bg-black px-4 py-2 text-sm font-bold text-white shadow-cta hover:bg-black disabled:opacity-60"
           >
             {extracting ? (
               <>
@@ -331,30 +331,30 @@ export default function MaterialEditor({
       )}
 
       {extracting && (
-        <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/50 p-6 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-          <p className="mt-3 text-sm font-bold text-primary-900">
+        <div className="mt-4 rounded-xl border border-black/10 bg-[#f7f7f5]/50 p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-black mx-auto" />
+          <p className="mt-3 text-sm font-bold text-black">
             자재 영역 분석 중 — 잠시만 기다려주세요
           </p>
-          <p className="mt-1 text-xs text-primary-900/60">
+          <p className="mt-1 text-xs text-black/60">
             바닥 / 벽 / 천장 / 창호 / 가구 영역을 자동으로 인식하고 있습니다 (5~30초)
           </p>
         </div>
       )}
       {refining && (
-        <div className="mt-4 rounded-xl border border-primary-300 bg-primary-50 p-6 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-          <p className="mt-3 text-sm font-bold text-primary-900">
+        <div className="mt-4 rounded-xl border border-black/10 bg-[#f7f7f5] p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-black mx-auto" />
+          <p className="mt-3 text-sm font-bold text-black">
             고화질 재렌더 중 — 잠시만 기다려주세요
           </p>
-          <p className="mt-1 text-xs text-primary-900/60">
+          <p className="mt-1 text-xs text-black/60">
             선택한 영역만 새 자재로 다시 생성 (가구·조명·창문은 그대로 유지) · 약 40~80초
           </p>
         </div>
       )}
 
       {error && (
-        <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap">
+        <div className="mt-3 rounded-lg bg-[#f7f7f5] border border-black/10 px-3 py-2 text-xs text-black whitespace-pre-wrap">
           {error}
         </div>
       )}
@@ -362,18 +362,18 @@ export default function MaterialEditor({
       {editMode === "auto" && segmentation && (
         <>
           {/* 진행 상태 */}
-          <div className="mt-4 flex items-center justify-between text-[0.7rem] text-primary-900/60">
+          <div className="mt-4 flex items-center justify-between text-[0.7rem] text-black/60">
             <span>
               영역 {segmentation.total_regions}개 (시공 가능 {replaceableCount}개)
             </span>
             <span>
-              자재 선택: <strong className="text-emerald-600">{decidedCount}</strong> / {replaceableCount}
+              자재 선택: <strong className="text-black">{decidedCount}</strong> / {replaceableCount}
             </span>
           </div>
 
           <div className="mt-3 grid gap-4 lg:grid-cols-2">
             {/* 좌: 클릭 가능 SVG 오버레이 이미지 */}
-            <div className="relative aspect-square overflow-hidden rounded-xl border border-primary-100 bg-white">
+            <div className="relative aspect-square overflow-hidden rounded-xl border border-black/10 bg-white">
               <img
                 src={renderItem.refinedUrl || renderItem.url}
                 alt="design"
@@ -401,20 +401,20 @@ export default function MaterialEditor({
                       }}
                       fill={
                         active
-                          ? "rgba(247, 59, 32, 0.30)"
+                          ? "rgba(0, 0, 0, 0.18)"
                           : decided
-                            ? "rgba(76, 175, 80, 0.18)"
+                            ? "rgba(0, 0, 0, 0.10)"
                             : replaceable
-                              ? "rgba(247, 59, 32, 0.06)"
+                              ? "rgba(0, 0, 0, 0.04)"
                               : "rgba(0, 0, 0, 0.0)"
                       }
                       stroke={
                         active
-                          ? "#F73B20"
+                          ? "#111111"
                           : decided
-                            ? "#10B981"
+                            ? "#555555"
                             : replaceable
-                              ? "rgba(247, 59, 32, 0.4)"
+                              ? "rgba(0, 0, 0, 0.30)"
                               : "rgba(0, 0, 0, 0.0)"
                       }
                       strokeWidth={active ? 0.006 : 0.003}
@@ -424,7 +424,7 @@ export default function MaterialEditor({
                 })}
               </svg>
               {renderItem.refinedUrl && (
-                <div className="absolute right-2 top-2 rounded-full bg-emerald-500 px-2 py-0.5 text-[0.65rem] font-bold text-white">
+                <div className="absolute right-2 top-2 rounded-full bg-black px-2 py-0.5 text-[0.65rem] font-bold text-white">
                   ✓ 고화질 재렌더 완료
                 </div>
               )}
@@ -432,7 +432,7 @@ export default function MaterialEditor({
 
             {/* 우: 영역 리스트 */}
             <div>
-              <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-primary-900/50 mb-2">
+              <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-black/50 mb-2">
                 자재 영역
               </p>
               <ul className="space-y-1.5 max-h-72 overflow-y-auto pr-1">
@@ -453,7 +453,7 @@ export default function MaterialEditor({
                   <button
                     onClick={handleRefine}
                     disabled={refining}
-                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-primary-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-800 disabled:opacity-60"
+                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-60"
                   >
                     {refining ? (
                       <>
@@ -474,7 +474,7 @@ export default function MaterialEditor({
                 {hasEdits && (
                   <button
                     onClick={() => setEstimateOpen(true)}
-                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-900 hover:bg-primary-50"
+                    className="col-span-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black hover:bg-[#f7f7f5]"
                   >
                     💰 견적 보기 ({decidedCount}개 영역)
                   </button>
@@ -482,7 +482,7 @@ export default function MaterialEditor({
               </div>
 
               {!hasEdits && (
-                <p className="mt-3 text-[0.7rem] text-primary-900/50 text-center">
+                <p className="mt-3 text-[0.7rem] text-black/50 text-center">
                   영역을 클릭하면 자재 라이브러리가 열립니다
                 </p>
               )}
@@ -531,12 +531,12 @@ export default function MaterialEditor({
 
       {/* SAM refining — 큰 로딩 패널 */}
       {refining && editMode === "sam" && (
-        <div className="mt-4 rounded-xl border border-primary-300 bg-primary-50 p-6 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary-500 mx-auto" />
-          <p className="mt-3 text-sm font-bold text-primary-900">
+        <div className="mt-4 rounded-xl border border-black/10 bg-[#f7f7f5] p-6 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-black mx-auto" />
+          <p className="mt-3 text-sm font-bold text-black">
             선택한 영역에 새 자재 적용 중 — 약 40~80초
           </p>
-          <p className="mt-1 text-xs text-primary-900/60">
+          <p className="mt-1 text-xs text-black/60">
             마스크 영역만 새 자재로 재생성, 나머지는 그대로 유지
           </p>
         </div>
@@ -555,6 +555,52 @@ function ModalPortal({ children }: { children: ReactNode }) {
   return createPortal(children, document.body);
 }
 
+type FloorMaterialGroup =
+  | "all"
+  | "sheet"
+  | "engineered"
+  | "solid"
+  | "lvt"
+  | "tile"
+  | "stone"
+  | "carpet"
+  | "other";
+
+const FLOOR_MATERIAL_GROUPS: Array<{ value: FloorMaterialGroup; label: string }> = [
+  { value: "all", label: "전체" },
+  { value: "sheet", label: "장판·모노륨" },
+  { value: "engineered", label: "강·강화마루" },
+  { value: "solid", label: "원목마루" },
+  { value: "lvt", label: "데코타일·LVT/SPC" },
+  { value: "tile", label: "포세린·세라믹" },
+  { value: "stone", label: "석재·대리석" },
+  { value: "carpet", label: "카펫타일" },
+  { value: "other", label: "기타" },
+];
+
+function classifyFloorMaterial(material: CatalogMaterial): Exclude<FloorMaterialGroup, "all"> {
+  const source = [
+    material.name,
+    material.sku,
+    material.description,
+    material.specification,
+    material.texture,
+    material.finish,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  if (/장판|모노륨|모노리움|pvc\s*(시트|sheet)|vinyl\s*sheet|sheet\s*floor/.test(source)) return "sheet";
+  if (/카펫|카페트|carpet/.test(source)) return "carpet";
+  if (/데코\s*타일|\blvt\b|\bspc\b|luxury\s*vinyl/.test(source)) return "lvt";
+  if (/원목|solid\s*wood|hardwood|parquet|헤링본/.test(source)) return "solid";
+  if (/강마루|강화마루|engineered|laminate/.test(source)) return "engineered";
+  if (/포세린|세라믹|자기질|폴리싱|porcelain|ceramic/.test(source)) return "tile";
+  if (/석재|천연석|대리석|화강석|라임스톤|stone|marble|limestone|granite/.test(source)) return "stone";
+  if (/타일|tile/.test(source)) return "tile";
+  return "other";
+}
+
 // ──────────────── SAM 클릭 후 카테고리 + 자재 선택 모달 ────────────────
 function SamCategoryMaterialModal({
   onClose,
@@ -569,6 +615,7 @@ function SamCategoryMaterialModal({
   const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);
+  const [floorGroup, setFloorGroup] = useState<FloorMaterialGroup>("all");
 
   const REPLACEABLE_CATS: { v: InteriorCategory; label: string }[] = [
     { v: "floor", label: "바닥" },
@@ -591,6 +638,29 @@ function SamCategoryMaterialModal({
       .catch(() => setLoading(false));
   }, [category]);
 
+  const visibleMaterials = useMemo(
+    () =>
+      category !== "floor" || floorGroup === "all"
+        ? materials
+        : materials.filter((material) => classifyFloorMaterial(material) === floorGroup),
+    [category, floorGroup, materials],
+  );
+  const floorGroupCounts = useMemo(() => {
+    const counts: Record<FloorMaterialGroup, number> = {
+      all: materials.length,
+      sheet: 0,
+      engineered: 0,
+      solid: 0,
+      lvt: 0,
+      tile: 0,
+      stone: 0,
+      carpet: 0,
+      other: 0,
+    };
+    for (const material of materials) counts[classifyFloorMaterial(material)] += 1;
+    return counts;
+  }, [materials]);
+
   return (
     <ModalPortal>
       <motion.div
@@ -598,24 +668,28 @@ function SamCategoryMaterialModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
       />
+      <div className="pointer-events-none fixed inset-0 z-[81] flex items-end justify-center p-2 sm:items-center sm:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
+        role="dialog"
+        aria-modal="true"
+        className="pointer-events-auto flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[24px] border border-black/10 bg-white shadow-card-hover sm:max-h-[calc(100dvh-2rem)]"
       >
+        <div className="shrink-0 px-5 pt-5">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+            <h3 className="text-base font-extrabold tracking-tight text-black">
               선택한 영역의 자재 변경
             </h3>
-            <p className="mt-1 text-xs text-primary-900/60">
+            <p className="mt-1 text-xs text-black/60">
               선택한 {REPLACEABLE_CATS.find((item) => item.v === category)?.label} 영역에 적용할 실제 제품을 고르세요
             </p>
           </div>
-          <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
+          <button onClick={onClose} className="text-black/50 hover:text-black">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -633,20 +707,53 @@ function SamCategoryMaterialModal({
           </div>
         </div>
 
+        {category === "floor" && (
+          <div className="mt-4 rounded-2xl border border-black/[0.08] bg-[#f7f7f5] p-3">
+            <p className="text-[0.68rem] font-bold text-black">바닥 자재 종류</p>
+            <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+              {FLOOR_MATERIAL_GROUPS.map((group) => {
+                const count = floorGroupCounts[group.value];
+                return (
+                  <button
+                    key={group.value}
+                    type="button"
+                    onClick={() => {
+                      setFloorGroup(group.value);
+                      setSelectedSku(null);
+                    }}
+                    disabled={count === 0}
+                    className={`shrink-0 rounded-full border px-3 py-2 text-[0.7rem] font-semibold transition ${
+                      floorGroup === group.value
+                        ? "border-black bg-black text-white"
+                        : "border-black/10 bg-white text-black/65 hover:border-black/30"
+                    } disabled:cursor-not-allowed disabled:opacity-30`}
+                  >
+                    {group.label} <span className="ml-0.5 opacity-55">{count}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="mt-1.5 text-[0.62rem] text-black/45">
+              장판은 PVC 시트 바닥재인 모노륨 계열을 포함합니다.
+            </p>
+          </div>
+        )}
+        </div>
+
         {/* 자재 그리드 */}
-        <div className="mt-4">
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">
           {loading ? (
             <div className="py-8 text-center">
-              <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
-              <p className="mt-2 text-xs text-primary-900/50">자재 카탈로그 불러오는 중…</p>
+              <Loader2 className="h-6 w-6 animate-spin text-black mx-auto" />
+              <p className="mt-2 text-xs text-black/50">자재 카탈로그 불러오는 중…</p>
             </div>
-          ) : materials.length === 0 ? (
-            <p className="py-6 text-center text-xs text-primary-900/60">
-              이 카테고리는 자재가 없습니다
+          ) : visibleMaterials.length === 0 ? (
+            <p className="py-6 text-center text-xs text-black/60">
+              선택한 종류에 등록된 자재가 없습니다
             </p>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {materials.map((m) => {
+              {visibleMaterials.map((m) => {
                 const sel = selectedSku === m.sku;
                 return (
                   <button
@@ -654,8 +761,8 @@ function SamCategoryMaterialModal({
                     onClick={() => setSelectedSku(m.sku)}
                     className={`text-left rounded-xl border-2 p-3 transition-all ${
                       sel
-                        ? "border-primary-500 bg-primary-50/50 shadow-sm"
-                        : "border-primary-100 bg-white hover:border-primary-300"
+                        ? "border-black/10 bg-[#f7f7f5]/50 shadow-sm"
+                        : "border-black/10 bg-white hover:border-black/10"
                     }`}
                   >
                     {m.thumbnail_url ? (
@@ -678,11 +785,11 @@ function SamCategoryMaterialModal({
                         style={{ background: m.color_hex || "#eee" }}
                       />
                     )}
-                    <p className="text-xs font-bold text-primary-900 leading-tight truncate">
+                    <p className="text-xs font-bold text-black leading-tight truncate">
                       {m.name}
                     </p>
                     {m.brand && (
-                      <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                      <p className="text-[0.65rem] text-black/50 truncate">{m.brand}</p>
                     )}
                     {(m.model_number || m.specification) && (
                       <p className="mt-0.5 truncate text-[0.58rem] text-black/40">
@@ -690,13 +797,13 @@ function SamCategoryMaterialModal({
                       </p>
                     )}
                     <div className="mt-1 space-y-0.5">
-                      <p className="text-[0.7rem] font-bold text-primary-700 tabular">
+                      <p className="text-[0.7rem] font-bold text-black tabular">
                         ₩{(m.material_price + m.labor_price).toLocaleString()}
-                        <span className="font-medium text-primary-900/50">
+                        <span className="font-medium text-black/50">
                           /{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
                         </span>
                       </p>
-                      <p className="text-[0.55rem] text-primary-900/50 tabular">
+                      <p className="text-[0.55rem] text-black/50 tabular">
                         자재 ₩{m.material_price.toLocaleString()} + 인건 ₩{m.labor_price.toLocaleString()}
                       </p>
                     </div>
@@ -707,10 +814,10 @@ function SamCategoryMaterialModal({
           )}
         </div>
 
-        <div className="mt-5 flex gap-2">
+        <div className="shrink-0 flex gap-2 border-t border-black/[0.07] bg-white px-5 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-4">
           <button
             onClick={onClose}
-            className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+            className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
           >
             취소
           </button>
@@ -720,7 +827,7 @@ function SamCategoryMaterialModal({
               if (m) onSelect(category, m);
             }}
             disabled={!selectedSku}
-            className="flex-[2] rounded-full bg-primary-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+            className="flex-[2] rounded-full bg-black px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-black disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
           >
             <Wand2 className="h-4 w-4" />
             적용 + 고화질 재렌더
@@ -730,6 +837,7 @@ function SamCategoryMaterialModal({
           </button>
         </div>
       </motion.div>
+      </div>
     </ModalPortal>
   );
 }
@@ -751,36 +859,36 @@ function RegionListItem({
         onClick={onClick}
         className={`w-full text-left rounded-lg border px-3 py-2 text-xs transition-all ${
           active
-            ? "border-primary-500 bg-white shadow-sm"
+            ? "border-black/10 bg-white shadow-sm"
             : decided
-              ? "border-emerald-300 bg-emerald-50"
-              : "border-primary-100 bg-white/70 hover:border-primary-300"
+              ? "border-black/10 bg-[#f7f7f5]"
+              : "border-black/10 bg-white/70 hover:border-black/10"
         }`}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <span
-              className="h-3 w-3 rounded-full border border-primary-200 shrink-0"
+              className="h-3 w-3 rounded-full border border-black/10 shrink-0"
               style={{ background: region.guessed_color_hex || "#fff" }}
             />
-            <span className="font-semibold text-primary-900 truncate">
+            <span className="font-semibold text-black truncate">
               {region.label_ko}
               {region.area_sqm ? (
-                <span className="ml-1 text-[0.65rem] text-primary-900/50 tabular">
+                <span className="ml-1 text-[0.65rem] text-black/50 tabular">
                   · {region.area_sqm.toFixed(1)}㎡
                 </span>
               ) : null}
             </span>
           </div>
-          {decided && <Check className="h-3 w-3 text-emerald-600" strokeWidth={3} />}
+          {decided && <Check className="h-3 w-3 text-black" strokeWidth={3} />}
         </div>
-        <div className="mt-1 text-primary-900/70">
+        <div className="mt-1 text-black/70">
           {decided ? (
             <>
-              <span className="font-semibold text-emerald-700">{region.current_material}</span>
+              <span className="font-semibold text-black">{region.current_material}</span>
             </>
           ) : (
-            <span className="text-primary-900/40">
+            <span className="text-black/40">
               {region.guessed_material || "자재 미선택 — 클릭"}
             </span>
           )}
@@ -824,36 +932,39 @@ function MaterialLibraryModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
       />
+      <div className="pointer-events-none fixed inset-0 z-[81] flex items-end justify-center p-2 sm:items-center sm:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-2xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
+        role="dialog"
+        aria-modal="true"
+        className="pointer-events-auto w-full max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:max-h-[calc(100dvh-2rem)]"
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+            <h3 className="text-base font-extrabold tracking-tight text-black">
               {region.label_ko} 자재 선택
             </h3>
-            <p className="mt-1 text-xs text-primary-900/60">
+            <p className="mt-1 text-xs text-black/60">
               {region.area_sqm ? `면적: ${region.area_sqm.toFixed(2)}㎡ · ` : ""}
               {region.guessed_material ? `현재 추정: ${region.guessed_material}` : "현재 자재 미상"}
             </p>
           </div>
-          <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
+          <button onClick={onClose} className="text-black/50 hover:text-black">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {loading ? (
           <div className="py-12 text-center">
-            <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
-            <p className="mt-2 text-xs text-primary-900/50">자재 카탈로그 불러오는 중…</p>
+            <Loader2 className="h-6 w-6 animate-spin text-black mx-auto" />
+            <p className="mt-2 text-xs text-black/50">자재 카탈로그 불러오는 중…</p>
           </div>
         ) : materials.length === 0 ? (
-          <div className="py-12 text-center text-sm text-primary-900/60">
+          <div className="py-12 text-center text-sm text-black/60">
             이 카테고리는 아직 자재 카탈로그가 없습니다
           </div>
         ) : (
@@ -866,8 +977,8 @@ function MaterialLibraryModal({
                   onClick={() => setSelectedSku(m.sku)}
                   className={`text-left rounded-xl border-2 p-3 transition-all ${
                     sel
-                      ? "border-primary-500 bg-primary-50/50 shadow-sm"
-                      : "border-primary-100 bg-white hover:border-primary-300"
+                      ? "border-black/10 bg-[#f7f7f5]/50 shadow-sm"
+                      : "border-black/10 bg-white hover:border-black/10"
                   }`}
                 >
                   {m.thumbnail_url ? (
@@ -890,11 +1001,11 @@ function MaterialLibraryModal({
                       style={{ background: m.color_hex || "#eee" }}
                     />
                   )}
-                  <p className="text-xs font-bold text-primary-900 leading-tight truncate">
+                  <p className="text-xs font-bold text-black leading-tight truncate">
                     {m.name}
                   </p>
                   {m.brand && (
-                    <p className="text-[0.65rem] text-primary-900/50 truncate">{m.brand}</p>
+                    <p className="text-[0.65rem] text-black/50 truncate">{m.brand}</p>
                   )}
                   {(m.model_number || m.specification) && (
                     <p className="mt-0.5 truncate text-[0.58rem] text-black/40">
@@ -902,13 +1013,13 @@ function MaterialLibraryModal({
                     </p>
                   )}
                   <div className="mt-1 space-y-0.5">
-                    <p className="text-[0.7rem] font-bold text-primary-700 tabular">
+                    <p className="text-[0.7rem] font-bold text-black tabular">
                       ₩{(m.material_price + m.labor_price).toLocaleString()}
-                      <span className="font-medium text-primary-900/50">
+                      <span className="font-medium text-black/50">
                         /{m.unit === "sqm" ? "㎡" : m.unit === "m" ? "m" : "EA"}
                       </span>
                     </p>
-                    <p className="text-[0.55rem] text-primary-900/50 tabular">
+                    <p className="text-[0.55rem] text-black/50 tabular">
                       자재 ₩{m.material_price.toLocaleString()} + 인건 ₩{m.labor_price.toLocaleString()}
                     </p>
                   </div>
@@ -921,7 +1032,7 @@ function MaterialLibraryModal({
         <div className="mt-5 flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 rounded-full border border-primary-200 px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+            className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
           >
             취소
           </button>
@@ -931,12 +1042,13 @@ function MaterialLibraryModal({
               if (m) onSelect(m);
             }}
             disabled={!selectedSku}
-            className="flex-1 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-primary-600 disabled:opacity-50"
+            className="flex-1 rounded-full bg-black px-4 py-2.5 text-sm font-semibold text-white shadow-cta hover:bg-black disabled:opacity-50"
           >
             적용하기
           </button>
         </div>
       </motion.div>
+      </div>
     </ModalPortal>
   );
 }
@@ -980,48 +1092,51 @@ function EstimateModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 z-[80] bg-primary-900/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[80] bg-black/50 backdrop-blur-sm"
       />
+      <div className="pointer-events-none fixed inset-0 z-[81] flex items-end justify-center p-2 sm:items-center sm:p-4">
       <motion.div
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
-        className="fixed inset-x-2 bottom-2 z-[81] mx-auto max-h-[calc(100dvh-1rem)] max-w-xl overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2"
+        role="dialog"
+        aria-modal="true"
+        className="pointer-events-auto w-full max-w-xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-[24px] border border-black/10 bg-white p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))] shadow-card-hover sm:max-h-[calc(100dvh-2rem)]"
       >
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="text-base font-extrabold tracking-tight text-primary-900">
+            <h3 className="text-base font-extrabold tracking-tight text-black">
               견적서 (총괄표 + 내역서)
             </h3>
-            <p className="mt-0.5 text-[0.65rem] text-primary-900/50">
+            <p className="mt-0.5 text-[0.65rem] text-black/50">
               spec §A — 12 공종 그룹 · 2026 KICT 표준품셈 + KPI 원가계산
             </p>
           </div>
-          <button onClick={onClose} className="text-primary-900/50 hover:text-primary-900">
+          <button onClick={onClose} className="text-black/50 hover:text-black">
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {loading ? (
           <div className="py-12 text-center">
-            <Loader2 className="h-6 w-6 animate-spin text-primary-500 mx-auto" />
+            <Loader2 className="h-6 w-6 animate-spin text-black mx-auto" />
           </div>
         ) : !estimate || sections.length === 0 ? (
-          <p className="py-8 text-center text-sm text-primary-900/60">
+          <p className="py-8 text-center text-sm text-black/60">
             자재가 선택된 영역이 없습니다
           </p>
         ) : (
           <>
             {/* ─── 총 견적 금액 (큰 박스, spec §A-1) ─── */}
-            <div className="mt-4 rounded-2xl border-2 border-primary-900 bg-gradient-to-br from-primary-50/40 to-amber-50/40 p-4">
-              <p className="text-[0.65rem] font-bold text-primary-900/60 tracking-widest">
+            <div className="mt-4 rounded-2xl border-2 border-black/10 bg-gradient-to-br from-[#f7f7f5] to-[#f7f7f5] p-4">
+              <p className="text-[0.65rem] font-bold text-black/60 tracking-widest">
                 총 견적 금액 (VAT 포함)
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-primary-500 tabular">
+              <p className="mt-1 text-2xl font-extrabold text-black tabular">
                 ₩{totalAmount.toLocaleString()}
               </p>
               {estimate.indirectCosts?.modified && (
-                <p className="mt-1 text-[0.65rem] text-amber-700">
+                <p className="mt-1 text-[0.65rem] text-black">
                   사업자 입찰 요율 적용됨
                 </p>
               )}
@@ -1029,10 +1144,10 @@ function EstimateModal({
 
             {/* ─── 총괄표 (12 공종 + 간접비 5종, spec §A-2) ─── */}
             <div className="mt-4">
-              <p className="text-[0.7rem] font-bold text-primary-900/70 mb-2">
+              <p className="text-[0.7rem] font-bold text-black/70 mb-2">
                 공종별 소계
               </p>
-              <ul className="rounded-xl border border-primary-200 divide-y divide-primary-100 overflow-hidden">
+              <ul className="divide-y divide-black/[0.07] overflow-hidden rounded-xl border border-black/10">
                 {sections.map((sec) => {
                   const isOpen = expandedSection === sec.sectionId;
                   return (
@@ -1040,43 +1155,43 @@ function EstimateModal({
                       <button
                         type="button"
                         onClick={() => setExpandedSection(isOpen ? null : sec.sectionId)}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-primary-50/50 text-left"
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2.5 hover:bg-[#f7f7f5]/50 text-left"
                       >
                         <span className="flex items-center gap-2 min-w-0 flex-1">
-                          <span className="text-[0.65rem] font-bold text-primary-900/40 tabular shrink-0">
+                          <span className="text-[0.65rem] font-bold text-black/40 tabular shrink-0">
                             {sec.sectionNumber}
                           </span>
-                          <span className="text-sm font-bold text-primary-900 truncate">
+                          <span className="text-sm font-bold text-black truncate">
                             {sec.sectionName}
                           </span>
-                          <span className="text-[0.65rem] text-primary-900/40 shrink-0">
+                          <span className="text-[0.65rem] text-black/40 shrink-0">
                             ({sec.items.length}건)
                           </span>
                         </span>
-                        <span className="text-sm font-extrabold text-primary-900 tabular shrink-0">
+                        <span className="text-sm font-extrabold text-black tabular shrink-0">
                           ₩{sec.subtotal.total.toLocaleString()}
                         </span>
                       </button>
                       {/* 내역서 (spec §A-3 — 품명 / 단위 / 수량 / 자재비 / 노무비 / 경비 / 합계) */}
                       {isOpen && (
-                        <div className="bg-primary-50/30 px-3 py-2 border-t border-primary-100">
+                        <div className="bg-[#f7f7f5]/30 px-3 py-2 border-t border-black/10">
                           <ul className="space-y-1.5">
                             {sec.items.map((it) => (
                               <li key={it.itemId} className="text-[0.7rem] tabular">
                                 <div className="flex items-start justify-between gap-2">
-                                  <span className="font-semibold text-primary-900 truncate flex-1">
+                                  <span className="font-semibold text-black truncate flex-1">
                                     {it.name}
                                     {it.spec && (
-                                      <span className="ml-1 text-primary-900/50 font-normal">
+                                      <span className="ml-1 text-black/50 font-normal">
                                         · {it.spec}
                                       </span>
                                     )}
                                   </span>
-                                  <span className="font-bold text-primary-900 shrink-0">
+                                  <span className="font-bold text-black shrink-0">
                                     ₩{it.totalCost.toLocaleString()}
                                   </span>
                                 </div>
-                                <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.62rem] text-primary-900/55">
+                                <div className="mt-0.5 flex flex-wrap gap-x-2 text-[0.62rem] text-black/55">
                                   <span>
                                     {it.quantity.toLocaleString()}{" "}
                                     {it.unit === "sqm" ? "㎡" : it.unit === "m" ? "m" : it.unit}
@@ -1091,14 +1206,14 @@ function EstimateModal({
                                     <span>경비 ₩{it.expenseCost.toLocaleString()}</span>
                                   )}
                                   {it.source === "standard" && (
-                                    <span className="text-primary-500/70">표준</span>
+                                    <span className="text-black/70">표준</span>
                                   )}
                                 </div>
                               </li>
                             ))}
                           </ul>
                           {/* 공종 소계 (3분할: 자재 / 노무 / 경비) */}
-                          <div className="mt-2 pt-2 border-t border-primary-200 flex justify-between text-[0.62rem] text-primary-900/60 tabular">
+                          <div className="mt-2 pt-2 border-t border-black/10 flex justify-between text-[0.62rem] text-black/60 tabular">
                             <span>자재 ₩{sec.subtotal.materialCost.toLocaleString()}</span>
                             <span>노무 ₩{sec.subtotal.laborCost.toLocaleString()}</span>
                             <span>경비 ₩{sec.subtotal.expenseCost.toLocaleString()}</span>
@@ -1112,63 +1227,63 @@ function EstimateModal({
             </div>
 
             {/* ─── 직접공사비 합 + 간접비 5종 (spec §C — 총괄표 하단) ─── */}
-            <div className="mt-4 rounded-xl border border-primary-200 bg-primary-50/30 p-3 space-y-1.5 text-sm">
-              <div className="flex justify-between font-bold text-primary-900">
+            <div className="mt-4 rounded-xl border border-black/10 bg-[#f7f7f5]/30 p-3 space-y-1.5 text-sm">
+              <div className="flex justify-between font-bold text-black">
                 <span>직접공사비 합</span>
                 <span className="tabular">₩{Math.round(directCost).toLocaleString()}</span>
               </div>
               {indirect && (
                 <>
-                  <div className="flex justify-between text-primary-900/75 border-t border-primary-200 pt-1.5">
+                  <div className="flex justify-between text-black/75 border-t border-black/10 pt-1.5">
                     <span>가설공사비 (보양·자재·폐기물)</span>
                     <span className="tabular">₩{Math.round(indirect.setupCost).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-primary-900/75">
+                  <div className="flex justify-between text-black/75">
                     <span>
                       산업안전보건관리비
-                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                      <span className="ml-1 text-[0.62rem] text-black/40">
                         ({(indirect.appliedRates?.safety_rate ?? 0.0311) * 100}%)
                       </span>
                     </span>
                     <span className="tabular">₩{Math.round(indirect.safetyCost).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-primary-900/75">
+                  <div className="flex justify-between text-black/75">
                     <span>
                       일반관리비
-                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                      <span className="ml-1 text-[0.62rem] text-black/40">
                         ({((indirect.appliedRates?.general_management_rate ?? 0.05) * 100).toFixed(1)}%)
                       </span>
                     </span>
                     <span className="tabular">₩{Math.round(indirect.generalManagementCost).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-primary-900/75">
+                  <div className="flex justify-between text-black/75">
                     <span>
                       기업이윤
-                      <span className="ml-1 text-[0.62rem] text-primary-900/40">
+                      <span className="ml-1 text-[0.62rem] text-black/40">
                         ({((indirect.appliedRates?.profit_rate ?? 0.10) * 100).toFixed(1)}%)
                       </span>
                     </span>
                     <span className="tabular">₩{Math.round(indirect.profit).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between font-bold text-primary-900 border-t border-primary-200 pt-1.5">
+                  <div className="flex justify-between font-bold text-black border-t border-black/10 pt-1.5">
                     <span>공급가액</span>
                     <span className="tabular">₩{Math.round(indirect.supplyAmount).toLocaleString()}</span>
                   </div>
-                  <div className="flex justify-between text-primary-900/75">
+                  <div className="flex justify-between text-black/75">
                     <span>부가가치세 (10%)</span>
                     <span className="tabular">₩{Math.round(indirect.vat).toLocaleString()}</span>
                   </div>
                 </>
               )}
-              <div className="flex justify-between border-t-2 border-primary-900 pt-2 mt-1 text-base">
-                <span className="font-extrabold text-primary-900">총 견적 금액 (VAT 포함)</span>
-                <span className="font-extrabold text-primary-500 tabular">
+              <div className="flex justify-between border-t-2 border-black/10 pt-2 mt-1 text-base">
+                <span className="font-extrabold text-black">총 견적 금액 (VAT 포함)</span>
+                <span className="font-extrabold text-black tabular">
                   ₩{totalAmount.toLocaleString()}
                 </span>
               </div>
             </div>
 
-            <div className="mt-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-[0.65rem] text-amber-900/80 leading-relaxed">
+            <div className="mt-3 rounded-lg bg-[#f7f7f5] border border-black/10 px-3 py-2 text-[0.65rem] text-black/80 leading-relaxed">
               💡 단가는 KPA 자재 + 대한건설협회 표준품셈 기준. 간접비 요율은 2026 KICT + KPI 표준값 (산안비
               3.11% 법정 최저). 사업자 입찰 시 요율 수정 가능 (산안비 하향 제외).
             </div>
@@ -1181,11 +1296,12 @@ function EstimateModal({
 
         <button
           onClick={onClose}
-          className="mt-2 w-full rounded-full border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+          className="mt-2 w-full rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
         >
           닫기
         </button>
       </motion.div>
+      </div>
     </ModalPortal>
   );
 }
@@ -1239,35 +1355,35 @@ function PdfDownloadButton({
     <>
       {/* 발주자/현장 정보 입력 (선택) */}
       {showMeta && (
-        <div className="mt-4 space-y-2 rounded-lg border border-primary-200 bg-primary-50/30 p-3">
-          <p className="text-[0.7rem] font-bold text-primary-900/70">PDF 갑지에 들어갈 정보 (선택)</p>
+        <div className="mt-4 space-y-2 rounded-lg border border-black/10 bg-[#f7f7f5]/30 p-3">
+          <p className="text-[0.7rem] font-bold text-black/70">PDF 갑지에 들어갈 정보 (선택)</p>
           <input
             type="text"
             placeholder="발주자 성명 (예: 홍길동)"
             value={meta.client_name}
             onChange={(e) => setMeta({ ...meta, client_name: e.target.value })}
-            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-xs outline-none focus:border-black/10"
           />
           <input
             type="text"
             placeholder="연락처"
             value={meta.client_phone}
             onChange={(e) => setMeta({ ...meta, client_phone: e.target.value })}
-            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-xs outline-none focus:border-black/10"
           />
           <input
             type="email"
             placeholder="이메일 (선택)"
             value={meta.client_email}
             onChange={(e) => setMeta({ ...meta, client_email: e.target.value })}
-            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-xs outline-none focus:border-black/10"
           />
           <input
             type="text"
             placeholder="시공 장소 (예: 서울시 강남구 ...)"
             value={meta.site_address}
             onChange={(e) => setMeta({ ...meta, site_address: e.target.value })}
-            className="w-full rounded-lg border border-primary-200 bg-white px-3 py-2 text-xs outline-none focus:border-primary-400"
+            className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-xs outline-none focus:border-black/10"
           />
         </div>
       )}
@@ -1276,7 +1392,7 @@ function PdfDownloadButton({
         <button
           type="button"
           onClick={() => setShowMeta((v) => !v)}
-          className="rounded-full border border-primary-200 bg-white px-3 py-2.5 text-xs font-semibold text-primary-900/70 hover:bg-primary-50"
+          className="rounded-full border border-black/10 bg-white px-3 py-2.5 text-xs font-semibold text-black/70 hover:bg-[#f7f7f5]"
         >
           {showMeta ? "정보 닫기" : "정보 입력"}
         </button>
@@ -1284,7 +1400,7 @@ function PdfDownloadButton({
           type="button"
           onClick={handleDownload}
           disabled={downloading}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-primary-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-60"
+          className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-black to-black px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:opacity-95 disabled:opacity-60"
         >
           {downloading ? (
             <>

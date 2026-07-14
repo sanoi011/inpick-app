@@ -81,10 +81,10 @@ function RasterMaskOverlay({ maskUrl }: { maskUrl: string }) {
               x === 0 || y === 0 || x === width - 1 || y === height - 1 ||
               !selectedAt(index - 4) || !selectedAt(index + 4) ||
               !selectedAt(index - width * 4) || !selectedAt(index + width * 4);
-            image.data[index] = 241;
-            image.data[index + 1] = 91;
-            image.data[index + 2] = 74;
-            image.data[index + 3] = edge ? 235 : 58;
+            image.data[index] = 17;
+            image.data[index + 1] = 17;
+            image.data[index + 2] = 17;
+            image.data[index + 3] = edge ? 220 : 42;
           }
         }
         context.putImageData(image, 0, 0);
@@ -105,7 +105,7 @@ function RasterMaskOverlay({ maskUrl }: { maskUrl: string }) {
     return (
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 bg-[#f15b4a]/25"
+        className="pointer-events-none absolute inset-0 bg-black/20"
         style={{
           maskImage: "url(" + maskUrl + ")",
           maskMode: "luminance",
@@ -248,7 +248,7 @@ export default function ClickableRenderImage({
     <div className="space-y-3">
       {/* 모드 토글 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="inline-flex items-center gap-0.5 rounded-full border border-primary-200 bg-white p-0.5 text-[0.7rem] font-bold">
+        <div className="inline-flex items-center gap-0.5 rounded-full border border-black/10 bg-white p-0.5 text-[0.7rem] font-bold">
           <button
             type="button"
             onClick={() => {
@@ -257,8 +257,8 @@ export default function ClickableRenderImage({
             }}
             className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
               mode === "view"
-                ? "bg-primary-500 text-white"
-                : "text-primary-900/60 hover:text-primary-900"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
             }`}
           >
             <Eye className="h-3 w-3" /> 보기
@@ -268,8 +268,8 @@ export default function ClickableRenderImage({
             onClick={() => setMode("select")}
             className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
               mode === "select"
-                ? "bg-primary-500 text-white"
-                : "text-primary-900/60 hover:text-primary-900"
+                ? "bg-black text-white"
+                : "text-black/60 hover:text-black"
             }`}
           >
             <Crosshair className="h-3 w-3" /> 부위 선택
@@ -278,14 +278,14 @@ export default function ClickableRenderImage({
 
         {/* refine 모드 +/- 토글 (selected 있을 때만) */}
         {mode === "select" && selected && (
-          <div className="inline-flex items-center gap-0.5 rounded-full border border-amber-200 bg-amber-50 p-0.5 text-[0.65rem] font-bold">
+          <div className="inline-flex items-center gap-0.5 rounded-full border border-black/10 bg-[#f7f7f5] p-0.5 text-[0.65rem] font-bold">
             <button
               type="button"
               onClick={() => setRefineMode("add")}
               className={`px-2 py-1 rounded-full inline-flex items-center gap-0.5 transition-colors ${
                 refineMode === "add"
-                  ? "bg-emerald-500 text-white"
-                  : "text-amber-700 hover:text-amber-900"
+                  ? "bg-black text-white"
+                  : "text-black hover:text-black"
               }`}
               title="포함할 점"
             >
@@ -296,8 +296,8 @@ export default function ClickableRenderImage({
               onClick={() => setRefineMode("remove")}
               className={`px-2 py-1 rounded-full inline-flex items-center gap-0.5 transition-colors ${
                 refineMode === "remove"
-                  ? "bg-red-500 text-white"
-                  : "text-amber-700 hover:text-amber-900"
+                  ? "bg-black text-white"
+                  : "text-black hover:text-black"
               }`}
               title="제외할 점"
             >
@@ -354,7 +354,7 @@ export default function ClickableRenderImage({
       )}
 
       {/* 이미지 + SVG overlay */}
-      <div className="relative w-full rounded-xl border border-primary-200 overflow-hidden bg-white">
+      <div className="relative w-full rounded-xl border border-black/10 overflow-hidden bg-white">
         <img
           ref={imgRef}
           src={imageUrl}
@@ -378,8 +378,8 @@ export default function ClickableRenderImage({
             {!selected.mask_url && (
               <polygon
                 points={selected.polygon.map((p) => p.join(",")).join(" ")}
-                fill="rgba(247, 59, 32, 0.30)"
-                stroke="#F73B20"
+                fill="rgba(0, 0, 0, 0.16)"
+                stroke="#111111"
                 strokeWidth={Math.max(2, imageNatural.w / 200)}
                 vectorEffect="non-scaling-stroke"
               />
@@ -416,7 +416,7 @@ export default function ClickableRenderImage({
         {selected?.mask_url && <RasterMaskOverlay maskUrl={selected.mask_url} />}
 
         {mode === "select" && !selected && !loading && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-gradient-to-r from-transparent via-primary-500 to-transparent shadow-[0_0_14px_rgba(247,59,32,0.8)]" />
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-0.5 animate-pulse bg-gradient-to-r from-transparent via-black to-transparent shadow-[0_0_14px_rgba(0,0,0,0.28)]" />
         )}
 
         {/* 로딩 오버레이 */}
@@ -429,7 +429,7 @@ export default function ClickableRenderImage({
               className="absolute inset-0 bg-white/70 backdrop-blur-sm flex items-center justify-center"
             >
               <div className="text-center">
-                <Loader2 className="h-7 w-7 animate-spin text-primary-500 mx-auto" />
+                <Loader2 className="h-7 w-7 animate-spin text-black mx-auto" />
                 <p className="mt-2 text-sm font-bold text-black">{SAM_SURFACE_TARGETS[targetSurface].labelKo} 경계 분석 중…</p>
                 <p className="text-[0.65rem] text-black/50">
                   의미 분석 후 클릭 위치로 범위를 좁히고 있습니다
@@ -449,11 +449,11 @@ export default function ClickableRenderImage({
 
       {/* SAM 다중 마스크 후보 — 좁게/추천/넓게를 직접 보고 선택 */}
       {selected && candidateOptions.length > 1 && !loading && (
-        <div className="rounded-xl border border-primary-200 bg-white p-3">
+        <div className="rounded-xl border border-black/10 bg-white p-3">
           <div className="flex items-center gap-2">
-            <ScanLine className="h-3.5 w-3.5 text-primary-500" />
-            <p className="text-xs font-bold text-primary-900">선택 경계 비교</p>
-            <span className="text-[0.65rem] text-primary-900/50">가장 정확한 범위를 고르세요</span>
+            <ScanLine className="h-3.5 w-3.5 text-black" />
+            <p className="text-xs font-bold text-black">선택 경계 비교</p>
+            <span className="text-[0.65rem] text-black/50">가장 정확한 범위를 고르세요</span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-1.5">
             {candidateOptions.map((candidate, index) => {
@@ -470,8 +470,8 @@ export default function ClickableRenderImage({
                   }}
                   className={`rounded-lg border px-2 py-2 text-[0.7rem] font-bold transition ${
                     candidateIndex === index
-                      ? "border-primary-500 bg-primary-50 text-primary-700 ring-1 ring-primary-200"
-                      : "border-primary-100 text-primary-900/60 hover:border-primary-300"
+                      ? "border-black/10 bg-[#f7f7f5] text-black ring-1 ring-black/10"
+                      : "border-black/10 text-black/60 hover:border-black/10"
                   }`}
                 >
                   {labels[index]}{index === recommendedCandidateIndex ? " · 추천" : ""}
@@ -507,7 +507,7 @@ export default function ClickableRenderImage({
 
       {/* 에러 */}
       {(sam.click.error || sam.refine.error) && (
-        <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-900 whitespace-pre-wrap">
+        <div className="rounded-lg bg-[#f7f7f5] border border-black/10 px-3 py-2 text-xs text-black whitespace-pre-wrap">
           {sam.click.error || sam.refine.error}
         </div>
       )}
@@ -518,7 +518,7 @@ export default function ClickableRenderImage({
           <button
             type="button"
             onClick={handleReset}
-            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-primary-200 bg-white px-4 py-2.5 text-sm font-semibold text-primary-900/70 hover:bg-primary-50"
+            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             다시 선택
@@ -527,7 +527,7 @@ export default function ClickableRenderImage({
             <button
               type="button"
               onClick={handleConfirm}
-              className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-full bg-primary-500 px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-primary-600"
+              className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-full bg-black px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-black"
             >
               선택 경계 확인 · 자재 고르기
               <ChevronRight className="h-3.5 w-3.5" />

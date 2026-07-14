@@ -22,8 +22,8 @@ import { useAuth } from "@/hooks/useAuth";
 
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
-  { label: "인테리어 견적", href: "/workflow" },
-  { label: "자재", href: "/material-preview" },
+  { label: "부분 AI 인테리어", href: "/partial-ai" },
+  { label: "부분시공", href: "/partial-install" },
   { label: "시공사", href: "/find-contractors" },
   { label: "커뮤니티", href: "/community" },
 ];
@@ -113,8 +113,8 @@ const FOOTER_LINKS = [
     title: "서비스",
     links: [
       { label: "AI 인테리어", href: "/workflow" },
-      { label: "부분 인테리어", href: "/partial-install" },
-      { label: "자재 미리보기", href: "/material-preview" },
+      { label: "부분 AI 인테리어", href: "/partial-ai" },
+      { label: "부분시공", href: "/partial-install" },
       { label: "시공사 찾기", href: "/find-contractors" },
     ],
   },

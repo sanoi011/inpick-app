@@ -31,7 +31,7 @@ export default function Notch({ step, total }: Props) {
                     active
                       ? "bg-white text-black"
                       : complete
-                        ? "bg-primary-500 text-white"
+                        ? "bg-black text-white"
                         : "bg-black/[0.05] text-black/45"
                   }`}
                 >

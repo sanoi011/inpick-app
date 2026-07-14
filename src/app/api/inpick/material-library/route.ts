@@ -29,7 +29,11 @@ const CATEGORY_CODES: Partial<Record<InteriorCategory, string[]>> = {
 };
 
 const CATEGORY_PRODUCT_KEYWORDS: Partial<Record<InteriorCategory, string[]>> = {
-  floor: ["마루", "플로어링", "바닥재", "장판", "데코타일", "카펫타일", "포세린타일"],
+  floor: [
+    "강마루", "강화마루", "원목마루", "플로어링", "바닥재",
+    "장판", "모노륨", "PVC시트", "데코타일", "LVT", "SPC",
+    "카펫타일", "포세린", "세라믹", "폴리싱", "석재", "대리석",
+  ],
   wall: ["벽지", "벽패널", "월패널", "페인트", "도료", "인테리어필름"],
   ceiling: ["천장", "흡음", "텍스", "루버", "석고보드"],
   window: ["창호", "창문", "시스템창", "복층유리"],

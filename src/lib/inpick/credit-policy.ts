@@ -19,6 +19,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const CREDIT_COSTS = {
   "render-room": 1, // 거실 외 공간 이미지 1장 생성·공개
   "render-room-living": 5, // 대표 거실 이미지 1장 생성
+  "partial-ai-room": 5, // 부분 AI 인테리어: 거실·방·주방·욕실 1실 렌더
   "render-room-high": 2, // 고화질 재생성
   "refine-render": 2, // 정밀 영역 선택 후 GPT Image 2 자재 재렌더
   "unlock-estimate-details": 10, // Step3 세부 견적 1회 공개

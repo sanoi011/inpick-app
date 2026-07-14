@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import {
   User, Building2, Hexagon, Shield,
   LayoutDashboard, FolderOpen, FileSignature, Bell, CreditCard,
   Settings, HelpCircle, LogOut, ChevronDown,
-  Sparkles, Wrench, Layers, Star,
 } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,12 +14,9 @@ import { useAuth } from "@/hooks/useAuth";
  * 헤더 V4 — 좌측 로고 + 우측 로그인 버튼 (비로그인) 또는 마이페이지+토큰 (로그인)
  */
 export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" | "solid" }) {
-  const router = useRouter();
   const [mode, setMode] = useState<"dark" | "light">("dark");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [servicesOpen, setServicesOpen] = useState(false);
-  const servicesRef = useRef<HTMLDivElement>(null);
   const { authenticated, balance, loading } = useTokens();
   const { user, loading: authLoading, signOut } = useAuth();
 
@@ -42,18 +37,6 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
-
-  // 서비스 드롭다운 외부 클릭 닫기
-  useEffect(() => {
-    if (!servicesOpen) return;
-    const onDoc = (e: MouseEvent) => {
-      if (servicesRef.current && !servicesRef.current.contains(e.target as Node)) {
-        setServicesOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [servicesOpen]);
 
   useEffect(() => {
     const sections = ["hero", "walkthrough", "demo", "mob", "test", "final"];
@@ -76,20 +59,7 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
   // solid 변형(커뮤니티 등 밝은 배경 서브페이지): 항상 밝은 헤더 + 진한 글씨
   const isDark = variant === "solid" ? false : mode === "dark";
 
-  // 서비스 카테고리 — 3대 핵심 기능 (서비스 드롭다운에 노출, 웹+앱 공통)
-  const SERVICES: Array<{
-    label: string;
-    href: string;
-    desc: string;
-    icon: typeof Sparkles;
-    badge?: string;
-  }> = [
-    { label: "전체 인테리어", href: "/workflow", icon: Sparkles, desc: "주소 입력만으로 AI 디자인 + 17공종 견적" },
-    { label: "부분 인테리어·자재추천", href: "/partial-install", icon: Wrench, desc: "변기·문고리·수전 등 부분 교체 추천", badge: "NEW" },
-    { label: "자재 미리보기", href: "/material-preview", icon: Layers, desc: "우리집에 자재 적용 3D 미리보기", badge: "NEW" },
-  ];
-
-  // 메인 카테고리 (홈 헤더 가운데) — 3대 기능은 위 서비스 드롭다운으로 이동
+  // 메인 카테고리 (홈 헤더 가운데)
   const MAIN_CATEGORIES: Array<{ label: string; href: string }> = [
     { label: "소개", href: "/#walkthrough" },
     { label: "요금제", href: "/account/tokens" },
@@ -131,86 +101,26 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
           </a>
         </div>
 
-        {/* 서비스 카테고리 드롭다운 — 웹+앱 공통, 클릭 시 3대 기능 슬라이드다운 */}
-        <div ref={servicesRef} className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => setServicesOpen((v) => !v)}
-            aria-expanded={servicesOpen}
-            aria-label="서비스 메뉴"
-            className={`inline-flex shrink-0 items-center gap-0.5 whitespace-nowrap rounded-full px-2.5 py-2 text-[13px] font-bold tracking-tight transition-colors sm:gap-1 sm:px-3 sm:text-[14px] ${
-              isDark ? "text-offwhite hover:bg-offwhite/10" : "text-ink hover:bg-ink/5"
-            }`}
-          >
-            서비스
-            <ChevronDown className={`h-3.5 w-3.5 transition-transform ${servicesOpen ? "rotate-180" : ""}`} />
-          </button>
-          <AnimatePresence>
-            {servicesOpen && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.98 }}
-                transition={{ duration: 0.18, ease: "easeOut" }}
-                className="absolute left-0 top-full z-50 mt-2 w-[300px] overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-2xl"
-              >
-                <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-3">
-                  <p className="font-mono text-[11px] tracking-[0.14em] text-primary-500">
-                    INPICK 서비스
-                  </p>
-                </div>
-                <nav className="py-1.5">
-                  {SERVICES.map((s, i) => (
-                    <motion.a
-                      key={s.href}
-                      href={s.href}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setServicesOpen(false);
-                        router.push(s.href);
-                      }}
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 * i, duration: 0.18 }}
-                      className="flex items-start gap-3 px-4 py-3 transition-colors hover:bg-zinc-50"
-                    >
-                      <span className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-500/10 text-primary-500">
-                        <s.icon className="h-5 w-5" />
-                      </span>
-                      <span className="min-w-0">
-                        <span className="flex items-center gap-1.5 text-[14px] font-bold text-zinc-900">
-                          {s.label}
-                          {s.badge && (
-                            <span className="rounded-full bg-primary-500 px-1.5 py-0.5 text-[9px] font-bold leading-none text-white">
-                              {s.badge}
-                            </span>
-                          )}
-                        </span>
-                        <span className="mt-0.5 block text-[12px] leading-snug text-zinc-500">
-                          {s.desc}
-                        </span>
-                      </span>
-                    </motion.a>
-                  ))}
-                  <a
-                    href="/reviews"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setServicesOpen(false);
-                      router.push("/reviews");
-                    }}
-                    className="mt-1 flex items-center gap-2 border-t border-zinc-100 px-4 py-3 text-[13px] font-semibold text-zinc-700 transition-colors hover:bg-zinc-50"
-                  >
-                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
-                    서비스별 후기 보기
-                  </a>
-                </nav>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+        <a
+          href="/partial-ai"
+          className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2 py-2 text-[13px] font-bold tracking-tight transition-colors sm:px-3 sm:text-[14px] ${
+            isDark ? "text-offwhite hover:bg-offwhite/10" : "text-ink hover:bg-ink/5"
+          }`}
+        >
+          <span className="sm:hidden">부분 AI</span>
+          <span className="hidden sm:inline">부분 AI 인테리어</span>
+        </a>
 
-        {/* 커뮤니티 — 서비스 옆 상단바 메뉴 (웹+앱 공통) */}
+        <a
+          href="/partial-install"
+          className={`inline-flex shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-2 text-[13px] font-bold tracking-tight transition-colors sm:px-3 sm:text-[14px] ${
+            isDark ? "text-offwhite hover:bg-offwhite/10" : "text-ink hover:bg-ink/5"
+          }`}
+        >
+          부분시공
+        </a>
+
+        {/* 커뮤니티 — 부분시공 옆 상단바 메뉴 (웹+앱 공통) */}
         <a
           href="/community"
           className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-2 text-[13px] font-bold tracking-tight transition-colors sm:px-3 sm:text-[14px] ${

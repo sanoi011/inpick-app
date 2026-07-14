@@ -119,6 +119,38 @@ interface ConsolidatedRow {
   source?: LineSourceKind;
 }
 
+/**
+ * 세부견적 공개 권한은 브라우저에 장기간 남는 projectId가 아니라 현재 견적 버전에 묶는다.
+ * 같은 설계/자재 상태로 재진입하면 재차감하지 않고, 이미지·평형·자재가 바뀐 새 견적은 다시 잠긴다.
+ */
+function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2Data): string {
+  const renders = Object.entries(step2.rendersByRoom || {})
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([room, items]) => [
+      room,
+      (items || []).map((item) => [
+        item.refinedUrl || item.url || "",
+        item.refinedAt || item.timestamp || "",
+      ]),
+    ]);
+  const signature = JSON.stringify({
+    address: step1.basicInfo.selectedAddress?.roadAddress || "",
+    building: step1.basicInfo.selectedAddress?.buildingName || "",
+    pyeong: step1.basicInfo.selectedPyeong?.pyeongName || "",
+    exclusiveArea: step1.basicInfo.selectedPyeong?.exclusiveArea || 0,
+    expansionType: step1.basicInfo.expansionType || "",
+    rooms: [...(step1.rooms || [])].sort(),
+    selectedByRoom: step2.selectedByRoom || {},
+    renders,
+  });
+  let hash = 2166136261;
+  for (let index = 0; index < signature.length; index += 1) {
+    hash ^= signature.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${projectId}-${(hash >>> 0).toString(36)}`;
+}
+
 // P4: source 배지 라벨/색상 매핑
 const SOURCE_LABEL: Record<LineSourceKind, string> = {
   user_selected_material: "사용자 확정",
@@ -389,6 +421,7 @@ function EstimatePage() {
   const [pdfPurchaseOpen, setPdfPurchaseOpen] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [detailsProjectId, setDetailsProjectId] = useState<string | null>(null);
+  const [detailsAccessId, setDetailsAccessId] = useState<string | null>(null);
   const [detailsUnlocked, setDetailsUnlocked] = useState(false);
   const [detailsAccessChecked, setDetailsAccessChecked] = useState(false);
   const [detailsUnlocking, setDetailsUnlocking] = useState(false);
@@ -413,15 +446,16 @@ function EstimatePage() {
   }, [router]);
 
   useEffect(() => {
-    const projectId = searchParams?.get("projectId") || getOrCreateWorkflowProjectId();
-    if (!projectId) {
+    if (!detailsAccessId) {
       setDetailsAccessChecked(true);
       return;
     }
-    setDetailsProjectId(projectId);
+    setDetailsUnlocked(false);
+    setDetailsAccessChecked(false);
+    setDetailsGateVisible(false);
     let cancelled = false;
     fetch(
-      `/api/inpick/estimate-details-access?projectId=${encodeURIComponent(projectId)}`,
+      `/api/inpick/estimate-details-access?projectId=${encodeURIComponent(detailsAccessId)}`,
       { cache: "no-store" },
     )
       .then(async (response) => {
@@ -434,17 +468,17 @@ function EstimatePage() {
     return () => {
       cancelled = true;
     };
-  }, [searchParams]);
+  }, [detailsAccessId]);
 
   const unlockEstimateDetails = async () => {
-    if (!detailsProjectId || detailsUnlocking) return;
+    if (!detailsAccessId || detailsUnlocking) return;
     setDetailsUnlocking(true);
     setDetailsAccessError(null);
     try {
       const response = await fetch("/api/inpick/estimate-details-access", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId: detailsProjectId }),
+        body: JSON.stringify({ projectId: detailsAccessId }),
       });
       const data = (await response.json().catch(() => ({}))) as {
         granted?: boolean;
@@ -684,6 +718,9 @@ function EstimatePage() {
         rendersByRoom: {},
         promptByRoom: {},
       } as Step2Data);
+      const activeProjectId = searchParams?.get("projectId") || projectId;
+      setDetailsProjectId(activeProjectId);
+      setDetailsAccessId(buildEstimateAccessId(activeProjectId, finalS1, finalS2));
       setStep1(finalS1);
       setStep2(finalS2);
       // sessionStorage 동기화 (다음 진입 시 빠르게)

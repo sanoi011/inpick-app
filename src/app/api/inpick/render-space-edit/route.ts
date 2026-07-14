@@ -55,6 +55,8 @@ interface RenderSpaceEditBody {
   targetId?: string;
   targetNameKo?: string;
   spaceType?: string;
+  /** 부분 AI 인테리어 전용 모드 — 서버에서 1실 5토큰을 강제 적용 */
+  serviceMode?: "partial_ai_room";
 }
 
 const OPENAI_BASE = "https://api.openai.com/v1";
@@ -141,8 +143,10 @@ export async function POST(req: NextRequest) {
 
     // ─── 토큰 차감 ─────────────────────
     try {
-      charge = await enforceConsume("render-room", {
+      const billingFeature = body.serviceMode === "partial_ai_room" ? "partial-ai-room" : "render-room";
+      charge = await enforceConsume(billingFeature, {
         feature: "render-space-edit",
+        serviceMode: body.serviceMode ?? "material_preview",
         preserveGeometry: true,
         targetSurfaces: body.targetSurfaces,
         spaceType: body.spaceType,
@@ -310,6 +314,7 @@ export async function POST(req: NextRequest) {
       mode: "photo_only",
       editableRenderId,
       preserveGeometry: true,
+      creditsCharged: charge?.charged ?? 0,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
