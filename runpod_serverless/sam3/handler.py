@@ -12,6 +12,7 @@ import os
 import tempfile
 import threading
 import time
+from pathlib import Path
 
 import cv2
 import numpy as np
@@ -24,10 +25,38 @@ _lock = threading.Lock()
 _engine = None
 _engine_name = None
 _loaded_at = None
+_checkpoint_source = None
+
+HF_CACHE_HOME = Path("/runpod-volume/huggingface-cache")
+SAM31_CACHE_REPO = HF_CACHE_HOME / "hub" / "models--facebook--sam3.1"
+if HF_CACHE_HOME.is_dir():
+    # RunPod Endpoint의 Model 필드에 facebook/sam3.1을 등록하면 이 경로에
+    # 체크포인트가 준비된다. 런타임 재다운로드보다 이 캐시를 우선 사용한다.
+    os.environ.setdefault("HF_HOME", str(HF_CACHE_HOME))
+
+
+def resolve_sam31_checkpoint():
+    configured = os.getenv("SAM31_CHECKPOINT_PATH", "").strip()
+    if configured:
+        path = Path(configured)
+        if not path.is_file():
+            raise FileNotFoundError(
+                f"MODEL_VERSION_MISMATCH: SAM31_CHECKPOINT_PATH not found: {path}"
+            )
+        return str(path), "configured"
+
+    cached = list(SAM31_CACHE_REPO.glob("snapshots/*/sam3.1_multiplex.pt"))
+    if cached:
+        newest = max(cached, key=lambda path: path.stat().st_mtime)
+        return str(newest), "runpod-model-cache"
+
+    # 개발·초기 배포에서는 Meta 빌더가 Hugging Face에서 내려받는다.
+    # gated checkpoint이므로 RunPod 환경변수 HF_TOKEN이 반드시 필요하다.
+    return None, "huggingface-runtime"
 
 
 def get_engine():
-    global _engine, _engine_name, _loaded_at
+    global _engine, _engine_name, _loaded_at, _checkpoint_source
     if _engine is not None:
         return _engine, _engine_name
     with _lock:
@@ -39,7 +68,9 @@ def get_engine():
         if MODEL_VERSION.startswith("3.1"):
             from sam3.model_builder import build_sam3_multiplex_video_predictor
 
+            checkpoint_path, _checkpoint_source = resolve_sam31_checkpoint()
             _engine = build_sam3_multiplex_video_predictor(
+                checkpoint_path=checkpoint_path,
                 max_num_objects=int(os.getenv("SAM31_MAX_OBJECTS", "16")),
                 multiplex_count=int(os.getenv("SAM31_MULTIPLEX_COUNT", "16")),
                 use_fa3=os.getenv("SAM31_USE_FA3", "0") == "1",
@@ -57,6 +88,7 @@ def get_engine():
             model.eval()
             _engine = Sam3Processor(model)
             _engine_name = "sam3"
+            _checkpoint_source = "huggingface-runtime"
 
         _loaded_at = time.time()
         return _engine, _engine_name
@@ -276,7 +308,12 @@ def classify_error(error: Exception) -> dict:
         code, retryable = "INVALID_IMAGE", False
     elif "timeout" in lower:
         code, retryable = "MODEL_TIMEOUT", True
-    elif "missing key" in lower or "unexpected key" in lower or "size mismatch" in lower:
+    elif (
+        "model_version_mismatch" in lower
+        or "missing key" in lower
+        or "unexpected key" in lower
+        or "size mismatch" in lower
+    ):
         code, retryable = "MODEL_VERSION_MISMATCH", False
     else:
         code, retryable = "WORKER_ERROR", True
@@ -304,6 +341,7 @@ def health_payload(loaded: bool) -> dict:
         "model_version": MODEL_VERSION,
         "loaded": loaded,
         "loaded_at": _loaded_at,
+        "checkpoint_source": _checkpoint_source,
         "cuda_available": torch.cuda.is_available(),
         "cuda_device": device_name,
         "gpu_free_bytes": free_bytes,

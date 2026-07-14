@@ -12,7 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
-COPY requirements.txt .
+# RunPod GitHub 연동은 저장소 루트를 build context로 사용한다.
+# 로컬에서도 `docker build -f runpod_serverless/sam3/Dockerfile .`로 동일하게 빌드한다.
+COPY runpod_serverless/sam3/requirements.txt .
 RUN python3.12 -m pip install --break-system-packages -r requirements.txt \
     && python3.12 -m pip install --break-system-packages \
       torch==2.10.0 torchvision --index-url https://download.pytorch.org/whl/cu128 \
@@ -20,5 +22,5 @@ RUN python3.12 -m pip install --break-system-packages -r requirements.txt \
     && cd /opt/sam3 && git fetch --depth 1 origin "${SAM3_GIT_REF}" && git checkout FETCH_HEAD \
     && python3.12 -m pip install --break-system-packages -e /opt/sam3
 
-COPY handler.py .
+COPY runpod_serverless/sam3/handler.py .
 CMD ["python3.12", "-u", "handler.py"]

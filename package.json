@@ -19,7 +19,8 @@
     "mobile:sync": "npx cap sync",
     "mobile:assets": "npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1A1F2E' --splashBackgroundColor '#F73B20' --splashBackgroundColorDark '#F73B20'",
     "mobile:open:ios": "npx cap open ios",
-    "mobile:open:android": "npx cap open android"
+    "mobile:open:android": "npx cap open android",
+    "runpod:sam31:smoke": "node scripts/runpod-sam31-smoke.mjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
