@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 import {
   BarChart3, FileText, Users, Loader2, Plus, Star,
   DollarSign, Bell, Calendar, ChevronRight,
@@ -129,6 +130,8 @@ export default function ContractorDashboard() {
           <Plus className="w-4 h-4" /> 새 견적
         </Link>
       </div>
+
+      <PromotionalBannerSlot placement="contractor_dashboard_top" className="mb-6" />
 
       {loading ? (
         <div className="flex items-center justify-center py-20">

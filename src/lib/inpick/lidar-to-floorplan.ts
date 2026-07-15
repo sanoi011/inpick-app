@@ -5,7 +5,7 @@
  *   1. 사용자가 iPhone Pro/iPad Pro의 RoomPlan/PolyCam/Scaniverse 같은 앱으로 방 스캔
  *   2. USDZ/OBJ/GLB/PLY 형식으로 export → 우리 사이트에 업로드
  *   3. 이 함수: Three.js로 mesh 로드 → 직교 top-down 카메라로 렌더 → PNG dataURL
- *   4. 그 PNG를 기존 /api/inpick/normalize-floorplan 에 보내 GPT-4o Vision이 치수 추출
+ *   4. 그 PNG를 /api/inpick/normalize-floorplan에 보내 최상위 Vision 모델이 치수 추출
  *
  * 모두 클라이언트 측 동작 — 사용자 PC에서 처리, 서버 부하 0.
  *

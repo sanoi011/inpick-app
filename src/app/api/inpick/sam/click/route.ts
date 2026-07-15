@@ -14,13 +14,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   samClickSegment,
-  sam31ConceptSegment,
   isSamRunPodConfigured,
-  isSam31RunPodConfigured,
-  SamRunPodError,
 } from "@/lib/inpick/sam-runpod-client";
 import {
-  getSamSurfaceConcept,
   isSamSurfaceTarget,
   type SamSurfaceTarget,
 } from "@/lib/inpick/sam-surface-prompts";
@@ -66,11 +62,11 @@ async function uploadMaskToStorage(maskB64: string, prefix: string): Promise<str
 }
 
 export async function POST(req: NextRequest) {
-  if (!isSamRunPodConfigured() && !isSam31RunPodConfigured()) {
+  if (!isSamRunPodConfigured()) {
     return NextResponse.json(
       {
         error: "영역 분할 서비스가 아직 활성화되지 않았습니다",
-        hint: "관리자에게 RunPod SAM 3.1 또는 SAM 2.1 엔드포인트 등록 요청",
+        hint: "관리자에게 RunPod SAM 2.1 엔드포인트 등록 요청",
       },
       { status: 503 },
     );
@@ -92,37 +88,10 @@ export async function POST(req: NextRequest) {
     const targetSurface: SamSurfaceTarget | null = isSamSurfaceTarget(body.targetSurface)
       ? body.targetSurface
       : null;
-    let engine: "sam3.1" | "sam2.1" = "sam2.1";
-    let fallbackUsed = false;
-    let fallbackReason: string | undefined;
-    let result;
-
-    if (targetSurface && isSam31RunPodConfigured()) {
-      try {
-        result = await sam31ConceptSegment(
-          imageB64,
-          getSamSurfaceConcept(targetSurface),
-          body.x,
-          body.y,
-        );
-        engine = "sam3.1";
-      } catch (error) {
-        if (!isSamRunPodConfigured()) throw error;
-        fallbackReason = error instanceof SamRunPodError ? error.code : "SAM31_UNKNOWN_ERROR";
-        console.warn(
-          `[sam/click] SAM 3.1 failed (${fallbackReason}); falling back to SAM 2.1:`,
-          error instanceof Error ? error.message : String(error),
-        );
-        result = await samClickSegment(imageB64, body.x, body.y);
-        fallbackUsed = true;
-      }
-    } else {
-      if (!isSamRunPodConfigured()) {
-        throw new Error("RUNPOD_SAM_ENDPOINT_ID 미설정 — SAM 2.1 폴백 불가");
-      }
-      result = await samClickSegment(imageB64, body.x, body.y);
-      fallbackUsed = Boolean(targetSurface);
-    }
+    // 현재 운영 정책: 정확도·비용이 검증된 SAM 2.1로 고정.
+    // SAM 3.1 엔드포인트 코드는 향후 명시적 전환 시에만 사용한다.
+    const engine = "sam2.1" as const;
+    const result = await samClickSegment(imageB64, body.x, body.y);
 
     // mask PNG를 Storage에 업로드 → URL 반환 (응답 body 작게 유지)
     const maskUrl = await uploadMaskToStorage(result.mask_b64, "sam-masks/click");
@@ -150,8 +119,7 @@ export async function POST(req: NextRequest) {
       mask_url: maskUrl,
       engine,
       semantic_label: targetSurface || undefined,
-      fallback_used: fallbackUsed,
-      fallback_reason: fallbackReason,
+      fallback_used: false,
       // mask_b64 그대로 반환은 안 함 — 용량 큼
       candidates: candidatesOut,
     });

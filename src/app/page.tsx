@@ -20,6 +20,9 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import AppDownloadSection from "@/components/landing/AppDownloadSection";
+import BusinessDropdown from "@/components/business/BusinessDropdown";
+import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
+import { BUSINESS_MENU_ITEMS } from "@/lib/business-center";
 
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
@@ -132,6 +135,7 @@ const FOOTER_LINKS = [
     title: "비즈니스",
     links: [
       { label: "사업자 서비스", href: "/contractor" },
+      { label: "비즈니스 문의", href: "/business" },
       { label: "사업자 등록", href: "/contractor/register" },
       { label: "사업자 로그인", href: "/auth?type=contractor" },
       { label: "AIOD 소개", href: "/aiod" },
@@ -152,6 +156,7 @@ export default function Home() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [businessMobileOpen, setBusinessMobileOpen] = useState(false);
   const [trendIndex, setTrendIndex] = useState(0);
 
   useEffect(() => {
@@ -171,7 +176,12 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-white font-sans text-[#0d0d0d]">
-      <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-xl">
+      {/*
+        모바일 Capacitor WebView에서 sticky top-0을 쓰면 스크롤 시
+        헤더가 iOS 상태바 뒤로 올라간다. 모바일은 첫 화면 로고로
+        남겨 스크롤과 함께 사라지게 하고, 데스크톱에서만 sticky를 유지한다.
+      */}
+      <header className="relative z-50 bg-white/95 backdrop-blur-xl lg:sticky lg:top-0">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center gap-8 px-5 sm:px-7 lg:px-10">
           <Link href="/" className="flex shrink-0 items-center gap-2.5" aria-label="InPick 홈">
             <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
@@ -184,9 +194,7 @@ export default function Home() {
                 {item.label}
               </Link>
             ))}
-            <Link href="/contractor" className="inline-flex items-center gap-1 transition-opacity hover:opacity-55">
-              비즈니스 <ChevronDown className="h-3.5 w-3.5" />
-            </Link>
+            <BusinessDropdown />
           </nav>
 
           <div className="ml-auto hidden items-center gap-3 sm:flex">
@@ -241,6 +249,24 @@ export default function Home() {
                   {item.label}
                 </Link>
               ))}
+              <button
+                type="button"
+                onClick={() => setBusinessMobileOpen((open) => !open)}
+                className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-[15px] font-medium hover:bg-black/[0.04]"
+                aria-expanded={businessMobileOpen}
+              >
+                비즈니스 <ChevronDown className={`h-4 w-4 transition-transform ${businessMobileOpen ? "rotate-180" : ""}`} />
+              </button>
+              {businessMobileOpen && (
+                <div className="grid gap-1 rounded-2xl bg-[#f5f5f3] p-2">
+                  {BUSINESS_MENU_ITEMS.map((item) => (
+                    <Link key={item.href} href={item.href} onClick={() => setMenuOpen(false)} className="rounded-xl bg-white px-3 py-3">
+                      <span className="block text-[13px] font-semibold">{item.label}</span>
+                      <span className="mt-0.5 block text-[10px] text-black/42">{item.description}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
             </nav>
             <div className="mt-4 grid grid-cols-2 gap-2 border-t border-black/[0.06] pt-4">
               {authLoading ? (
@@ -337,6 +363,8 @@ export default function Home() {
       </section>
 
       <AppDownloadSection />
+
+      <PromotionalBannerSlot placement="home_mid" className="bg-[#f7f7f5] px-5 pb-14 sm:px-8 sm:pb-20" />
 
       <section id="showcase" className="px-3 pb-3 sm:px-5 sm:pb-5">
         <div className="mx-auto mb-8 flex max-w-[1560px] items-end justify-between gap-5 px-2 sm:mb-10">

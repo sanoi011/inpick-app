@@ -9,6 +9,10 @@ import {
 } from "lucide-react";
 import { useAdminAuth } from "@/hooks/useAdminAuth";
 import { toast } from "@/components/ui/Toast";
+import {
+  INPICK_FRONTIER_FALLBACK_LABEL,
+  INPICK_FRONTIER_MODEL_LABEL,
+} from "@/lib/inpick/ai-model-policy";
 
 interface Stats {
   estimates: number;
@@ -166,7 +170,7 @@ export default function AdminDashboardPage() {
       <div className="rounded-[24px] border border-black/[0.07] bg-white p-5 sm:p-6">
         <h3 className="mb-4 flex items-center gap-2 text-[15px] font-semibold tracking-[-0.025em] text-black">
           <Sparkles className="h-[18px] w-[18px] text-primary-500" />
-          AI 시스템 현황 (2026-05)
+          AI 시스템 현황 (2026-07)
         </h3>
         <div className="grid grid-cols-1 gap-3 text-xs sm:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
@@ -176,7 +180,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
             <p className="font-bold text-blue-700">Vision 분석</p>
-            <p className="mt-1.5 leading-5 text-black/62">GPT-4o (정형화 + 자재 영역)</p>
+            <p className="mt-1.5 leading-5 text-black/62">{INPICK_FRONTIER_MODEL_LABEL} 최상위 고정 (정형화 + 자재 영역)</p>
+            <p className="mt-1 text-[10px] text-black/36">권한·일시 장애 시만 {INPICK_FRONTIER_FALLBACK_LABEL} 안전 대체</p>
             <p className="mt-2 break-all text-[10px] text-black/32">normalize-floorplan / extract-regions</p>
           </div>
           <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
@@ -186,7 +191,8 @@ export default function AdminDashboardPage() {
           </div>
           <div className="rounded-2xl border border-black/[0.06] bg-[#f7f7f5] p-4">
             <p className="font-bold text-emerald-700">견적 산출</p>
-            <p className="mt-1.5 leading-5 text-black/62">Vision 자재 추출 + MOLIT 일위대가 + 부자재 10%</p>
+            <p className="mt-1.5 leading-5 text-black/62">{INPICK_FRONTIER_MODEL_LABEL} 최상위 견적 추론 + MOLIT 일위대가 + 부자재 10%</p>
+            <p className="mt-1 text-[10px] text-black/36">고품질 추론 + JSON 구조화 응답</p>
             <p className="mt-2 break-all text-[10px] text-black/32">/api/inpick/build-estimate</p>
           </div>
         </div>
@@ -293,7 +299,7 @@ export default function AdminDashboardPage() {
             </Link>
             <Link href="/admin/drawing-logs" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Bot className="w-4 h-4 text-pink-600" />
-              <span className="font-medium text-black">도면 인식 로그 (GPT-4o Vision)</span>
+              <span className="font-medium text-black">도면 인식 로그 ({INPICK_FRONTIER_MODEL_LABEL} Vision)</span>
             </Link>
             <Link href="/contractor" target="_blank" className="flex items-center gap-2 rounded-2xl bg-[#f7f7f5] px-4 py-3.5 text-[12px] transition hover:bg-black/[0.06]">
               <Users className="w-4 h-4 text-purple-600" />

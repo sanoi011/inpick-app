@@ -44,9 +44,9 @@ interface Stats {
   lowConfidence: number;
 }
 
-// 현재 시스템 (2026-05) — GPT-4o Vision 기반 정형화 + gpt-image / DALL-E 렌더링
+// 저장된 provider key는 하위 호환을 위해 유지하지만 실제 호출은 GPT-5.6 Sol Vision 1순위.
 const METHOD_LABELS: Record<string, string> = {
-  gpt4o_vision: "GPT-4o Vision (정형화)",
+  gpt4o_vision: "GPT-5.6 Sol Vision (정형화)",
   normalize_floorplan: "/api/normalize-floorplan",
   extract_regions: "자재 영역 추출 (Vision)",
   render_room: "AI 디자인 렌더 (gpt-image-2)",
@@ -59,7 +59,7 @@ const METHOD_LABELS: Record<string, string> = {
 
 const METHOD_FILTERS = [
   { value: "", label: "전체" },
-  { value: "gpt4o_vision", label: "GPT-4o Vision" },
+  { value: "gpt4o_vision", label: "GPT-5.6 Sol Vision" },
   { value: "normalize_floorplan", label: "평면도 정형화" },
   { value: "extract_regions", label: "자재 영역 추출" },
   { value: "render_room", label: "AI 디자인 렌더" },

@@ -1,9 +1,10 @@
 // src/app/api/project/estimate-materials/route.ts
 // POST /api/project/estimate-materials
-// 도면 이미지 + 디자인 선호도 → Gemini Pro → 견적용 SelectedMaterial[] 자동 추천
+// 도면 이미지 + 디자인 선호도 → GPT-5.6 Sol → 견적용 SelectedMaterial[] 자동 추천
 
 import { NextRequest, NextResponse } from "next/server";
-import { getGeminiClient, isGeminiConfigured } from "@/lib/gemini-client";
+import { analyzeImageVision } from "@/lib/inpick/openai-client";
+import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 
 export const maxDuration = 60;
 
@@ -140,8 +141,8 @@ export async function POST(request: NextRequest) {
     const priorities = designPreferences?.priorities || [];
     const specialNotes = designPreferences?.specialNotes || [];
 
-    // Gemini 미설정 시 Mock
-    if (!isGeminiConfigured()) {
+    // OpenAI 미설정 시 표준 추천으로 안전 폴백
+    if (!hasOpenAIKey()) {
       const materials = getMockMaterials(budget);
       return NextResponse.json({
         materials,
@@ -151,19 +152,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const client = getGeminiClient();
-    if (!client) {
-      const materials = getMockMaterials(budget);
-      return NextResponse.json({
-        materials,
-        designConcept: "AI 클라이언트 초기화 실패 - 기본 추천",
-        method: "mock",
-        warnings: ["AI 클라이언트 초기화 실패"],
-      });
-    }
-
     // 도면 이미지 가져오기
-    const imageParts: Array<{ inlineData: { mimeType: string; data: string } }> = [];
+    let imageBase64: string | undefined;
+    let imageMimeType: string | undefined;
     if (floorPlanImageUrl) {
       try {
         let fetchUrl = floorPlanImageUrl;
@@ -176,7 +167,8 @@ export async function POST(request: NextRequest) {
         if (imgRes.ok) {
           const buffer = Buffer.from(await imgRes.arrayBuffer());
           const mimeType = imgRes.headers.get("content-type") || "image/png";
-          imageParts.push({ inlineData: { mimeType, data: buffer.toString("base64") } });
+          imageBase64 = buffer.toString("base64");
+          imageMimeType = mimeType;
         }
       } catch (err) {
         console.warn("[estimate-materials] Failed to fetch image:", err);
@@ -190,7 +182,7 @@ export async function POST(request: NextRequest) {
     const userPrompt = `## 프로젝트 정보
 - 전용면적: ${area || 84}㎡
 - 방 수: ${roomCount || 3}개
-${imageParts.length > 0 ? "- 첨부된 평면도 이미지를 참고하여 공간별 특성에 맞게 자재를 추천하세요" : "- 일반적인 한국 아파트 구조를 기준으로 추천하세요"}
+${imageBase64 ? "- 첨부된 평면도 이미지를 참고하여 공간별 특성에 맞게 자재를 추천하세요" : "- 일반적인 한국 아파트 구조를 기준으로 추천하세요"}
 
 ## 고객 선호도
 - 스타일: ${style}
@@ -203,26 +195,17 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
 
     const startTime = Date.now();
 
-    let response;
+    let response: Awaited<ReturnType<typeof analyzeImageVision>>;
     try {
-      response = await client.models.generateContent({
-        model: "gemini-3-pro-preview",
-        contents: [{
-          role: "user",
-          parts: [
-            ...imageParts,
-            { text: MATERIAL_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(MATERIAL_SCHEMA, null, 2) + "\n\n" + userPrompt },
-          ],
-        }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: MATERIAL_SCHEMA,
-          temperature: 0.3,
-          maxOutputTokens: 8192,
-        },
+      response = await analyzeImageVision({
+        imageBase64,
+        imageMimeType,
+        prompt: MATERIAL_PROMPT + "\n\nJSON 스키마:\n" + JSON.stringify(MATERIAL_SCHEMA, null, 2) + "\n\n" + userPrompt,
+        responseFormat: "json_object",
+        maxOutputTokens: 12_000,
       });
     } catch (apiError) {
-      console.error("[estimate-materials] Gemini API error:", apiError);
+      console.error("[estimate-materials] GPT-5.6 API error:", apiError);
       const materials = getMockMaterials(budget);
       return NextResponse.json({
         materials,
@@ -232,7 +215,7 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
       });
     }
 
-    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    const text = response.content || "";
     let parsed: { materials?: AIMaterial[]; designConcept?: string };
 
     try {
@@ -279,7 +262,8 @@ ${MATERIAL_CATEGORIES.map(c => `- ${c}`).join("\n")}`;
       method: "ai_recommend",
       warnings: [],
       processingTimeMs,
-      imageAnalyzed: imageParts.length > 0,
+      imageAnalyzed: Boolean(imageBase64),
+      model: response.model,
     });
   } catch (error) {
     console.error("[estimate-materials] Error:", error);

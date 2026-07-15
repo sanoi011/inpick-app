@@ -1,7 +1,7 @@
 /**
  * POST /api/inpick/extract-material-regions
  *
- * 1차 렌더 이미지(gpt-image-2) → GPT-4o Vision → SegmentationData JSON
+ * 1차 렌더 이미지(gpt-image-2) → GPT-5.6 Sol Vision → SegmentationData JSON
  * SAM 2.1 직접 운영 GPU 서버가 준비되면 그쪽으로 분기 추가 예정.
  *
  * 가이드 정책: Replicate / 외부 SaaS 일체 금지.

@@ -24,6 +24,7 @@ import {
   Wand2,
 } from "lucide-react";
 import HeaderV4 from "@/components/landing-v4/HeaderV4";
+import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 import ClickableRenderImage from "@/components/workflow/ClickableRenderImage";
 import { useTokens } from "@/contexts/TokensContext";
 import type { SamPolygonResult } from "@/hooks/useSamClient";
@@ -315,6 +316,8 @@ export default function PartialAiPage() {
           </div>
         </div>
       </section>
+
+      <PromotionalBannerSlot placement="partial_ai_materials" className="px-5 py-6 lg:px-8" />
 
       <section className="border-y border-black/[0.07] bg-[#f7f7f5]">
         <div className="mx-auto max-w-7xl px-5 py-8 lg:px-8">

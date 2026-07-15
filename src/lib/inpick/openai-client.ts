@@ -4,9 +4,14 @@
  *
  * 기능:
  *  - generateRoomRender: 실별 인테리어 렌더 (gpt-image-2 단일, 폴백 없음)
- *  - analyzeImageVision: 평면도/렌더 이미지 분석 (gpt-4o vision)
- *  - generateElevationSVG: 입면전개도 SVG 코드 생성 (gpt-4o)
+ *  - analyzeImageVision: 평면도/렌더 이미지 분석 (GPT-5.6 Sol 최상위 고정)
+ *  - generateElevationSVG: 입면전개도 deterministic SVG 생성
  */
+
+import {
+  INPICK_FRONTIER_MODEL_CANDIDATES,
+  isRecoverableFrontierModelError,
+} from "./ai-model-policy";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 
@@ -337,6 +342,7 @@ export interface VisionAnalyzeInput {
   imageMimeType?: string;
   prompt: string;
   responseFormat?: "json_object" | "text";
+  maxOutputTokens?: number;
 }
 
 interface OpenAIUsage {
@@ -347,48 +353,65 @@ interface OpenAIUsage {
 
 export async function analyzeImageVision(
   input: VisionAnalyzeInput,
-): Promise<{ content: string; usage: OpenAIUsage | undefined }> {
-  const imageContent = input.imageUrl
-    ? { type: "image_url", image_url: { url: input.imageUrl, detail: "high" } }
-    : {
-        type: "image_url",
-        image_url: {
-          url: `data:${input.imageMimeType || "image/jpeg"};base64,${input.imageBase64}`,
-          detail: "high",
-        },
-      };
-
-  const body: Record<string, unknown> = {
-    model: "gpt-4o",
-    messages: [
-      {
-        role: "user",
-        content: [imageContent, { type: "text", text: input.prompt }],
+): Promise<{ content: string; usage: OpenAIUsage | undefined; model: string }> {
+  const content: Array<Record<string, unknown>> = [];
+  if (input.imageUrl) {
+    content.push({ type: "image_url", image_url: { url: input.imageUrl, detail: "high" } });
+  } else if (input.imageBase64) {
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: `data:${input.imageMimeType || "image/jpeg"};base64,${input.imageBase64}`,
+        detail: "high",
       },
-    ],
-    max_tokens: 2000,
-  };
-  if (input.responseFormat === "json_object") {
-    body.response_format = { type: "json_object" };
+    });
   }
+  content.push({ type: "text", text: input.prompt });
 
-  const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${getKey()}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.text();
-    throw new Error(`OpenAI vision failed: ${res.status} ${err.slice(0, 300)}`);
+  const errors: string[] = [];
+  for (const model of INPICK_FRONTIER_MODEL_CANDIDATES) {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const body: Record<string, unknown> = {
+        model,
+        messages: [{ role: "user", content }],
+        max_completion_tokens: input.maxOutputTokens ?? 8_192,
+        reasoning_effort: "high",
+      };
+      if (input.responseFormat === "json_object") {
+        body.response_format = { type: "json_object" };
+      }
+
+      const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${getKey()}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          content: data.choices?.[0]?.message?.content || "",
+          usage: data.usage,
+          model: data.model || model,
+        };
+      }
+
+      const err = await res.text();
+      errors.push(`${model} ${res.status} attempt ${attempt + 1}: ${err.slice(0, 300)}`);
+      const recoverable = isRecoverableFrontierModelError(res.status, err);
+      if (!recoverable) {
+        throw new Error(`OpenAI frontier analysis failed: ${errors.join(" | ")}`);
+      }
+      if ((res.status === 429 || res.status >= 500 || /capacity|overloaded/i.test(err)) && attempt === 0) {
+        await new Promise((resolve) => setTimeout(resolve, 1_500));
+        continue;
+      }
+      break;
+    }
   }
-  const data = await res.json();
-  return {
-    content: data.choices?.[0]?.message?.content || "",
-    usage: data.usage,
-  };
+  throw new Error(`OpenAI frontier models unavailable: ${errors.join(" | ")}`);
 }
 
 export interface ElevationInput {

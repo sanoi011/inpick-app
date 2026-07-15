@@ -43,6 +43,7 @@ import {
   Wrench,
 } from "lucide-react";
 import HeaderV4 from "@/components/landing-v4/HeaderV4";
+import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 
 type ProductResult = {
   productId: string;
@@ -423,6 +424,8 @@ export default function PartialInstallPage() {
           </div>
         </div>
       </section>
+
+      <PromotionalBannerSlot placement="partial_install_results" className="px-5 py-6 lg:px-8" />
 
       <section className="border-y border-black/[0.07] bg-[#f7f7f5]">
         <div className="mx-auto max-w-7xl px-5 py-5 lg:px-8">

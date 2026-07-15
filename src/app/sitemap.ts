@@ -14,6 +14,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/viewer",
     "/find-contractors",
     "/community",
+    "/business",
   ];
 
   const contractorPages = [

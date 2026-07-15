@@ -2,7 +2,7 @@
  * POST /api/inpick/normalize-floorplan
  *
  * 네이버/업로드 평면도 → gpt-image-2 image edit로 워터마크 제거 + 바닥 고화질화 (raster 유지)
- *                    → GPT-4o Vision으로 실 layout 추출 (mm)
+ *                    → GPT-5.6 Sol Vision으로 실 layout 추출 (mm)
  *                    → dimension overlay SVG 생성 (raster 위에 absolute로 얹힘)
  *
  * 입력: { imageUrl?, imageBase64?, imageMimeType?, exclusiveAreaM2?, isHandDrawn?, unitName? }

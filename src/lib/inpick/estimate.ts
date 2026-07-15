@@ -311,7 +311,7 @@ function perimeterM(dim: RoomDim): number {
   return Math.round(2 * (dim.widthMm + dim.depthMm) / 1000 * 100) / 100;
 }
 
-/** 렌더 이미지 → 부위별 자재 추출 (GPT-4o Vision) */
+/** 렌더 이미지 → 부위별 자재 추출 (GPT-5.6 Sol Vision) */
 export interface ExtractMaterialsInput {
   renderImageUrl: string;
   roomName: string;

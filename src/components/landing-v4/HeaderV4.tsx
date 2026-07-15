@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useTokens } from "@/hooks/useTokens";
 import { useAuth } from "@/hooks/useAuth";
+import BusinessDropdown from "@/components/business/BusinessDropdown";
 
 /**
  * 헤더 V4 — 좌측 로고 + 우측 로그인 버튼 (비로그인) 또는 마이페이지+토큰 (로그인)
@@ -63,7 +64,6 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
   const MAIN_CATEGORIES: Array<{ label: string; href: string }> = [
     { label: "소개", href: "/#walkthrough" },
     { label: "요금제", href: "/account/tokens" },
-    { label: "비즈니스", href: "/contractor" },
   ];
 
   return (
@@ -145,18 +145,7 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
               {c.label}
             </a>
           ))}
-          {/* 사업자 페이지 — 강조 */}
-          <a
-            href="/contractor"
-            className={`ml-2 px-3 py-2 text-[13px] font-bold tracking-tight rounded-full inline-flex items-center gap-1 transition-colors ${
-              isDark
-                ? "border border-offwhite/30 text-offwhite hover:bg-offwhite/10"
-                : "border border-ink/20 text-ink hover:bg-ink/5"
-            }`}
-          >
-            <Building2 className="h-3 w-3" />
-            사업자페이지
-          </a>
+          <BusinessDropdown dark={isDark} />
         </div>
 
         <div className="flex items-center gap-2 text-[13px] sm:gap-2.5 sm:text-[14px]">

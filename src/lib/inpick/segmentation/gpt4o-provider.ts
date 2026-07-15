@@ -1,5 +1,5 @@
 /**
- * GPT-4o Vision 기반 segmentation provider.
+ * GPT-5.6 Sol Vision 기반 segmentation provider.
  * 인프라 없이 작동. SAM이 비활성/미인증인 동안의 기본 동작.
  * 정확도는 SAM 2.1 대비 떨어지지만 polygon 좌표 직접 출력해서 단일 호출로 끝남.
  */
@@ -83,7 +83,7 @@ export const gpt4oProvider: SegmentationProvider = {
     try {
       parsed = JSON.parse(visionRes.content);
     } catch {
-      throw new Error("GPT-4o segmentation JSON 파싱 실패");
+      throw new Error("GPT-5.6 Sol segmentation JSON 파싱 실패");
     }
 
     const imageWidth = parsed.imageWidth || 1024;

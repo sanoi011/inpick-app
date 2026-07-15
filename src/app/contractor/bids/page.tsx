@@ -37,6 +37,7 @@ import type { CostItem, RoomCostSection } from "@/components/project/CostTable";
 import DesignGalleryModal, {
   type DesignRender,
 } from "@/components/contractor/DesignGalleryModal";
+import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => (
@@ -505,6 +506,8 @@ function ContractorBidsContent() {
           </Link>
         </div>
       </section>
+
+      <PromotionalBannerSlot placement="contractor_bids_top" className="mt-6" />
 
       <section className="mt-7 grid grid-cols-2 gap-2 lg:grid-cols-4">
         <MetricCard label="새 맞춤 공고" value={counts.available} detail="입찰 가능" />
