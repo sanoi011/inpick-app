@@ -7,28 +7,29 @@
  * 예: surfaceType="floor" + room="bath" → ["BATH_TILE", "tile", "porcelain_tile"]
  */
 import type { SurfaceType } from "./types";
+import {
+  MATERIAL_PRODUCT_CATEGORY_CODES,
+  materialProductCategoryCodes,
+} from "@/lib/inpick/material-product-category-codes";
 
 /**
  * 1차 매핑 — surface 단독 (room 무관).
  * material_products.category_code 우선, 그 다음 category_taxonomy slug.
  */
 export const SURFACE_TO_CATEGORY_HINTS: Record<SurfaceType, string[]> = {
-  floor: ["FLOORING", "flooring", "wood_floor", "laminate_floor", "강마루", "장판", "마루", "원목마루"],
-  wall: ["WALLPAPER", "PAINT", "wallpaper", "paint", "wall_panel", "도배", "벽지", "페인트"],
-  ceiling: ["CEILING", "ceiling", "ceiling_paper", "천장지", "천장", "도장"],
-  tile: ["BATH_TILE", "KITCHEN_TILE", "tile", "porcelain_tile", "bathroom_tile", "kitchen_tile", "타일", "포세린"],
-  cabinet: ["KITCHEN_CABINET", "STORAGE", "cabinet", "kitchen_cabinet", "붙박이장", "싱크대"],
-  countertop: ["countertop", "engineered_stone", "인조대리석", "상판"],
-  baseboard: ["BASEBOARD", "baseboard", "걸레받이"],
-  door: ["DOOR_ROOM", "ENTRY_DOOR", "door", "interior_door", "문짝", "문틀", "방문", "현관문"],
-  window: ["WINDOW", "window", "샷시", "창호"],
-  fixture: ["fixture", "hardware", "부속"],
-  lighting: ["LIGHTING", "lighting", "조명"],
+  floor: [...MATERIAL_PRODUCT_CATEGORY_CODES.floor, "flooring", "wood_floor", "laminate_floor", "강마루", "장판", "마루", "원목마루"],
+  wall: [...MATERIAL_PRODUCT_CATEGORY_CODES.wall, "wallpaper", "paint", "wall_panel", "도배", "벽지", "페인트"],
+  ceiling: [...MATERIAL_PRODUCT_CATEGORY_CODES.ceiling, "ceiling", "ceiling_paper", "천장지", "천장", "도장"],
+  tile: [...MATERIAL_PRODUCT_CATEGORY_CODES.tile, "tile", "porcelain_tile", "bathroom_tile", "kitchen_tile", "타일", "포세린"],
+  cabinet: [...MATERIAL_PRODUCT_CATEGORY_CODES.cabinet, "ARCH_ROOM", "cabinet", "kitchen_cabinet", "붙박이장", "싱크대"],
+  countertop: [...MATERIAL_PRODUCT_CATEGORY_CODES.countertop, "countertop", "engineered_stone", "인조대리석", "상판"],
+  baseboard: [...MATERIAL_PRODUCT_CATEGORY_CODES.baseboard, "baseboard", "걸레받이"],
+  door: [...MATERIAL_PRODUCT_CATEGORY_CODES.door, "door", "interior_door", "문짝", "문틀", "방문", "현관문"],
+  window: [...MATERIAL_PRODUCT_CATEGORY_CODES.window, "window", "샷시", "창호"],
+  fixture: [...MATERIAL_PRODUCT_CATEGORY_CODES.fixture, "fixture", "hardware", "부속"],
+  lighting: [...MATERIAL_PRODUCT_CATEGORY_CODES.lighting, "lighting", "조명"],
   sanitary: [
-    "TOILET",
-    "VANITY",
-    "SHOWER_BATH",
-    "BATH_SET",
+    ...MATERIAL_PRODUCT_CATEGORY_CODES.sanitary,
     "sanitary",
     "toilet",
     "sink",
@@ -57,31 +58,33 @@ export function refineCategoryHintsByRoom(
   // 욕실 우선
   if (isBath) {
     if (surface === "floor" || surface === "wall" || surface === "tile") {
-      return ["BATH_TILE", ...base.filter((c) => c !== "FLOORING")];
+      return materialProductCategoryCodes("tile").concat(
+        base.filter((c) => c !== "FLOORING"),
+      );
     }
     if (surface === "fixture" || surface === "sanitary") {
-      return ["BATH_SET", "TOILET", "VANITY", "SHOWER_BATH", ...base];
+      return ["ARCH_BATH", "MECH_SANITARY", "MECH_SANITARY_WC", "MECH_SANITARY_BASIN", "BATH_SET", "TOILET", "VANITY", "SHOWER_BATH", ...base];
     }
   }
 
   // 주방
   if (isKitchen) {
-    if (surface === "floor") return ["FLOORING", "KITCHEN_TILE", ...base];
-    if (surface === "wall") return ["KITCHEN_TILE", "WALLPAPER", ...base];
+    if (surface === "floor") return materialProductCategoryCodes("floor", "tile").concat(base);
+    if (surface === "wall") return materialProductCategoryCodes("tile", "wall").concat(base);
     if (surface === "fixture" || surface === "cabinet") {
-      return ["KITCHEN_CABINET", "KITCHEN_SINK", ...base];
+      return materialProductCategoryCodes("cabinet", "countertop", "fixture").concat(base);
     }
   }
 
   // 현관
   if (isEntry) {
-    if (surface === "door") return ["ENTRY_DOOR", "DOOR_ROOM", ...base];
-    if (surface === "floor") return ["BATH_TILE", "FLOORING", ...base];
+    if (surface === "door") return ["ARCH_DOOR_ENTRY", "ARCH_DOOR_ROOM", "ENTRY_DOOR", "DOOR_ROOM", ...base];
+    if (surface === "floor") return ["ARCH_FLOOR_TILE", "ARCH_FLOOR", "BATH_TILE", "FLOORING", ...base];
   }
 
   // 발코니
   if (isBalcony) {
-    if (surface === "floor") return ["BATH_TILE", "FLOORING", ...base];
+    if (surface === "floor") return ["ARCH_FLOOR_TILE", "ARCH_FLOOR", "BATH_TILE", "FLOORING", ...base];
   }
 
   return base;

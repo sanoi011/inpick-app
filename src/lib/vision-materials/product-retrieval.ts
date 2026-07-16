@@ -81,24 +81,31 @@ export async function retrieveProductCandidates(
     is_verified?: boolean;
     visual_similarity?: number;
   }> = [];
+  let vectorMatched = false;
 
-  if (observation.embedding && observation.embedding.length > 0) {
-    // Supabase pgvector RPC가 없으면 raw query 사용
-    // 우선 단순 SELECT + popularity 기준으로 fallback (embedding 없는 환경 대응)
-    // production: RPC 함수 또는 SQL `<=>` 연산 추가 필요
+  if (observation.embedding?.length === 512) {
     try {
-      const { data, error } = await admin
-        .from("material_products")
-        .select(
-          "id, brand, product_name, model_number, specification, category_code, unit, retail_price, contractor_price, price_grade, thumbnail_url, popularity_score, is_verified",
-        )
-        .in("category_code", categoryHints)
-        .not("brand", "is", null)
-        .order("popularity_score", { ascending: false, nullsFirst: false })
-        .limit(max * 2); // 여유분 (rerank 시 점수 낮은 것 필터)
-      if (!error && data) {
-        candidates = data.map((p: Record<string, unknown>) => ({
-          id: p.id as string,
+      // 새 RPC는 로컬 생성 Supabase 타입보다 뒤에 추가되므로 명시적 최소 인터페이스 사용.
+      const rpcClient = admin as unknown as {
+        rpc: (
+          functionName: string,
+          args: Record<string, unknown>,
+        ) => Promise<{
+          data: Array<Record<string, unknown>> | null;
+          error: { message: string } | null;
+        }>;
+      };
+      const { data, error } = await rpcClient.rpc("match_material_product_images", {
+        query_embedding: observation.embedding,
+        category_filters: categoryHints,
+        match_count: max * 2,
+        similarity_threshold: 0.15,
+      });
+      if (error) {
+        console.warn(`[vision-materials/retrieval] vector RPC unavailable: ${error.message}`);
+      } else if (data) {
+        candidates = data.map((p) => ({
+          id: (p.product_id || p.id) as string,
           brand: p.brand as string,
           product_name: p.product_name as string,
           sku: p.model_number as string | undefined,
@@ -108,10 +115,12 @@ export async function retrieveProductCandidates(
           contractor_price: p.contractor_price as number | undefined,
           retail_price: p.retail_price as number | undefined,
           price_grade: p.price_grade as string | undefined,
-          thumbnail_url: p.thumbnail_url as string | undefined,
+          thumbnail_url: (p.image_url || p.thumbnail_url) as string | undefined,
           popularity_score: p.popularity_score as number | undefined,
           is_verified: p.is_verified as boolean | undefined,
+          visual_similarity: Number(p.similarity) || 0,
         }));
+        vectorMatched = candidates.length > 0;
       }
     } catch (e) {
       console.warn(
@@ -122,17 +131,41 @@ export async function retrieveProductCandidates(
 
   // ─── 2차: embedding 없거나 실패 시 — category + popularity ───
   if (candidates.length === 0) {
-    const { data, error } = await admin
-      .from("material_products")
-      .select(
-        "id, brand, product_name, model_number, specification, category_code, unit, retail_price, contractor_price, price_grade, thumbnail_url, popularity_score, is_verified",
-      )
-      .in("category_code", categoryHints)
-      .not("brand", "is", null)
-      .order("popularity_score", { ascending: false, nullsFirst: false })
-      .limit(max);
-    if (!error && data) {
-      candidates = data.map((p: Record<string, unknown>) => ({
+    const fields =
+      "id, brand, product_name, model_number, specification, category_code, unit, retail_price, contractor_price, price_grade, thumbnail_url, popularity_score, is_verified";
+    const fetchFallback = async (pricedOnly: boolean, limit: number) => {
+      let query = admin
+        .from("material_products")
+        .select(fields)
+        .in("category_code", categoryHints)
+        .not("brand", "is", null)
+        .order("is_verified", { ascending: false, nullsFirst: false })
+        .order("popularity_score", { ascending: false, nullsFirst: false })
+        .limit(limit);
+      if (pricedOnly) {
+        query = query.or("contractor_price.not.is.null,retail_price.not.is.null");
+      }
+      return query;
+    };
+
+    // 견적 후보는 검증 가능한 가격이 있는 제품을 먼저 채우고, 부족한 수만
+    // 이미지/인기도 후보로 보완한다.
+    const pricedResult = await fetchFallback(true, max);
+    const fallbackRows = [...(pricedResult.data || [])] as Array<Record<string, unknown>>;
+    if (!pricedResult.error && fallbackRows.length < max) {
+      const generalResult = await fetchFallback(false, max * 2);
+      if (!generalResult.error) {
+        const seen = new Set(fallbackRows.map((row) => String(row.id)));
+        for (const row of (generalResult.data || []) as Array<Record<string, unknown>>) {
+          if (seen.has(String(row.id))) continue;
+          fallbackRows.push(row);
+          seen.add(String(row.id));
+          if (fallbackRows.length >= max) break;
+        }
+      }
+    }
+    if (!pricedResult.error) {
+      candidates = fallbackRows.map((p) => ({
         id: p.id as string,
         brand: p.brand as string,
         product_name: p.product_name as string,
@@ -158,9 +191,12 @@ export async function retrieveProductCandidates(
       roomType,
       roomName,
     );
-    const visual = observation.embedding ? 0.6 : 0.4; // embedding 없으면 낮춤
+    const visual = vectorMatched
+      ? Math.max(0, Math.min(1, p.visual_similarity ?? 0))
+      : observation.embedding
+        ? 0.45
+        : 0.35;
     const category = compatible ? 0.9 : 0.3;
-    const popularity = (p.popularity_score || 0) / 100; // 정규화
     const priceAvail = (p.contractor_price || p.retail_price) ? 1 : 0;
     const verifiedBonus = p.is_verified ? 0.1 : 0;
     const priceCompetitive = budgetMatch(input.budgetTier, p.price_grade);
@@ -181,6 +217,9 @@ export async function retrieveProductCandidates(
 
     const reasons: string[] = [];
     if (compatible) reasons.push(`category match: ${p.category_code}`);
+    if (vectorMatched && p.visual_similarity != null) {
+      reasons.push(`visual similarity: ${p.visual_similarity.toFixed(3)}`);
+    }
     if (p.is_verified) reasons.push("verified product");
     if (p.popularity_score && p.popularity_score > 0)
       reasons.push(`popular (score ${p.popularity_score})`);
@@ -189,7 +228,7 @@ export async function retrieveProductCandidates(
     if (!compatible)
       warnings.push(`CATEGORY_ROOM_INCOMPATIBLE: ${observation.surfaceType} vs ${p.category_code}`);
     if (!priceAvail) warnings.push("PRICE_MISSING");
-    if (!observation.embedding) warnings.push("NO_EMBEDDING_USED_CATEGORY_ONLY");
+    if (!vectorMatched) warnings.push("NO_VECTOR_MATCH_USED_CATEGORY_ONLY");
 
     return {
       materialProductId: p.id,
