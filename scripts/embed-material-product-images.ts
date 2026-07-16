@@ -1,23 +1,15 @@
 /**
- * material_product_images.clip_embedding 채우기 (Phase 2).
+ * material_product_images.clip_embedding 채우기.
  *
- * 가이드: c:\Users\user\Downloads\inpick-vision-material-estimate-dev-plan-20260510.md
- *        Phase 2 — 제품 이미지 embedding 인덱스 구축
- *
- * 정책: Gemini 무사용 — RunPod CLIP/OpenCLIP worker 또는 OpenAI vision endpoint 사용.
- *
- * 단계:
- *   1. clip_embedding이 NULL인 row 페이징
- *   2. RUNPOD_VISION_MATERIALS_ENDPOINT가 설정되면 worker로 image_url → 512-dim embedding 요청
- *   3. 미설정이면 deterministic mock embedding (테스트용 — production 사용 금지)
- *   4. UPDATE material_product_images SET clip_embedding = $1 WHERE id = $2
- *
- * 사용:
- *   npx tsx scripts/embed-material-product-images.ts
- *   npx tsx scripts/embed-material-product-images.ts --dry true --limit 100
- *   npx tsx scripts/embed-material-product-images.ts --batchSize 50 --provider runpod
+ * 운영 안전 정책:
+ *   - 실제 쓰기는 RunPod OpenCLIP만 허용
+ *   - mock embedding은 dry-run에서만 허용
+ *   - 512차원·유한값·L2 norm·모델 식별자를 검증한 뒤 저장
+ *   - offset 대신 UUID cursor를 사용해 업데이트 도중 행을 건너뛰지 않음
  */
 import { createClient } from "@supabase/supabase-js";
+
+const APPROVED_MODEL = "openclip-vit-b-32-laion2b-s34b-b79k";
 
 interface Row {
   id: string;
@@ -25,166 +17,232 @@ interface Row {
   material_product_id: string;
 }
 
+interface EmbeddingResult {
+  embedding: number[];
+  model: string;
+  provider: "runpod" | "mock";
+}
+
 function parseArgs(argv: string[]) {
   const args: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
-    const a = argv[i];
-    if (a.startsWith("--")) {
-      const key = a.slice(2);
-      const val = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true";
-      args[key] = val;
-    }
+    const arg = argv[i];
+    if (!arg.startsWith("--")) continue;
+    const key = arg.slice(2);
+    args[key] =
+      argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : "true";
   }
   return args;
 }
 
-/** RunPod vision-materials worker로 이미지 → CLIP 512-dim embedding */
-async function embedViaRunPod(imageUrl: string): Promise<number[] | null> {
+function validEmbedding(value: unknown): value is number[] {
+  if (!Array.isArray(value) || value.length !== 512) return false;
+  if (!value.every((item) => typeof item === "number" && Number.isFinite(item))) {
+    return false;
+  }
+  const norm = Math.sqrt(value.reduce((sum, item) => sum + item * item, 0));
+  return norm >= 0.95 && norm <= 1.05;
+}
+
+function normalizeRunPodEndpoint(value: string): string {
+  const trimmed = value.trim().replace(/\/$/, "").replace(/\/runsync$/, "");
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://api.runpod.ai/v2/${trimmed}`;
+}
+
+async function embedBatchViaRunPod(
+  rows: Row[],
+): Promise<Map<string, EmbeddingResult>> {
   const apiKey = process.env.RUNPOD_API_KEY;
   const endpoint = process.env.RUNPOD_VISION_MATERIALS_ENDPOINT;
-  if (!apiKey || !endpoint) return null;
-  try {
-    const res = await fetch(`${endpoint}/runsync`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        input: {
-          mode: "embed_only",
-          image_url: imageUrl,
+  const results = new Map<string, EmbeddingResult>();
+  if (!apiKey || !endpoint || rows.length === 0) return results;
+  const runsyncUrl = `${normalizeRunPodEndpoint(endpoint)}/runsync`;
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      const response = await fetch(runsyncUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
         },
-      }),
-      signal: AbortSignal.timeout(60_000),
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { output?: { embedding?: number[] } };
-    return data.output?.embedding || null;
-  } catch {
-    return null;
+        body: JSON.stringify({
+          input: {
+            mode: "batch_embed",
+            image_urls: rows.map((row) => row.image_url),
+          },
+        }),
+        signal: AbortSignal.timeout(180_000),
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = (await response.json()) as {
+        output?: {
+          items?: Array<{ image_url?: string; embedding?: unknown; error?: string | null }>;
+          model?: string;
+          error?: string;
+        };
+        error?: string;
+      };
+      const output = payload.output;
+      if (output?.error || payload.error) {
+        throw new Error(output?.error || payload.error);
+      }
+      if (output?.model !== APPROVED_MODEL || !Array.isArray(output.items)) {
+        throw new Error(`invalid batch payload (model=${output?.model || "missing"})`);
+      }
+      for (let index = 0; index < rows.length; index++) {
+        const item = output.items[index];
+        if (!item || item.error || !validEmbedding(item.embedding)) continue;
+        results.set(rows[index].id, {
+          embedding: item.embedding,
+          model: APPROVED_MODEL,
+          provider: "runpod",
+        });
+      }
+      return results;
+    } catch (error) {
+      if (attempt === 2) {
+        console.warn(
+          `[embed-mpi] RunPod batch 실패 (${rows.length}개): ${error instanceof Error ? error.message : error}`,
+        );
+        return results;
+      }
+    }
   }
+  return results;
 }
 
-/**
- * Mock embedding — image_url 해시 기반 deterministic 512-dim 벡터.
- * Production 사용 금지 — 테스트/dev 전용.
- */
-function mockEmbedding(imageUrl: string): number[] {
-  const hash = simpleHash(imageUrl);
-  const arr = new Array(512).fill(0);
-  for (let i = 0; i < 512; i++) {
-    const seed = (hash + i) % 1000;
-    arr[i] = (seed - 500) / 500; // -1 ~ 1 정규화
+function mockEmbedding(imageUrl: string): EmbeddingResult {
+  let hash = 0;
+  for (let i = 0; i < imageUrl.length; i++) {
+    hash = (hash << 5) - hash + imageUrl.charCodeAt(i);
+    hash |= 0;
   }
-  // L2 정규화
-  const norm = Math.sqrt(arr.reduce((s, v) => s + v * v, 0));
-  return norm > 0 ? arr.map((v) => v / norm) : arr;
-}
-
-function simpleHash(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) {
-    h = (h << 5) - h + s.charCodeAt(i);
-    h |= 0;
-  }
-  return Math.abs(h);
+  const values = Array.from({ length: 512 }, (_, index) => {
+    const seed = (Math.abs(hash) + index) % 1000;
+    return (seed - 500) / 500;
+  });
+  const norm = Math.sqrt(values.reduce((sum, item) => sum + item * item, 0));
+  return {
+    embedding: values.map((item) => item / norm),
+    model: "mock-dry-run-only",
+    provider: "mock",
+  };
 }
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  const dryRun = args.dry === "true";
-  const batchSize = parseInt(args.batchSize || "20", 10);
-  const limit = parseInt(args.limit || "0", 10);
-  const provider = (args.provider || "auto").toLowerCase(); // auto | runpod | mock
+  const dryRun = args.dry === "true" || args.write !== "true";
+  const batchSize = Math.min(24, Math.max(1, parseInt(args.batchSize || "24", 10)));
+  const limit = Math.max(0, parseInt(args.limit || "0", 10));
+  const provider = (args.provider || "auto").toLowerCase();
+  if (!["auto", "runpod", "mock"].includes(provider)) {
+    throw new Error(`지원하지 않는 provider: ${provider}`);
+  }
+
+  const hasRunPod = Boolean(
+    process.env.RUNPOD_API_KEY && process.env.RUNPOD_VISION_MATERIALS_ENDPOINT,
+  );
+  const useRunPod = provider === "runpod" || (provider === "auto" && hasRunPod);
+  if (!dryRun && !useRunPod) {
+    throw new Error(
+      "운영 embedding 쓰기는 RUNPOD_API_KEY와 RUNPOD_VISION_MATERIALS_ENDPOINT가 필요합니다.",
+    );
+  }
+  if (!dryRun && provider === "mock") {
+    throw new Error("mock embedding은 DB에 저장할 수 없습니다.");
+  }
+  if (provider === "runpod" && !hasRunPod) {
+    throw new Error("RunPod 환경변수가 설정되지 않았습니다.");
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!url || !key) {
-    console.error("[embed-mpi] Supabase 환경변수 미설정");
-    process.exit(1);
-  }
+  if (!url || !key) throw new Error("Supabase 환경변수 미설정");
   const admin = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const useRunPod =
-    provider === "runpod" ||
-    (provider === "auto" && process.env.RUNPOD_VISION_MATERIALS_ENDPOINT);
-
   console.log(
-    `[embed-mpi] provider=${useRunPod ? "runpod" : "mock"} dryRun=${dryRun} batchSize=${batchSize} limit=${limit || "all"}`,
+    `[embed-mpi] mode=${dryRun ? "DRY-RUN" : "WRITE"} ` +
+      `provider=${useRunPod ? "runpod" : "mock"} batchSize=${batchSize} limit=${limit || "none"}`,
   );
-  if (!useRunPod) {
-    console.warn(
-      "[embed-mpi] ⚠ Mock embedding 사용 — production에서는 RUNPOD_VISION_MATERIALS_ENDPOINT 설정 필수",
-    );
-  }
 
   let processed = 0;
   let succeeded = 0;
   let failed = 0;
-  let offset = 0;
+  let cursor = args.afterId || "";
 
-  while (true) {
-    const remaining = limit > 0 ? limit - processed : Infinity;
-    if (remaining <= 0) break;
-    const take = Math.min(batchSize, remaining);
-
-    const { data, error } = await admin
+  while (limit === 0 || processed < limit) {
+    const take = Math.min(batchSize, limit > 0 ? limit - processed : batchSize);
+    let query = admin
       .from("material_product_images")
       .select("id, image_url, material_product_id")
       .is("clip_embedding", null)
-      .order("created_at", { ascending: true })
-      .range(offset, offset + take - 1);
-    if (error) {
-      console.warn("[embed-mpi] 조회 에러:", error.message);
-      break;
-    }
+      .order("id", { ascending: true })
+      .limit(take);
+    if (cursor) query = query.gt("id", cursor);
+    const { data, error } = await query;
+    if (error) throw new Error(`이미지 조회 실패: ${error.message}`);
     if (!data || data.length === 0) break;
 
-    for (const r of data as Row[]) {
-      const embedding = useRunPod
-        ? await embedViaRunPod(r.image_url)
-        : mockEmbedding(r.image_url);
+    const rows = data as Row[];
+    const batchResults = useRunPod
+      ? await embedBatchViaRunPod(rows)
+      : new Map(rows.map((row) => [row.id, mockEmbedding(row.image_url)]));
+
+    for (const row of rows) {
+      cursor = row.id;
+      const result = batchResults.get(row.id);
       processed++;
-      if (!embedding) {
+      if (!result || !validEmbedding(result.embedding)) {
         failed++;
         continue;
       }
+
       if (!dryRun) {
-        const { error: updErr } = await admin
+        const { error: updateError } = await admin
           .from("material_product_images")
-          .update({ clip_embedding: embedding })
-          .eq("id", r.id);
-        if (updErr) {
-          console.warn(`  fail ${r.id}: ${updErr.message}`);
+          .update({
+            clip_embedding: result.embedding,
+            embedding_model: result.model,
+            embedding_provider: result.provider,
+            embedded_at: new Date().toISOString(),
+          })
+          .eq("id", row.id)
+          .is("clip_embedding", null);
+        if (updateError) {
+          console.warn(`  fail ${row.id}: ${updateError.message}`);
           failed++;
-        } else {
-          succeeded++;
+          continue;
         }
-      } else {
-        succeeded++;
       }
+      succeeded++;
     }
-
-    offset += data.length;
     console.log(
-      `  progress: processed=${processed}, succeeded=${succeeded}, failed=${failed}`,
+      `  progress: processed=${processed}, succeeded=${succeeded}, failed=${failed}, cursor=${cursor}`,
     );
-
     if (data.length < take) break;
   }
 
   console.log(
-    `[embed-mpi] DONE — processed=${processed}, succeeded=${succeeded}${dryRun ? " (DRY)" : ""}, failed=${failed}`,
-  );
-  console.log(
-    `[embed-mpi] 다음: ivfflat index 통계 갱신 (Supabase SQL — VACUUM ANALYZE material_product_images;)`,
+    JSON.stringify(
+      {
+        mode: dryRun ? "DRY-RUN" : "WRITE",
+        provider: useRunPod ? "runpod" : "mock",
+        model: useRunPod ? APPROVED_MODEL : "mock-dry-run-only",
+        processed,
+        succeeded,
+        failed,
+        cursor,
+      },
+      null,
+      2,
+    ),
   );
 }
 
-main().catch((e) => {
-  console.error("[embed-mpi] fatal:", e);
+main().catch((error) => {
+  console.error("[embed-mpi] fatal:", error instanceof Error ? error.message : error);
   process.exit(1);
 });

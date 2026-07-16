@@ -4,12 +4,15 @@
  * 가이드: §7
  *
  * 정책:
- *   - RUNPOD_VISION_MATERIALS_ENDPOINT 미설정 시 mock 모드 (고정 응답)
+ *   - RunPod 미설정/실패 시 프로젝트 내 OpenAI Vision polygon 분석기로 폴백
+ *   - 실제 이미지 분석까지 실패한 개발 환경에서만 mock 사용
  *   - production은 sync 또는 async 둘 다 지원 (RunPod /run /runsync)
  *   - 결과는 SurfaceObservation[] 형식으로 정규화하여 반환
  */
 
 import type { SurfaceObservation, SurfaceType } from "./types";
+import { gpt4oProvider } from "@/lib/inpick/segmentation/gpt4o-provider";
+import type { InteriorCategory } from "@/types/segmentation";
 
 export interface WorkerInput {
   imageUrl: string;
@@ -28,22 +31,41 @@ export interface WorkerOutput {
   source: "real" | "mock";
 }
 
+const APPROVED_EMBEDDING_MODEL = "openclip-vit-b-32-laion2b-s34b-b79k";
+
+function normalizeRunPodEndpoint(value: string): string {
+  const trimmed = value.trim().replace(/\/$/, "").replace(/\/runsync$/, "");
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://api.runpod.ai/v2/${trimmed}`;
+}
+
+function isValidEmbedding(value: unknown): value is number[] {
+  if (!Array.isArray(value) || value.length !== 512) return false;
+  if (!value.every((item) => typeof item === "number" && Number.isFinite(item))) {
+    return false;
+  }
+  const norm = Math.sqrt(value.reduce((sum, item) => sum + item * item, 0));
+  return norm >= 0.95 && norm <= 1.05;
+}
+
 /**
  * RunPod vision-materials worker 호출.
- * env 미설정 시 mock 응답.
+ * 전용 worker가 없으면 OpenAI Vision 폴백으로 실제 이미지를 분석한다.
  */
 export async function callVisionMaterialsWorker(
   input: WorkerInput,
 ): Promise<WorkerOutput> {
   const apiKey = process.env.RUNPOD_API_KEY;
   const endpoint = process.env.RUNPOD_VISION_MATERIALS_ENDPOINT;
-  if (!apiKey || !endpoint) {
-    return mockWorkerResponse(input);
-  }
+  // 공간/면 검출은 polygon을 반환하는 Vision 분석기가 담당한다. RunPod는
+  // 검출된 실제 crop만 GPU batch embedding해 임의 화면 분할을 방지한다.
+  const regionAnalysis = await visionFallbackWorkerResponse(input);
+  if (!apiKey || !endpoint || regionAnalysis.source === "mock") return regionAnalysis;
+  if (regionAnalysis.surfaces.length === 0) return regionAnalysis;
 
   const t0 = Date.now();
   try {
-    const res = await fetch(`${endpoint}/runsync`, {
+    const res = await fetch(`${normalizeRunPodEndpoint(endpoint)}/runsync`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -51,42 +73,142 @@ export async function callVisionMaterialsWorker(
       },
       body: JSON.stringify({
         input: {
+          mode: "embed_regions",
           image_url: input.imageUrl,
-          clicked_point: input.clickedPoint,
-          selected_bbox: input.selectedBbox,
-          target_surface_types: input.targetSurfaceTypes,
-          room_type: input.roomType,
-          style_tags: input.styleTags,
-          max_surfaces: input.maxSurfaces ?? 12,
+          regions: regionAnalysis.surfaces.map((surface, index) => ({
+            id: String(index),
+            surface_type: surface.surfaceType,
+            bbox: surface.bbox,
+            area_ratio: surface.areaRatio,
+            coarse_labels: surface.coarseLabels,
+            confidence: surface.confidence,
+          })),
         },
       }),
-      signal: AbortSignal.timeout(90_000),
+      signal: AbortSignal.timeout(110_000),
     });
     if (!res.ok) {
-      console.warn(`[vision-materials/worker] HTTP ${res.status} — fallback mock`);
-      return mockWorkerResponse(input);
+      throw new Error(`HTTP ${res.status}`);
     }
     const data = (await res.json()) as {
       output?: {
         surfaces?: Array<Record<string, unknown>>;
         model_versions?: Record<string, string>;
         elapsed_ms?: number;
+        error?: string;
       };
+      error?: string;
     };
-    const surfaces = ((data.output?.surfaces || []) as Array<Record<string, unknown>>).map(
-      mapWorkerSurface,
-    );
+    if (data.error || data.output?.error) throw new Error(data.error || data.output?.error);
+    if (data.output?.model_versions?.embedding !== APPROVED_EMBEDDING_MODEL) {
+      throw new Error(
+        `unapproved embedding model: ${data.output?.model_versions?.embedding || "missing"}`,
+      );
+    }
+
+    const embeddedByIndex = new Map<number, ReturnType<typeof mapWorkerSurface>>();
+    for (const raw of data.output?.surfaces || []) {
+      const index = Number(raw.region_id);
+      const mapped = mapWorkerSurface(raw);
+      if (Number.isInteger(index) && isValidEmbedding(mapped.embedding)) {
+        embeddedByIndex.set(index, mapped);
+      }
+    }
+    if (embeddedByIndex.size === 0) throw new Error("no valid region embeddings");
+
+    const surfaces = regionAnalysis.surfaces.map((surface, index) => {
+      const embedded = embeddedByIndex.get(index);
+      if (!embedded) return surface;
+      return {
+        ...surface,
+        embedding: embedded.embedding,
+        dominantColors: embedded.dominantColors?.length
+          ? embedded.dominantColors
+          : surface.dominantColors,
+      };
+    });
     return {
       surfaces,
-      modelVersions: data.output?.model_versions || {},
-      elapsedMs: data.output?.elapsed_ms || Date.now() - t0,
+      modelVersions: {
+        ...regionAnalysis.modelVersions,
+        ...(data.output?.model_versions || {}),
+      },
+      elapsedMs: regionAnalysis.elapsedMs + (data.output?.elapsed_ms || Date.now() - t0),
       source: "real",
     };
   } catch (e) {
     console.warn(
-      `[vision-materials/worker] error: ${e instanceof Error ? e.message : String(e)} — fallback mock`,
+      `[vision-materials/worker] error: ${e instanceof Error ? e.message : String(e)} — fallback vision`,
+    );
+    return regionAnalysis;
+  }
+}
+
+async function visionFallbackWorkerResponse(input: WorkerInput): Promise<WorkerOutput> {
+  const t0 = Date.now();
+  try {
+    const segmentation = await gpt4oProvider.segment({
+      imageUrl: input.imageUrl,
+      roomName: input.roomType,
+    });
+    const targetSet = input.targetSurfaceTypes?.length
+      ? new Set(input.targetSurfaceTypes)
+      : null;
+    const surfaces = segmentation.regions
+      .map((region): SurfaceObservation | null => {
+        const surfaceType = mapInteriorCategory(region.category);
+        if (!surfaceType || (targetSet && !targetSet.has(surfaceType))) return null;
+        const [x, y, width, height] = region.bbox;
+        const coarseLabels = [
+          ...(region.guessed_material
+            ? [{ label: region.guessed_material, confidence: region.confidence }]
+            : []),
+          { label: region.label_ko, confidence: region.confidence },
+        ];
+        return {
+          surfaceType,
+          bbox: { x, y, width, height },
+          areaRatio: region.area_normalized,
+          dominantColors: region.guessed_color_hex
+            ? [{ hex: region.guessed_color_hex, ratio: 1 }]
+            : undefined,
+          coarseLabels,
+          confidence: region.confidence,
+        };
+      })
+      .filter((surface): surface is SurfaceObservation => surface !== null)
+      .slice(0, input.maxSurfaces ?? 12);
+    return {
+      surfaces,
+      modelVersions: {
+        detector: "openai-vision-region-analysis",
+        segmenter: "openai-vision-polygon",
+        embedding: "none-category-rerank",
+        ocr: "openai-vision-labels",
+      },
+      elapsedMs: Date.now() - t0,
+      source: "real",
+    };
+  } catch (error) {
+    console.warn(
+      `[vision-materials/worker] vision fallback failed: ${error instanceof Error ? error.message : String(error)} — development mock`,
     );
     return mockWorkerResponse(input);
+  }
+}
+
+function mapInteriorCategory(category: InteriorCategory): SurfaceType | null {
+  switch (category) {
+    case "floor":
+    case "wall":
+    case "ceiling":
+    case "window":
+    case "door":
+    case "cabinet":
+    case "lighting":
+      return category;
+    default:
+      return null;
   }
 }
 
