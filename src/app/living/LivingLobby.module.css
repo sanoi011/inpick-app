@@ -1,0 +1,24 @@
+.enterOverlay {
+  animation: living-enter 950ms ease-in-out forwards;
+}
+
+@keyframes living-enter {
+  0% {
+    clip-path: inset(0 50% 0 50%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    clip-path: inset(0 0 0 0);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enterOverlay {
+    animation: none;
+    opacity: 1;
+  }
+}
