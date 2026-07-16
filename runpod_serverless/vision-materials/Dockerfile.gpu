@@ -6,20 +6,21 @@
 # 환경변수:
 #   VISION_MATERIALS_LOAD_MODELS=true (실제 모델 로드 활성)
 #
-# 권장 GPU: A10G / RTX 4090 / A100
-FROM nvidia/cuda:12.1.0-runtime-ubuntu22.04
+# 권장 GPU: 16GB 이상 (A4000/A5000/A10/RTX 4090)
+FROM pytorch/pytorch:2.3.0-cuda12.1-cudnn8-runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV VISION_MATERIALS_LOAD_MODELS=true
+ENV VISION_MATERIALS_ENABLE_OCR=false
+ENV VISION_MATERIALS_MAX_BATCH=24
+ENV HF_HOME=/root/.cache/huggingface
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3.11 python3.11-venv python3-pip \
-        libgl1 libglib2.0-0 ca-certificates curl wget \
+        libgl1 libglib2.0-0 ca-certificates \
     && rm -rf /var/lib/apt/lists/* \
-    && update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1 \
-    && update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+    && python -m pip install --no-cache-dir --upgrade pip
 
 WORKDIR /app
 
@@ -27,14 +28,12 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# GPU 전용 — torch + open_clip + easyocr (heavy)
-# 현재는 CPU base에도 실행되도록 lazy import (handler.py가 graceful degrade)
+# GPU 전용 — base image에 torch/torchvision/CUDA가 포함되어 있다.
 RUN pip install --no-cache-dir \
-    torch==2.3.0 \
-    torchvision==0.18.0 \
-    open-clip-torch>=2.24.0 \
-    easyocr>=1.7.1 \
-    transformers>=4.44.0
+    open-clip-torch==2.26.1
+
+# 모델 가중치를 이미지에 포함해 RunPod cold start 중 외부 다운로드를 없앤다.
+RUN python -c "import open_clip; open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k', device='cpu')"
 
 # Phase 후속에서 활성화:
 # RUN pip install --no-cache-dir \

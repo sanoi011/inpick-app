@@ -30,7 +30,9 @@ import json
 import io
 import base64
 import urllib.request
+import urllib.parse
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 import runpod  # type: ignore
@@ -54,6 +56,13 @@ _clip_tokenizer = None
 _ocr = None
 _torch = None
 _device = "cpu"
+_CLIP_MODEL_ID = "openclip-vit-b-32-laion2b-s34b-b79k"
+_CLIP_DIMENSIONS = 512
+_MAX_BATCH_SIZE = min(64, max(1, int(os.environ.get("VISION_MATERIALS_MAX_BATCH", "24"))))
+_MAX_IMAGE_BYTES = min(
+    50 * 1024 * 1024,
+    max(1 * 1024 * 1024, int(os.environ.get("VISION_MATERIALS_MAX_IMAGE_BYTES", str(20 * 1024 * 1024)))),
+)
 
 if _LOAD_MODELS:
     try:
@@ -75,17 +84,18 @@ if _LOAD_MODELS:
         except Exception as e:
             print(f"[vision-materials] OpenCLIP load fail: {e}", flush=True)
 
-        # ─── EasyOCR ───
-        try:
-            import easyocr
-            _ocr = easyocr.Reader(
-                ["ko", "en"],
-                gpu=(_device == "cuda"),
-                verbose=False,
-            )
-            print("[vision-materials] EasyOCR loaded", flush=True)
-        except Exception as e:
-            print(f"[vision-materials] EasyOCR load fail: {e}", flush=True)
+        # OCR은 자재 임베딩 경로에는 불필요하고 cold start를 크게 늘리므로 opt-in.
+        if os.environ.get("VISION_MATERIALS_ENABLE_OCR", "").lower() == "true":
+            try:
+                import easyocr
+                _ocr = easyocr.Reader(
+                    ["ko", "en"],
+                    gpu=(_device == "cuda"),
+                    verbose=False,
+                )
+                print("[vision-materials] EasyOCR loaded", flush=True)
+            except Exception as e:
+                print(f"[vision-materials] EasyOCR load fail: {e}", flush=True)
 
         # ─── GroundingDINO + SAM2 (heavy — 옵션) ───
         # weight 다운로드 필요 — Phase 후속에서 설정
@@ -121,8 +131,21 @@ print(
 def download_image(url: str) -> Optional[bytes]:
     """이미지 URL → bytes (실패 시 None)."""
     try:
-        with urllib.request.urlopen(url, timeout=20) as resp:
-            return resp.read()
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in {"http", "https"}:
+            raise ValueError("http/https image_url only")
+        request = urllib.request.Request(
+            url,
+            headers={"User-Agent": "InPick-Vision-Materials/1.0"},
+        )
+        with urllib.request.urlopen(request, timeout=25) as resp:
+            content_length = resp.headers.get("Content-Length")
+            if content_length and int(content_length) > _MAX_IMAGE_BYTES:
+                raise ValueError("image too large")
+            data = resp.read(_MAX_IMAGE_BYTES + 1)
+            if len(data) > _MAX_IMAGE_BYTES:
+                raise ValueError("image too large")
+            return data
     except Exception as e:
         print(f"[vision-materials] download fail: {e}", flush=True)
         return None
@@ -143,14 +166,126 @@ def clip_embed(pil_image) -> Optional[List[float]]:
         return None
     try:
         img_t = _clip_preprocess(pil_image).unsqueeze(0).to(_device)
-        with _torch.no_grad():
+        with _torch.inference_mode():
             features = _clip_model.encode_image(img_t)
-            features = features / features.norm(dim=-1, keepdim=True)
-        emb = features[0].cpu().numpy().tolist()
-        return emb
+            features = features / features.norm(dim=-1, keepdim=True).clamp(min=1e-12)
+        return features[0].float().cpu().numpy().tolist()
     except Exception as e:
         print(f"[vision-materials] clip_embed error: {e}", flush=True)
         return None
+
+
+def clip_embed_many(pil_images: List[Any]) -> List[Optional[List[float]]]:
+    """여러 PIL 이미지를 한 번의 GPU batch로 512차원 임베딩."""
+    if not pil_images:
+        return []
+    if not _HAS_MODELS or _clip_model is None or _clip_preprocess is None or _torch is None:
+        return [None for _ in pil_images]
+    try:
+        batch = _torch.stack([_clip_preprocess(image) for image in pil_images]).to(_device)
+        with _torch.inference_mode():
+            features = _clip_model.encode_image(batch)
+            features = features / features.norm(dim=-1, keepdim=True).clamp(min=1e-12)
+        return [row for row in features.float().cpu().numpy().tolist()]
+    except Exception as e:
+        print(f"[vision-materials] clip_embed_many error: {e}", flush=True)
+        return [None for _ in pil_images]
+
+
+def _download_and_decode(url: str):
+    data = download_image(url)
+    return encode_image_to_pil(data) if data else None
+
+
+def batch_embed_urls(image_urls: List[str]) -> Dict[str, Any]:
+    """자재 이미지 URL을 병렬 다운로드하고 한 번에 GPU 임베딩."""
+    t0 = time.time()
+    if not _HAS_MODELS:
+        return {
+            "items": [{"image_url": url, "embedding": None, "error": "model unavailable"} for url in image_urls],
+            "model": "unavailable",
+            "elapsed_ms": int((time.time() - t0) * 1000),
+        }
+
+    with ThreadPoolExecutor(max_workers=min(8, len(image_urls))) as executor:
+        decoded = list(executor.map(_download_and_decode, image_urls))
+
+    valid_positions = [index for index, image in enumerate(decoded) if image is not None]
+    valid_images = [decoded[index] for index in valid_positions]
+    valid_embeddings = clip_embed_many(valid_images)
+    by_position = dict(zip(valid_positions, valid_embeddings))
+
+    items = []
+    for index, image_url in enumerate(image_urls):
+        embedding = by_position.get(index)
+        items.append({
+            "image_url": image_url,
+            "embedding": embedding,
+            "error": None if embedding is not None else "image download/decode/embed failed",
+        })
+    return {
+        "items": items,
+        "model": _CLIP_MODEL_ID,
+        "dimensions": _CLIP_DIMENSIONS,
+        "elapsed_ms": int((time.time() - t0) * 1000),
+    }
+
+
+def normalize_bbox(raw_bbox: Dict[str, Any], width: int, height: int) -> Optional[Dict[str, float]]:
+    """정규화(0~1) 또는 pixel bbox를 안전한 pixel bbox로 변환."""
+    try:
+        x = float(raw_bbox.get("x", 0))
+        y = float(raw_bbox.get("y", 0))
+        box_width = float(raw_bbox.get("width", 0))
+        box_height = float(raw_bbox.get("height", 0))
+        if max(abs(x), abs(y), abs(box_width), abs(box_height)) <= 1.5:
+            x *= width
+            box_width *= width
+            y *= height
+            box_height *= height
+        left = max(0.0, min(float(width), x))
+        top = max(0.0, min(float(height), y))
+        right = max(left, min(float(width), x + box_width))
+        bottom = max(top, min(float(height), y + box_height))
+        if right - left < 4 or bottom - top < 4:
+            return None
+        return {"x": left, "y": top, "width": right - left, "height": bottom - top}
+    except (TypeError, ValueError):
+        return None
+
+
+def embed_regions(pil_image, regions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """외부 Vision이 검출한 실제 영역을 crop해 batch embedding."""
+    prepared = []
+    crops = []
+    for index, region in enumerate(regions[:12]):
+        bbox = normalize_bbox(region.get("bbox") or {}, pil_image.width, pil_image.height)
+        if not bbox:
+            continue
+        crop = pil_image.crop((
+            int(bbox["x"]),
+            int(bbox["y"]),
+            int(bbox["x"] + bbox["width"]),
+            int(bbox["y"] + bbox["height"]),
+        ))
+        prepared.append((index, region, bbox, crop))
+        crops.append(crop)
+
+    embeddings = clip_embed_many(crops)
+    surfaces = []
+    for (index, region, bbox, crop), embedding in zip(prepared, embeddings):
+        surfaces.append({
+            "region_id": str(region.get("id") or index),
+            "surface_type": str(region.get("surface_type") or "unknown"),
+            "bbox": bbox,
+            "area_ratio": float(region.get("area_ratio") or ((bbox["width"] * bbox["height"]) / (pil_image.width * pil_image.height))),
+            "dominant_colors": extract_dominant_colors(crop, k=3),
+            "ocr_text": ocr_text(crop),
+            "coarse_labels": region.get("coarse_labels") or [],
+            "clip_embedding": embedding,
+            "confidence": float(region.get("confidence") or 0.7),
+        })
+    return surfaces
 
 
 def ocr_text(pil_image) -> str:
@@ -213,7 +348,25 @@ def run_pipeline(req: WorkerRequest) -> Dict[str, Any]:
         emb = clip_embed(pil) if _HAS_MODELS else None
         return {
             "embedding": emb,
-            "model": "openclip-vit-b-32" if _HAS_MODELS else "mock",
+            "model": _CLIP_MODEL_ID if _HAS_MODELS else "unavailable",
+            "elapsed_ms": int((time.time() - t0) * 1000),
+        }
+
+    if mode == "embed_regions":
+        if not pil:
+            return {"error": "image download/decode 실패", "surfaces": []}
+        regions = raw_input.get("regions") if raw_input else None
+        if not isinstance(regions, list) or not regions:
+            return {"error": "regions required", "surfaces": []}
+        surfaces = embed_regions(pil, regions)
+        return {
+            "surfaces": surfaces,
+            "model_versions": {
+                "detector": "openai-vision-region-analysis",
+                "segmenter": "openai-vision-polygon",
+                "embedding": _CLIP_MODEL_ID if _HAS_MODELS else "unavailable",
+                "ocr": "easyocr-1.7" if _ocr else "disabled",
+            },
             "elapsed_ms": int((time.time() - t0) * 1000),
         }
 
@@ -238,16 +391,22 @@ def run_pipeline(req: WorkerRequest) -> Dict[str, Any]:
             "width": size,
             "height": size,
         }
+    elif req.selected_bbox:
+        selected = normalize_bbox(req.selected_bbox, pil.width, pil.height)
+        if selected:
+            boxes_per_target[targets[0]] = selected
     else:
-        # 다중 surface — 균등 분할 (mock)
-        n = min(3, len(targets))
-        for i, st in enumerate(targets[:n]):
-            boxes_per_target[st] = {
-                "x": (pil.width / n) * i,
-                "y": pil.height * 0.3,
-                "width": pil.width / n,
-                "height": pil.height * 0.4,
-            }
+        # 임의 3등분은 잘못된 자재 후보를 만들므로 금지한다.
+        return {
+            "surfaces": [],
+            "model_versions": {
+                "detector": "external-region-required",
+                "segmenter": "external-region-required",
+                "embedding": _CLIP_MODEL_ID if _HAS_MODELS else "unavailable",
+                "ocr": "disabled",
+            },
+            "elapsed_ms": int((time.time() - t0) * 1000),
+        }
 
     # 2. 각 box → crop → embedding/OCR/색상
     for surface_type, bbox in boxes_per_target.items():
@@ -280,7 +439,7 @@ def run_pipeline(req: WorkerRequest) -> Dict[str, Any]:
         "model_versions": {
             "detector": "placeholder-grounding-dino",  # TODO: Phase 후속 활성화
             "segmenter": "placeholder-sam2",
-            "embedding": "openclip-vit-b-32" if _HAS_MODELS else "mock",
+            "embedding": _CLIP_MODEL_ID if _HAS_MODELS else "mock",
             "ocr": "easyocr-1.7" if _ocr else "mock",
         },
         "elapsed_ms": int((time.time() - t0) * 1000),
@@ -322,6 +481,24 @@ def mock_response(req: WorkerRequest, t0: float) -> Dict[str, Any]:
 def handler(job: Dict[str, Any]) -> Dict[str, Any]:
     try:
         job_input = job.get("input", {}) if isinstance(job, dict) else {}
+        mode = str(job_input.get("mode", "full")) if isinstance(job_input, dict) else "full"
+        if mode == "health":
+            return {
+                "ready": _HAS_MODELS,
+                "model": _CLIP_MODEL_ID if _HAS_MODELS else "unavailable",
+                "dimensions": _CLIP_DIMENSIONS,
+                "device": _device,
+                "max_batch_size": _MAX_BATCH_SIZE,
+            }
+        if mode == "batch_embed":
+            image_urls = job_input.get("image_urls")
+            if not isinstance(image_urls, list) or not image_urls:
+                raise ValueError("image_urls required")
+            if len(image_urls) > _MAX_BATCH_SIZE:
+                raise ValueError(f"image_urls max {_MAX_BATCH_SIZE}")
+            if not all(isinstance(url, str) and url for url in image_urls):
+                raise ValueError("image_urls must be non-empty strings")
+            return batch_embed_urls(image_urls)
         req = parse_request(job_input)
         # mode=embed_only 같은 추가 필드 전달용
         try:

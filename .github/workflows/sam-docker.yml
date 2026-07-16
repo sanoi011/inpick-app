@@ -7,7 +7,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'runpod_serverless/**'
+      - 'runpod_serverless/Dockerfile'
+      - 'runpod_serverless/handler.py'
+      - 'runpod_serverless/requirements.txt'
+      - 'runpod_serverless/download_model.py'
+      - 'runpod_serverless/sam3/**'
       - '.github/workflows/sam-docker.yml'
   workflow_dispatch:
     inputs:
