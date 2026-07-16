@@ -209,19 +209,39 @@ async function smokeWorker(endpointId: string) {
   return { status: result.status, output: result.output, error: result.error };
 }
 
-async function embedNextBatch(endpointId: string) {
+async function scaleEndpoint(endpointId: string, workersMax: number) {
+  if (!/^[a-z0-9]+$/i.test(endpointId)) throw new Error("invalid endpointId");
+  if (![1, 3].includes(workersMax)) throw new Error("workersMax must be 1 or 3");
+  const endpoint = await runPod<RunPodEndpoint>(`/endpoints/${endpointId}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      workersMax,
+      workersMin: 0,
+      scalerType: "REQUEST_COUNT",
+      scalerValue: 1,
+    }),
+  });
+  return safeEndpoint(endpoint);
+}
+
+async function embedNextBatch(endpointId: string, offset = 0) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !serviceKey) throw new Error("Supabase admin env missing");
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+  if (!Number.isInteger(offset) || offset < 0 || offset > 48) {
+    throw new Error("offset must be 0, 24, or 48");
+  }
+  if (offset % 24 !== 0) throw new Error("offset must be a multiple of 24");
+
   const { data, error } = await admin
     .from("material_product_images")
     .select("id, image_url")
     .is("clip_embedding", null)
     .order("id", { ascending: true })
-    .limit(24);
+    .range(offset, offset + 23);
   if (error) throw new Error(`image query failed: ${error.message}`);
   const rows = (data || []) as Array<{ id: string; image_url: string }>;
   if (rows.length === 0) return { processed: 0, succeeded: 0, failed: 0, remaining: 0 };
@@ -281,6 +301,8 @@ export async function POST(request: NextRequest) {
       token?: string;
       action?: string;
       endpointId?: string;
+      offset?: number;
+      workersMax?: number;
     };
     if (body.token !== BOOTSTRAP_TOKEN) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -294,8 +316,11 @@ export async function POST(request: NextRequest) {
     if (body.action === "smoke" && body.endpointId) {
       return NextResponse.json(await smokeWorker(body.endpointId));
     }
+    if (body.action === "scale" && body.endpointId && body.workersMax) {
+      return NextResponse.json(await scaleEndpoint(body.endpointId, body.workersMax));
+    }
     if (body.action === "embed_batch" && body.endpointId) {
-      return NextResponse.json(await embedNextBatch(body.endpointId));
+      return NextResponse.json(await embedNextBatch(body.endpointId, body.offset));
     }
     return NextResponse.json({ error: "invalid action" }, { status: 400 });
   } catch (error) {
