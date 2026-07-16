@@ -12,6 +12,13 @@
 /mobile/
 /resources/
 /runs/
+/.next/
+/node_modules/
+/build/
+/reports/
+/datasets/
+/test-results/
+/yolov8n.pt
 capacitor.config.ts
 *.py
 *.pdf
