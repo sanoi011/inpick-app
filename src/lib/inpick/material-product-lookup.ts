@@ -34,6 +34,10 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
+import {
+  MATERIAL_PRODUCT_CATEGORY_CODES,
+  materialProductCategoryCodes,
+} from "@/lib/inpick/material-product-category-codes";
 
 // ─── 매칭 결과 ───
 export interface MaterialProductMatch {
@@ -46,6 +50,7 @@ export interface MaterialProductMatch {
   unit: string;
   priceGrade?: string;
   thumbnailUrl?: string;
+  categoryCode: string;
   sourceProductId: string; // audit
 }
 
@@ -70,57 +75,86 @@ function classifyRoom(roomName: string): RoomCategory {
   return "living_general";
 }
 
-function surfaceToCategoryCode(
+function surfaceToCategoryCodes(
   surface: string,
   roomCat: RoomCategory,
   materialName: string,
-): string | null {
+): string[] {
   const s = surface.toLowerCase();
   const m = (materialName || "").toLowerCase();
 
   // 1. 명시적 surface 키워드
   if (s.includes("fixture")) {
     if (roomCat === "bath") {
-      if (m.includes("변기") || m.includes("toilet")) return "TOILET";
-      if (m.includes("세면") || m.includes("vanity")) return "VANITY";
-      if (m.includes("샤워") || m.includes("욕조") || m.includes("shower")) return "SHOWER_BATH";
-      return "BATH_SET";
+      if (m.includes("변기") || m.includes("toilet")) {
+        return ["MEC-SAN-TOILET", "MECH_SANITARY_WC", "TOILET"];
+      }
+      if (m.includes("세면") || m.includes("vanity")) {
+        return ["MEC-SAN-BASIN", "MEC-FAU-BASIN", "MECH_SANITARY_BASIN", "VANITY"];
+      }
+      if (m.includes("샤워") || m.includes("욕조") || m.includes("shower")) {
+        return ["MEC-SAN-BATHTUB", "MECH_SANITARY_TUB", "MECH_FAUCET_SHOWER", "SHOWER_BATH"];
+      }
+      return materialProductCategoryCodes("sanitary", "fixture");
     }
     if (roomCat === "kitchen") {
-      if (m.includes("싱크")) return "KITCHEN_SINK";
-      return "KITCHEN_CABINET";
+      if (m.includes("수전")) return ["MEC-FAU-KITCHEN", "MECH_FAUCET"];
+      if (m.includes("싱크")) return ["ARCH_KITCHEN_SINK", "KITCHEN_SINK"];
+      if (m.includes("상판")) return materialProductCategoryCodes("countertop");
+      if (m.includes("후드")) return ["FUR-KIT-HOOD", "ARCH_KITCHEN_HOOD"];
+      if (m.includes("쿡탑") || m.includes("인덕션")) return ["FUR-KIT-COOKTOP"];
+      return materialProductCategoryCodes("cabinet", "countertop", "fixture");
     }
-    if (roomCat === "dressroom") return "STORAGE";
-    return "STORAGE";
+    if (m.includes("보일러")) return ["MEC-HEAT-BOILER"];
+    if (roomCat === "dressroom") return ["STORAGE", ...MATERIAL_PRODUCT_CATEGORY_CODES.cabinet];
+    return materialProductCategoryCodes("fixture", "cabinet");
   }
 
   if (s.includes("도어") || s.includes("door")) {
-    if (roomCat === "entry") return "ENTRY_DOOR";
-    return "DOOR_ROOM";
+    return materialProductCategoryCodes("door");
   }
 
-  if (s.includes("창호") || s.includes("window")) return "WINDOW";
+  if (s.includes("창호") || s.includes("window")) return materialProductCategoryCodes("window");
 
-  if (s.includes("조명") || s.includes("light")) return "LIGHTING";
+  if (s.includes("조명") || s.includes("light")) return materialProductCategoryCodes("lighting");
 
-  if (s.includes("걸레") || s.includes("baseboard")) return "BASEBOARD";
+  if (s.includes("걸레") || s.includes("baseboard")) return materialProductCategoryCodes("baseboard");
 
   if (s.includes("바닥") || s.includes("floor")) {
-    if (roomCat === "bath") return "BATH_TILE";
-    if (roomCat === "kitchen" && m.includes("타일")) return "KITCHEN_TILE";
-    return "FLOORING";
+    if (roomCat === "bath" || m.includes("타일") || m.includes("포세린")) {
+      return materialProductCategoryCodes("tile");
+    }
+    return MATERIAL_PRODUCT_CATEGORY_CODES.floor.filter(
+      (code) => code !== "MAT-FLR-PORCELAIN",
+    );
   }
 
   if (s.includes("벽") || s.includes("wall")) {
-    if (roomCat === "bath") return "BATH_TILE";
-    if (roomCat === "kitchen" && m.includes("타일")) return "KITCHEN_TILE";
-    if (m.includes("도장") || m.includes("페인트")) return "PAINT";
-    return "WALLPAPER";
+    if (roomCat === "bath" || (roomCat === "kitchen" && m.includes("타일"))) {
+      return materialProductCategoryCodes("tile");
+    }
+    if (m.includes("도장") || m.includes("페인트")) {
+      return ["MAT-WAL-PAINT", "ARCH_WALL_PAINT", "ARCH_PAINT", "PAINT", "WALL_PAINT"];
+    }
+    return [
+      "MAT-WAL-WALLPAPER-SILK",
+      "ARCH_WALL",
+      "ARCH_WALL_SILK",
+      "ARCH_WALL_PAPER",
+      "WALLPAPER",
+      "WALL_PAPER",
+    ];
   }
 
-  if (s.includes("천장") || s.includes("ceil")) return "CEILING";
+  if (s.includes("천장") || s.includes("ceil")) {
+    return roomCat === "bath"
+      ? materialProductCategoryCodes("ceiling")
+      : MATERIAL_PRODUCT_CATEGORY_CODES.ceiling.filter(
+          (code) => code !== "MAT-CEI-SMC",
+        );
+  }
 
-  return null;
+  return [];
 }
 
 // ─── Supabase admin client (캐시) ───
@@ -153,15 +187,15 @@ export async function lookupMaterialProduct(input: {
   if (!admin) return null; // env 미설정 시 lookup skip (호환)
 
   const roomCat = classifyRoom(input.roomName);
-  const categoryCode = surfaceToCategoryCode(
+  const categoryCodes = surfaceToCategoryCodes(
     input.surface,
     roomCat,
     input.materialName || "",
   );
-  if (!categoryCode) return null;
+  if (categoryCodes.length === 0) return null;
 
   const grade = input.preferredGrade || "standard";
-  const cacheKey = `${categoryCode}|${grade}`;
+  const cacheKey = `${categoryCodes.join(",")}|${grade}`;
   if (matchCache.has(cacheKey)) {
     return matchCache.get(cacheKey) ?? null;
   }
@@ -169,53 +203,49 @@ export async function lookupMaterialProduct(input: {
   // 우선순위: verified + grade 일치 → grade 일치 → 카테고리만
   // popularity_score DESC, retail_price IS NOT NULL 우선
   try {
-    // 1차: verified + grade
-    let { data, error } = await admin
-      .from("material_products")
-      .select(
-        "id, brand, product_name, model_number, specification, retail_price, contractor_price, unit, price_grade, thumbnail_url, popularity_score, is_verified",
-      )
-      .eq("category_code", categoryCode)
-      .eq("price_grade", grade)
-      .eq("is_verified", true)
-      .not("brand", "is", null)
-      .order("popularity_score", { ascending: false, nullsFirst: false })
-      .limit(1);
-
-    // 2차: grade 일치 (verified 무관)
-    if ((!data || data.length === 0) && !error) {
-      const r2 = await admin
+    const select =
+      "id, category_code, brand, product_name, model_number, specification, retail_price, contractor_price, unit, price_grade, thumbnail_url, popularity_score, is_verified";
+    const queryOne = async (options: {
+      verified?: boolean;
+      matchingGrade?: boolean;
+      priced?: boolean;
+    }) => {
+      let query = admin
         .from("material_products")
-        .select(
-          "id, brand, product_name, model_number, specification, retail_price, contractor_price, unit, price_grade, thumbnail_url, popularity_score, is_verified",
-        )
-        .eq("category_code", categoryCode)
-        .eq("price_grade", grade)
+        .select(select)
+        .in("category_code", categoryCodes)
         .not("brand", "is", null)
+        .order("is_verified", { ascending: false, nullsFirst: false })
         .order("popularity_score", { ascending: false, nullsFirst: false })
         .limit(1);
-      data = r2.data;
-      error = r2.error;
-    }
+      if (options.verified) query = query.eq("is_verified", true);
+      if (options.matchingGrade) query = query.eq("price_grade", grade);
+      if (options.priced) {
+        query = query.or("contractor_price.not.is.null,retail_price.not.is.null");
+      }
+      return query;
+    };
 
-    // 3차: 카테고리만
-    if ((!data || data.length === 0) && !error) {
-      const r3 = await admin
-        .from("material_products")
-        .select(
-          "id, brand, product_name, model_number, specification, retail_price, contractor_price, unit, price_grade, thumbnail_url, popularity_score, is_verified",
-        )
-        .eq("category_code", categoryCode)
-        .not("brand", "is", null)
-        .order("popularity_score", { ascending: false, nullsFirst: false })
-        .limit(1);
-      data = r3.data;
-      error = r3.error;
+    // 실제 견적에서는 이미지/인기도보다 검증 가격을 먼저 선택한다.
+    const attempts = [
+      { verified: true, matchingGrade: true, priced: true },
+      { matchingGrade: true, priced: true },
+      { verified: true, matchingGrade: true },
+      { matchingGrade: true },
+      {},
+    ];
+    let data: Array<Record<string, unknown>> | null = null;
+    let error: { message: string } | null = null;
+    for (const attempt of attempts) {
+      const result = await queryOne(attempt);
+      data = result.data as Array<Record<string, unknown>> | null;
+      error = result.error;
+      if (error || (data && data.length > 0)) break;
     }
 
     if (error) {
       console.warn(
-        `[material-lookup] supabase error for ${categoryCode}: ${error.message}`,
+        `[material-lookup] supabase error for ${categoryCodes.join(",")}: ${error.message}`,
       );
       matchCache.set(cacheKey, null);
       return null;
@@ -227,6 +257,7 @@ export async function lookupMaterialProduct(input: {
 
     const p = data[0] as {
       id: string;
+      category_code: string;
       brand: string;
       product_name: string;
       model_number?: string;
@@ -247,13 +278,14 @@ export async function lookupMaterialProduct(input: {
       unit: p.unit || "EA",
       priceGrade: p.price_grade || undefined,
       thumbnailUrl: p.thumbnail_url || undefined,
+      categoryCode: p.category_code,
       sourceProductId: p.id,
     };
     matchCache.set(cacheKey, result);
     return result;
   } catch (e) {
     console.warn(
-      `[material-lookup] unexpected error for ${categoryCode}: ${e instanceof Error ? e.message : String(e)}`,
+      `[material-lookup] unexpected error for ${categoryCodes.join(",")}: ${e instanceof Error ? e.message : String(e)}`,
     );
     matchCache.set(cacheKey, null);
     return null;

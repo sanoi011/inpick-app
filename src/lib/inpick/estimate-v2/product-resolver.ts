@@ -18,7 +18,6 @@
 import { lookupMaterialProduct } from "@/lib/inpick/material-product-lookup";
 import {
   resolveCategoryFromEstimateLine,
-  resolveCategoryFromText,
 } from "@/lib/inpick/material-taxonomy/category-resolver";
 import { getCategoryByCode } from "@/lib/inpick/material-taxonomy/category-seed";
 import type {
@@ -29,6 +28,8 @@ import type {
 
 export interface ResolveProductInput {
   surfacePlan?: SurfacePlan;
+  /** 완성 마감재 라인에서만 SurfacePlan의 사용자 선택 제품을 직접 적용 */
+  useSelectedSurfaceProduct?: boolean;
   /** WorkPackageOutput 내부 정보 — taskName / itemName / spec / categoryCode */
   workOutput: {
     taskNameKo: string;
@@ -93,8 +94,26 @@ export async function resolveMaterialProductForLine(
     input.workOutput.defaultItemNameKo ||
     input.workOutput.taskNameKo;
 
-  // ─── 1순위: surfacePlan에 SKU/brand가 이미 있으면 confirmed ───
-  if (input.surfacePlan?.sku || input.surfacePlan?.brand) {
+  // ─── 1순위: 후보 선택/vision 분석이 전달한 검증된 material_products.id ───
+  if (input.useSelectedSurfaceProduct && input.surfacePlan?.materialProductId) {
+    return {
+      materialProductId: input.surfacePlan.materialProductId,
+      brand: input.surfacePlan.brand,
+      productName: input.surfacePlan.materialNameKo || materialName,
+      sku: input.surfacePlan.sku,
+      spec: input.surfacePlan.spec,
+      categoryCode: input.surfacePlan.materialCategory,
+      matchStatus:
+        input.surfacePlan.source === "user_selected_material" ? "confirmed" : "recommended",
+      matchConfidence: input.surfacePlan.confidence,
+    };
+  }
+
+  // ─── 2순위: 구버전 hint에 SKU/brand만 있으면 제품명은 유지하되 ID 확정은 하지 않음 ───
+  if (
+    input.useSelectedSurfaceProduct &&
+    (input.surfacePlan?.sku || input.surfacePlan?.brand)
+  ) {
     return {
       materialProductId: undefined, // sku 직접 매칭은 DB lookup 추가 가능 (P12+ 후속)
       brand: input.surfacePlan.brand,
@@ -133,7 +152,7 @@ export async function resolveMaterialProductForLine(
           sku: match.sku,
           spec: match.specification,
           unit: match.unit,
-          categoryCode: undefined, // lookup 내부에서 결정한 카테고리는 별도 반환 X
+          categoryCode: match.categoryCode,
           matchStatus: "recommended",
           matchConfidence: 0.7,
           raw: match,

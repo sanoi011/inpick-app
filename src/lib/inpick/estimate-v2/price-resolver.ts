@@ -25,6 +25,7 @@ export interface ResolvePriceInput {
   unit: EstimateUnit;
   /** 사용자/사업자가 override한 단가 (있으면 최우선) */
   overridePriceWon?: number;
+  overridePriceSource?: MaterialPriceSource;
   /** WorkPackageRule의 fallback 단가 — 모든 DB 매칭 실패 시 사용 */
   fallbackDefaultPriceWon?: number;
   /** 카테고리 표준 단가 키 (KPA 등) */
@@ -83,7 +84,7 @@ export async function resolveMaterialPriceForLine(
     return {
       unitPrice: input.overridePriceWon,
       currency: "KRW",
-      priceSource: "manual_override",
+      priceSource: input.overridePriceSource ?? "manual_override",
       confidence: 1.0,
       appliedAt: new Date().toISOString(),
     };

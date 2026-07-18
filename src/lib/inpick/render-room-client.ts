@@ -75,6 +75,7 @@ export interface RenderRoomClientResult {
     floorplanUsed?: boolean;
     floorplanImageUrl?: string;
     propertyId?: string;
+    referenceMode?: "floorplan" | "area_average";
     renderSpecKind?: "RenderRoomSpec_v1" | "text_only";
     renderSpecConfidence?: number;
     roomName?: string;

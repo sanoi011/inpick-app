@@ -50,9 +50,17 @@ export interface MaterialHint {
   surfaceType: SurfaceTypeKind;
   /** "porcelain_tile" / "engineered_wood" 등 카테고리 키 */
   materialCategory: string;
+  /** material_products.id — DB에서 검증된 제품만 저장 */
+  materialProductId?: string;
   materialNameKo?: string;
   brand?: string;
   sku?: string;
+  spec?: string;
+  unit?: string;
+  unitPrice?: number;
+  priceSource?: string;
+  observationId?: string;
+  matchStatus?: "confirmed" | "recommended" | "fallback";
   /** 0~1 신뢰도 */
   confidence: number;
   source: MaterialHintSource;

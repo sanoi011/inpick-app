@@ -102,10 +102,15 @@ export interface BuildSurfacePlansInput {
     roomName: string;
     surfaceType: MaterialHint["surfaceType"];
     materialCategory: string;
+    materialProductId?: string;
     materialNameKo?: string;
     brand?: string;
     sku?: string;
+    spec?: string;
     unitPrice?: number;
+    priceSource?: string;
+    observationId?: string;
+    confidence?: number;
   }>;
   /** 추가 vision evidence (analyze 결과) — 이미 design_outputs.material_hints에 병합돼 있을 수 있음 */
   materialEvidence?: unknown[];
@@ -167,15 +172,80 @@ export function buildSurfacePlansFromContext(
       surfaceType,
       action: "replace",
       materialCategory: edit.materialCategory,
+      materialProductId: edit.materialProductId,
       materialNameKo: edit.materialNameKo,
       brand: edit.brand,
       sku: edit.sku,
+      spec: edit.spec,
       selectedMaterialUnitPrice: edit.unitPrice,
+      selectedMaterialPriceSource: normalizeMaterialPriceSource(edit.priceSource),
       source: "user_selected_material",
-      confidence: 1.0,
-      evidenceRefs: [{ type: "material_edit", id: edit.id }],
+      confidence: edit.confidence ?? 1.0,
+      evidenceRefs: [
+        { type: "material_edit", id: edit.id },
+        ...(edit.observationId
+          ? [{ type: "vision_observation" as const, id: edit.observationId }]
+          : []),
+      ],
       assumptions: ["사용자가 직접 선택한 자재입니다."],
       warnings: [],
+    });
+  }
+
+  // 2~3순위: finalize에서 제품/결정까지 수화한 vision evidence.
+  // 과거 design_output에 분석 hint가 기록되지 않은 프로젝트도 observation으로 복구한다.
+  for (const rawEvidence of input.materialEvidence ?? []) {
+    if (!rawEvidence || typeof rawEvidence !== "object") continue;
+    const evidence = rawEvidence as Record<string, unknown>;
+    const materialProductId = asOptionalString(evidence.materialProductId);
+    const roomId = asOptionalString(evidence.roomId);
+    const roomName = asOptionalString(evidence.roomName);
+    const rawSurface = asOptionalString(evidence.surfaceType);
+    const matchStatus = asOptionalString(evidence.matchStatus);
+    if (!materialProductId || !roomId || !roomName || !rawSurface) continue;
+    if (matchStatus !== "confirmed" && matchStatus !== "recommended") continue;
+    const surfaceType = surfaceFromHint(mapEvidenceSurfaceToHint(rawSurface));
+    const source: EvidenceSource =
+      matchStatus === "confirmed"
+        ? "vision_confirmed_material"
+        : "vision_recommended_material";
+    const key = `${roomId}::${surfaceType}`;
+    if (!tryClaim(key, source)) continue;
+    const observationId = asOptionalString(evidence.observationId);
+    plans.push({
+      id: randomId(),
+      projectId: input.projectId,
+      projectMode: input.projectMode,
+      roomId,
+      roomName,
+      roomType: inferRoomType(roomName),
+      surfaceType,
+      action: "replace",
+      materialCategory:
+        asOptionalString(evidence.materialCategory) || rawSurface,
+      materialProductId,
+      materialNameKo: asOptionalString(evidence.materialNameKo),
+      brand: asOptionalString(evidence.brand),
+      sku: asOptionalString(evidence.sku),
+      spec: asOptionalString(evidence.spec),
+      selectedMaterialUnitPrice: asOptionalPositiveNumber(evidence.unitPrice),
+      selectedMaterialPriceSource: normalizeMaterialPriceSource(
+        asOptionalString(evidence.priceSource),
+      ),
+      source,
+      confidence: asConfidence(evidence.confidence),
+      evidenceRefs: observationId
+        ? [{ type: "vision_observation", id: observationId }]
+        : [],
+      assumptions: [
+        matchStatus === "confirmed"
+          ? "이미지 분석 결과에서 확정된 실제 제품입니다."
+          : "이미지 분석 제품 후보 중 최상위 추천입니다.",
+      ],
+      warnings:
+        matchStatus === "recommended"
+          ? ["추천 자재는 사용자 또는 사업자 확인 전까지 확정 제품이 아닙니다."]
+          : [],
     });
   }
 
@@ -188,7 +258,10 @@ export function buildSurfacePlansFromContext(
       for (const hint of output.materialHints ?? []) {
         const surfaceType = surfaceFromHint(hint.surfaceType);
         const key = `${roomId}::${surfaceType}`;
-        const source = evidenceSourceFromHint(hint.source);
+        const source =
+          hint.source === "vision_analysis" && hint.matchStatus === "confirmed"
+            ? "vision_confirmed_material"
+            : evidenceSourceFromHint(hint.source);
         if (!tryClaim(key, source)) continue;
         plans.push({
           id: randomId(),
@@ -200,12 +273,21 @@ export function buildSurfacePlansFromContext(
           surfaceType,
           action: "replace",
           materialCategory: hint.materialCategory,
+          materialProductId: hint.materialProductId,
           materialNameKo: hint.materialNameKo,
           brand: hint.brand,
           sku: hint.sku,
+          spec: hint.spec,
+          selectedMaterialUnitPrice: hint.unitPrice,
+          selectedMaterialPriceSource: normalizeMaterialPriceSource(hint.priceSource),
           source,
           confidence: hint.confidence,
-          evidenceRefs: [{ type: "design_output", id: output.id }],
+          evidenceRefs: [
+            { type: "design_output", id: output.id },
+            ...(hint.observationId
+              ? [{ type: "vision_observation" as const, id: hint.observationId }]
+              : []),
+          ],
           assumptions: hint.assumptions ?? [],
           warnings: [],
         });
@@ -277,6 +359,48 @@ export function buildSurfacePlansFromContext(
   }
 
   return { surfacePlans: plans, quantityBasisByRoom };
+}
+
+function mapEvidenceSurfaceToHint(surfaceType: string): MaterialHint["surfaceType"] {
+  if (["floor", "wall", "ceiling", "door", "window", "lighting"].includes(surfaceType)) {
+    return surfaceType as MaterialHint["surfaceType"];
+  }
+  if (surfaceType === "cabinet") return "built_in_furniture";
+  if (surfaceType === "countertop") return "counter";
+  if (surfaceType === "tile") return "wall";
+  return "unknown";
+}
+
+function asOptionalString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function asOptionalPositiveNumber(value: unknown): number | undefined {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : undefined;
+}
+
+function asConfidence(value: unknown): number {
+  const number = Number(value);
+  return Number.isFinite(number) ? Math.max(0, Math.min(1, number)) : 0.5;
+}
+
+function normalizeMaterialPriceSource(
+  source: string | undefined,
+): SurfacePlan["selectedMaterialPriceSource"] {
+  switch (source) {
+    case "contractor_price":
+      return "contractor_price";
+    case "retail_price":
+    case "catalog_price":
+      return "catalog_price";
+    case "material_price_lookup":
+      return "material_price_lookup";
+    case "manual_override":
+      return "manual_override";
+    default:
+      return undefined;
+  }
 }
 
 function collectRoomsFromOutputs(outputs: DesignOutput[]): Map<string, string> {

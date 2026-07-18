@@ -2,8 +2,9 @@
 /**
  * 기본정보 입력 카드 — 3 옵션 (주소·도면·LIDAR) + 예산·기본/확장형 통합.
  *
- * 옵션 1: 주소 검색 → JUSO 자동완성 + 네이버 평면도 자동 호출
- * 옵션 2: 도면 직접 업로드 (이미지·손도면) — 우리가 정형화
+ * 옵션 1: 주소 검색 → 네이버 평면도 있으면 원본 형식 유지 + 워터마크 최소 정리
+ *                   → 없으면 수동 평형으로 실별 평균 면적 산출
+ * 옵션 2: 도면 직접 업로드 (이미지·손도면)
  * 옵션 3: LIDAR 스캔 (모바일) — placeholder
  *
  * 셋 중 하나만 완료해도 다음 단계 진행 가능.
@@ -31,7 +32,7 @@ import {
 } from "@/lib/inpick/floorplan/normalize-request";
 
 type InputMode = "address" | "upload" | "lidar";
-const FLOORPLAN_PIPELINE_VERSION = 5;
+const FLOORPLAN_PIPELINE_VERSION = 7;
 
 export interface BasicInfoData {
   mode: InputMode;
@@ -67,6 +68,7 @@ export interface BasicInfoData {
   floorplanModel?: string;
   floorplanQuality?: "medium" | "high";
   layoutVariant?: "basic" | "extended";
+  analysisEngine?: string;
   normalizedRooms?: Array<{
     name: string;
     widthMm: number;
@@ -99,6 +101,7 @@ interface NormalizeFloorplanResponse {
   cleanModel?: string;
   cleanQuality?: "medium" | "high";
   layoutVariant?: "basic" | "extended";
+  analysisEngine?: string;
 }
 
 export default function BasicInfoCard({ value, onChange }: Props) {
@@ -106,7 +109,7 @@ export default function BasicInfoCard({ value, onChange }: Props) {
   const setMode = (m: InputMode) => onChange({ ...value, mode: m });
 
   const inputDone =
-    (mode === "address" && !!value.cleanedImageUrl && !value.normalizing && !value.normalizationWarning) ||
+    (mode === "address" && !!value.selectedPyeong && !!value.expansionType) ||
     (mode === "upload" && !!value.uploadedFloorplan?.dataUrl) ||
     (mode === "lidar" && !!value.lidarScan?.dataUrl);
   const budgetDone = value.budget > 0;
@@ -195,6 +198,7 @@ function ConstructionTypeSelector({ value, onChange }: Props) {
                   floorplanModel: undefined,
                   floorplanQuality: undefined,
                   layoutVariant: undefined,
+                  analysisEngine: undefined,
                   normalizing: false,
                   normalizationStartedAt: undefined,
                   normalizationWarning: undefined,
@@ -302,13 +306,13 @@ function AddressMode({ value, onChange }: Props) {
   >([]);
   const [loadingBuilding, setLoadingBuilding] = useState(false);
   const [showAllPyeong, setShowAllPyeong] = useState(false);
+  const [manualPyeong, setManualPyeong] = useState("");
+  const [buildingLookupDone, setBuildingLookupDone] = useState(false);
   const valueRef = useRef(value);
   const activeNormalizeKeyRef = useRef<string | null>(null);
   const activeNormalizeControllerRef = useRef<AbortController | null>(null);
   const attemptedNormalizeKeysRef = useRef(new Set<string>());
   valueRef.current = value;
-
-  useEffect(() => () => activeNormalizeControllerRef.current?.abort(), []);
 
   // Fast Refresh/새로고침 또는 구 파이프라인에서 비동기 호출만 끊긴 경우 자동 복구.
   useEffect(() => {
@@ -316,12 +320,12 @@ function AddressMode({ value, onChange }: Props) {
       !value.normalizing ||
       (value.normalizationStartedAt &&
         value.normalizationPipelineVersion === FLOORPLAN_PIPELINE_VERSION) ||
-      !value.selectedPyeong?.grandPlanUrl ||
+      !value.selectedPyeong ||
       !value.expansionType
     ) {
       return;
     }
-    const normalizeKey = `${value.selectedPyeong.pyeongNo}:${value.selectedPyeong.grandPlanUrl}:${value.expansionType}`;
+    const normalizeKey = `${value.selectedPyeong.pyeongNo}:${value.selectedPyeong.grandPlanUrl || "area-average"}:${value.selectedPyeong.exclusiveArea}:${value.expansionType}`;
     attemptedNormalizeKeysRef.current.delete(normalizeKey);
     if (activeNormalizeKeyRef.current === normalizeKey) activeNormalizeKeyRef.current = null;
     onChange({
@@ -344,20 +348,19 @@ function AddressMode({ value, onChange }: Props) {
         ...current,
         normalizing: false,
         normalizationStartedAt: undefined,
-        normalizationWarning: "도면 생성 시간이 초과되었습니다. 다시 시도해주세요.",
+        normalizationWarning: "공간 정보 분석 시간이 초과되었습니다.",
       });
     }, remaining);
     return () => window.clearTimeout(timer);
   }, [onChange, value.normalizationStartedAt, value.normalizing]);
 
-  // ─── 가이드: 평형 + expansion 둘 다 결정되면 자동 호출 ───
-  // 흐름: 주소 → 평형 클릭 (저장만) → 기본/확장형 클릭 → 도면 정리 시작
-  // expansion 변경 시 cleanedImageUrl 리셋되어 useEffect가 재호출
+  // 평형 + expansion 둘 다 결정되면 백그라운드 호출한다.
+  // 도면이 있으면 워터마크만 최소 정리하고, 없으면 평형 평균 실 치수를 산출한다.
   useEffect(() => {
     if (
-      value.selectedPyeong?.grandPlanUrl &&
+      value.selectedPyeong &&
       value.expansionType &&
-      !value.cleanedImageUrl &&
+      !value.normalizedRooms?.length &&
       !value.normalizing &&
       !value.normalizationWarning
     ) {
@@ -368,7 +371,7 @@ function AddressMode({ value, onChange }: Props) {
   }, [
     value.selectedPyeong?.pyeongNo,
     value.expansionType,
-    value.cleanedImageUrl,
+    value.normalizedRooms?.length,
     value.normalizing,
     value.normalizationWarning,
   ]);
@@ -425,6 +428,7 @@ function AddressMode({ value, onChange }: Props) {
         floorplanModel: undefined,
         floorplanQuality: undefined,
         layoutVariant: undefined,
+        analysisEngine: undefined,
         normalizing: false,
         normalizationStartedAt: undefined,
         normalizationWarning: undefined,
@@ -434,6 +438,8 @@ function AddressMode({ value, onChange }: Props) {
       setFocused(false);
       setPyeongList([]);
       setShowAllPyeong(false);
+      setManualPyeong("");
+      setBuildingLookupDone(false);
       setLoadingBuilding(true);
       try {
         const params = new URLSearchParams({
@@ -450,6 +456,7 @@ function AddressMode({ value, onChange }: Props) {
         console.error("building fetch fail", e);
       } finally {
         setLoadingBuilding(false);
+        setBuildingLookupDone(true);
       }
     },
     [onChange, value]
@@ -462,7 +469,7 @@ function AddressMode({ value, onChange }: Props) {
   };
 
   /**
-   * 평면도 정형화 호출 — 평형 + expansion 둘 다 결정된 시점에만 실행.
+   * 도면 최소 정리/평형 평균 분석 호출 — 평형 + expansion 결정 시 실행.
    * useEffect (위)에서 자동 trigger.
    */
   const runNormalize = async (
@@ -476,8 +483,7 @@ function AddressMode({ value, onChange }: Props) {
     expansion: "basic" | "extended",
   ) => {
     const sourceUrl = pyeong.grandPlanUrl;
-    if (!sourceUrl) return;
-    const normalizeKey = `${pyeong.pyeongNo}:${sourceUrl}:${expansion}`;
+    const normalizeKey = `${pyeong.pyeongNo}:${sourceUrl || "area-average"}:${pyeong.exclusiveArea}:${expansion}`;
     if (
       activeNormalizeKeyRef.current === normalizeKey ||
       attemptedNormalizeKeysRef.current.has(normalizeKey)
@@ -526,6 +532,7 @@ function AddressMode({ value, onChange }: Props) {
       floorplanModel: undefined,
       floorplanQuality: undefined,
       layoutVariant: undefined,
+      analysisEngine: undefined,
       normalizing: true,
       normalizationStartedAt: Date.now(),
       normalizationPipelineVersion: FLOORPLAN_PIPELINE_VERSION,
@@ -546,12 +553,16 @@ function AddressMode({ value, onChange }: Props) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrl: sourceUrl,
+            ...(sourceUrl ? { imageUrl: sourceUrl } : {}),
             exclusiveAreaM2: p.exclusiveArea,
+            roomCount: p.roomCnt,
             unitName: aptName,
             address,
             aptName,
-            skipImageClean: false,
+            // 도면이 있으면 형식을 재생성하지 않고 워터마크만 최소 정리한다.
+            // 도면이 없으면 평형 통계 평균값으로 실별 치수를 산출한다.
+            skipImageClean: !sourceUrl,
+            processingMode: sourceUrl ? "watermark_only" : "area_average",
             expansion: expansion === "extended",
             layoutVariant: expansion,
           }),
@@ -559,7 +570,7 @@ function AddressMode({ value, onChange }: Props) {
         },
         { timeoutMs: FLOORPLAN_CLIENT_TIMEOUT_MS },
       );
-      if (res.ok && data.cleanedImageUrl) {
+      if (res.ok && data.rooms?.length) {
         if (data.layoutVariant !== expansion) {
           finishWithError("선택한 시공 형태와 도면이 일치하지 않습니다. 다시 시도해주세요.");
           return;
@@ -569,7 +580,7 @@ function AddressMode({ value, onChange }: Props) {
           ...valueRef.current,
           selectedPyeong: p,
           expansionType: expansion,
-          floorplanPropertyId: data.property_id,
+          floorplanPropertyId: data.cleanedImageUrl ? data.property_id : undefined,
           cleanedImageUrl: data.cleanedImageUrl,
           normalizedImageUrl: data.normalizedImageUrl || data.cleanedImageUrl,
           dimensionOverlaySvg: data.dimensionOverlaySvg,
@@ -585,13 +596,14 @@ function AddressMode({ value, onChange }: Props) {
               ? data.cleanQuality
               : undefined,
           layoutVariant: data.layoutVariant || expansion,
+          analysisEngine: data.analysisEngine,
           normalizing: false,
           normalizationStartedAt: undefined,
           normalizationWarning: undefined,
         });
       } else {
         console.warn("[floorplan-normalize] unavailable:", data.error || res.status);
-        finishWithError("도면을 완성하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        finishWithError("공간 정보를 정밀 분석하지 못했습니다.");
       }
     } catch (e) {
       console.error("normalize fail", e);
@@ -604,8 +616,8 @@ function AddressMode({ value, onChange }: Props) {
       }
       finishWithError(
         e instanceof FloorplanRequestError && e.code === "timeout"
-          ? "도면 생성 시간이 초과되었습니다. 다시 시도해주세요."
-          : "도면을 완성하지 못했습니다. 다시 시도해주세요.",
+          ? "공간 정보 분석 시간이 초과되었습니다."
+          : "공간 정보를 정밀 분석하지 못했습니다.",
       );
     } finally {
       if (activeNormalizeControllerRef.current === normalizeController) {
@@ -623,8 +635,8 @@ function AddressMode({ value, onChange }: Props) {
   const retryNormalize = () => {
     const pyeong = valueRef.current.selectedPyeong;
     const expansion = valueRef.current.expansionType;
-    if (!pyeong?.grandPlanUrl || !expansion) return;
-    const normalizeKey = `${pyeong.pyeongNo}:${pyeong.grandPlanUrl}:${expansion}`;
+    if (!pyeong || !expansion) return;
+    const normalizeKey = `${pyeong.pyeongNo}:${pyeong.grandPlanUrl || "area-average"}:${pyeong.exclusiveArea}:${expansion}`;
     attemptedNormalizeKeysRef.current.delete(normalizeKey);
     if (activeNormalizeKeyRef.current === normalizeKey) activeNormalizeKeyRef.current = null;
     void runNormalizeRef.current?.(pyeong, expansion);
@@ -658,11 +670,25 @@ function AddressMode({ value, onChange }: Props) {
       floorplanModel: undefined,
       floorplanQuality: undefined,
       layoutVariant: undefined,
+      analysisEngine: undefined,
       normalizing: false,
       normalizationStartedAt: undefined,
       normalizationWarning: undefined,
     });
     // expansion 이미 셋된 상태에서 평형 클릭 → useEffect가 자동 호출
+  };
+
+  const handleManualPyeong = () => {
+    const pyeong = Number(manualPyeong);
+    if (!Number.isFinite(pyeong) || pyeong < 5 || pyeong > 200) return;
+    // 사용자가 말하는 아파트 "평형"은 통상 공급면적 기준이다.
+    // 전용률 76% 평균으로 전용면적을 추정하고 이후 실별 평균값 산정에 사용한다.
+    const exclusiveArea = Math.round(pyeong * 3.3058 * 0.76 * 10) / 10;
+    void handleSelectPyeong({
+      pyeongNo: -Math.round(pyeong * 10),
+      pyeongName: `${pyeong}평`,
+      exclusiveArea,
+    });
   };
 
   return (
@@ -811,57 +837,78 @@ function AddressMode({ value, onChange }: Props) {
         </div>
       )}
 
+      {value.selectedAddress && buildingLookupDone && pyeongList.length === 0 && (
+        <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#f7f7f5] p-3">
+          <p className="text-xs font-semibold text-black/70">평형 정보를 찾지 못했습니다</p>
+          <p className="mt-1 text-[11px] leading-4 text-black/42">
+            공급 평형을 직접 입력하면 실별 평균 면적을 백그라운드에서 계산합니다.
+          </p>
+          <div className="mt-3 flex gap-2">
+            <div className="relative min-w-0 flex-1">
+              <input
+                type="number"
+                min={5}
+                max={200}
+                step={0.1}
+                value={manualPyeong}
+                onChange={(event) => setManualPyeong(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    handleManualPyeong();
+                  }
+                }}
+                placeholder="예: 34"
+                className="h-11 w-full rounded-xl border border-black/10 bg-white px-3 pr-9 text-sm font-semibold text-black outline-none focus:border-black/30"
+              />
+              <span className="pointer-events-none absolute right-3 top-3 text-xs text-black/38">평</span>
+            </div>
+            <button
+              type="button"
+              onClick={handleManualPyeong}
+              disabled={!manualPyeong || Number(manualPyeong) < 5 || Number(manualPyeong) > 200}
+              className="rounded-xl bg-black px-4 text-xs font-semibold text-white transition disabled:bg-black/20"
+            >
+              적용
+            </button>
+          </div>
+        </div>
+      )}
+
       {value.selectedPyeong && (
         <ConstructionTypeSelector value={value} onChange={onChange} />
       )}
 
-      {value.selectedPyeong?.grandPlanUrl && value.expansionType && (
-        <div className="mt-3">
-          <div className="relative w-full overflow-hidden rounded-xl border border-black/[0.08] bg-white">
-            {value.normalizing ? (
-              <div className="relative flex min-h-[330px] flex-col items-center justify-center overflow-hidden bg-[#f7f7f5] px-6 py-10 text-center sm:min-h-[390px]">
-                <img
-                  src={value.selectedPyeong.grandPlanUrl}
-                  alt="선택한 원본 도면 미리보기"
-                  className="absolute inset-0 h-full w-full object-contain opacity-20 blur-[1px]"
-                />
-                <div className="absolute inset-0 bg-white/70" />
-                <div className="relative h-16 w-16" aria-hidden>
-                  <div className="absolute inset-0 rounded-full border-[3px] border-black/10" />
-                  <div className="absolute inset-0 animate-[spin_3s_linear_infinite] rounded-full border-[3px] border-transparent border-r-black border-t-black" />
-                  <div className="absolute inset-[9px] animate-[spin_5s_linear_infinite_reverse] rounded-full border-2 border-transparent border-b-black/35" />
-                </div>
-                <p className="relative mt-5 text-xs font-semibold text-black/65">도면 생성 중</p>
-                <p className="relative mt-1 text-[11px] text-black/40">선택한 도면을 확인하고 시공 형태를 반영하고 있습니다.</p>
-              </div>
-            ) : value.cleanedImageUrl && !value.normalizationWarning ? (
-              <div className="relative bg-white">
-                <img
-                  src={value.cleanedImageUrl}
-                  alt={`${value.layoutVariant === "extended" ? "확장형" : "기본형"} 흑백 건축도면`}
-                  className="w-full object-contain"
-                />
-                {value.dimensionOverlaySvg && (
-                  <div
-                    className="pointer-events-none absolute inset-0"
-                    dangerouslySetInnerHTML={{ __html: value.dimensionOverlaySvg }}
-                  />
-                )}
-              </div>
-            ) : value.normalizationWarning ? (
-              <div className="flex min-h-[260px] flex-col items-center justify-center bg-[#f7f7f5] px-6 py-10 text-center">
-                <button
-                  type="button"
-                  onClick={retryNormalize}
-                  className="rounded-full bg-black px-5 py-2.5 text-xs font-semibold text-white transition hover:bg-black/75"
-                >
-                  다시 처리
-                </button>
-              </div>
-            ) : (
-              <div className="min-h-[220px] bg-[#f7f7f5]" />
-            )}
+      {value.selectedPyeong && value.expansionType && (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-black/[0.07] bg-[#f7f7f5] px-4 py-3">
+          {value.normalizing ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin text-black/55" />
+          ) : (
+            <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-black text-[9px] font-bold text-white">
+              ✓
+            </span>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-black/70">
+              {value.normalizing ? "공간 정보를 분석하고 있습니다" : "공간 정보가 준비되었습니다"}
+            </p>
+            <p className="mt-0.5 text-[11px] leading-4 text-black/40">
+              {value.normalizationWarning
+                ? "분석은 보류하고 선택한 평형 평균값으로 디자인과 가견적을 진행합니다."
+                : value.selectedPyeong.grandPlanUrl
+                  ? "원본 형식은 유지하고 워터마크만 정리하며, 실별 면적은 평형 평균값으로 계산합니다."
+                  : "선택한 평형의 실별 평균 면적을 계산하며 다음 단계는 바로 진행할 수 있습니다."}
+            </p>
           </div>
+          {value.normalizationWarning && (
+            <button
+              type="button"
+              onClick={retryNormalize}
+              className="shrink-0 rounded-full border border-black/10 bg-white px-3 py-1.5 text-[11px] font-semibold text-black/60 transition hover:text-black"
+            >
+              다시 분석
+            </button>
+          )}
         </div>
       )}
     </div>

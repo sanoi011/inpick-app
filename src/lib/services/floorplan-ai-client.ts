@@ -163,24 +163,23 @@ async function findPython(): Promise<string | null> {
 async function callViaHttp(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 45000,
 ): Promise<FloorplanAIResult | null> {
   if (!FLOORPLAN_AI_URL) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(imageBuffer)]);
     formData.append('file', blob, filename);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-
     const response = await fetch(`${FLOORPLAN_AI_URL}/api/v1/recognize`, {
       method: 'POST',
       body: formData,
       signal: controller.signal,
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       console.warn(`[floorplan-ai] HTTP ${response.status}: ${response.statusText}`);
@@ -192,6 +191,8 @@ async function callViaHttp(
   } catch (err) {
     console.warn('[floorplan-ai] HTTP call failed:', err instanceof Error ? err.message : err);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -201,6 +202,7 @@ async function callViaHttp(
 async function callViaChildProcess(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 60000,
 ): Promise<FloorplanAIResult | null> {
   const pythonPath = await findPython();
   if (!pythonPath) {
@@ -227,7 +229,7 @@ async function callViaChildProcess(
       let stderr = '';
 
       const proc = spawn(pythonPath, [scriptPath, tempPath], {
-        timeout: 60000,
+        timeout: timeoutMs,
         env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
       });
 
@@ -268,24 +270,23 @@ async function callViaChildProcess(
 async function callViaV47Http(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 45000,
 ): Promise<PdfParserV47Result | null> {
   if (!PDF_PARSER_V47_URL) return null;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(imageBuffer)]);
     formData.append('file', blob, filename);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 45000);
-
     const response = await fetch(`${PDF_PARSER_V47_URL}/api/v1/recognize`, {
       method: 'POST',
       body: formData,
       signal: controller.signal,
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       console.warn(`[pdf-parser-v47] HTTP ${response.status}: ${response.statusText}`);
@@ -301,6 +302,8 @@ async function callViaV47Http(
   } catch (err) {
     console.warn('[pdf-parser-v47] HTTP call failed:', err instanceof Error ? err.message : err);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -311,9 +314,10 @@ async function callViaV47Http(
 export async function callFloorplanAI(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 45000,
 ): Promise<FloorplanAIResult | null> {
   // 1. HTTP 서버 시도
-  const httpResult = await callViaHttp(imageBuffer, filename);
+  const httpResult = await callViaHttp(imageBuffer, filename, timeoutMs);
   if (httpResult) {
     console.log('[floorplan-ai] HTTP call succeeded');
     return httpResult;
@@ -321,7 +325,7 @@ export async function callFloorplanAI(
 
   // 2. child_process 폴백
   console.log('[floorplan-ai] Trying child_process fallback...');
-  return callViaChildProcess(imageBuffer, filename);
+  return callViaChildProcess(imageBuffer, filename, timeoutMs);
 }
 
 /**
@@ -331,8 +335,9 @@ export async function callFloorplanAI(
 export async function callPdfParserV47(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 45000,
 ): Promise<PdfParserV47Result | null> {
-  const result = await callViaV47Http(imageBuffer, filename);
+  const result = await callViaV47Http(imageBuffer, filename, timeoutMs);
   if (result) {
     console.log(`[pdf-parser-v47] Success: ${result.project.rooms.length} rooms, ${result.project.walls.length} walls`);
   }
@@ -346,10 +351,11 @@ export async function callPdfParserV47(
 export async function callFloorplanAIAny(
   imageBuffer: Buffer,
   filename: string,
+  timeoutMs = 45000,
 ): Promise<FloorplanAIResponse | null> {
   // v4.7 우선 시도 (더 완전한 파이프라인)
   if (PDF_PARSER_V47_URL) {
-    const v47 = await callViaV47Http(imageBuffer, filename);
+    const v47 = await callViaV47Http(imageBuffer, filename, timeoutMs);
     if (v47 && v47.success) {
       console.log('[floorplan-ai] v4.7 call succeeded');
       return { format: 'v47', data: v47 };
@@ -357,7 +363,7 @@ export async function callFloorplanAIAny(
   }
 
   // 기존 서비스 폴백
-  const legacy = await callFloorplanAI(imageBuffer, filename);
+  const legacy = await callFloorplanAI(imageBuffer, filename, timeoutMs);
   if (legacy) {
     return { format: 'legacy', data: legacy };
   }

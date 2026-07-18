@@ -2,9 +2,14 @@
 
 import { useState } from "react";
 import { motion } from "motion/react";
-import { Layers, Check, ChevronDown, Building2, Home, Store, Box, RotateCcw } from "lucide-react";
+import { Layers, Check, ChevronDown, Building2, Home, Store, Box, RotateCcw, TriangleAlert } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import BasicInfoCard, { BasicInfoData } from "./BasicInfoCard";
+import {
+  normalizeSiteConditionAnswers,
+  SITE_CONDITION_OPTIONS,
+  type SiteConditionAnswers,
+} from "@/lib/inpick/estimate-v2/site-condition-answers";
 
 type BuildingType = "apartment" | "house" | "store" | "etc";
 
@@ -111,6 +116,8 @@ export interface Step1Data {
   normalizedFloorplan?: NormalizedFloorplan;
   // 실별 가구·붙박이 옵션 (예: { living: ["builtIn", "systemCloset"], kitchen: ["sinkUpper", "fridgeCabinet"] })
   roomFurnishings?: Record<string, string[]>;
+  /** 이미지로 확인하기 어려운 철거·전기·설비·반출 조건 */
+  siteConditions?: SiteConditionAnswers;
 }
 
 // 실별 추가 시공 옵션 (가구·붙박이) — 실 클릭 시 펼쳐짐
@@ -163,8 +170,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   const addressInputDone =
     (value.basicInfo.mode === "address" &&
       !!value.basicInfo.selectedPyeong &&
-      !!value.basicInfo.cleanedImageUrl &&
-      !value.basicInfo.normalizationWarning) ||
+      !!value.basicInfo.expansionType) ||
     (value.basicInfo.mode === "upload" && !!value.basicInfo.uploadedFloorplan?.dataUrl) ||
     (value.basicInfo.mode === "lidar" && !!value.basicInfo.lidarScan?.dataUrl);
   const inputDone = isApartmentDrawingMode ? addressInputDone : true;
@@ -183,13 +189,17 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         ? !!value.storeUsage
         : false);
 
-  // P6-2: 도면 정형화 진행 중이면 "내 공간 꾸미기" 버튼 비활성 — Step2에서 도면 기반 생성이 보장되도록
+  // 주소 모드는 구조 분석을 백그라운드로 유지한다. Step2는 면적·형태와
+  // 원본 참조로 즉시 시작하고, 분석 결과가 준비되면 정밀 공간정보를 사용한다.
   const normalizing = !!value.basicInfo.normalizing;
   const floorplanProcessingFailed =
     isApartmentDrawingMode &&
     value.basicInfo.mode === "address" &&
     !!value.basicInfo.normalizationWarning;
-  const allOk = basicDone && scopeOk && !normalizing && !floorplanProcessingFailed;
+  const allOk =
+    basicDone &&
+    scopeOk &&
+    (value.basicInfo.mode === "address" || (!normalizing && !floorplanProcessingFailed));
   // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
   const missing: string[] = [];
   if (!inputDone) missing.push("주소·평형 또는 도면");
@@ -197,8 +207,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   if (!value.buildingType) missing.push("건물 유형");
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
-  if (normalizing) missing.push("도면 정리 완료 대기");
-  if (floorplanProcessingFailed) missing.push("고화질 도면 다시 처리");
+  if (value.basicInfo.mode !== "address" && normalizing) missing.push("도면 정리 완료 대기");
+  if (value.basicInfo.mode !== "address" && floorplanProcessingFailed) missing.push("도면 다시 처리");
 
   // 3-mode entry card 선택 시 workflowEntry + buildingType 함께 세팅
   const selectMode = (entry: WorkflowEntry) => {
@@ -212,6 +222,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
       rooms: [],
       storeUsage: undefined,
       storeUsageEtc: undefined,
+      siteConditions: undefined,
     });
   };
 
@@ -253,8 +264,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
               bgImage="/mode-cards/apartment-drawing-v2.webp"
               fallbackEmoji="🏢"
               accent="from-blue-500/70 to-blue-700/80"
-              title="아파트 도면으로"
-              description="주소·평형 검색으로 도면을 불러옵니다. 방별 정밀 디자인 + 17공종 견적."
+              title="아파트 주소·평형"
+              description="주소로 평형을 찾고, 없으면 직접 입력합니다. 공간별 AI 디자인 + 17공종 가견적."
             />
             <ModeEntryCard
               onClick={() => selectMode("photo_residential")}
@@ -281,7 +292,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             현재 모드 ·{" "}
             <span className="font-semibold text-black">
               {value.workflowEntry === "apartment_drawing"
-                ? "아파트 도면"
+                ? "아파트 주소·평형"
                 : value.workflowEntry === "photo_residential"
                   ? "내 공간 사진"
                   : "상가·사무실"}
@@ -303,7 +314,20 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         <Card title="기본정보 입력" icon={Layers} done={basicDone}>
           <BasicInfoCard
             value={value.basicInfo}
-            onChange={(next) => update("basicInfo", next)}
+            onChange={(next) =>
+              onChange({
+                ...value,
+                basicInfo: next,
+                normalizedFloorplan: next.normalizedRooms?.length
+                  ? {
+                      pyeong: next.normalizedPyeong || next.selectedPyeong?.pyeongName || "평형 평균",
+                      rooms: next.normalizedRooms,
+                      openings: next.normalizedOpenings || [],
+                      notes: next.normalizedNotes || "평형 통계 평균값",
+                    }
+                  : undefined,
+              })
+            }
           />
         </Card>
       )}
@@ -329,6 +353,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                     floorLevel: undefined,
                     storeUsage: undefined,
                     storeUsageEtc: undefined,
+                    siteConditions: undefined,
                   })
                 }
                 className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-[0.78rem] font-semibold tracking-tight transition-all ${
@@ -406,6 +431,13 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
           </>
         )}
 
+        {isResidential && scopeOk && (
+          <SiteConditionQuestions
+            value={value.siteConditions}
+            onChange={(siteConditions) => update("siteConditions", siteConditions)}
+          />
+        )}
+
         {/* 다음 단계 버튼 — 항상 노출 (allOk 시 활성, 아니면 비활성 + 안내) */}
         <motion.button
           onClick={() => allOk && onNext()}
@@ -427,13 +459,106 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             </>
           ) : normalizing ? (
             <>
-              도면 생성 중
+              공간 정보 분석 중
             </>
           ) : (
             <>다음 단계 — 입력 필요: {missing.join(" · ")}</>
           )}
         </motion.button>
       </Card>
+      </div>
+    </div>
+  );
+}
+
+function SiteConditionQuestions({
+  value,
+  onChange,
+}: {
+  value?: SiteConditionAnswers;
+  onChange: (next: SiteConditionAnswers) => void;
+}) {
+  const answers = normalizeSiteConditionAnswers(value);
+  const groups: Array<{
+    key: keyof SiteConditionAnswers;
+    title: string;
+    question: string;
+    options: ReadonlyArray<{ value: string; label: string; description: string }>;
+  }> = [
+    {
+      key: "demolitionScope",
+      title: "철거 범위",
+      question: "기존 마감을 어느 정도 철거하나요?",
+      options: SITE_CONDITION_OPTIONS.demolitionScope,
+    },
+    {
+      key: "electricalScope",
+      title: "전기 공사",
+      question: "배선과 회로 공사 범위는 어느 정도인가요?",
+      options: SITE_CONDITION_OPTIONS.electricalScope,
+    },
+    {
+      key: "plumbingScope",
+      title: "설비·배관",
+      question: "주방·욕실의 급배수 위치를 이동하나요?",
+      options: SITE_CONDITION_OPTIONS.plumbingScope,
+    },
+    {
+      key: "siteAccess",
+      title: "폐기물 반출",
+      question: "엘리베이터와 차량 반출 조건은 어떤가요?",
+      options: SITE_CONDITION_OPTIONS.siteAccess,
+    },
+  ];
+
+  return (
+    <div className="mt-5 rounded-2xl border border-black/[0.08] bg-[#f7f7f5] p-4">
+      <div className="flex items-start gap-2.5">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-black/55" />
+        <div>
+          <p className="text-xs font-bold text-black">현장조건 확인</p>
+          <p className="mt-1 text-[11px] leading-5 text-black/45">
+            이미지로 볼 수 없는 공사 조건입니다. 잘 모르면 기본단가로 계산하고 사업자가 현장에서 확정합니다.
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        {groups.map((group) => (
+          <div key={group.key}>
+            <div className="flex flex-wrap items-baseline gap-2">
+              <span className="text-[10px] font-black tracking-[0.08em] text-black/35">{group.title}</span>
+              <p className="text-xs font-semibold text-black/70">{group.question}</p>
+            </div>
+            <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+              {group.options.map((option) => {
+                const selected = answers[group.key] === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() =>
+                      onChange({
+                        ...answers,
+                        [group.key]: option.value,
+                      } as SiteConditionAnswers)
+                    }
+                    className={`rounded-xl border px-3 py-2.5 text-left transition ${
+                      selected
+                        ? "border-black bg-black text-white"
+                        : "border-black/[0.08] bg-white text-black hover:border-black/25"
+                    }`}
+                  >
+                    <span className="block text-[11px] font-bold">{option.label}</span>
+                    <span className={`mt-0.5 block text-[10px] leading-4 ${selected ? "text-white/60" : "text-black/40"}`}>
+                      {option.description}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );

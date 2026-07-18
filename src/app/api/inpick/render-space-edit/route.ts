@@ -49,6 +49,8 @@ interface RenderSpaceEditBody {
   editPrompt: string;
   preserveGeometry?: boolean; // 호환용, 항상 true로 강제
   targetSurfaces?: SurfaceType[];
+  /** false면 구형 부위별 자재 분석 파이프라인을 실행하지 않음 */
+  analyzeSurfaces?: boolean;
   budgetTier?: "basic" | "standard" | "premium";
   quality?: "low" | "medium" | "high";
   projectId?: string; // editable_renders 저장용
@@ -310,7 +312,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── analyze 비동기 트리거 — fire-and-forget ──
-    if (editableRenderId && body.projectId && body.targetId) {
+    if (body.analyzeSurfaces !== false && editableRenderId && body.projectId && body.targetId) {
       const origin = req.nextUrl.origin;
       fetch(`${origin}/api/inpick/editable-render/analyze`, {
         method: "POST",

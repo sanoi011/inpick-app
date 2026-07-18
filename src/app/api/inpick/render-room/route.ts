@@ -101,8 +101,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── missing_floorplan 가드 (토큰 차감 전) ─────────────
-    // Storage에서 propertyId로 자동 로드 시도 후, 그래도 없으면 차단.
+    // Storage에서 propertyId로 정리된 원본 도면을 먼저 찾는다.
+    // 도면이 없으면 width/depth 평균 치수를 프롬프트 기준으로 사용한다.
     let floorplanImageUrl = body.floorplanImageUrl;
     if (!floorplanImageUrl && body.propertyId) {
       if (await hasFloorplan(body.propertyId, "normalized")) {
@@ -111,18 +111,6 @@ export async function POST(req: NextRequest) {
         floorplanImageUrl = getFloorplanUrl(body.propertyId, "original") || undefined;
       }
     }
-    if (!floorplanImageUrl) {
-      return NextResponse.json(
-        {
-          error: "missing_floorplan",
-          hint:
-            "아파트 도면이 필요합니다. Step1에서 주소+평형 선택 → /api/inpick/normalize-floorplan으로 propertyId 확보 후 재시도하거나, " +
-            "사진 기반 모드는 /api/inpick/render-photo-style을 사용하세요.",
-        },
-        { status: 400 },
-      );
-    }
-
     // ─── v2 §4-2 토큰 차감 (모든 validation 통과 후) ──
     const isLivingRoom = /거실|living\s*room/i.test(body.roomName);
     const feature: CreditFeature =
@@ -176,7 +164,7 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
-    // floorplanImageUrl는 토큰 차감 전 단계에서 이미 검증·로드됨.
+    // floorplanImageUrl이 없으면 평형 평균 치수 기반 text-to-image로 진행한다.
 
     // ─── 이미지 생성 요청 계측 (차감·rate limit 통과 = 실제 생성 시작) ──
     trackServerEventAsync({
@@ -211,7 +199,11 @@ export async function POST(req: NextRequest) {
           (body as unknown as { parsedFloorPlan?: ParsedFloorPlanLike })
             .parsedFloorPlan || {
             rooms: [
-              { id: "target", name: body.roomName, areaM2: undefined },
+              {
+                id: "target",
+                name: body.roomName,
+                areaM2: (body.widthMm * body.depthMm) / 1_000_000,
+              },
               // adjacentRooms를 fallback 방으로 등록
               ...(body.adjacentRooms || []).map((n, i) => ({
                 id: `adj_${i}`,
@@ -469,6 +461,7 @@ export async function POST(req: NextRequest) {
         floorplanUsed: !!floorplanImageUrl,
         floorplanImageUrl: floorplanImageUrl || undefined,
         propertyId: body.propertyId,
+        referenceMode: floorplanImageUrl ? "floorplan" : "area_average",
         renderSpecKind: renderRoomSpec ? "RenderRoomSpec_v1" : "text_only",
         renderSpecConfidence: renderRoomSpec?.confidence,
         roomName: body.roomName,

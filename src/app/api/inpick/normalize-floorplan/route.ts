@@ -1,9 +1,9 @@
 /**
  * POST /api/inpick/normalize-floorplan
  *
- * 네이버/업로드 평면도 → gpt-image-2 image edit로 워터마크 제거 + 바닥 고화질화 (raster 유지)
- *                    → GPT-5.6 Sol Vision으로 실 layout 추출 (mm)
- *                    → dimension overlay SVG 생성 (raster 위에 absolute로 얹힘)
+ * 주소 평형 + 네이버 평면도 있음 → 원본 형식 유지, 워터마크만 최소 정리
+ * 주소 평형 + 평면도 없음        → 평형 통계 평균으로 실별 면적/치수 산출
+ * 업로드 도면                    → 기존 구조 분석 호환
  *
  * 입력: { imageUrl?, imageBase64?, imageMimeType?, exclusiveAreaM2?, isHandDrawn?, unitName? }
  * 출력: {
@@ -14,11 +14,11 @@
  * }
  */
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { analyzeImageVision } from "@/lib/inpick/openai-client";
 import { getOpenAIKey } from "@/lib/inpick/openai-env";
 import {
   classifyPyeong,
-  estimateRoomDimsFromPyeong,
   type PyungType,
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
@@ -34,16 +34,30 @@ import {
   hasFloorplan,
 } from "@/lib/inpick/floorplan-storage";
 import { withFloorplanDeadline } from "@/lib/inpick/floorplan/deadline";
+import { callFloorplanAIAny } from "@/lib/services/floorplan-ai-client";
+import {
+  floorplanAIToStructure,
+  type InferredFloorplanStructure,
+} from "@/lib/inpick/floorplan/inference-result";
+import {
+  buildAreaAveragePrompt,
+  buildStandardAreaAverage,
+  parseAreaAverageResponse,
+  type AreaAverageInput,
+} from "@/lib/inpick/floorplan/area-average";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
 
 const OPENAI_BASE = "https://api.openai.com/v1";
 const EXTENDED_LAYOUT_PIPELINE_VERSION = "extended-v4";
+const WATERMARK_ONLY_PIPELINE_VERSION = "watermark-only-v1";
 const CACHE_LOOKUP_TIMEOUT_MS = 3_000;
 const STORAGE_WRITE_TIMEOUT_MS = 5_000;
 const SOURCE_DOWNLOAD_TIMEOUT_MS = 10_000;
 const VISION_TIMEOUT_MS = 35_000;
+const LOCAL_INFERENCE_TIMEOUT_MS = 30_000;
+const STRUCTURE_ANALYSIS_TIMEOUT_MS = 70_000;
 const IMAGE_EDIT_TIMEOUT_MS = 65_000;
 
 interface Body {
@@ -54,6 +68,12 @@ interface Body {
   isHandDrawn?: boolean;
   unitName?: string;
   skipImageClean?: boolean;
+  processingMode?:
+    | "area_average"
+    | "watermark_only"
+    | "structure_only"
+    | "clean_preview";
+  roomCount?: number;
   expansion?: boolean;
   layoutVariant?: "basic" | "extended";
   /** 가이드 §1-2 — propertyId 시스템: address+aptName+areaSqm 해시로 영구 저장 */
@@ -63,21 +83,13 @@ interface Body {
   propertyId?: string;
 }
 
-interface VisionRoom {
-  name: string;
-  widthMm?: number;
-  depthMm?: number;
-  xMm?: number;
-  yMm?: number;
-}
-
-interface VisionResult {
-  rooms?: VisionRoom[];
-  openings?: { wall?: string; type?: string; widthMm?: number; heightMm?: number }[];
-  detectedAreaM2?: number;
-  totalWidthMm?: number;
-  totalDepthMm?: number;
-  notes?: string;
+interface StructureAnalysisResult {
+  content: string;
+  engine:
+    | "inpick-floorplan-ai"
+    | "openai-vision"
+    | "openai-area-average"
+    | "standard-area-average";
 }
 
 const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면도입니다.
@@ -106,49 +118,61 @@ const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면�
 - 명시 치수 우선, 미표시면 표준 비율 추정
 - 욕실/침실 2개+면 "욕실1","욕실2"`;
 
+async function estimateAreaAverageStructure(
+  input: AreaAverageInput,
+  apiKey?: string,
+): Promise<StructureAnalysisResult> {
+  const fallback = buildStandardAreaAverage(input);
+  if (!apiKey) {
+    return {
+      content: JSON.stringify({ rooms: fallback.rooms, notes: fallback.notes }),
+      engine: "standard-area-average",
+    };
+  }
+
+  try {
+    const response = await analyzeImageVision({
+      prompt: buildAreaAveragePrompt(input),
+      responseFormat: "json_object",
+      maxOutputTokens: 2_048,
+      reasoningEffort: "low",
+      requestTimeoutMs: 20_000,
+    });
+    const parsed = parseAreaAverageResponse(response.content, input);
+    if (parsed) {
+      return {
+        content: JSON.stringify({ rooms: parsed.rooms, notes: parsed.notes }),
+        engine: "openai-area-average",
+      };
+    }
+  } catch (error) {
+    console.warn("[FLOORPLAN] area average prompt fallback:", error);
+  }
+
+  return {
+    content: JSON.stringify({ rooms: fallback.rooms, notes: fallback.notes }),
+    engine: "standard-area-average",
+  };
+}
+
 /** 평면도 raster cleaning — GPT Image 2 단일 */
 async function cleanFloorplanRaster(
   imageBuf: Buffer,
   apiKey: string,
   options: {
-    layoutVariant?: "basic" | "extended";
     imageMimeType?: string;
     signal?: AbortSignal;
   } = {},
 ): Promise<{ b64: string; costUsd: number; model: string }> {
-  const expansionBlock = options.layoutVariant === "extended"
-    ? `LAYOUT VARIANT = 확장형(EXTENDED) — 이것은 단순 정리가 아니라 원본 기본형을 확장형으로 변환하는 필수 편집입니다.
-1. 원본에서 거실 또는 침실과 직접 맞닿은 발코니·베란다를 모두 찾으세요.
-2. 각 인접 실과 발코니 사이의 비내력 경계벽, 분합문, 창호선과 문 호(arc)를 제거하고 두 영역을 하나의 실로 합치세요.
-3. 합쳐진 영역은 인접 거실·침실과 동일한 흰 바탕으로 끊김 없이 연결하고, 실의 외곽은 기존 발코니 외벽까지 넓히세요.
-4. 외기에 면한 발코니 바깥쪽 창호, 내력벽, 기둥, 샤프트, 주방 다용도실과 습식 설비 발코니는 그대로 보존하세요.
-5. 확장 결과는 기본형과 시각적으로 명확히 달라야 합니다. 거실·침실과 발코니 사이의 내부 구획선이 남아 있으면 실패입니다.
-6. 임의의 새 방·문·창을 만들지 말고 원본에서 실제로 인접한 발코니만 확장하세요. `
-    : `LAYOUT VARIANT = 기본형(BASIC) — 원본 기본형을 그대로 보존하는 필수 편집입니다.
-거실·침실과 발코니·베란다 사이의 경계벽, 분합문, 창호선과 출입문 호(arc)를 모두 유지하세요. 발코니를 실내와 합치거나 벽을 제거하지 마세요. `;
-
-  const structurePreservationBlock = options.layoutVariant === "extended"
-    ? "위에서 지정한 거실·침실-발코니 사이의 내부 경계만 제거 예외입니다. 그 외 외곽선, 실 개수, 비확장 벽, 출입문, 외기에 면한 창문, 기둥과 설비 위치는 픽셀 단위로 보존하고 임의로 추가·삭제하지 마세요. "
-    : "원본의 외곽선, 실 개수, 실 배치, 벽 중심선, 출입문, 창문, 기둥과 설비 위치를 픽셀 단위로 보존하고 임의로 방·문·창을 추가하거나 삭제하지 마세요. ";
-
   const prompt =
-    "Korean apartment floor plan, orthographic top-down architectural drawing, ultra-clean high-resolution technical visualization. " +
-    "한국 아파트 평면도를 전문 건축 CAD 도면을 고해상도 래스터로 출력한 것처럼 재구성하세요. " +
-    expansionBlock +
-    // 워터마크 제거
-    "기존 NAVER, 네이버 부동산, 직방, 호갱노노, 호갱님, 다방 등 모든 외부 서비스 워터마크와 로고 완전히 지움. " +
-    "워터마크가 있던 자리는 흰 배경과 검정 건축선으로 자연스럽게 복원하고 새로운 로고·브랜드·워터마크·문자를 추가하지 마세요. " +
-    // 레이아웃 보존 — 확장형의 내부 경계 제거만 명시적 예외
-    structurePreservationBlock +
-    "원본에 표기된 숫자 치수는 구조 판단에만 참고하고 새 숫자 치수나 면적 텍스트를 이미지 안에 생성하지 마세요. 치수는 별도 SVG 레이어로 표시합니다. " +
-    // 흑백 건축도면 표현
-    "색상, 바닥재 텍스처, 가구 렌더, 재질 표현을 모두 제거하고 검정 선과 흰 배경만 사용하세요. " +
-    "벽 표현: 외벽 = 두꺼운 순검정 이중선, 내벽 = 얇은 순검정 이중선, 출입문 = 검정 호(arc), 창문 = 검정 두 줄 평행선, 기둥 = 검정 윤곽선. 회색·컬러 선 금지. " +
-    // 배경
-    "배경: 순백색 (#FFFFFF), 정투영, 균일한 선 굵기, 날카로운 모서리, 그림자·원근·노이즈·블러·JPEG 아티팩트 없음. " +
-    // 금지
-    "치수 텍스트, 한글 라벨, 화살표, 가구 일러스트는 그리지 마세요 (별도 SVG 오버레이로 처리). " +
-    "어떤 브랜드 로고나 워터마크도 추가하지 말고 검정 건축선 외 컬러 요소를 만들지 마세요.";
+    "Minimal cleanup of the attached Korean apartment floor-plan image. " +
+    "Remove only overlaid third-party watermark and logo marks. " +
+    "Preserve the original drawing exactly: canvas, crop, resolution ratio, colors, room labels, " +
+    "dimension numbers, furniture symbols, walls, doors, windows, balconies and every structural line. " +
+    "Do not redraw it as CAD, do not convert it to black-and-white, do not simplify or beautify it, " +
+    "do not change basic/extended layout, and do not invent or delete any room, line, text or symbol. " +
+    "Fill only the removed overlay pixels from their immediate surrounding background. " +
+    "워터마크·로고 외에는 원본 픽셀과 도면 형식을 그대로 유지하세요.";
 
   // GPT Image 2만 사용한다. 지원하지 않는 input_fidelity를 보내면 400으로 거절되므로 제외.
   const errors: string[] = [];
@@ -156,6 +180,14 @@ async function cleanFloorplanRaster(
     ? options.imageMimeType
     : "image/png";
   const inputFilename = inputMimeType.includes("jpeg") ? "image.jpg" : "image.png";
+  let editSize: "1536x1024" | "1024x1536" | "1024x1024" = "1536x1024";
+  try {
+    const metadata = await sharp(imageBuf).metadata();
+    const ratio = (metadata.width || 1) / (metadata.height || 1);
+    editSize = ratio > 1.15 ? "1536x1024" : ratio < 0.87 ? "1024x1536" : "1024x1024";
+  } catch {
+    // 원본 메타데이터를 읽지 못하면 기존 가로형 기본값을 사용한다.
+  }
   for (const modelName of ["gpt-image-2"]) {
     const form = new FormData();
     form.append("model", modelName);
@@ -165,7 +197,7 @@ async function cleanFloorplanRaster(
       inputFilename,
     );
     form.append("prompt", prompt);
-    form.append("size", "1536x1024");
+    form.append("size", editSize);
     // 1536px 해상도는 유지하되 초기 도면은 medium으로 생성해 대기 시간을 줄인다.
     // 최종 인테리어 렌더의 high 품질 정책과는 별개다.
     form.append("quality", "medium");
@@ -214,26 +246,67 @@ async function cleanFloorplanRaster(
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as Body;
-    if (!body.imageUrl && !body.imageBase64) {
+    const hasImage = Boolean(body.imageUrl || body.imageBase64);
+    const exclusiveAreaM2 = Number(body.exclusiveAreaM2 || 0);
+    if (!hasImage && (!Number.isFinite(exclusiveAreaM2) || exclusiveAreaM2 <= 0)) {
       return NextResponse.json(
-        { error: "imageUrl 또는 imageBase64 필수" },
+        { error: "도면 이미지 또는 전용면적이 필요합니다." },
         { status: 400 },
       );
     }
-    const apiKey = getOpenAIKey();
-    if (!apiKey) {
-      return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
-    }
-
     // ─── propertyId 결정 (가이드 §1-2) ───
-    const exclusiveAreaM2 = body.exclusiveAreaM2 ?? 0;
     const layoutVariant = body.layoutVariant ?? (body.expansion ? "extended" : "basic");
     const expansionRequested = layoutVariant === "extended";
+    const processingMode =
+      body.processingMode ||
+      (!hasImage ? "area_average" : body.skipImageClean ? "structure_only" : "clean_preview");
+    const apiKey = getOpenAIKey();
+
+    // 도면이 없으면 주소·평형만으로 평균 실 구성을 백그라운드 산출한다.
+    if (!hasImage || processingMode === "area_average") {
+      const averageInput: AreaAverageInput = {
+        exclusiveAreaM2,
+        roomCount: body.roomCount,
+        expansion: expansionRequested,
+        unitName: body.unitName || body.aptName,
+      };
+      const average = await estimateAreaAverageStructure(averageInput, apiKey);
+      const parsed = JSON.parse(average.content) as InferredFloorplanStructure;
+      const rooms = (parsed.rooms || []).map((room) => ({
+        name: room.name,
+        widthMm: room.widthMm || 3000,
+        depthMm: room.depthMm || 2800,
+        heightMm: room.heightMm || 2400,
+        source: "standard" as const,
+      }));
+      return NextResponse.json({
+        pyeong: classifyPyeong(exclusiveAreaM2),
+        providedAreaM2: exclusiveAreaM2,
+        rooms,
+        openings: [],
+        notes: parsed.notes || "평형 통계 평균값 · 이미지 생성·가견적용",
+        analysisEngine: average.engine,
+        layoutVariant,
+        totalWidthMm: 0,
+        totalDepthMm: 0,
+      });
+    }
+
+    if (
+      (processingMode === "clean_preview" || processingMode === "watermark_only") &&
+      !apiKey
+    ) {
+      return NextResponse.json({ error: "OpenAI 키 미설정" }, { status: 500 });
+    }
     const propertyId = body.propertyId
       || getPropertyId(
         `${body.address || "unknown"}|layout:${layoutVariant}${
           expansionRequested ? `|pipeline:${EXTENDED_LAYOUT_PIPELINE_VERSION}` : ""
-        }`,
+        }${
+          processingMode === "watermark_only"
+            ? `|pipeline:${WATERMARK_ONLY_PIPELINE_VERSION}`
+            : ""
+        }|mode:${processingMode}`,
         body.aptName || body.unitName || "unknown",
         exclusiveAreaM2,
       );
@@ -272,7 +345,11 @@ export async function POST(req: NextRequest) {
           normalizedImageUrl: normalizedUrl,
           originalImageUrl: originalUrl,
           cleanedImageUrl: normalizedUrl,
-          rooms: meta.rooms || [],
+          rooms: (meta.rooms || []).map((room) => ({
+            ...room,
+            heightMm: 2400,
+            source: "standard" as const,
+          })),
           totalWidthMm: meta.total_width_mm || 0,
           totalDepthMm: meta.total_depth_mm || 0,
           pyeong: meta.pyeong || classifyPyeong(exclusiveAreaM2 || 84.9),
@@ -285,22 +362,27 @@ export async function POST(req: NextRequest) {
       }
       // 이미지 캐시는 유효하지만 메타데이터 저장소만 느린 경우에도 재생성하지 않는다.
       // 실 치수는 전용면적 표준값으로 즉시 복구하고 다음 단계에서 보강할 수 있다.
-      const cachedPyeong = classifyPyeong(exclusiveAreaM2 || 84.9);
+      const cachedAverage = buildStandardAreaAverage({
+        exclusiveAreaM2: exclusiveAreaM2 || 84.9,
+        roomCount: body.roomCount,
+        expansion: expansionRequested,
+        unitName: body.unitName || body.aptName,
+      });
       return NextResponse.json({
         property_id: propertyId,
         cached: true,
         normalizedImageUrl: normalizedUrl,
         originalImageUrl: originalUrl,
         cleanedImageUrl: normalizedUrl,
-        rooms: Object.values(estimateRoomDimsFromPyeong(cachedPyeong)).map((room) => ({
+        rooms: cachedAverage.rooms.map((room) => ({
           ...room,
           source: "standard" as const,
         })),
         totalWidthMm: 0,
         totalDepthMm: 0,
-        pyeong: cachedPyeong,
+        pyeong: cachedAverage.pyeong,
         openings: [],
-        notes: "cache hit · 실 치수 표준값 적용",
+        notes: "cache hit · 평형 평균 실 치수 적용",
         cleanModel: "cache",
         cleanQuality: "high",
         layoutVariant,
@@ -354,18 +436,53 @@ export async function POST(req: NextRequest) {
 
     // 2) 외부 CDN URL 대신 동일한 원본 바이트를 Vision에 전달한다.
     // OpenAI가 네이버 URL에 직접 접근하지 못하는 경우도 안정적으로 처리된다.
+    const localInferenceConfigured = Boolean(
+      process.env.FLOORPLAN_AI_URL || process.env.PDF_PARSER_V47_URL,
+    );
     const visionPromise = withFloorplanDeadline(
-      analyzeImageVision({
-        imageBase64: imageBuf.toString("base64"),
-        imageMimeType,
-        prompt: ANALYZE_PROMPT,
-        responseFormat: "json_object",
-        maxOutputTokens: 4_096,
-        reasoningEffort: "medium",
-        requestTimeoutMs: VISION_TIMEOUT_MS,
-      }),
-      VISION_TIMEOUT_MS + 1_000,
-      "floorplan vision analysis",
+      (async (): Promise<StructureAnalysisResult> => {
+        if (processingMode === "watermark_only") {
+          return estimateAreaAverageStructure(
+            {
+              exclusiveAreaM2: exclusiveAreaM2 || 84.9,
+              roomCount: body.roomCount,
+              expansion: expansionRequested,
+              unitName: body.unitName || body.aptName,
+            },
+            apiKey,
+          );
+        }
+        if (processingMode === "structure_only" && localInferenceConfigured) {
+          const local = await callFloorplanAIAny(
+            imageBuf,
+            imageMimeType.includes("jpeg") ? "floorplan.jpg" : "floorplan.png",
+            LOCAL_INFERENCE_TIMEOUT_MS,
+          );
+          if (local) {
+            return {
+              content: JSON.stringify(floorplanAIToStructure(local)),
+              engine: "inpick-floorplan-ai",
+            };
+          }
+        }
+        if (!apiKey) throw new Error("structure analyzer unavailable");
+        const result = await analyzeImageVision({
+          imageBase64: imageBuf.toString("base64"),
+          imageMimeType,
+          prompt: ANALYZE_PROMPT,
+          responseFormat: "json_object",
+          maxOutputTokens: 4_096,
+          reasoningEffort: "medium",
+          requestTimeoutMs: VISION_TIMEOUT_MS,
+        });
+        return { content: result.content, engine: "openai-vision" };
+      })(),
+      processingMode === "structure_only"
+        ? STRUCTURE_ANALYSIS_TIMEOUT_MS
+        : processingMode === "watermark_only"
+          ? 21_000
+        : VISION_TIMEOUT_MS + 1_000,
+      "floorplan structure analysis",
     );
 
     // 저장소 장애가 AI 생성 시작 자체를 막지 않도록 원본 저장은 병렬·제한시간으로 처리한다.
@@ -374,11 +491,10 @@ export async function POST(req: NextRequest) {
       STORAGE_WRITE_TIMEOUT_MS,
       "floorplan original save",
     ).catch((error) => console.warn("[FLOORPLAN] save original skipped:", error));
-    // 3) Vision 결과 + 흑백 도면 생성을 병렬 처리
+    // 3) 실별 평균값 산출/구조 분석과 최소 워터마크 정리를 병렬 처리한다.
     const cleanPromise = !body.skipImageClean
       ? withFloorplanDeadline(
-          cleanFloorplanRaster(imageBuf, apiKey, {
-            layoutVariant,
+          cleanFloorplanRaster(imageBuf, apiKey!, {
             imageMimeType,
             signal: req.signal,
           }),
@@ -390,7 +506,7 @@ export async function POST(req: NextRequest) {
     await originalSavePromise;
 
     // 네이버 주소 모드는 도면 후처리 결과가 완성된 뒤에만 사용자에게 노출한다.
-    if (!body.skipImageClean) {
+    if (!body.skipImageClean && processingMode !== "watermark_only") {
       if (cleaned.status === "rejected" || !cleaned.value) {
         return NextResponse.json(
           {
@@ -402,11 +518,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Vision은 치수/실 정보 보강용이다. 실패해도 면적별 표준 치수로 안전하게 계속한다.
-    let parsed: VisionResult = {};
+    // 분석 실패 시에도 면적별 평균 치수로 안전하게 계속한다.
+    let parsed: InferredFloorplanStructure = {};
+    let analysisEngine = "standard-dimensions";
     if (visionRes.status === "fulfilled") {
       try {
         parsed = JSON.parse(visionRes.value.content);
+        analysisEngine = visionRes.value.engine;
       } catch (error) {
         console.warn("[FLOORPLAN] vision JSON fallback:", error);
       }
@@ -416,7 +534,18 @@ export async function POST(req: NextRequest) {
 
     const areaM2 = body.exclusiveAreaM2 ?? parsed.detectedAreaM2 ?? 84.9;
     const pyeong: PyungType = classifyPyeong(areaM2);
-    const standard: Record<string, RoomDim> = estimateRoomDimsFromPyeong(pyeong);
+    const areaAverageMode =
+      analysisEngine === "openai-area-average" ||
+      analysisEngine === "standard-area-average";
+    const averageFallback = buildStandardAreaAverage({
+      exclusiveAreaM2: areaM2,
+      roomCount: body.roomCount,
+      expansion: expansionRequested,
+      unitName: body.unitName || body.aptName,
+    });
+    const standard: Record<string, RoomDim> = Object.fromEntries(
+      averageFallback.rooms.map((room) => [room.name, room]),
+    );
 
     // 실 머지 (Vision + 표준 fallback)
     const visionRooms = parsed.rooms || [];
@@ -429,16 +558,19 @@ export async function POST(req: NextRequest) {
         name: vr.name,
         widthMm: vr.widthMm && vr.widthMm > 500 ? vr.widthMm : std?.widthMm ?? 3000,
         depthMm: vr.depthMm && vr.depthMm > 500 ? vr.depthMm : std?.depthMm ?? 2800,
-        heightMm: std?.heightMm ?? 2400,
+        heightMm: vr.heightMm ?? std?.heightMm ?? 2400,
         xMm: vr.xMm,
         yMm: vr.yMm,
-        source: vr.widthMm && vr.depthMm ? "vision" : "standard",
+        source:
+          !areaAverageMode && vr.widthMm && vr.depthMm ? "vision" : "standard",
       });
       seen.add(vr.name);
     }
-    for (const [name, dim] of Object.entries(standard)) {
-      if (seen.has(name)) continue;
-      merged.push({ ...dim, source: "standard" });
+    if (!areaAverageMode || merged.length === 0) {
+      for (const [name, dim] of Object.entries(standard)) {
+        if (seen.has(name)) continue;
+        merged.push({ ...dim, source: "standard" });
+      }
     }
 
     // dimension overlay 좌표 생성 (Vision 좌표 우선, 없으면 자동 grid)
@@ -576,6 +708,7 @@ export async function POST(req: NextRequest) {
       cleanCostUsd,
       cleanModel: cleaned.status === "fulfilled" ? cleaned.value?.model : undefined,
       cleanQuality: cleaned.status === "fulfilled" && cleaned.value ? "medium" : undefined,
+      analysisEngine,
       layoutVariant,
       dimensionOverlaySvg,
       totalWidthMm,

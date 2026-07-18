@@ -16,6 +16,42 @@ import type {
 } from "./types";
 
 const PROJECT_ID_KEY = "workflow_project_id";
+const WORKFLOW_SNAPSHOT_PREFIX = "workflow_snapshot:";
+const WORKFLOW_STATE_CACHE_TTL_MS = 15_000;
+
+export interface WorkflowSessionSnapshot {
+  projectId: string;
+  step1?: unknown;
+  step2?: unknown;
+  lastStep: 1 | 2;
+}
+
+/**
+ * 현재 브라우저의 단계 선택은 DB 디바운스 저장보다 최대 1.2초 최신이다.
+ * 로컬 값이 있으면 뒤늦은 DB lastStep이 화면을 임의로 옮기지 못하게 한다.
+ */
+export function resolveWorkflowLastStep(
+  localLastStep: number | undefined,
+  serverLastStep: number | undefined,
+): 1 | 2 {
+  return (localLastStep ?? serverLastStep) === 2 ? 2 : 1;
+}
+
+/** step2 본문이 없는 오래된 상태는 빈 Step2 화면으로 열지 않는다. */
+export function resolveWorkflowVisibleStep(input: {
+  requestedStep2: boolean;
+  lastStep: number;
+  hasStep2: boolean;
+}): 1 | 2 {
+  if (input.requestedStep2) return 2;
+  return input.lastStep === 2 && input.hasStep2 ? 2 : 1;
+}
+
+const workflowStateCache = new Map<
+  string,
+  { expiresAt: number; value: WorkflowStateRow | null }
+>();
+const workflowStateRequests = new Map<string, Promise<WorkflowStateRow | null>>();
 
 /**
  * workflow projectId — localStorage에 UUID로 보관.
@@ -72,6 +108,101 @@ export function setWorkflowProjectId(id: string) {
     localStorage.setItem(PROJECT_ID_KEY, id);
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * 프로젝트별 최근 작업 스냅샷을 읽는다.
+ *
+ * 기존 글로벌 workflow_step* 키는 현재 프로젝트와 id가 같을 때만
+ * 폴백으로 읽어, 다른 프로젝트 상태가 잠시 노출되는 것을 막는다.
+ */
+export function readWorkflowSessionSnapshot(
+  projectId: string,
+): WorkflowSessionSnapshot | null {
+  if (typeof window === "undefined" || !projectId) return null;
+  try {
+    const scoped = sessionStorage.getItem(`${WORKFLOW_SNAPSHOT_PREFIX}${projectId}`);
+    if (scoped) {
+      const parsed = JSON.parse(scoped) as Partial<WorkflowSessionSnapshot>;
+      if (parsed.projectId === projectId) {
+        return {
+          projectId,
+          step1: parsed.step1,
+          step2: parsed.step2,
+          lastStep: parsed.lastStep === 2 ? 2 : 1,
+        };
+      }
+    }
+
+    const activeProjectId =
+      localStorage.getItem(PROJECT_ID_KEY) || sessionStorage.getItem(PROJECT_ID_KEY);
+    if (activeProjectId !== projectId) return null;
+
+    const step1raw = sessionStorage.getItem("workflow_step1");
+    const step2raw = sessionStorage.getItem("workflow_step2");
+    if (!step1raw && !step2raw) return null;
+    return {
+      projectId,
+      step1: step1raw ? JSON.parse(step1raw) : undefined,
+      step2: step2raw ? JSON.parse(step2raw) : undefined,
+      lastStep: sessionStorage.getItem("workflow_step") === "2" ? 2 : 1,
+    };
+  } catch (err) {
+    console.warn("[workflow] session snapshot restore fail", err);
+    return null;
+  }
+}
+
+/**
+ * 현재 화면 호환 키와 프로젝트별 키를 한 번에 동기화한다.
+ * step2는 호출 전 lightenWorkflowStep2로 경량화한 값이어야 한다.
+ */
+export function saveWorkflowSessionSnapshot(input: WorkflowSessionSnapshot): boolean {
+  if (typeof window === "undefined" || !input.projectId) return false;
+  try {
+    const snapshot: WorkflowSessionSnapshot = {
+      ...input,
+      lastStep: input.lastStep === 2 ? 2 : 1,
+    };
+    sessionStorage.setItem(
+      `${WORKFLOW_SNAPSHOT_PREFIX}${input.projectId}`,
+      JSON.stringify(snapshot),
+    );
+    if (snapshot.step1 != null) {
+      sessionStorage.setItem("workflow_step1", JSON.stringify(snapshot.step1));
+    }
+    if (snapshot.step2 != null) {
+      sessionStorage.setItem("workflow_step2", JSON.stringify(snapshot.step2));
+    }
+    sessionStorage.setItem("workflow_step", String(snapshot.lastStep));
+    return true;
+  } catch (err) {
+    console.warn("[workflow] session snapshot save skipped (non-fatal)", err);
+    return false;
+  }
+}
+
+/** 다른 프로젝트로 전환할 때 현재 화면용 글로벌 키만 비운다. */
+export function clearActiveWorkflowSessionSnapshot() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem("workflow_step1");
+    sessionStorage.removeItem("workflow_step2");
+    sessionStorage.removeItem("workflow_step");
+  } catch {
+    /* private mode */
+  }
+}
+
+/** 초기화할 때 현재 프로젝트의 프로젝트별 캐시도 함께 제거한다. */
+export function clearWorkflowSessionSnapshot(projectId: string) {
+  clearActiveWorkflowSessionSnapshot();
+  if (typeof window === "undefined" || !projectId) return;
+  try {
+    sessionStorage.removeItem(`${WORKFLOW_SNAPSHOT_PREFIX}${projectId}`);
+  } catch {
+    /* private mode */
   }
 }
 
@@ -152,6 +283,7 @@ export async function saveWorkflowState(input: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
+    if (res.ok) workflowStateCache.delete(input.projectId);
     return res.ok;
   } catch (err) {
     console.warn("[workflow-state] save error (non-fatal):", err);
@@ -179,16 +311,44 @@ export interface WorkflowStateRow {
 export async function fetchWorkflowState(
   projectId: string,
 ): Promise<WorkflowStateRow | null> {
+  const now = Date.now();
+  const cached = workflowStateCache.get(projectId);
+  if (cached && cached.expiresAt > now) return cached.value;
+
+  const pending = workflowStateRequests.get(projectId);
+  if (pending) return pending;
+
+  const request = fetchWorkflowStateUncached(projectId).finally(() => {
+    workflowStateRequests.delete(projectId);
+  });
+  workflowStateRequests.set(projectId, request);
+  return request;
+}
+
+async function fetchWorkflowStateUncached(
+  projectId: string,
+): Promise<WorkflowStateRow | null> {
   try {
     const res = await fetch(
       `/api/inpick/workflow-state?projectId=${encodeURIComponent(projectId)}`,
     );
     if (!res.ok) return null;
-    return (await res.json()) as WorkflowStateRow;
+    const value = (await res.json()) as WorkflowStateRow;
+    workflowStateCache.set(projectId, {
+      expiresAt: Date.now() + WORKFLOW_STATE_CACHE_TTL_MS,
+      value,
+    });
+    return value;
   } catch (err) {
     console.warn("[workflow-state] fetch error (non-fatal):", err);
     return null;
   }
+}
+
+/** 내 프로젝트 카드 hover/focus 시 복원 요청을 미리 시작한다. */
+export function preloadWorkflowState(projectId: string): void {
+  if (!projectId) return;
+  void fetchWorkflowState(projectId);
 }
 
 /**

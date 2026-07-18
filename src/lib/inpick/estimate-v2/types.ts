@@ -74,6 +74,14 @@ export type QuantityFormula =
 
 export type EstimateUnit = "m2" | "m" | "ea" | "set" | "day" | "lot";
 
+/**
+ * 현장 상태에 따라 금액 변동 폭이 큰 공종의 단가 성격.
+ * - fixed: 확정 자재/수량 기반
+ * - standard_unit: INPICK 기본 단가 기반
+ * - site_allowance: 현장 확인 전 가견적(사업자 조정 대상)
+ */
+export type PricingBasis = "fixed" | "standard_unit" | "site_allowance";
+
 // ─── 입력: SurfacePlan ───────────────────────────────────────
 
 export interface SurfacePlan {
@@ -89,6 +97,8 @@ export interface SurfacePlan {
   action: WorkAction;
 
   materialCategory: string;
+  /** material_products.id — 사용자 선택/vision 후보에서 검증된 실제 제품 */
+  materialProductId?: string;
   materialNameKo?: string;
   brand?: string;
   sku?: string;
@@ -97,6 +107,8 @@ export interface SurfacePlan {
 
   /** 자재 단가 (선택 자재가 있으면) — 없으면 WorkPackageRule.costModel.defaultMaterialUnitPrice 사용 */
   selectedMaterialUnitPrice?: number;
+  /** 선택 제품 단가의 실제 출처 */
+  selectedMaterialPriceSource?: MaterialPriceSource;
 
   quantityHint?: {
     m2?: number;
@@ -176,6 +188,13 @@ export interface WorkPackageLineTemplate {
   };
 
   assumptions: string[];
+
+  /** 철거·전기·설비처럼 현장 확인 후 조정되는 공종의 가격 메타 */
+  pricingBasis?: PricingBasis;
+  contractorEditable?: boolean;
+  siteVerificationRequired?: boolean;
+  variationNotice?: string;
+  siteAdjustmentFactors?: string[];
 }
 
 export interface WorkPackageRule {
@@ -323,6 +342,15 @@ export interface ConstructionEstimateLine {
   included: boolean;
   source: EvidenceSource;
   confidence: number;
+
+  /** 기본단가/현장확인/사업자 조정 여부 — 소비자·입찰·PDF 공통 표시 */
+  pricingBasis?: PricingBasis;
+  contractorEditable?: boolean;
+  siteVerificationRequired?: boolean;
+  variationNotice?: string;
+  siteAdjustmentFactors?: string[];
+  siteConditionAdjustmentFactor?: number;
+  siteConditionAdjustmentReason?: string;
 
   evidenceRefs: Array<{
     type:

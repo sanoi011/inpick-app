@@ -7,7 +7,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown, ChevronRight, TrendingDown, ImageIcon, Trash2,
-  FileText, Receipt, CalendarRange, MessageSquare, FileSignature, Layers,
+  FileText, Receipt, CalendarRange, FileSignature, Layers,
+  TriangleAlert, Pencil,
 } from "lucide-react";
 import { assembleSheet, assembleByRoom, type DetailLine } from "@/lib/estimate-pro/detail-model";
 import {
@@ -15,6 +16,7 @@ import {
   type JebiItem, type MarginRates,
 } from "@/lib/estimate-pro/cost-model";
 import { buildSchedule } from "@/lib/estimate-pro/schedule-model";
+import { SITE_CONDITION_NOTICES } from "@/lib/inpick/estimate-v2/site-condition-pricing";
 
 const won = (n: number) => Math.round(n || 0).toLocaleString("ko-KR");
 
@@ -99,8 +101,8 @@ export default function EstimateProForm({ lines, category = "residential", proje
             <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] text-black/65">{visionBadge}</span>
           )}
           <div className="ml-auto flex items-center bg-gray-100 rounded-lg p-0.5">
-            <Seg active={role === "owner"} onClick={() => setRole("owner")}>고객/업체</Seg>
-            <Seg active={role === "bidder"} onClick={() => setRole("bidder")} icon={<MessageSquare className="w-3.5 h-3.5" />}>사업자 입찰</Seg>
+            <Seg active={role === "owner"} onClick={() => setRole("owner")}>고객 보기</Seg>
+            <Seg active={role === "bidder"} onClick={() => setRole("bidder")} icon={<Pencil className="w-3.5 h-3.5" />}>사업자 편집</Seg>
           </div>
         </div>
         <div className="px-4 flex gap-1 overflow-x-auto">
@@ -113,13 +115,85 @@ export default function EstimateProForm({ lines, category = "residential", proje
       </div>
 
       <div className="p-4">
+        <SiteConditionSummary rows={rows} role={role} />
         {tab === "cover" && <CoverTab meta={meta} setMeta={setMeta} cost={cost} category={category} areaLabel={areaLabel} lineCount={sheet.lineCount} tradeCount={sheet.groups.length} />}
         {tab === "summary" && <CostTab cost={cost} jebi={jebi} margins={margins} role={role} includeJebi={includeJebi} setIncludeJebi={setIncludeJebi} updateJebi={updateJebi} setMargins={setMargins} />}
         {tab === "rollup" && <RollupTab sheet={sheet} cost={cost} />}
-        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} />}
+        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} role={role} />}
         {tab === "schedule" && <ScheduleTab schedule={schedule} targetDays={targetDays} setTargetDays={setTargetDays} />}
       </div>
     </div>
+  );
+}
+
+function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bidder" }) {
+  const groups = [
+    {
+      key: "demolition",
+      label: "철거·폐기",
+      notice: SITE_CONDITION_NOTICES.demolition,
+      matches: (row: Row) => row.trade.includes("철거") || row.trade.includes("폐기물"),
+    },
+    {
+      key: "electrical",
+      label: "전기",
+      notice: SITE_CONDITION_NOTICES.electrical,
+      matches: (row: Row) => row.trade.includes("전기"),
+    },
+    {
+      key: "plumbing",
+      label: "설비·배관",
+      notice: SITE_CONDITION_NOTICES.plumbing,
+      matches: (row: Row) => row.trade.includes("설비") || row.trade.includes("배관"),
+    },
+  ].map((group) => ({
+    ...group,
+    rows: rows.filter(group.matches),
+    amount: rows.filter(group.matches).reduce((sum, row) => sum + row.amount, 0),
+  })).filter((group) => group.rows.length > 0);
+
+  if (groups.length === 0) return null;
+
+  return (
+    <section className="mb-4 rounded-xl border border-zinc-200 bg-white p-4">
+      <div className="flex items-start gap-2.5">
+        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-bold text-zinc-900">현장 확인 공종</h2>
+              <p className="mt-0.5 text-[11px] leading-4 text-zinc-500">
+                이미지·도면으로 확인하기 어려운 공종은 기본단가 가견적으로 먼저 반영했습니다.
+              </p>
+            </div>
+            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600">
+              {role === "bidder" ? "사업자 수정 가능" : "현장 확인 후 확정"}
+            </span>
+          </div>
+
+          <div className="mt-3 grid gap-2 sm:grid-cols-3">
+            {groups.map((group) => (
+              <div key={group.key} className="rounded-lg bg-zinc-50 px-3 py-2.5 ring-1 ring-zinc-200/70">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-bold text-zinc-600">{group.label}</span>
+                  <span className="text-[10px] text-zinc-400">{group.rows.length}건</span>
+                </div>
+                <p className="mt-1 text-sm font-black tabular-nums text-zinc-900">{won(group.amount)}원</p>
+                <p className="mt-1 line-clamp-2 text-[9px] leading-3.5 text-zinc-400" title={group.notice}>
+                  {group.notice}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {role === "bidder" && (
+            <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600">
+              <Pencil className="h-3 w-3" /> 세부내역서에서 현장 확인 수량·재료단가·노무단가를 수정하면 합계가 즉시 재계산됩니다.
+            </p>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -154,6 +228,7 @@ function CoverTab({ meta, setMeta, cost, category, areaLabel, lineCount, tradeCo
       </div>
       <p className="text-[11px] text-slate-400 mt-5 leading-relaxed">
         · 본 견적은 {tradeCount}개 공종 / {lineCount}개 항목 · 생성 디자인의 Vision 분석 기반입니다. 현장 실측 후 물량이 조정될 수 있습니다.<br />
+        · 철거·전기·설비 금액은 현장 확인 전 기본단가 가견적이며, 현장 상태 확인 후 사업자가 수정·확정합니다.<br />
         · 유효기간: 견적일로부터 30일. · 위 금액은 부가가치세를 포함합니다.
       </p>
     </div>
@@ -277,7 +352,7 @@ function RollupTab({ sheet, cost }: any) {
 }
 
 /* 4. 세부내역서 (편집) */
-function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRow, deleteRow, precedingByTrade }: any) {
+function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRow, deleteRow, precedingByTrade, role }: any) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2 flex-wrap">
@@ -287,7 +362,9 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
             <button onClick={() => setGroupBy("room")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>실별</button>
             <button onClick={() => setGroupBy("trade")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
           </div>
-          <span className="text-[11px] text-gray-400 hidden sm:inline">항목을 누르면 세부 내역이 펼쳐집니다</span>
+          <span className="text-[11px] text-gray-400 hidden sm:inline">
+            {role === "bidder" ? "수량과 단가를 현장 확인값으로 수정할 수 있습니다" : "사업자 편집에서 현장 확인값을 조정할 수 있습니다"}
+          </span>
         </div>
       </div>
       {sheet.groups.map((g: any) => {
@@ -326,7 +403,7 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
                       <th className="px-2 py-2 text-right font-semibold w-28">합계</th><th className="w-8"></th>
                     </tr></thead>
                     <tbody>
-                      {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} />))}
+                      {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} role={role} />))}
                       <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-black">{won(g.sum)}</td><td></td></tr>
                     </tbody>
                   </table>
@@ -340,14 +417,36 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
     </div>
   );
 }
-function EditRow({ l, updateRow, deleteRow }: { l: Row; updateRow: any; deleteRow: any }) {
+function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; deleteRow: any; role: "owner" | "bidder" }) {
   const hasMat = l.brand !== "-";
+  const editable = role === "bidder";
   const numCls = "w-full text-right text-xs bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent hover:border-zinc-200 focus:border-zinc-400 rounded px-1 py-1 focus:outline-none tabular-nums";
   return (
     <tr className="border-b border-zinc-50 hover:bg-zinc-50/60">
       <td className="px-2 py-1.5 text-center"><span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium ${PART_BADGE}`}>{l.part}</span></td>
       <td className="px-2 py-1.5">
-        <div className="font-medium text-zinc-800">{l.itemName}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-medium text-zinc-800">{l.itemName}</span>
+          {l.siteVerificationRequired && (
+            <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[9px] font-bold text-zinc-600 ring-1 ring-zinc-200">
+              기본단가 · 현장확인
+            </span>
+          )}
+        </div>
+        {l.variationNotice && (
+          <p
+            className="mt-0.5 max-w-md text-[10px] leading-4 text-zinc-400"
+            title={(l.siteAdjustmentFactors || []).join(" · ")}
+          >
+            {l.variationNotice}
+          </p>
+        )}
+        {l.siteConditionAdjustmentReason && (
+          <p className="mt-0.5 text-[10px] font-semibold text-zinc-600">
+            사용자 조건 반영 · {l.siteConditionAdjustmentReason}
+            {l.siteConditionAdjustmentFactor != null && ` · ×${l.siteConditionAdjustmentFactor.toFixed(2)}`}
+          </p>
+        )}
         {hasMat && (
           <div className="relative inline-block group mt-0.5">
             <span className="text-[11px] text-zinc-500 border-b border-dotted border-zinc-300 cursor-help">{l.brand} · {l.product}</span>
@@ -361,13 +460,13 @@ function EditRow({ l, updateRow, deleteRow }: { l: Row; updateRow: any; deleteRo
       </td>
       <td className="px-2 py-1.5 text-zinc-500">{l.spec}</td>
       <td className="px-2 py-1.5 text-center text-zinc-500">{l.unit}</td>
-      <td className="px-1 py-1.5"><input type="number" value={l.quantity} onChange={(e) => updateRow(l.id, { quantity: Number(e.target.value) || 0 })} className={numCls} /></td>
-      <td className="px-1 py-1.5"><input type="number" value={l.matUnit} onChange={(e) => updateRow(l.id, { matUnit: Number(e.target.value) || 0 })} className={numCls} /></td>
+      <td className="px-1 py-1.5">{editable ? <input aria-label={`${l.itemName} 수량`} type="number" value={l.quantity} onChange={(e) => updateRow(l.id, { quantity: Number(e.target.value) || 0 })} className={numCls} /> : <span className="block px-1 text-right tabular-nums text-zinc-600">{l.quantity}</span>}</td>
+      <td className="px-1 py-1.5">{editable ? <input aria-label={`${l.itemName} 재료단가`} type="number" value={l.matUnit} onChange={(e) => updateRow(l.id, { matUnit: Number(e.target.value) || 0 })} className={numCls} /> : <span className="block px-1 text-right tabular-nums text-zinc-600">{won(l.matUnit)}</span>}</td>
       <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.matAmount)}</td>
-      <td className="px-1 py-1.5"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-zinc-400 flex-shrink-0" /></span>}<input type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /></div></td>
+      <td className="px-1 py-1.5"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-zinc-400 flex-shrink-0" /></span>}{editable ? <input aria-label={`${l.itemName} 노무단가`} type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /> : <span className="block w-full px-1 text-right tabular-nums text-zinc-600">{won(l.labUnit)}</span>}</div></td>
       <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.labAmount)}</td>
       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-zinc-900">{won(l.amount)}</td>
-      <td className="px-1 py-1.5 text-center"><button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-black" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button></td>
+      <td className="px-1 py-1.5 text-center">{editable && <button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-black" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
     </tr>
   );
 }

@@ -241,10 +241,15 @@ function synthesizeLinesForOutput(
  * design_outputs 없을 때 폴백 lines — projectMode별 최소 견적.
  */
 function synthesizeFallbackLines(ctx: ContextRow): ContextEstimateLine[] {
-  const step1 = ctx.step1_snapshot as { areaM2?: number; selectedPyeong?: { exclusiveArea?: number } };
+  const step1 = ctx.step1_snapshot as {
+    areaM2?: number;
+    selectedPyeong?: { exclusiveArea?: number };
+    basicInfo?: { selectedPyeong?: { exclusiveArea?: number } };
+  };
   const areaM2 =
     step1?.areaM2 ||
     step1?.selectedPyeong?.exclusiveArea ||
+    step1?.basicInfo?.selectedPyeong?.exclusiveArea ||
     (ctx.scope_snapshot as { totalAreaM2?: number })?.totalAreaM2 ||
     79.3; // 24평 기본
   const lines: ContextEstimateLine[] = [];
@@ -285,12 +290,29 @@ function estimateSurfaceArea(
   output: DesignOutput,
   ctx: ContextRow,
 ): { floor: number; wall: number; ceiling: number } {
-  // 1) target_type=room이면 표준 방 면적 룩업 (target_name 기반)
-  const stdRoomArea = STANDARD_ROOM_AREA[output.targetName] ?? 12; // m²
+  const step1 = ctx.step1_snapshot as {
+    selectedPyeong?: { exclusiveArea?: number };
+    basicInfo?: { selectedPyeong?: { exclusiveArea?: number } };
+    normalizedFloorplan?: {
+      rooms?: Array<{ name: string; widthMm?: number; depthMm?: number }>;
+    };
+  };
+  const normalizedRoom = step1.normalizedFloorplan?.rooms?.find(
+    (room) =>
+      room.name === output.targetName ||
+      room.name.includes(output.targetName.replace(/\d+$/, "")) ||
+      output.targetName.includes(room.name.replace(/\d+$/, "")),
+  );
+  const normalizedRoomArea =
+    normalizedRoom?.widthMm && normalizedRoom?.depthMm
+      ? (normalizedRoom.widthMm * normalizedRoom.depthMm) / 1_000_000
+      : undefined;
+  // target_type=room이면 평형 평균/도면 치수를 우선하고 표준 방 면적은 마지막 폴백이다.
+  const stdRoomArea = normalizedRoomArea ?? STANDARD_ROOM_AREA[output.targetName] ?? 12;
   // 2) target_type=whole이면 전체 면적
-  const step1 = ctx.step1_snapshot as { selectedPyeong?: { exclusiveArea?: number } };
   const totalArea =
     step1?.selectedPyeong?.exclusiveArea ??
+    step1?.basicInfo?.selectedPyeong?.exclusiveArea ??
     (ctx.scope_snapshot as { totalAreaM2?: number })?.totalAreaM2 ??
     79.3;
   if (output.targetType === "whole") {

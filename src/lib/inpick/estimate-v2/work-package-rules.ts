@@ -922,6 +922,12 @@ export const LIGHTING_ELECTRICAL_RULE: WorkPackageRule = {
         defaultLaborUnitPrice: 22000,
         defaultExpenseUnitPrice: 3000,
       },
+      // 등기구 제품/SKU 가격은 현장 배선 난이도 계수와 분리한다.
+      pricingBasis: "standard_unit",
+      contractorEditable: true,
+      siteVerificationRequired: false,
+      variationNotice: "",
+      siteAdjustmentFactors: [],
       assumptions: ["방 1개당 평균 1개 (LED 매입등 기본)"],
     },
     {

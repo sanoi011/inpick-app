@@ -141,6 +141,7 @@ function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2
     expansionType: step1.basicInfo.expansionType || "",
     rooms: [...(step1.rooms || [])].sort(),
     selectedByRoom: step2.selectedByRoom || {},
+    materialSelections: step2.materialSelections || {},
     renders,
   });
   let hash = 2166136261;
@@ -149,6 +150,33 @@ function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2
     hash = Math.imul(hash, 16777619);
   }
   return `${projectId}-${(hash >>> 0).toString(36)}`;
+}
+
+function selectedMaterialsForRoom(
+  step2: Step2Data,
+  roomId?: string,
+  roomName?: string,
+) {
+  return Object.values(step2.materialSelections || {})
+    .filter(
+      (selection) =>
+        (!roomId && !roomName) ||
+        selection.roomId === roomId ||
+        selection.roomName === roomName,
+    )
+    .map((selection) => ({
+      surfaceType: selection.surfaceType,
+      materialCategory: selection.materialCategory,
+      materialProductId: selection.materialProductId,
+      materialNameKo: selection.materialNameKo,
+      brand: selection.brand,
+      sku: selection.sku,
+      spec: selection.spec,
+      unitPrice: selection.unitPrice,
+      priceSource: selection.priceSource,
+      observationId: selection.observationId,
+      confidence: selection.confidence,
+    }));
 }
 
 // P4: source 배지 라벨/색상 매핑
@@ -350,15 +378,121 @@ async function downloadEstimatePdf(input: {
 
 // P11-FIX: useSearchParams 사용 페이지는 Suspense로 감싸야 prerender 통과 (Vercel 빌드 에러 4회 원인)
 // 가이드: https://nextjs.org/docs/messages/missing-suspense-with-csr-bailout
+const ESTIMATE_LOADING_STAGES = [
+  { label: "디자인 결과 확인", detail: "실별 최종 이미지와 면적 정보를 읽고 있어요" },
+  { label: "자재·단가 연결", detail: "마감자재와 최신 견적 단가를 연결하고 있어요" },
+  { label: "공종별 금액 산출", detail: "철거·전기·설비를 포함해 재료비와 노무비를 계산하고 있어요" },
+  { label: "최종 금액 검산", detail: "경비와 부가세까지 더해 최종 견적을 확인하고 있어요" },
+] as const;
+
+function EstimateLoadingOverlay({ visible }: { visible: boolean }) {
+  const [stage, setStage] = useState(0);
+
+  useEffect(() => {
+    if (!visible) {
+      setStage(0);
+      return;
+    }
+    setStage(0);
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      const elapsed = Date.now() - startedAt;
+      setStage(Math.min(ESTIMATE_LOADING_STAGES.length - 1, Math.floor(elapsed / 1_700)));
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const current = ESTIMATE_LOADING_STAGES[stage];
+  return (
+    <div
+      className="fixed inset-0 z-[80] flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f7f7f5]/95 px-5 backdrop-blur-2xl"
+      role="status"
+      aria-live="polite"
+      aria-label={`${current.label}: ${current.detail}`}
+    >
+      <div className="pointer-events-none absolute inset-0 opacity-50" aria-hidden>
+        <div className="absolute left-[12%] top-[16%] h-64 w-64 rounded-full bg-white blur-3xl" />
+        <div className="absolute bottom-[8%] right-[10%] h-80 w-80 rounded-full bg-black/[0.035] blur-3xl" />
+      </div>
+
+      <div className="relative w-full max-w-[520px] rounded-[32px] border border-black/[0.08] bg-white/95 p-6 shadow-[0_28px_100px_rgba(0,0,0,0.12)] sm:p-9">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-black/35">
+              STEP 03 · Estimate
+            </p>
+            <h2 className="mt-2 text-[27px] font-medium tracking-[-0.055em] text-black sm:text-[34px]">
+              디자인 견적을 만들고 있어요
+            </h2>
+          </div>
+          <div className="relative h-16 w-16 shrink-0" aria-hidden>
+            <div className="absolute inset-0 rounded-full border border-black/10" />
+            <div className="absolute inset-[7px] animate-[spin_2.8s_linear_infinite] rounded-full border-2 border-transparent border-r-black border-t-black" />
+            <div className="absolute inset-[17px] animate-pulse rounded-full bg-black" />
+          </div>
+        </div>
+
+        <div className="mt-8 rounded-[22px] bg-[#f7f7f5] p-5">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5" aria-hidden>
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-black/35" />
+              <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-black" />
+            </span>
+            <p className="text-sm font-semibold text-black">{current.label}</p>
+          </div>
+          <p className="mt-2 min-h-10 text-xs leading-5 text-black/48">{current.detail}</p>
+
+          <div className="mt-5 grid grid-cols-4 gap-1.5" aria-hidden>
+            {ESTIMATE_LOADING_STAGES.map((item, index) => (
+              <div
+                key={item.label}
+                className={`h-1.5 overflow-hidden rounded-full transition-colors duration-500 ${
+                  index <= stage ? "bg-black" : "bg-black/[0.08]"
+                }`}
+              >
+                {index === stage && (
+                  <div className="h-full w-1/2 animate-[pulse_1.2s_ease-in-out_infinite] rounded-full bg-white/55" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-5 grid grid-cols-2 gap-2 text-[11px] font-medium text-black/45 sm:grid-cols-4">
+          {ESTIMATE_LOADING_STAGES.map((item, index) => (
+            <div key={item.label} className="flex items-center gap-1.5">
+              <span
+                className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold transition ${
+                  index < stage
+                    ? "bg-black text-white"
+                    : index === stage
+                      ? "border border-black bg-white text-black"
+                      : "bg-black/[0.06] text-black/30"
+                }`}
+              >
+                {index < stage ? "✓" : index + 1}
+              </span>
+              <span className={index === stage ? "text-black" : ""}>{item.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <p className="mt-7 text-center text-[11px] text-black/35">
+          계산이 완료되면 최종 견적 화면이 자동으로 열립니다.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function EstimatePageWithSuspense() {
   return (
     <Suspense
       fallback={
-        <main className="flex min-h-screen items-center justify-center bg-white">
-          <div className="flex items-center gap-3 text-black">
-            <Loader2 className="h-5 w-5 animate-spin text-black" />
-            <span className="text-sm font-semibold">견적서 불러오는 중…</span>
-          </div>
+        <main className="min-h-screen bg-[#f7f7f5]">
+          <EstimateLoadingOverlay visible />
         </main>
       }
     >
@@ -506,7 +640,10 @@ function EstimatePage() {
     }
   };
 
-  async function finalizeEstimateContext(s1: Step1Data): Promise<string | null> {
+  async function finalizeEstimateContext(
+    s1: Step1Data,
+    s2: Step2Data,
+  ): Promise<string | null> {
     const projectId = getOrCreateWorkflowProjectId();
     if (!projectId) return null;
     const projectMode: "apartment" | "photo_only" | "commercial" =
@@ -515,11 +652,40 @@ function EstimatePage() {
         : s1.workflowEntry === "photo_commercial"
           ? "commercial"
           : "apartment";
+    const finalSelectedUrls = s2.finalSelectedImageUrlsByRoom || {};
+    const selectedRoomKeys = Array.from(
+      new Set([
+        ...Object.keys(finalSelectedUrls),
+        ...Object.keys(s2.selectedByRoom || {}).filter(
+          (roomKey) => s2.selectedByRoom[roomKey] != null,
+        ),
+      ]),
+    );
+    const selectedDesigns = selectedRoomKeys.flatMap((roomKey) => {
+      const renders = s2.rendersByRoom?.[roomKey] || [];
+      const selectedIndex = s2.selectedByRoom?.[roomKey];
+      const render = selectedIndex != null ? renders[selectedIndex] : undefined;
+      const imageUrl = finalSelectedUrls[roomKey] || render?.refinedUrl || render?.url;
+      if (!imageUrl) return [];
+      return [{
+        targetId: roomKey,
+        targetName: ROOM_NAME_MAP[roomKey] || roomKey,
+        imageUrl,
+        sourceImageUrl: render?.url,
+        prompt: render?.revisedPrompt || render?.prompt,
+      }];
+    });
     try {
       const res = await fetch("/api/inpick/estimate-context/finalize", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ projectId, projectMode, step1Snapshot: s1 }),
+        body: JSON.stringify({
+          projectId,
+          projectMode,
+          step1Snapshot: s1,
+          selectionMode: selectedDesigns.length > 0 ? "final_images_only" : undefined,
+          selectedDesigns,
+        }),
       });
       if (!res.ok) return null;
       const data = (await res.json()) as { contextId?: string };
@@ -731,7 +897,8 @@ function EstimatePage() {
         /* quota */
       }
       // 화면 전환 후 context를 생성하므로 이전 화면에서 API를 기다리지 않는다.
-      const nextContextId = contextId || (await finalizeEstimateContext(finalS1));
+      const nextContextId =
+        contextId || (await finalizeEstimateContext(finalS1, finalS2));
       if (cancelled) return;
       setResolvedContextId(nextContextId);
       void runEstimate(finalS1, finalS2, nextContextId);
@@ -911,6 +1078,7 @@ function EstimatePage() {
           body: JSON.stringify({
             projectMode: "photo_only",
             areaM2: area || undefined, // API가 평수 기본값 폴백 처리
+            siteConditions: s1.siteConditions,
             budgetTier:
               s1.basicInfo.expansionType === "extended" ? "premium" : "standard",
           }),
@@ -945,8 +1113,10 @@ function EstimatePage() {
                 roomName: "전체 공간",
                 areaM2: area || 79.3,
                 prompts,
+                userSelectedMaterials: selectedMaterialsForRoom(s2),
               },
             ],
+            siteConditions: s1.siteConditions,
           });
           setConstructionEstimate(clientEstimate);
           setEstimatePath({
@@ -988,6 +1158,7 @@ function EstimatePage() {
               s1.basicInfo.expansionType === "extended" ? "premium" : "standard",
             zones: zoneInputs,
             requiredSystems: [],
+            siteConditions: s1.siteConditions,
           }),
         });
         const data = await res.json();
@@ -1004,12 +1175,14 @@ function EstimatePage() {
               roomName: z.nameKo,
               areaM2: z.areaM2,
               prompts,
+              userSelectedMaterials: selectedMaterialsForRoom(s2, z.id, z.nameKo),
             };
           });
           const clientEstimate = buildConstructionEstimateClientSide({
             projectId: getOrCreateWorkflowProjectId() || "preview",
             projectMode: "commercial",
             rooms: zoneRooms,
+            siteConditions: s1.siteConditions,
           });
           setConstructionEstimate(clientEstimate);
           setEstimatePath({
@@ -1125,6 +1298,7 @@ function EstimatePage() {
           // API 폴백을 위해 평수/면적도 전달
           areaM2: area,
           pyung: area ? area / 3.305785 : undefined,
+          siteConditions: s1.siteConditions,
         }),
       });
       const data = await res.json();
@@ -1162,6 +1336,7 @@ function EstimatePage() {
           widthM?: number;
           depthM?: number;
           prompts: string[];
+          userSelectedMaterials?: ReturnType<typeof selectedMaterialsForRoom>;
         }> = [];
         const generatedKeys = Object.keys(s2.rendersByRoom || {}).filter(
           (k) => k !== "all" && (s2.rendersByRoom[k]?.length ?? 0) > 0,
@@ -1182,7 +1357,14 @@ function EstimatePage() {
           const prompts = (s2.rendersByRoom?.[k] || [])
             .map((r) => r.revisedPrompt || r.prompt)
             .filter(Boolean) as string[];
-          roomEntries.push({ roomName: koreanName, areaM2, widthM, depthM, prompts });
+          roomEntries.push({
+            roomName: koreanName,
+            areaM2,
+            widthM,
+            depthM,
+            prompts,
+            userSelectedMaterials: selectedMaterialsForRoom(s2, k, koreanName),
+          });
         }
         // 최후 fallback — 어떤 정보도 없으면 표준 5실 (거실/주방/안방/욕실1/현관)
         if (roomEntries.length === 0) {
@@ -1201,6 +1383,7 @@ function EstimatePage() {
           projectId: getOrCreateWorkflowProjectId() || "preview",
           projectMode,
           rooms: roomEntries,
+          siteConditions: s1.siteConditions,
         });
         console.info(
           `[estimate-v2] built — lines=${clientEstimate.lines.length} trades=${clientEstimate.tradeSummaries.length} total=₩${clientEstimate.totals.totalWithVat.toLocaleString()}`,
@@ -1340,7 +1523,7 @@ function EstimatePage() {
       rows: groups[trade],
       groupTotal: groups[trade].reduce((s, r) => s + r.total, 0),
     }));
-  }, [filteredRooms, expenseRate]);
+  }, [filteredRooms, expenseRate, matchMetaByRoom]);
 
   // 제외 항목 빼고 합계 재계산 (자재 단위 키 기준)
   const grandTotal = useMemo(() => {
@@ -1414,6 +1597,7 @@ function EstimatePage() {
     <LenisProvider>
       <main className="relative min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
         <Notch step={3} total={3} />
+        <EstimateLoadingOverlay visible={loading} />
         <div className="flex min-h-screen">
           {/* 좌측 아이콘 사이드바 */}
           <aside className="hidden w-[72px] shrink-0 flex-col items-center gap-1 border-r border-black/[0.07] bg-white py-5 lg:flex">
@@ -2335,8 +2519,12 @@ function EstimatePage() {
                     };
                     const items: GalleryItem[] = [];
                     const seenUrls = new Set<string>();
+                    const finalUrls = new Set(
+                      Object.values(step2?.finalSelectedImageUrlsByRoom || {}).filter(Boolean),
+                    );
                     // DB design_outputs 우선
                     for (const o of designOutputsForGallery) {
+                      if (finalUrls.size > 0 && !finalUrls.has(o.imageUrl)) continue;
                       if (seenUrls.has(o.imageUrl)) continue;
                       seenUrls.add(o.imageUrl);
                       items.push({
@@ -2346,19 +2534,23 @@ function EstimatePage() {
                         status: o.status,
                       });
                     }
-                    // sessionStorage rendersByRoom 보강 — 모든 렌더 항목을 가져옴 (selected 1개만 X)
+                    // sessionStorage 보강 — 실별 최종 선택 이미지 1장만 표시
                     if (step2) {
                       for (const [roomKey, list] of Object.entries(step2.rendersByRoom || {})) {
-                        for (const r of list ?? []) {
-                          const url = r.refinedUrl || r.url;
-                          if (!url || seenUrls.has(url)) continue;
-                          seenUrls.add(url);
-                          items.push({
-                            key: `ss-${roomKey}-${url.slice(-20)}`,
-                            imageUrl: url,
-                            label: ROOM_NAME_MAP[roomKey] || roomKey,
-                          });
-                        }
+                        const selectedIndex = step2.selectedByRoom?.[roomKey];
+                        const selectedRender =
+                          selectedIndex != null ? (list ?? [])[selectedIndex] : undefined;
+                        const url =
+                          step2.finalSelectedImageUrlsByRoom?.[roomKey] ||
+                          selectedRender?.refinedUrl ||
+                          selectedRender?.url;
+                        if (!url || seenUrls.has(url)) continue;
+                        seenUrls.add(url);
+                        items.push({
+                          key: `ss-${roomKey}-${url.slice(-20)}`,
+                          imageUrl: url,
+                          label: ROOM_NAME_MAP[roomKey] || roomKey,
+                        });
                       }
                     }
                     if (items.length === 0) return null;
@@ -2366,7 +2558,7 @@ function EstimatePage() {
                       <div className="rounded-[22px] border border-black/[0.08] bg-white p-5">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-[0.7rem] font-semibold uppercase tracking-widest text-black/40">
-                            분석된 디자인 · {items.length}건
+                            최종 선택 디자인 · {items.length}건
                           </p>
                           {designOutputsForGallery.length === 0 && (
                             <span

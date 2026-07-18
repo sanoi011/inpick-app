@@ -10,6 +10,7 @@ import { TRADE_NAMES } from '@/lib/floor-plan/quantity/types';
 import { resolveMaterialMeta, resolvePart, type PartCode } from './material-meta';
 import { LABOR_CALIBRATION } from './material-meta';
 import type { ConstructionEstimate } from '@/lib/inpick/estimate-v2/types';
+import type { PricingBasis } from '@/lib/inpick/estimate-v2/types';
 
 const UNIT_LABELS: Record<string, string> = {
   SQM: 'm²', LM: 'm', EA: '개', SET: '세트', LOT: '식',
@@ -43,6 +44,13 @@ export interface DetailLine {
   source: string;       // 단가 근거
   optional: boolean;    // 옵션 항목(샷시/확장단열 등)
   added: boolean;       // 보강(신규 추가) 항목 여부 — UI 강조용
+  pricingBasis?: PricingBasis; // 기본단가/현장가견적 구분
+  contractorEditable?: boolean;
+  siteVerificationRequired?: boolean;
+  variationNotice?: string;
+  siteAdjustmentFactors?: string[];
+  siteConditionAdjustmentFactor?: number;
+  siteConditionAdjustmentReason?: string;
 }
 
 export interface DetailGroup {
@@ -407,6 +415,13 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
         'Vision 분석 견적',
       optional: false,
       added: false,
+      pricingBasis: l.pricingBasis,
+      contractorEditable: l.contractorEditable,
+      siteVerificationRequired: l.siteVerificationRequired,
+      variationNotice: l.variationNotice,
+      siteAdjustmentFactors: l.siteAdjustmentFactors,
+      siteConditionAdjustmentFactor: l.siteConditionAdjustmentFactor,
+      siteConditionAdjustmentReason: l.siteConditionAdjustmentReason,
     };
   });
 }

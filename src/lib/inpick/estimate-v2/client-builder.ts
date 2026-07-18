@@ -20,6 +20,7 @@ import type {
   SurfaceType,
   WorkAction,
 } from "./types";
+import type { SiteConditionAnswers } from "./site-condition-answers";
 
 interface MinimalRoom {
   /** "거실" / "안방" / "주방" 등 한국어 이름 */
@@ -34,10 +35,15 @@ interface MinimalRoom {
   userSelectedMaterials?: Array<{
     surfaceType: MaterialHint["surfaceType"];
     materialCategory: string;
+    materialProductId?: string;
     materialNameKo?: string;
     brand?: string;
     sku?: string;
+    spec?: string;
     unitPrice?: number;
+    priceSource?: string;
+    observationId?: string;
+    confidence?: number;
   }>;
 }
 
@@ -45,6 +51,7 @@ export interface ClientBuildEstimateInput {
   projectId: string;
   projectMode: ProjectMode;
   rooms: MinimalRoom[];
+  siteConditions?: SiteConditionAnswers;
 }
 
 /**
@@ -106,13 +113,25 @@ export function buildConstructionEstimateClientSide(
         surfaceType: sType,
         action: "replace",
         materialCategory: sel.materialCategory,
+        materialProductId: sel.materialProductId,
         materialNameKo: sel.materialNameKo,
         brand: sel.brand,
         sku: sel.sku,
+        spec: sel.spec,
         selectedMaterialUnitPrice: sel.unitPrice,
+        selectedMaterialPriceSource:
+          sel.priceSource === "contractor_price"
+            ? "contractor_price"
+            : sel.priceSource === "retail_price" || sel.priceSource === "catalog_price"
+              ? "catalog_price"
+              : sel.priceSource === "material_price_lookup"
+                ? "material_price_lookup"
+                : undefined,
         source: "user_selected_material",
-        confidence: 1.0,
-        evidenceRefs: [],
+        confidence: sel.confidence ?? 1.0,
+        evidenceRefs: sel.observationId
+          ? [{ type: "vision_observation", id: sel.observationId }]
+          : [],
         assumptions: ["사용자가 직접 선택한 자재입니다."],
         warnings: [],
       });
@@ -166,6 +185,7 @@ export function buildConstructionEstimateClientSide(
     projectMode: input.projectMode,
     surfacePlans,
     quantityBasisByRoom,
+    siteConditions: input.siteConditions,
   });
 }
 

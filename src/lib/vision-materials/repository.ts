@@ -179,6 +179,21 @@ export async function insertDecision(input: CreateDecisionInput): Promise<string
   return (data as { id: string } | null)?.id || null;
 }
 
+export async function updateObservationMatchStatus(
+  observationId: string,
+  status: "matched" | "fallback" | "rejected" | "confirmed",
+): Promise<void> {
+  const admin = getAdmin();
+  if (!admin || !observationId || observationId.startsWith("mock-")) return;
+  const { error } = await admin
+    .from("material_vision_observations")
+    .update({ status })
+    .eq("id", observationId);
+  if (error) {
+    console.warn(`[vision-materials/repo] observation status update error: ${error.message}`);
+  }
+}
+
 // ─── estimate line links ───
 export interface CreateEstimateLineLinkInput {
   projectId: string;

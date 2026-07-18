@@ -207,7 +207,10 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     : "narrow elongated rectangular floor plan";
   const floorplanTag = input.isFromFloorplan
     ? `Layout strictly from user's actual floor plan — preserve room shape and proportions exactly. `
-    : "";
+    : `No exact floor plan is available. Use the selected floor-area based Korean apartment average dimensions below as the spatial guide; do not imply this is the real measured layout. `;
+  const openingConstraint = input.isFromFloorplan || input.floorplanImageUrl
+    ? "평면도에 명시되지 않은 창문·문 임의 추가 금지. "
+    : "실 종류에 맞는 한국 아파트 평균 창문·문 구성을 사용하고 구조적으로 불가능한 개구부는 만들지 마세요. ";
   const previousRefTag = input.previousReference
     ? `\nPrevious render of this same room (preserve same room shape, window/door positions, camera angle): "${input.previousReference.slice(0, 400)}"\n`
     : "";
@@ -237,30 +240,52 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
     `${furnishingStr}` +
     `STRICT NO FURNITURE (사용자가 선택한 '시공 포함 항목'은 예외): NO sofa, NO chair, NO table, NO bed, NO mattress, NO rug, NO cushion, NO curtain (only blinds/roller-shade allowed), NO bookshelf, NO TV, NO appliance(except built-in kitchen), NO art, NO plant, NO flower, NO decoration, NO book, NO dish, NO clothing. ` +
     `절대 금지 (한글, 단 위 시공 포함 항목은 표현 필수): 소파·의자·테이블·침대·매트리스·러그·쿠션·커튼(블라인드만 가능)·책장·TV·가전(붙박이 주방 외)·그림·관엽식물·꽃·장식·책·식기·옷가지 모두 제외. ` +
-    `평면도에 명시되지 않은 창문·문 임의 추가 금지. ` +
+    openingConstraint +
     `Result: 2026 modern empty Korean apartment shell, ready for furniture move-in. 빈 공간 그 자체.`;
 
   const size = input.size || "1024x1024";
   const apiKey = getKey();
 
-  // ────────────────────────────────────────────────────────
-  // 가이드(InPick_Floorplan_Pipeline_Refactor.md §3) 정책:
-  //   - gpt-image-2 EDITS API 만 사용 (평면도 입력으로 형태 100% 보존)
-  //   - text-only generations API fallback 절대 금지
-  //   - 평면도 이미지 없으면 즉시 throw "Floorplan not found. Crawl first."
-  // ────────────────────────────────────────────────────────
-  if (!input.floorplanImageUrl) {
-    throw new Error(
-      "Floorplan not found. Crawl first. " +
-        "(평면도 이미지가 없으면 generateRoomRender 호출 불가 — Step1에서 주소+평형 선택 → normalize-floorplan 호출 후 propertyId 확보 후 호출)",
-    );
-  }
-
+  const quality = input.quality || "low";
+  const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 280_000);
 
   try {
-    // ─── EDITS API 경로 (평면도 input — 가이드 강제) ───
+    // 도면이 없으면 평형 평균 치수와 실 종류를 담은 prompt로 바로 생성한다.
+    if (!input.floorplanImageUrl) {
+      const res = await fetch(`${OPENAI_BASE}/images/generations`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "gpt-image-2",
+          prompt,
+          size,
+          quality,
+          n: 1,
+        }),
+        signal: controller.signal,
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        throw new Error(`GPT Image 2 generations 실패 — ${res.status}: ${errorText.slice(0, 200)}`);
+      }
+      const data = await res.json();
+      const b64 = data.data?.[0]?.b64_json;
+      if (!b64) throw new Error("GPT Image 2 generations 응답에 이미지 데이터 없음");
+      return {
+        imageUrl: `data:image/png;base64,${b64}`,
+        imageBase64: b64,
+        revisedPrompt: prompt,
+        model: data.model || "gpt-image-2",
+        costUsd: costMap[quality] ?? 0.17,
+      };
+    }
+
+    // 정리된 원본 도면이 있으면 edits API의 구조 참조로 사용한다.
     const fpRes = await fetch(input.floorplanImageUrl, {
       signal: controller.signal,
     });
@@ -279,9 +304,6 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
       `Camera: eye-level interior view from inside the ${input.roomName}, looking towards the most prominent feature wall. ` +
       `\n\n` +
       prompt;
-
-    const quality = input.quality || "low"; // 가이드 v2 §5-1 — Phase 2부터 1차 기본 low
-    const costMap: Record<string, number> = { low: 0.01, medium: 0.04, high: 0.17 };
 
     // ─── GPT Image 2 고정 ───
     // 사용자가 선택한 도면/공간의 형태 보존을 위해 구형 모델로 자동 하향하지 않는다.

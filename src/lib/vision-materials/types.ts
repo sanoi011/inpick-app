@@ -161,6 +161,8 @@ export interface VisionMaterialAnalyzeResult {
     /** {detector, segmenter, embedding, ocr, vision} 모델 버전 */
     modelVersions: Record<string, string>;
     elapsedMs: number;
+    /** real=실제 탐지/임베딩, mock=분석 인프라 미연결 개발 폴백 */
+    analysisMode: "real" | "mock";
   };
   /** 에러 시 — 사용자에게 보여줄 hint */
   error?: string;

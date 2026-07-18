@@ -12,8 +12,8 @@
  *  - 사용자 자재 확정 여부 (L4 견적이면 견적가 흔들기 어려움)
  *  - 카테고리/SKU별 단가 (사업자 자체 단가와 비교)
  */
-import { useEffect, useState } from "react";
-import { Loader2, Lock, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Lock, Sparkles, TriangleAlert } from "lucide-react";
 
 interface V2Line {
   id: string;
@@ -25,10 +25,20 @@ interface V2Line {
   quantity: number;
   material_unit_price: number;
   labor_unit_price: number;
+  expense_unit_price: number;
   total_amount: number;
   source: string;
   product_match_status: string | null;
   material_category_code: string | null;
+  assumptions?: string[] | null;
+  warnings?: string[] | null;
+  pricing_basis?: string | null;
+  contractor_editable?: boolean | null;
+  site_verification_required?: boolean | null;
+  variation_notice?: string | null;
+  site_adjustment_factors?: string[] | null;
+  site_condition_adjustment_factor?: number | null;
+  site_condition_adjustment_reason?: string | null;
 }
 
 interface V2Estimate {
@@ -117,6 +127,38 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   })();
 
+  const siteConditionSummary = (() => {
+    if (!estimate) return [];
+    const definitions = [
+      {
+        key: "demolition",
+        label: "철거·폐기",
+        codes: ["02", "15"],
+        notice: "기존 마감·폐기물·양중 조건에 따라 현장 확인 후 조정",
+      },
+      {
+        key: "electrical",
+        label: "전기",
+        codes: ["04"],
+        notice: "분전반·노후 배선·전용회로와 매립 범위 확인 후 조정",
+      },
+      {
+        key: "plumbing",
+        label: "설비·배관",
+        codes: ["05"],
+        notice: "배관 노후도·누수·급배수 위치 이동 범위 확인 후 조정",
+      },
+    ];
+    return definitions.map((definition) => {
+      const lines = estimate.lines.filter((line) => definition.codes.includes(line.trade_code));
+      return {
+        ...definition,
+        lineCount: lines.length,
+        amount: lines.reduce((sum, line) => sum + (Number(line.total_amount) || 0), 0),
+      };
+    }).filter((item) => item.lineCount > 0);
+  })();
+
   return (
     <div>
       <button
@@ -146,6 +188,32 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
               총 {Number(estimate.total_amount).toLocaleString("ko-KR")}원
             </span>
           </div>
+
+          {siteConditionSummary.length > 0 && (
+            <div className="mb-3 rounded-xl border border-black/[0.09] bg-white p-3">
+              <div className="flex items-start gap-2">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-black/60" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-black">현장 확인 후 사업자 조정 공종</p>
+                  <p className="mt-0.5 text-[10px] leading-4 text-black/45">
+                    아래 금액은 INPICK 기본단가 가견적입니다. 현장 방문 후 공종별 수량·재료비·노무비를 업체 단가로 수정해 입찰에 반영하세요.
+                  </p>
+                  <div className="mt-2 grid gap-1.5 sm:grid-cols-3">
+                    {siteConditionSummary.map((item) => (
+                      <div key={item.key} className="rounded-lg bg-[#f5f5f3] px-2.5 py-2">
+                        <div className="flex items-center justify-between gap-2 text-[10px]">
+                          <span className="font-bold text-black/65">{item.label}</span>
+                          <span className="text-black/35">{item.lineCount}건</span>
+                        </div>
+                        <p className="mt-0.5 text-xs font-black text-black">{Math.round(item.amount).toLocaleString("ko-KR")}원</p>
+                        <p className="mt-1 text-[9px] leading-3.5 text-black/40">{item.notice}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* 공종별 합계 */}
           <div className="mb-3 grid grid-cols-2 gap-1.5 sm:grid-cols-3 md:grid-cols-4">
@@ -194,25 +262,40 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
                   .map((l) => (
                     <tr key={l.id} className="border-t border-black/[0.06] bg-white">
                       <td className="px-2 py-1 text-gray-700">{l.trade_name_ko}</td>
-                      <td className="px-2 py-1 text-gray-900">{l.item_name_ko}</td>
+                      <td className="px-2 py-1 text-gray-900">
+                        {l.item_name_ko}
+                        {l.site_condition_adjustment_reason && (
+                          <span className="mt-0.5 block text-[9px] font-semibold text-amber-700">
+                            {l.site_condition_adjustment_reason}
+                            {l.site_condition_adjustment_factor
+                              ? ` · ×${Number(l.site_condition_adjustment_factor).toFixed(2)}`
+                              : ""}
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 py-1 text-right tabular-nums">
                         {l.quantity}
                         {l.unit}
                       </td>
                       <td className="px-2 py-1 text-right tabular-nums text-gray-600">
-                        {Math.round(Number(l.material_unit_price) + Number(l.labor_unit_price)).toLocaleString("ko-KR")}
+                        {Math.round(Number(l.material_unit_price) + Number(l.labor_unit_price) + Number(l.expense_unit_price || 0)).toLocaleString("ko-KR")}
                       </td>
                       <td className="px-2 py-1 text-right font-semibold tabular-nums text-black">
                         {Math.round(Number(l.total_amount)).toLocaleString("ko-KR")}
                       </td>
                       <td className="px-2 py-1">
-                        <span
-                          className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                            SOURCE_COLOR[l.source] ?? "bg-black/[0.05] text-black/60"
-                          }`}
-                        >
-                          {SOURCE_LABEL_KO[l.source]?.slice(0, 6) ?? l.source.slice(0, 6)}
-                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          <span
+                            className={`rounded-full px-1.5 py-0.5 text-[9px] ${
+                              SOURCE_COLOR[l.source] ?? "bg-black/[0.05] text-black/60"
+                            }`}
+                          >
+                            {SOURCE_LABEL_KO[l.source]?.slice(0, 6) ?? l.source.slice(0, 6)}
+                          </span>
+                          {["02", "04", "05", "15"].includes(l.trade_code) && (
+                            <span className="rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white">현장확인</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

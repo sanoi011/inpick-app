@@ -16,6 +16,8 @@ import type {
   TradeSummaryRow,
 } from "./types";
 import { createEstimateDocumentNo } from "./document-number";
+import { SITE_CONDITION_NOTICES } from "@/lib/inpick/estimate-v2/site-condition-pricing";
+import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 
 export interface BuildSnapshotInput {
   projectId: string;
@@ -61,8 +63,7 @@ export interface BuildSnapshotInput {
   version?: number;
   // P13-1: v2 ConstructionEstimate 직접 전달 — PDF 자재집계표/산출근거서용
   //   있으면 buildEstimateResult.estimates 대신 이 lines 사용 (manufacturer/supplier/source 포함)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  constructionEstimate?: any;
+  constructionEstimate?: ConstructionEstimate;
 }
 
 /**
@@ -164,8 +165,7 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
 
   // P13-1: v2 ConstructionEstimate가 있으면 그 lines 우선 사용 (manufacturer/supplier/priceSource 포함)
   if (input.constructionEstimate?.lines && Array.isArray(input.constructionEstimate.lines)) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const l of input.constructionEstimate.lines as any[]) {
+    for (const l of input.constructionEstimate.lines) {
       lines.push({
         id: `L${String(lineIdCounter++).padStart(4, "0")}`,
         tradeCode: String(l.tradeCode || "17"),
@@ -300,17 +300,40 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
   );
 
   // 4. assumptions / exclusions / warnings
-  const assumptions = [
+  const appliedSiteConditions = Array.from(
+    new Set(
+      (input.constructionEstimate?.lines || [])
+        .filter((line) => line.siteConditionAdjustmentReason)
+        .map((line) => String(line.siteConditionAdjustmentReason)),
+    ),
+  );
+  const siteConditionAssumptions = [
+    SITE_CONDITION_NOTICES.demolition,
+    SITE_CONDITION_NOTICES.electrical,
+    SITE_CONDITION_NOTICES.plumbing,
+    ...appliedSiteConditions.map((condition) => `사용자 현장조건 사전답변: ${condition}`),
+    ...(input.mode === "contractor_bid"
+      ? ["사업자 입찰 견적에서는 현장 확인 결과를 반영해 해당 공종의 수량·재료단가·노무단가를 수정할 수 있습니다."]
+      : []),
+  ];
+  const assumptions = Array.from(new Set([
     "본 견적은 도면 기반 물량산출과 선택 자재 기준으로 작성되었습니다.",
     "현장 실측, 추가 철거, 관리사무소 요구사항, 구조/설비 특이사항에 따라 금액이 변경될 수 있습니다.",
     `금액 단위: 원 / 단가 기준: material_price_lookup + 카탈로그 + KPA 표준`,
-  ];
+    ...siteConditionAssumptions,
+  ]));
   const exclusions = [
     "전기 인입공사, 가스 인입공사",
     "관할 관청 인허가 비용",
     "이사비, 보관비, 청소비 (별도 협의)",
   ];
-  const warnings: string[] = [];
+  const warnings: string[] = Array.from(
+    new Set(
+      (input.constructionEstimate?.lines || [])
+        .filter((line) => line.siteVerificationRequired && line.variationNotice)
+        .map((line) => String(line.variationNotice)),
+    ),
+  );
   // mock 자재 매칭 결과는 warning
   const matchMeta = input.buildEstimateResult?.matchMetaByRoom || {};
   for (const room of Object.keys(matchMeta)) {

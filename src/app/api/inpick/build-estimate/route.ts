@@ -26,16 +26,17 @@ import type {
 } from "@/lib/vision-materials/types";
 // P2: contextId 기반 견적 합성 (design_outputs + materialEvidence + userEdits)
 import { buildEstimateFromContext } from "@/lib/inpick/estimate-context/build-estimate-from-context";
+import { normalizeSiteConditionAnswers } from "@/lib/inpick/estimate-v2/site-condition-answers";
 // P5: legacy 경로에서도 design_outputs DB의 materialHints를 자동 활용
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import {
+  createClient as createServiceClient,
+  type SupabaseClient,
+} from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import type { MaterialHint } from "@/lib/inpick/estimate-context/types";
 // P7: estimate-v2 공종별 실행내역서 엔진
 // P12: async 버전 — DB product/price resolver 호출하여 line에 brand/sku/source 채움
-import {
-  buildConstructionEstimate,
-  buildConstructionEstimateWithProductResolution,
-} from "@/lib/inpick/estimate-v2/build-construction-estimate";
+import { buildConstructionEstimateWithProductResolution } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { trackServerEventAsync } from "@/lib/analytics/track";
@@ -257,9 +258,8 @@ function buildFallbackRoomsFromArea(body: Record<string, unknown>): Array<{
  * P14-2: ConstructionEstimate → construction_estimates + construction_estimate_lines + snapshots DB INSERT.
  * fire-and-forget — 견적 응답은 막지 않음. 실패해도 silent (log only).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function persistEstimateToDb(
-  admin: any,
+  admin: SupabaseClient,
   estimate: ConstructionEstimate,
   projectId: string,
   userId: string,
@@ -325,6 +325,13 @@ async function persistEstimateToDb(
       evidence_refs: l.evidenceRefs,
       assumptions: l.assumptions,
       warnings: l.warnings,
+      pricing_basis: l.pricingBasis,
+      contractor_editable: l.contractorEditable,
+      site_verification_required: l.siteVerificationRequired,
+      variation_notice: l.variationNotice,
+      site_adjustment_factors: l.siteAdjustmentFactors,
+      site_condition_adjustment_factor: l.siteConditionAdjustmentFactor,
+      site_condition_adjustment_reason: l.siteConditionAdjustmentReason,
       // P12: product/price meta
       material_product_id: l.materialProductId,
       manufacturer: l.manufacturer,
@@ -347,20 +354,30 @@ async function persistEstimateToDb(
     const { data: insertedLines, error: linesErr } = await admin
       .from("construction_estimate_lines")
       .insert(lineRows)
-      .select("id, material_product_id, brand, manufacturer, supplier_name, sku, spec, material_unit_price, material_price_source, fallback_reason");
+      .select("id, sort_no, material_product_id, brand, manufacturer, supplier_name, sku, spec, material_unit_price, material_price_source, fallback_reason");
     if (linesErr) {
       console.warn("[build-estimate] lines INSERT failed:", linesErr.message);
       return;
     }
 
     // 3) snapshots — product 매칭된 line만 INSERT
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const snapshotRows = ((insertedLines ?? []) as any[])
+    type InsertedEstimateLine = {
+      id: string;
+      sort_no: number;
+      material_product_id?: string;
+      brand?: string;
+      manufacturer?: string;
+      supplier_name?: string;
+      sku?: string;
+      spec?: string;
+      material_unit_price?: number;
+      material_price_source?: string;
+      fallback_reason?: string;
+    };
+    const persistedLines = (insertedLines ?? []) as InsertedEstimateLine[];
+    const snapshotRows = persistedLines
       .filter((l) => l.material_product_id)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .map((l: any) => {
-        const row = l as Record<string, unknown>;
-        return {
+      .map((row) => ({
           estimate_line_id: row.id,
           project_id: projectId,
           user_id: userId,
@@ -373,8 +390,7 @@ async function persistEstimateToDb(
           unit_price: row.material_unit_price,
           price_source: row.material_price_source,
           fallback_reason: row.fallback_reason,
-        };
-      });
+        }));
     if (snapshotRows.length > 0) {
       const { error: snapErr } = await admin
         .from("estimate_line_product_snapshots")
@@ -383,8 +399,51 @@ async function persistEstimateToDb(
         console.warn("[build-estimate] snapshots INSERT failed:", snapErr.message);
       }
     }
+
+    // 4) vision observation → 실제 제품 → 발행 견적 라인 추적 링크.
+    const estimateLineBySortNo = new Map(estimate.lines.map((line) => [line.sortNo, line]));
+    const materialLinkRows = persistedLines.flatMap((persisted) => {
+      const sourceLine = estimateLineBySortNo.get(persisted.sort_no);
+      if (!sourceLine || !persisted.material_product_id) return [];
+      const observationId = sourceLine.evidenceRefs.find(
+        (ref) => ref.type === "vision_observation",
+      )?.id;
+      const matchStatus =
+        sourceLine.productMatchStatus === "confirmed"
+          ? "confirmed"
+          : sourceLine.productMatchStatus === "recommended"
+            ? "recommended"
+            : "fallback";
+      return [{
+        project_id: projectId,
+        estimate_id: estimateId,
+        estimate_line_id: persisted.id,
+        observation_id: observationId || null,
+        material_product_id: persisted.material_product_id,
+        trade_code: sourceLine.tradeCode,
+        room_id: sourceLine.roomId,
+        room_name: sourceLine.roomName,
+        surface_type: sourceLine.surfaceType,
+        quantity: sourceLine.quantity,
+        unit: sourceLine.unit,
+        unit_price: sourceLine.materialUnitPrice,
+        price_source: sourceLine.materialPriceSource,
+        confidence:
+          sourceLine.productMatchConfidence ?? sourceLine.confidence,
+        match_status: matchStatus,
+        fallback_reason: sourceLine.fallbackReason,
+      }];
+    });
+    if (materialLinkRows.length > 0) {
+      const { error: linkError } = await admin
+        .from("material_estimate_line_links")
+        .insert(materialLinkRows);
+      if (linkError) {
+        console.warn("[build-estimate] material links INSERT failed:", linkError.message);
+      }
+    }
     console.info(
-      `[build-estimate] persisted estimateId=${estimateId} lines=${lineRows.length} snapshots=${snapshotRows.length}`,
+      `[build-estimate] persisted estimateId=${estimateId} lines=${lineRows.length} snapshots=${snapshotRows.length} materialLinks=${materialLinkRows.length}`,
     );
   } catch (err) {
     console.warn("[build-estimate] persistEstimateToDb error:", err);
@@ -422,6 +481,7 @@ async function buildConstructionEstimateFromContextId(
   const step1 = (data.step1_snapshot ?? {}) as {
     basicInfo?: { selectedPyeong?: { exclusiveArea?: number } };
     normalizedFloorplan?: { rooms?: Array<{ name: string; widthMm?: number; depthMm?: number }> };
+    siteConditions?: unknown;
   };
   const roomAreasByName: Record<string, number> = {};
   // P14-1: 방 도면 치수 (mm) → KitchenPlan/RoomQuantityBasis에 전달
@@ -450,6 +510,9 @@ async function buildConstructionEstimateFromContextId(
       ? // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (data.user_material_edits_snapshot as any[])
       : [],
+    materialEvidence: Array.isArray(data.material_evidence_snapshot)
+      ? (data.material_evidence_snapshot as unknown[])
+      : [],
     roomAreasByName,
     floorplanDimsByName,
   });
@@ -461,6 +524,7 @@ async function buildConstructionEstimateFromContextId(
       projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
       surfacePlans,
       quantityBasisByRoom,
+      siteConditions: normalizeSiteConditionAnswers(step1.siteConditions),
     });
 
   // P14-2: construction_estimate_lines + snapshot DB INSERT (fire-and-forget)
@@ -584,18 +648,19 @@ function materialHintsToAnalyzedSurfaces(
 ): AnalyzedSurface[] {
   const out: AnalyzedSurface[] = [];
   for (const h of hints) {
+    // prompt/모델 문자열로 제품 ID나 SKU를 만들지 않는다.
+    // material_products에서 검증된 UUID가 있는 hint만 vision 후보로 승격한다.
+    if (!h.materialProductId) continue;
     const status =
       h.source === "user_selected"
         ? "confirmed"
-        : h.source === "vision_analysis"
-          ? h.confidence >= 0.7
-            ? "confirmed"
-            : "recommended"
+        : h.matchStatus === "confirmed"
+          ? "confirmed"
           : "recommended";
     const surfaceType: SurfaceType = mapHintSurfaceToVisionType(h.surfaceType);
     out.push({
       observation: {
-        id: `hint-${targetName}-${h.surfaceType}`,
+        id: h.observationId || `verified-hint-${targetName}-${h.surfaceType}`,
         surfaceType,
         bbox: { x: 0, y: 0, width: 0, height: 0 },
         coarseLabels: [],
@@ -604,20 +669,38 @@ function materialHintsToAnalyzedSurfaces(
       } as AnalyzedSurface["observation"],
       candidates: [
         {
-          materialProductId: h.sku ?? `prompt-${h.materialCategory}`,
+          materialProductId: h.materialProductId,
+          rank: 1,
           brand: h.brand,
           productName: h.materialNameKo ?? h.materialCategory,
           sku: h.sku,
-          spec: undefined,
-          unit: "m²",
-          unitPrice: 0,
+          spec: h.spec,
+          category: h.materialCategory,
+          unit: h.unit || "m²",
+          unitPrice: h.unitPrice,
+          priceSource: h.priceSource,
+          scores: {
+            category: 1,
+            visual: h.source === "vision_analysis" ? h.confidence : 0,
+            texture: 0,
+            color: 0,
+            ocr: 0,
+            price: h.unitPrice ? 1 : 0,
+            roomRule: 1,
+            budgetStyle: 0.5,
+            total: h.confidence,
+          },
           confidence: h.confidence,
-        } as AnalyzedSurface["candidates"][number],
+          reasons: ["material_products 검증 제품"],
+          warnings: [],
+        },
       ],
       recommendation: {
-        status: status as AnalyzedSurface["recommendation"]["status"],
+        status,
+        selectedMaterialProductId: h.materialProductId,
         confidence: h.confidence,
-      } as AnalyzedSurface["recommendation"],
+        displayLabel: `${status === "confirmed" ? "[확정]" : "[추천]"} ${h.brand || ""} ${h.materialNameKo || h.materialCategory}`.trim(),
+      },
     });
   }
   return out;

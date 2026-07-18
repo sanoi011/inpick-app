@@ -28,6 +28,7 @@ import {
   insertObservations,
   insertCandidates,
   insertDecision,
+  updateObservationMatchStatus,
   observationToRow,
   candidateToRow,
 } from "@/lib/vision-materials/repository";
@@ -119,6 +120,7 @@ export async function POST(request: NextRequest) {
         fallbackCount: 0,
         modelVersions: worker.modelVersions,
         elapsedMs: Date.now() - t0,
+        analysisMode: worker.source,
       },
       hint: "표면 후보 없음 — 다른 영역을 클릭하거나 이미지 품질을 확인하세요",
     });
@@ -205,6 +207,17 @@ export async function POST(request: NextRequest) {
         (isMockWorker ? "MOCK_WORKER_NOT_PRODUCTION_GRADE" : "VISION_MATERIALS_EVAL_NOT_PASSED");
     }
 
+    await updateObservationMatchStatus(
+      observationIds[i],
+      recommendation.status === "confirmed"
+        ? "confirmed"
+        : recommendation.status === "recommended"
+          ? "matched"
+          : recommendation.status === "rejected"
+            ? "rejected"
+            : "fallback",
+    );
+
     analyzed.push({
       observation: obs,
       candidates: reranked,
@@ -226,6 +239,7 @@ export async function POST(request: NextRequest) {
       fallbackCount: 0,
       modelVersions: worker.modelVersions,
       elapsedMs: Date.now() - t0,
+      analysisMode: worker.source,
     },
   );
 

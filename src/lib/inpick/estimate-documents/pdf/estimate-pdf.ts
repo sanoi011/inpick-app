@@ -225,7 +225,7 @@ function drawCoverPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   doc.setTextColor(80, 80, 80);
   const note =
     "본 견적서는 InPick 프로젝트 도면, 선택 자재, 물량산출 기준으로 작성되었습니다. " +
-    "현장 실측, 추가 철거, 관리사무소 요구사항, 구조/설비 특이사항에 따라 금액이 변경될 수 있습니다.";
+    "철거·전기·설비는 현장 확인 전 기본단가 가견적이며, 기존 상태·철거 범위·배선·배관 조건 확인 후 사업자가 수정·확정합니다.";
   doc.text(doc.splitTextToSize(note, PAGE.width - PAGE.marginX * 2), PAGE.marginX, y + 4);
   doc.setTextColor(0, 0, 0);
 }
@@ -815,6 +815,8 @@ function drawAssumptionsExclusionsPage(doc: jsPDF, pkg: EstimateDocumentPackage)
     `견적 유효기간: ${pkg.validUntil ? fmtDate(pkg.validUntil) : "발행일로부터 30일"}`,
     "현장 실측·도면 정밀 확인 후 자재 수량 5% 이내 조정 가능.",
     "자재 단가는 시공일 기준 시장 단가로 재확인 후 적용.",
+    "철거 금액은 기존 마감 상태·폐기물량·층수·양중 및 반출 조건에 따라 조정 가능.",
+    "전기·설비 금액은 분전반/배선 상태, 전용회로 수, 배관 노후도 및 위치 이동 범위에 따라 조정 가능.",
     "사용자가 자재 등급(basic/standard/premium)을 변경하면 금액 재산정.",
     "사업자 입찰 또는 계약 시 본 견적은 참고 자료이며, 최종 금액은 계약서 기준.",
   ];

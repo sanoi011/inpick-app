@@ -44,6 +44,14 @@ import type {
   WorkPackageRule,
 } from "./types";
 import { DEFAULT_RATE_CONFIG } from "./types";
+import {
+  buildBaseSiteConditionAllowanceLines,
+  getSiteConditionPricingMeta,
+} from "./site-condition-pricing";
+import {
+  applySiteConditionAdjustments,
+  type SiteConditionAnswers,
+} from "./site-condition-answers";
 
 export interface BuildConstructionEstimateInput {
   projectId: string;
@@ -51,6 +59,7 @@ export interface BuildConstructionEstimateInput {
   surfacePlans: SurfacePlan[];
   quantityBasisByRoom: Record<string, RoomQuantityBasis>;
   rateOverrides?: Partial<EstimateRateConfig>;
+  siteConditions?: SiteConditionAnswers;
 }
 
 /**
@@ -126,6 +135,8 @@ export async function buildConstructionEstimateWithProductResolution(
           try {
             const product = await resolveMaterialProductForLine({
               surfacePlan,
+              useSelectedSurfaceProduct:
+                template.costModel.materialUnitPriceKey === "selected_material_unit_price",
               workOutput: {
                 taskNameKo: template.taskNameKo,
                 defaultItemNameKo: template.defaultItemNameKo,
@@ -144,6 +155,7 @@ export async function buildConstructionEstimateWithProductResolution(
               product,
               unit: template.unit,
               overridePriceWon: surfacePlan.selectedMaterialUnitPrice,
+              overridePriceSource: surfacePlan.selectedMaterialPriceSource,
               fallbackDefaultPriceWon: template.costModel.defaultMaterialUnitPrice,
             });
             applyResolvedProductPriceToLine(line, product, price);
@@ -156,7 +168,17 @@ export async function buildConstructionEstimateWithProductResolution(
     }
   }
 
-  const deduped = mergeDuplicateLines(rawLines);
+  rawLines.push(
+    ...buildBaseSiteConditionAllowanceLines({
+      projectId: input.projectId,
+      projectMode: input.projectMode,
+      quantityBasisByRoom: input.quantityBasisByRoom,
+      existingLines: rawLines,
+    }),
+  );
+
+  const adjustedLines = applySiteConditionAdjustments(rawLines, input.siteConditions);
+  const deduped = mergeDuplicateLines(adjustedLines);
   const sorted = sortEstimateLines(deduped);
 
   return {
@@ -278,7 +300,17 @@ export function buildConstructionEstimate(
     }
   }
 
-  const deduped = mergeDuplicateLines(rawLines);
+  rawLines.push(
+    ...buildBaseSiteConditionAllowanceLines({
+      projectId: input.projectId,
+      projectMode: input.projectMode,
+      quantityBasisByRoom: input.quantityBasisByRoom,
+      existingLines: rawLines,
+    }),
+  );
+
+  const adjustedLines = applySiteConditionAdjustments(rawLines, input.siteConditions);
+  const deduped = mergeDuplicateLines(adjustedLines);
   const sorted = sortEstimateLines(deduped);
 
   const tradeSummaries = summarizeByTrade(sorted);
@@ -314,14 +346,41 @@ export function findWorkPackageRules(plan: SurfacePlan): WorkPackageRule[] {
     if (!rule.match.actions.includes(plan.action)) continue;
     const materialCategoryLower = plan.materialCategory.toLowerCase();
     const matNameLower = (plan.materialNameKo ?? "").toLowerCase();
+    const taxonomyAliases = workRuleAliasesForCategory(materialCategoryLower);
     const categoryMatch = rule.match.materialCategories.some((c) => {
       const cl = c.toLowerCase();
-      return materialCategoryLower.includes(cl) || matNameLower.includes(cl);
+      return (
+        materialCategoryLower.includes(cl) ||
+        matNameLower.includes(cl) ||
+        taxonomyAliases.some((alias) => alias.includes(cl) || cl.includes(alias))
+      );
     });
     if (!categoryMatch) continue;
     matched.push(rule);
   }
   return matched;
+}
+
+function workRuleAliasesForCategory(category: string): string[] {
+  if (category.includes("arch_floor_lvt")) return ["lvt", "deco_tile"];
+  if (category.includes("arch_floor_tile") || category.includes("arch_tile")) {
+    return ["porcelain_tile", "tile"];
+  }
+  if (category.includes("arch_floor")) return ["engineered_floor", "wood_floor"];
+  if (category.includes("arch_wall_paint") || category.includes("arch_paint")) {
+    return ["paint", "wall_paint"];
+  }
+  if (category.includes("arch_wall")) return ["wallpaper", "silk_wallpaper"];
+  if (category.includes("arch_kitchen") || category.includes("arch_stone")) {
+    return ["kitchen_standard", "kitchen_cabinet"];
+  }
+  if (category.includes("arch_bath") || category.includes("mech_sanitary")) {
+    return ["bathroom_full", "bathroom"];
+  }
+  if (category.includes("elec_light")) return ["lighting", "led_recessed"];
+  if (category.includes("arch_win")) return ["window", "창호"];
+  if (category.includes("arch_door")) return ["door", "도어"];
+  return [];
 }
 
 export function shouldIncludeTemplate(
@@ -356,6 +415,14 @@ function createEstimateLine(
   const laborAmount = Math.round(prices.laborUnitPrice * quantity);
   const expenseAmount = Math.round(prices.expenseUnitPrice * quantity);
   const totalAmount = materialAmount + laborAmount + expenseAmount;
+  const siteMeta = getSiteConditionPricingMeta(template.tradeCode);
+  const variationNotice = template.variationNotice ?? siteMeta?.variationNotice;
+  const siteAdjustmentFactors =
+    template.siteAdjustmentFactors ?? siteMeta?.siteAdjustmentFactors ?? [];
+  const siteVerificationRequired =
+    template.siteVerificationRequired ?? siteMeta?.siteVerificationRequired ?? false;
+  const isSelectedProductLine =
+    template.costModel.materialUnitPriceKey === "selected_material_unit_price";
 
   return {
     id: randomId(),
@@ -369,10 +436,29 @@ function createEstimateLine(
     roomType: plan.roomType,
     surfaceType: plan.surfaceType,
     taskNameKo: template.taskNameKo,
-    itemNameKo: plan.materialNameKo || template.defaultItemNameKo,
-    brand: plan.brand,
-    sku: plan.sku,
-    spec: plan.spec || template.defaultSpec,
+    itemNameKo:
+      (isSelectedProductLine ? plan.materialNameKo : undefined) ||
+      template.defaultItemNameKo,
+    brand: isSelectedProductLine ? plan.brand : undefined,
+    sku: isSelectedProductLine ? plan.sku : undefined,
+    spec: (isSelectedProductLine ? plan.spec : undefined) || template.defaultSpec,
+    materialProductId: isSelectedProductLine ? plan.materialProductId : undefined,
+    productName: isSelectedProductLine ? plan.materialNameKo : undefined,
+    productMatchStatus:
+      isSelectedProductLine && plan.materialProductId
+        ? plan.source === "user_selected_material"
+          ? "confirmed"
+          : "recommended"
+        : undefined,
+    productMatchConfidence:
+      isSelectedProductLine && plan.materialProductId
+        ? plan.confidence
+        : undefined,
+    materialPriceSource: isSelectedProductLine
+      ? plan.selectedMaterialPriceSource
+      : undefined,
+    priceConfidence:
+      isSelectedProductLine && plan.selectedMaterialUnitPrice ? plan.confidence : undefined,
     unit: template.unit,
     quantityFormulaKo: formulaKo,
     quantity,
@@ -386,6 +472,13 @@ function createEstimateLine(
     included: true,
     source: plan.source,
     confidence: plan.confidence,
+    pricingBasis:
+      template.pricingBasis ?? siteMeta?.pricingBasis ?? "standard_unit",
+    contractorEditable:
+      template.contractorEditable ?? siteMeta?.contractorEditable ?? false,
+    siteVerificationRequired,
+    variationNotice,
+    siteAdjustmentFactors,
     evidenceRefs: [
       { type: "surface_plan", id: plan.id },
       ...plan.evidenceRefs.map((r) => ({
@@ -393,8 +486,19 @@ function createEstimateLine(
         id: r.id,
       })),
     ],
-    assumptions: [...(plan.assumptions ?? []), ...qtyAssumptions, ...template.assumptions],
-    warnings: [...(plan.warnings ?? [])],
+    assumptions: [
+      ...(plan.assumptions ?? []),
+      ...qtyAssumptions,
+      ...template.assumptions,
+      ...(variationNotice ? [variationNotice] : []),
+      ...(siteAdjustmentFactors.length > 0
+        ? [`현장확인 변수: ${siteAdjustmentFactors.join(" · ")}`]
+        : []),
+    ],
+    warnings: [
+      ...(plan.warnings ?? []),
+      ...(siteVerificationRequired && variationNotice ? [variationNotice] : []),
+    ],
   };
 }
 

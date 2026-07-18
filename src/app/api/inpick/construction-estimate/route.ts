@@ -9,10 +9,15 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export const runtime = "nodejs";
 
 export async function GET(req: NextRequest) {
+  const contractorId = await getContractorIdFromRequest(req);
+  if (!contractorId) {
+    return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+  }
   const consumerProjectId = req.nextUrl.searchParams.get("consumerProjectId");
   if (!consumerProjectId) {
     return NextResponse.json({ error: "consumerProjectId required" }, { status: 400 });
@@ -30,8 +35,8 @@ export async function GET(req: NextRequest) {
 
   const { data: estimates, error: estErr } = await admin
     .from("construction_estimates")
-    .select("id, consumer_project_id, total_amount, precision_level, created_at")
-    .eq("consumer_project_id", consumerProjectId)
+    .select("id, project_id, total_with_vat, estimate_json, created_at")
+    .eq("project_id", consumerProjectId)
     .order("created_at", { ascending: false })
     .limit(1);
 
@@ -48,7 +53,7 @@ export async function GET(req: NextRequest) {
   const { data: lines, error: lineErr } = await admin
     .from("construction_estimate_lines")
     .select(
-      "id, trade_code, trade_name_ko, task_name_ko, item_name_ko, unit, quantity, material_unit_price, labor_unit_price, total_amount, source, product_match_status, material_category_code",
+      "id, trade_code, trade_name_ko, task_name_ko, item_name_ko, brand, sku, spec, unit, quantity, material_unit_price, labor_unit_price, expense_unit_price, total_amount, source, product_match_status, material_category_code, assumptions, warnings, pricing_basis, contractor_editable, site_verification_required, variation_notice, site_adjustment_factors, site_condition_adjustment_factor, site_condition_adjustment_reason",
     )
     .eq("estimate_id", estimate.id)
     .order("trade_code", { ascending: true });
@@ -60,7 +65,12 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     estimate: {
-      ...estimate,
+      id: estimate.id,
+      consumer_project_id: estimate.project_id,
+      total_amount: estimate.total_with_vat,
+      precision_level:
+        (estimate.estimate_json as { precisionLevel?: string } | null)?.precisionLevel ?? null,
+      created_at: estimate.created_at,
       lines: lines ?? [],
     },
   });

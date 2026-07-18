@@ -47,8 +47,9 @@ export async function runVisionAnalysisForOutput(opts: {
     }
 
     const analyzeData = (await analyzeRes.json()) as {
-      surfaces?: Array<{
+      observations?: Array<{
         observation?: {
+          id?: string;
           surfaceType?: string;
         };
         candidates?: Array<{
@@ -56,6 +57,11 @@ export async function runVisionAnalysisForOutput(opts: {
           brand?: string;
           productName?: string;
           sku?: string;
+          spec?: string;
+          category?: string;
+          unit?: string;
+          unitPrice?: number;
+          priceSource?: string;
           confidence?: number;
         }>;
         recommendation?: {
@@ -67,17 +73,24 @@ export async function runVisionAnalysisForOutput(opts: {
 
     // Step 3: 결과 → MaterialHint 변환 (기존 prompt hint와 병합, vision 우선)
     const visionHints: MaterialHint[] = [];
-    for (const surface of analyzeData.surfaces ?? []) {
+    for (const surface of analyzeData.observations ?? []) {
       const top = surface.candidates?.[0];
       if (!top || !top.materialProductId) continue;
       const status = surface.recommendation?.status;
       if (status === "fallback" || status === "rejected") continue;
       visionHints.push({
         surfaceType: mapSurfaceTypeForHint(surface.observation?.surfaceType),
-        materialCategory: surface.observation?.surfaceType ?? "unknown",
+        materialCategory: top.category || surface.observation?.surfaceType || "unknown",
+        materialProductId: top.materialProductId,
         materialNameKo: top.productName,
         brand: top.brand,
         sku: top.sku,
+        spec: top.spec,
+        unit: top.unit,
+        unitPrice: top.unitPrice,
+        priceSource: top.priceSource,
+        observationId: surface.observation?.id,
+        matchStatus: status === "confirmed" ? "confirmed" : "recommended",
         confidence: surface.recommendation?.confidence ?? top.confidence ?? 0.5,
         source: "vision_analysis",
         assumptions: status === "confirmed" ? ["vision 분석 confirmed"] : [],
@@ -87,7 +100,7 @@ export async function runVisionAnalysisForOutput(opts: {
     const seen = new Set<string>();
     const mergedHints: MaterialHint[] = [];
     for (const h of [...visionHints, ...(output.materialHints ?? [])]) {
-      const key = `${h.surfaceType}::${h.materialCategory}`;
+      const key = h.surfaceType;
       if (seen.has(key)) continue;
       seen.add(key);
       mergedHints.push(h);
