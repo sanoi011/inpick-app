@@ -23,9 +23,15 @@ import {
   Wallet,
 } from "lucide-react";
 import type { AddressSearchResult } from "@/types/address";
+import {
+  fetchFloorplanJson,
+  FLOORPLAN_CLIENT_TIMEOUT_MS,
+  FLOORPLAN_STALE_STATE_MS,
+  FloorplanRequestError,
+} from "@/lib/inpick/floorplan/normalize-request";
 
 type InputMode = "address" | "upload" | "lidar";
-const FLOORPLAN_PIPELINE_VERSION = 2;
+const FLOORPLAN_PIPELINE_VERSION = 5;
 
 export interface BasicInfoData {
   mode: InputMode;
@@ -56,10 +62,10 @@ export interface BasicInfoData {
   normalizing?: boolean;
   normalizationStartedAt?: number;
   normalizationPipelineVersion?: number;
-  /** 고화질 도면 생성 실패 시 사용자 안내 */
+  /** 도면 생성 실패 시 사용자 안내 */
   normalizationWarning?: string;
   floorplanModel?: string;
-  floorplanQuality?: "high";
+  floorplanQuality?: "medium" | "high";
   layoutVariant?: "basic" | "extended";
   normalizedRooms?: Array<{
     name: string;
@@ -76,6 +82,23 @@ export interface BasicInfoData {
 interface Props {
   value: BasicInfoData;
   onChange: (next: BasicInfoData) => void;
+}
+
+interface NormalizeFloorplanResponse {
+  error?: string;
+  property_id?: string;
+  cleanedImageUrl?: string;
+  normalizedImageUrl?: string;
+  dimensionOverlaySvg?: string;
+  totalWidthMm?: number;
+  totalDepthMm?: number;
+  rooms?: BasicInfoData["normalizedRooms"];
+  openings?: BasicInfoData["normalizedOpenings"];
+  notes?: string;
+  pyeong?: string;
+  cleanModel?: string;
+  cleanQuality?: "medium" | "high";
+  layoutVariant?: "basic" | "extended";
 }
 
 export default function BasicInfoCard({ value, onChange }: Props) {
@@ -281,8 +304,11 @@ function AddressMode({ value, onChange }: Props) {
   const [showAllPyeong, setShowAllPyeong] = useState(false);
   const valueRef = useRef(value);
   const activeNormalizeKeyRef = useRef<string | null>(null);
+  const activeNormalizeControllerRef = useRef<AbortController | null>(null);
   const attemptedNormalizeKeysRef = useRef(new Set<string>());
   valueRef.current = value;
+
+  useEffect(() => () => activeNormalizeControllerRef.current?.abort(), []);
 
   // Fast Refresh/새로고침 또는 구 파이프라인에서 비동기 호출만 끊긴 경우 자동 복구.
   useEffect(() => {
@@ -310,7 +336,7 @@ function AddressMode({ value, onChange }: Props) {
   useEffect(() => {
     if (!value.normalizing || !value.normalizationStartedAt) return;
     const elapsed = Date.now() - value.normalizationStartedAt;
-    const remaining = Math.max(0, 125_000 - elapsed);
+    const remaining = Math.max(0, FLOORPLAN_STALE_STATE_MS - elapsed);
     const timer = window.setTimeout(() => {
       const current = valueRef.current;
       if (!current.normalizing || current.normalizationStartedAt !== value.normalizationStartedAt) return;
@@ -318,7 +344,7 @@ function AddressMode({ value, onChange }: Props) {
         ...current,
         normalizing: false,
         normalizationStartedAt: undefined,
-        normalizationWarning: "고화질 도면 처리 시간이 초과되었습니다. 다시 시도해주세요.",
+        normalizationWarning: "도면 생성 시간이 초과되었습니다. 다시 시도해주세요.",
       });
     }, remaining);
     return () => window.clearTimeout(timer);
@@ -460,6 +486,9 @@ function AddressMode({ value, onChange }: Props) {
     }
     activeNormalizeKeyRef.current = normalizeKey;
     attemptedNormalizeKeysRef.current.add(normalizeKey);
+    activeNormalizeControllerRef.current?.abort();
+    const normalizeController = new AbortController();
+    activeNormalizeControllerRef.current = normalizeController;
 
     const p = pyeong;
     const isCurrentSelection = () => {
@@ -511,11 +540,9 @@ function AddressMode({ value, onChange }: Props) {
         current.selectedAddress?.roadAddress ||
         current.selectedAddress?.jibunAddress ||
         aptName;
-      const normalizeController = new AbortController();
-      const normalizeTimer = window.setTimeout(() => normalizeController.abort(), 120_000);
-      let res: Response;
-      try {
-        res = await fetch("/api/inpick/normalize-floorplan", {
+      const { response: res, data } = await fetchFloorplanJson<NormalizeFloorplanResponse>(
+        "/api/inpick/normalize-floorplan",
+        {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -526,14 +553,17 @@ function AddressMode({ value, onChange }: Props) {
             aptName,
             skipImageClean: false,
             expansion: expansion === "extended",
+            layoutVariant: expansion,
           }),
           signal: normalizeController.signal,
-        });
-      } finally {
-        window.clearTimeout(normalizeTimer);
-      }
-      const data = await res.json();
+        },
+        { timeoutMs: FLOORPLAN_CLIENT_TIMEOUT_MS },
+      );
       if (res.ok && data.cleanedImageUrl) {
+        if (data.layoutVariant !== expansion) {
+          finishWithError("선택한 시공 형태와 도면이 일치하지 않습니다. 다시 시도해주세요.");
+          return;
+        }
         if (!isCurrentSelection()) return;
         onChange({
           ...valueRef.current,
@@ -550,7 +580,10 @@ function AddressMode({ value, onChange }: Props) {
           normalizedNotes: data.notes,
           normalizedPyeong: data.pyeong,
           floorplanModel: data.cleanModel,
-          floorplanQuality: data.cleanQuality === "high" ? "high" : undefined,
+          floorplanQuality:
+            data.cleanQuality === "high" || data.cleanQuality === "medium"
+              ? data.cleanQuality
+              : undefined,
           layoutVariant: data.layoutVariant || expansion,
           normalizing: false,
           normalizationStartedAt: undefined,
@@ -558,16 +591,26 @@ function AddressMode({ value, onChange }: Props) {
         });
       } else {
         console.warn("[floorplan-normalize] unavailable:", data.error || res.status);
-        finishWithError("고화질 도면을 완성하지 못했습니다. 잠시 후 다시 시도해주세요.");
+        finishWithError("도면을 완성하지 못했습니다. 잠시 후 다시 시도해주세요.");
       }
     } catch (e) {
       console.error("normalize fail", e);
+      if (
+        e instanceof DOMException &&
+        e.name === "AbortError" &&
+        activeNormalizeControllerRef.current !== normalizeController
+      ) {
+        return;
+      }
       finishWithError(
-        e instanceof DOMException && e.name === "AbortError"
-          ? "고화질 도면 처리 시간이 초과되었습니다. 다시 시도해주세요."
-          : "고화질 도면을 완성하지 못했습니다. 다시 시도해주세요.",
+        e instanceof FloorplanRequestError && e.code === "timeout"
+          ? "도면 생성 시간이 초과되었습니다. 다시 시도해주세요."
+          : "도면을 완성하지 못했습니다. 다시 시도해주세요.",
       );
     } finally {
+      if (activeNormalizeControllerRef.current === normalizeController) {
+        activeNormalizeControllerRef.current = null;
+      }
       if (activeNormalizeKeyRef.current === normalizeKey) {
         activeNormalizeKeyRef.current = null;
       }
@@ -776,18 +819,26 @@ function AddressMode({ value, onChange }: Props) {
         <div className="mt-3">
           <div className="relative w-full overflow-hidden rounded-xl border border-black/[0.08] bg-white">
             {value.normalizing ? (
-              <div className="flex min-h-[330px] flex-col items-center justify-center bg-[#f7f7f5] px-6 py-10 text-center sm:min-h-[390px]">
+              <div className="relative flex min-h-[330px] flex-col items-center justify-center overflow-hidden bg-[#f7f7f5] px-6 py-10 text-center sm:min-h-[390px]">
+                <img
+                  src={value.selectedPyeong.grandPlanUrl}
+                  alt="선택한 원본 도면 미리보기"
+                  className="absolute inset-0 h-full w-full object-contain opacity-20 blur-[1px]"
+                />
+                <div className="absolute inset-0 bg-white/70" />
                 <div className="relative h-16 w-16" aria-hidden>
                   <div className="absolute inset-0 rounded-full border-[3px] border-black/10" />
                   <div className="absolute inset-0 animate-[spin_3s_linear_infinite] rounded-full border-[3px] border-transparent border-r-black border-t-black" />
                   <div className="absolute inset-[9px] animate-[spin_5s_linear_infinite_reverse] rounded-full border-2 border-transparent border-b-black/35" />
                 </div>
+                <p className="relative mt-5 text-xs font-semibold text-black/65">도면 생성 중</p>
+                <p className="relative mt-1 text-[11px] text-black/40">선택한 도면을 확인하고 시공 형태를 반영하고 있습니다.</p>
               </div>
             ) : value.cleanedImageUrl && !value.normalizationWarning ? (
               <div className="relative bg-white">
                 <img
                   src={value.cleanedImageUrl}
-                  alt={`${value.layoutVariant === "extended" ? "확장형" : "기본형"} 고화질 흑백 건축도면`}
+                  alt={`${value.layoutVariant === "extended" ? "확장형" : "기본형"} 흑백 건축도면`}
                   className="w-full object-contain"
                 />
                 {value.dimensionOverlaySvg && (

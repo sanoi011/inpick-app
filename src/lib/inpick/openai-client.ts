@@ -343,6 +343,9 @@ export interface VisionAnalyzeInput {
   prompt: string;
   responseFormat?: "json_object" | "text";
   maxOutputTokens?: number;
+  reasoningEffort?: "low" | "medium" | "high";
+  /** 전체 후보/재시도를 포함한 최대 대기 시간. 미지정 시 기존 동작을 유지한다. */
+  requestTimeoutMs?: number;
 }
 
 interface OpenAIUsage {
@@ -354,6 +357,9 @@ interface OpenAIUsage {
 export async function analyzeImageVision(
   input: VisionAnalyzeInput,
 ): Promise<{ content: string; usage: OpenAIUsage | undefined; model: string }> {
+  const deadline = input.requestTimeoutMs
+    ? Date.now() + Math.max(1_000, input.requestTimeoutMs)
+    : null;
   const content: Array<Record<string, unknown>> = [];
   if (input.imageUrl) {
     content.push({ type: "image_url", image_url: { url: input.imageUrl, detail: "high" } });
@@ -375,22 +381,44 @@ export async function analyzeImageVision(
         model,
         messages: [{ role: "user", content }],
         max_completion_tokens: input.maxOutputTokens ?? 8_192,
-        reasoning_effort: "high",
+        reasoning_effort: input.reasoningEffort ?? "high",
       };
       if (input.responseFormat === "json_object") {
         body.response_format = { type: "json_object" };
       }
 
-      const res = await fetch(`${OPENAI_BASE}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${getKey()}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+      const remainingMs = deadline ? deadline - Date.now() : null;
+      if (remainingMs !== null && remainingMs <= 0) {
+        throw new Error(`OpenAI vision request timed out (${input.requestTimeoutMs}ms)`);
+      }
+      const controller = remainingMs !== null ? new AbortController() : null;
+      const timeoutId = controller
+        ? setTimeout(() => controller.abort(), Math.max(1, remainingMs!))
+        : null;
+      let res: Response;
+      let responseText = "";
+      try {
+        res = await fetch(`${OPENAI_BASE}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${getKey()}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: controller?.signal,
+        });
+        // 헤더 수신 뒤 본문이 멈추는 경우도 전체 제한시간에 포함한다.
+        responseText = await res.text();
+      } catch (error) {
+        if (error instanceof Error && error.name === "AbortError") {
+          throw new Error(`OpenAI vision request timed out (${input.requestTimeoutMs}ms)`);
+        }
+        throw error;
+      } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+      }
       if (res.ok) {
-        const data = await res.json();
+        const data = JSON.parse(responseText);
         return {
           content: data.choices?.[0]?.message?.content || "",
           usage: data.usage,
@@ -398,7 +426,7 @@ export async function analyzeImageVision(
         };
       }
 
-      const err = await res.text();
+      const err = responseText;
       errors.push(`${model} ${res.status} attempt ${attempt + 1}: ${err.slice(0, 300)}`);
       const recoverable = isRecoverableFrontierModelError(res.status, err);
       if (!recoverable) {
