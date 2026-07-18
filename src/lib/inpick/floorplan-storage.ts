@@ -78,6 +78,9 @@ export interface FloorplanMetadata {
   total_width_mm?: number;
   total_depth_mm?: number;
   pyeong?: string;
+  layout_variant?: "basic" | "extended";
+  clean_model?: string;
+  clean_quality?: "medium" | "high";
 }
 
 // ═══════════════════════════════════════════════════
