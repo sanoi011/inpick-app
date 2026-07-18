@@ -427,7 +427,7 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
             </>
           ) : normalizing ? (
             <>
-              고화질 흑백 도면 생성 중… 잠시만 기다려주세요
+              도면 생성 중
             </>
           ) : (
             <>다음 단계 — 입력 필요: {missing.join(" · ")}</>
