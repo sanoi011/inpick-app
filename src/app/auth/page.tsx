@@ -851,14 +851,16 @@ function AuthContent() {
 
   return (
     <main className="min-h-screen bg-white font-kr text-[#0d0d0d]">
-      <header className="absolute inset-x-0 top-0 z-20 flex h-16 items-center justify-between px-5 sm:px-8 lg:h-20 lg:px-10">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="InPick 홈">
-          <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
-          <span className="font-en text-[21px] font-bold tracking-[-0.055em]">inpick</span>
-        </Link>
-        <Link href="/" className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
-          메인으로 <ArrowUpRight className="h-4 w-4" />
-        </Link>
+      <header className="absolute inset-x-0 top-0 z-20 pt-safe">
+        <div className="flex h-16 items-center justify-between px-5 sm:px-8 lg:h-20 lg:px-10">
+          <Link href="/" className="flex items-center gap-2.5" aria-label="InPick 홈">
+            <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+            <span className="font-en text-[21px] font-bold tracking-[-0.055em]">inpick</span>
+          </Link>
+          <Link href="/" className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
+            메인으로 <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        </div>
       </header>
 
       <div className="grid min-h-screen lg:grid-cols-[1.04fr_0.96fr]">
@@ -885,7 +887,7 @@ function AuthContent() {
           </div>
         </section>
 
-        <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-24 sm:px-8 lg:py-24">
+        <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-[calc(6rem+env(safe-area-inset-top,0px))] sm:px-8 lg:py-24">
           <div className="w-full max-w-[430px]">
             <div className="mb-7">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">

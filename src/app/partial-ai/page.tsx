@@ -294,7 +294,7 @@ export default function PartialAiPage() {
     <main className="min-h-screen bg-[#f7f7f5] text-black">
       <HeaderV4 variant="solid" />
 
-      <section className="bg-white pt-24">
+      <section className="bg-white pt-[calc(6rem+env(safe-area-inset-top,0px))]">
         <div className="mx-auto max-w-7xl px-5 pb-12 pt-10 lg:px-8 lg:pb-16">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-black/40">02 · PARTIAL AI INTERIOR</p>
           <div className="mt-4 grid items-end gap-8 lg:grid-cols-[1.1fr_0.9fr]">

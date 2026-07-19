@@ -313,7 +313,7 @@ export default function MaterialPreviewPage() {
     <main className="min-h-screen bg-white text-zinc-950">
       <HeaderV4 />
 
-      <section className="relative overflow-hidden bg-zinc-950 pt-28 text-white">
+      <section className="relative overflow-hidden bg-zinc-950 pt-[calc(7rem+env(safe-area-inset-top,0px))] text-white">
         <img src="/images/feature-living.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-35" />
         <div className="absolute inset-0 bg-zinc-950/65" />
         <div className="relative mx-auto max-w-7xl px-5 pb-14 pt-10 lg:px-8">

@@ -10,6 +10,7 @@ import {
 import { useTokens } from "@/hooks/useTokens";
 import { useAuth } from "@/hooks/useAuth";
 import BusinessDropdown from "@/components/business/BusinessDropdown";
+import { isNativeApp } from "@/lib/mobile/platform";
 
 /**
  * 헤더 V4 — 좌측 로고 + 우측 로그인 버튼 (비로그인) 또는 마이페이지+토큰 (로그인)
@@ -17,6 +18,7 @@ import BusinessDropdown from "@/components/business/BusinessDropdown";
 export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" | "solid" }) {
   const [mode, setMode] = useState<"dark" | "light">("dark");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [nativeApp, setNativeApp] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { authenticated, balance, loading } = useTokens();
   const { user, loading: authLoading, signOut } = useAuth();
@@ -26,6 +28,10 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
   const isLoggedIn = !!user || authenticated;
   // 인증 확인 중(둘 다 아직 모름) — 로그인 버튼을 성급히 보여주지 않고 자리만 유지
   const authChecking = (authLoading || loading) && !isLoggedIn;
+
+  useEffect(() => {
+    setNativeApp(isNativeApp());
+  }, []);
 
   // 외부 클릭 시 dropdown 닫기
   useEffect(() => {
@@ -68,7 +74,7 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-[100] pt-safe ${
+      className={`${nativeApp ? "absolute" : "fixed"} inset-x-0 top-0 z-[100] pt-safe ${
         variant === "solid" ? "border-b border-zinc-200 bg-white/95 backdrop-blur-md" : ""
       }`}
     >

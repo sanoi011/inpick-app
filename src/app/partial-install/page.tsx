@@ -359,7 +359,7 @@ export default function PartialInstallPage() {
     <main className="min-h-screen bg-[#f7f7f5] text-zinc-950">
       <HeaderV4 variant="solid" />
 
-      <section className="bg-white pt-24">
+      <section className="bg-white pt-[calc(6rem+env(safe-area-inset-top,0px))]">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 pb-12 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-16">
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-black/45">부분시공 · 자재 매칭</p>

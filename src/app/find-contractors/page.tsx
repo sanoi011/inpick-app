@@ -78,7 +78,7 @@ export default function FindContractorsPage() {
       <Header />
 
       {/* 히어로 배너 */}
-      <section className="bg-white pt-24 sm:pt-28">
+      <section className="bg-white pt-[calc(6rem+env(safe-area-inset-top,0px))] sm:pt-[calc(7rem+env(safe-area-inset-top,0px))]">
         <div className="mx-auto max-w-5xl px-4 py-10 text-center sm:px-6 sm:py-14">
           <div className="mb-3 flex items-center justify-center gap-2">
             <Building2 className="h-5 w-5 text-black/55" strokeWidth={1.7} />

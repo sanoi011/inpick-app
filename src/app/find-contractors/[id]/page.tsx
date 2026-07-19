@@ -61,7 +61,7 @@ export default function ContractorDetailPage() {
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
         <Header />
-        <main className="mx-auto max-w-4xl px-4 pb-10 pt-28 sm:px-6">
+        <main className="mx-auto max-w-4xl px-4 pb-10 pt-[calc(7rem+env(safe-area-inset-top,0px))] sm:px-6">
           <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mb-4" />
           <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -93,7 +93,7 @@ export default function ContractorDetailPage() {
     return (
       <div className="min-h-screen bg-[#f7f7f5]">
         <Header />
-        <div className="max-w-3xl mx-auto px-6 py-20 text-center">
+        <div className="mx-auto max-w-3xl px-6 pb-20 pt-[calc(7rem+env(safe-area-inset-top,0px))] text-center">
           <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-900 mb-2">업체를 찾을 수 없습니다</h2>
           <button
@@ -125,7 +125,7 @@ export default function ContractorDetailPage() {
     <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
       <Header />
 
-      <main className="mx-auto max-w-4xl px-4 pb-10 pt-28 sm:px-6">
+      <main className="mx-auto max-w-4xl px-4 pb-10 pt-[calc(7rem+env(safe-area-inset-top,0px))] sm:px-6">
         {/* 뒤로가기 */}
         <button
           onClick={() => router.push("/find-contractors")}

@@ -100,7 +100,7 @@ export default function BusinessPage() {
     <main className="min-h-screen bg-[#f7f7f5] text-black">
       <HeaderV4 variant="solid" />
 
-      <section className="overflow-hidden bg-white pt-24">
+      <section className="overflow-hidden bg-white pt-[calc(6rem+env(safe-area-inset-top,0px))]">
         <div className="mx-auto grid max-w-7xl items-end gap-10 px-5 pb-14 pt-10 lg:grid-cols-[1.05fr_0.95fr] lg:px-8 lg:pb-20">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-black/40">INPICK BUSINESS PARTNER</p>

@@ -70,13 +70,15 @@ export default function ResetPasswordPage() {
 
   return (
     <main className="min-h-screen bg-white text-[#0d0d0d]">
-      <header className="absolute inset-x-0 top-0 flex h-16 items-center px-5 sm:px-8 lg:px-10">
-        <Link href="/" className="flex items-center gap-2.5">
-          <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
-          <span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
-        </Link>
+      <header className="absolute inset-x-0 top-0 pt-safe">
+        <div className="flex h-16 items-center px-5 sm:px-8 lg:px-10">
+          <Link href="/" className="flex items-center gap-2.5">
+            <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
+            <span className="text-[21px] font-bold tracking-[-0.055em]">inpick</span>
+          </Link>
+        </div>
       </header>
-      <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-24 sm:px-8">
+      <section className="flex min-h-screen items-center justify-center px-5 pb-12 pt-[calc(6rem+env(safe-area-inset-top,0px))] sm:px-8">
         <div className="w-full max-w-[420px]">
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-primary-50 text-primary-500">
             <Lock className="h-5 w-5" strokeWidth={1.8} />

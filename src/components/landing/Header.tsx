@@ -28,6 +28,7 @@ import { Menu, X, LogOut, User } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { NotificationBell } from "@/components/ui/NotificationBell";
 import { LocaleSwitcher } from "@/components/ui/LocaleSwitcher";
+import { isNativeApp } from "@/lib/mobile/platform";
 
 interface HeaderProps {
   brandName?: string;
@@ -49,8 +50,13 @@ export default function Header({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [nativeApp, setNativeApp] = useState(false);
   const { user, loading: authLoading, signOut } = useAuth();
   const colors = COLORS.light;
+
+  useEffect(() => {
+    setNativeApp(isNativeApp());
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 20);
@@ -60,7 +66,9 @@ export default function Header({
   }, []);
 
   return (
-    <header className="fixed left-0 right-0 top-0 z-50 bg-white/95 px-4 pt-3 backdrop-blur-xl">
+    <header
+      className={`${nativeApp ? "absolute" : "fixed"} left-0 right-0 top-0 z-50 bg-white/95 px-4 pt-[calc(0.75rem+env(safe-area-inset-top,0px))] backdrop-blur-xl`}
+    >
       <motion.nav
         initial={{ y: -20, opacity: 0, scale: 0.95 }}
         animate={{
