@@ -4,6 +4,7 @@ import { Bodoni_Moda, Manrope } from "next/font/google";
 import { ToastContainer } from "@/components/ui/Toast";
 import { TokensProvider } from "@/contexts/TokensContext";
 import NativeAuthListener from "@/components/auth/NativeAuthListener";
+import AuthFlowGate from "@/components/auth/AuthFlowGate";
 import SessionTracker from "@/components/analytics/SessionTracker";
 import "./globals.css";
 
@@ -131,7 +132,7 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${bodoni.variable} ${hostGrotesk.variable} antialiased font-sans`}
       >
         <TokensProvider>
-          {children}
+          <AuthFlowGate>{children}</AuthFlowGate>
           <ToastContainer />
           <NativeAuthListener />
           <SessionTracker />

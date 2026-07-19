@@ -23,6 +23,7 @@ import AppDownloadSection from "@/components/landing/AppDownloadSection";
 import BusinessDropdown from "@/components/business/BusinessDropdown";
 import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 import { BUSINESS_MENU_ITEMS } from "@/lib/business-center";
+import { buildConsumerAuthHref } from "@/lib/auth/access-policy";
 
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
@@ -158,6 +159,11 @@ export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [businessMobileOpen, setBusinessMobileOpen] = useState(false);
   const [trendIndex, setTrendIndex] = useState(0);
+  const designHref = authLoading || user
+    ? "/workflow"
+    : buildConsumerAuthHref("/workflow", "free_ai");
+  const resolveServiceHref = (href: string) =>
+    href === "/workflow" ? designHref : href;
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -171,7 +177,7 @@ export default function Home() {
     if (typeof window !== "undefined" && nextPrompt) {
       sessionStorage.setItem("inpick_home_prompt", nextPrompt);
     }
-    router.push("/workflow");
+    router.push(designHref);
   };
 
   return (
@@ -190,7 +196,7 @@ export default function Home() {
 
           <nav className="hidden items-center gap-6 text-[14px] font-medium tracking-[-0.02em] lg:flex">
             {NAV_ITEMS.map((item) => (
-              <Link key={item.label} href={item.href} className="transition-opacity hover:opacity-55">
+              <Link key={item.label} href={resolveServiceHref(item.href)} className="transition-opacity hover:opacity-55">
                 {item.label}
               </Link>
             ))}
@@ -215,7 +221,7 @@ export default function Home() {
               </Link>
             )}
             <Link
-              href="/workflow"
+              href={designHref}
               className="rounded-full bg-black px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-black/75"
             >
               무료로 시작하기
@@ -242,7 +248,7 @@ export default function Home() {
               {NAV_ITEMS.map((item) => (
                 <Link
                   key={item.label}
-                  href={item.href}
+                  href={resolveServiceHref(item.href)}
                   onClick={() => setMenuOpen(false)}
                   className="block rounded-xl px-3 py-3 text-[15px] font-medium hover:bg-black/[0.04]"
                 >
@@ -280,7 +286,7 @@ export default function Home() {
                   로그인
                 </Link>
               )}
-              <Link href="/workflow" className="rounded-full bg-black px-4 py-2.5 text-center text-sm font-semibold text-white">
+              <Link href={designHref} className="rounded-full bg-black px-4 py-2.5 text-center text-sm font-semibold text-white">
                 무료 시작
               </Link>
             </div>
@@ -374,7 +380,7 @@ export default function Home() {
               상상한 공간을, 실제처럼.
             </h2>
           </div>
-          <Link href="/workflow" className="hidden items-center gap-1.5 text-sm font-semibold hover:opacity-55 sm:inline-flex">
+          <Link href={designHref} className="hidden items-center gap-1.5 text-sm font-semibold hover:opacity-55 sm:inline-flex">
             내 공간 만들기 <ArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
@@ -385,7 +391,7 @@ export default function Home() {
               key={item.title}
               className={`group relative overflow-hidden rounded-[22px] bg-[#ececea] ${item.className}`}
             >
-              <Link href={item.href} className="absolute inset-0">
+              <Link href={resolveServiceHref(item.href)} className="absolute inset-0">
                 <Image
                   src={item.image}
                   alt={item.title}
@@ -432,7 +438,7 @@ export default function Home() {
               ].map(([number, title, desc]) => (
                 <Link
                   key={number}
-                  href="/workflow"
+                  href={designHref}
                   className="group grid grid-cols-[48px_1fr_auto] items-center gap-4 border-b border-black/10 py-6 sm:grid-cols-[72px_1fr_auto] sm:py-8"
                 >
                   <span className="text-xs font-semibold text-black/35">{number}</span>
@@ -453,7 +459,7 @@ export default function Home() {
         <h2 className="mx-auto mt-7 max-w-3xl text-[36px] font-medium leading-[1.08] tracking-[-0.06em] sm:text-[58px]">
           오늘, 내 공간을 새롭게 만들어보세요.
         </h2>
-        <Link href="/workflow" className="mt-8 inline-flex items-center gap-2 rounded-full bg-black px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-black/75">
+        <Link href={designHref} className="mt-8 inline-flex items-center gap-2 rounded-full bg-black px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-black/75">
           무료 인테리어 시작하기 <ArrowUpRight className="h-4 w-4" />
         </Link>
       </section>

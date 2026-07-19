@@ -42,6 +42,13 @@ export function detectPlatform(): InpickRuntimePlatform {
     }
   }
 
+  // 원격 server.url 로드나 브릿지 주입 직전에도 앱 진입 게이트가 빠지지 않도록
+  // Capacitor 기본/인픽 고정 UA 마커를 두 번째 근거로 사용한다.
+  const userAgent = navigator.userAgent || "";
+  if (/InPickNative\/|CapacitorWebView/i.test(userAgent)) {
+    return /Android/i.test(userAgent) ? "android" : "ios";
+  }
+
   // PWA 감지 (standalone display mode)
   const standalone =
     window.matchMedia?.("(display-mode: standalone)").matches ||

@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { User } from "@supabase/supabase-js";
+import { buildConsumerAuthHref } from "@/lib/auth/access-policy";
+import { isNativeApp } from "@/lib/mobile/platform";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -43,7 +45,11 @@ export function useAuth() {
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    window.location.href = "/";
+    window.location.replace(
+      isNativeApp()
+        ? buildConsumerAuthHref("/", "native_logout")
+        : "/",
+    );
   };
 
   return { user, loading, signOut };

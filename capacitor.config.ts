@@ -15,6 +15,9 @@ import type { CapacitorConfig } from "@capacitor/cli";
 const config: CapacitorConfig = {
   appId: "kr.inpick.app",
   appName: "InPick",
+  // WebView가 원격 운영 도메인을 로드해도 웹 코드가 앱을 확실히 식별한다.
+  // 기존 window.Capacitor 감지와 함께 앱 시작 인증 게이트의 이중 근거로 사용.
+  appendUserAgent: " InPickNative/1 CapacitorWebView",
 
   // webDir — npx cap sync 시 native 프로젝트로 복사할 정적 자산.
   // Vercel 사이트를 직접 로드하므로 placeholder만 두면 됨 (public/ 자체 사용).

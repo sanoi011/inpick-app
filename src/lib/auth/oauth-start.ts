@@ -16,6 +16,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { detectPlatform, openOAuthExternal } from "@/lib/mobile/platform";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import {
+  getReturnPathFromOAuthRedirect,
+  NATIVE_AUTH_RETURN_STORAGE_KEY,
+} from "@/lib/auth/access-policy";
 
 export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
 
@@ -34,6 +38,15 @@ export async function startOAuth(
 ): Promise<{ error?: string }> {
   const platform = detectPlatform();
   const isNative = platform === "ios" || platform === "android";
+  const nativeReturnPath = getReturnPathFromOAuthRedirect(opts.redirectTo);
+
+  if (isNative && typeof window !== "undefined") {
+    try {
+      sessionStorage.setItem(NATIVE_AUTH_RETURN_STORAGE_KEY, nativeReturnPath);
+    } catch {
+      /* private mode: native callback safely falls back to home */
+    }
+  }
 
   // iOS 앱: 애플·구글은 SDK로 직접 로그인(웹뷰 X → Safari '주소 유효하지 않음' 에러 소멸).
   // Android는 AAB(versionCode 1, 2026-07-04)에 네이티브 로그인 플러그인이 없어
@@ -44,13 +57,27 @@ export async function startOAuth(
       provider === "apple"
         ? await signInWithAppleNative(supabase)
         : await signInWithGoogleNative(supabase);
-    if (result.error) return { error: result.error };
+    if (result.error) {
+      try {
+        sessionStorage.removeItem(NATIVE_AUTH_RETURN_STORAGE_KEY);
+      } catch {
+        /* private mode */
+      }
+      return { error: result.error };
+    }
     // 세션 확립됨 — 로그인 완료 계측 (sendBeacon이라 hard nav에도 전송됨)
     trackClientEvent(AnalyticsEvents.LoginCompleted, {
       props: { provider, method: "native_sdk", platform: "ios" },
     });
-    // 홈으로 (미들웨어가 새 쿠키 읽도록 hard nav)
-    if (typeof window !== "undefined") window.location.href = "/";
+    // 인증 시작 화면으로 복귀하고 일회성 경로는 즉시 폐기한다.
+    if (typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem(NATIVE_AUTH_RETURN_STORAGE_KEY);
+      } catch {
+        /* private mode */
+      }
+      window.location.href = nativeReturnPath;
+    }
     return {};
   }
 
@@ -65,7 +92,16 @@ export async function startOAuth(
     },
   });
 
-  if (error) return { error: error.message };
+  if (error) {
+    if (isNative && typeof window !== "undefined") {
+      try {
+        sessionStorage.removeItem(NATIVE_AUTH_RETURN_STORAGE_KEY);
+      } catch {
+        /* private mode */
+      }
+    }
+    return { error: error.message };
+  }
 
   // OAuth 시작 성공 (웹은 redirect 직전, 네이티브는 외부 브라우저 오픈 직전).
   // 완료(login_completed)는 웹: /auth/callback, 네이티브: NativeAuthListener에서 발화.

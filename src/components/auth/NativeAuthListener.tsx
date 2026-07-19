@@ -18,6 +18,8 @@ import { createClient } from "@/lib/supabase/client";
 import { isNativeApp } from "@/lib/mobile/platform";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import { NATIVE_AUTH_RETURN_STORAGE_KEY } from "@/lib/auth/access-policy";
+import { sanitizeAuthReturnPath } from "@/lib/auth/return-path";
 
 /** 딥링크 OAuth 복귀 로그인 완료 계측 — 실패해도 로그인 흐름 무영향 */
 function trackNativeLoginCompleted(user: User | null | undefined) {
@@ -89,8 +91,17 @@ export default function NativeAuthListener() {
               trackNativeLoginCompleted(data?.user ?? data?.session?.user);
             }
             if (!cancelled) {
-              // 세션 확립 후 홈으로 (로그인 상태 반영)
-              window.location.replace("/");
+              let returnPath = "/";
+              try {
+                returnPath = sanitizeAuthReturnPath(
+                  sessionStorage.getItem(NATIVE_AUTH_RETURN_STORAGE_KEY),
+                );
+                sessionStorage.removeItem(NATIVE_AUTH_RETURN_STORAGE_KEY);
+              } catch {
+                /* private mode: safe home fallback */
+              }
+              // 세션 확립 후 로그인 시작 전 화면으로 복귀한다.
+              window.location.replace(returnPath);
             }
           } catch (e) {
             console.error("[native-auth] 콜백 처리 오류:", e);
