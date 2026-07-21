@@ -1,8 +1,8 @@
-import { createHmac } from "node:crypto";
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { Agent, fetch as undiciFetch } from "undici";
 import { applyCors, json } from "../lib/http.js";
+import { hashTossUserKey, tossUserEmail } from "../lib/toss-user.js";
 
 const TOSS_API_ORIGIN = "https://apps-in-toss-api.toss.im";
 
@@ -44,10 +44,8 @@ async function createTokenHash(userKey: string | number): Promise<string> {
   const admin = createClient(supabaseUrl, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  const userKeyHash = createHmac("sha256", hashSecret)
-    .update(`inpick:toss:${String(userKey)}`)
-    .digest("hex");
-  const email = `toss-${userKeyHash.slice(0, 48)}@auth.interiorpick.co.kr`;
+  const userKeyHash = hashTossUserKey(userKey, hashSecret);
+  const email = tossUserEmail(userKey, hashSecret);
   const metadata = {
     provider: "toss",
     toss_user_key_hash: userKeyHash,

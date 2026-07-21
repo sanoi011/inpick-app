@@ -6,6 +6,10 @@
       "destination": "/api/session"
     },
     {
+      "source": "/api/apps-in-toss/unlink",
+      "destination": "/api/unlink"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/proxy?target=:path*"
     }

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { isBlockedBiddingApi, normalizeApiTarget } from "../api/proxy.js";
+import { verifyBasicAuthorization } from "../lib/basic-auth.js";
 import { makeSupabaseSessionCookies } from "../lib/supabase-cookie.js";
+import { tossUserEmail } from "../lib/toss-user.js";
 
 function jwt(payload: Record<string, unknown>, padding = "") {
   return [
@@ -70,4 +72,19 @@ test("all contractor bidding entry points are blocked without blocking estimates
   }
   assert.equal(isBlockedBiddingApi("/api/inpick/build-estimate"), false);
   assert.equal(isBlockedBiddingApi("/api/inpick/render-room"), false);
+});
+
+test("unlink callback Basic authentication uses the console-entered raw value", () => {
+  const expected = "inpick_callback_test_value";
+  const header = `Basic ${Buffer.from(expected, "utf8").toString("base64")}`;
+  assert.equal(verifyBasicAuthorization(header, expected), true);
+  assert.equal(verifyBasicAuthorization(header, `${expected}_wrong`), false);
+  assert.equal(verifyBasicAuthorization("Bearer token", expected), false);
+});
+
+test("Toss user identity is deterministic without exposing the raw user key", () => {
+  const email = tossUserEmail(123456, "test-secret");
+  assert.match(email, /^toss-[a-f0-9]{48}@auth\.interiorpick\.co\.kr$/);
+  assert.doesNotMatch(email, /123456/);
+  assert.equal(email, tossUserEmail(123456, "test-secret"));
 });
