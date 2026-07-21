@@ -1,12 +1,14 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient, type User } from "@supabase/supabase-js";
 import { verifyBasicAuthorization } from "../lib/basic-auth.js";
-import { json } from "../lib/http.js";
+import { applyCors, json } from "../lib/http.js";
 import { tossUserEmail } from "../lib/toss-user.js";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
+  applyCors(response);
+  if (request.method === "OPTIONS") return response.status(204).end();
   if (request.method !== "POST") {
-    response.setHeader("Allow", "POST");
+    response.setHeader("Allow", "POST, OPTIONS");
     return json(response, 405, { error: "METHOD_NOT_ALLOWED" });
   }
 
