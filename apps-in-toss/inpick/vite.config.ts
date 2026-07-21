@@ -22,6 +22,14 @@ export default defineConfig(({ mode }) => {
     publicDir: path.resolve(here, "inpick-source/public"),
     resolve: {
       alias: [
+        {
+          find: "@/components/billing/TokenPurchaseDrawer",
+          replacement: path.resolve(here, "src/payments/TokenPurchaseDrawer.tsx"),
+        },
+        {
+          find: "@/components/payments/EstimatePdfPurchaseModal",
+          replacement: path.resolve(here, "src/payments/EstimatePdfPurchaseModal.tsx"),
+        },
         { find: "@", replacement: inpickSource },
         { find: "next/navigation", replacement: path.resolve(here, "src/adapters/navigation.tsx") },
         { find: "next/link", replacement: path.resolve(here, "src/adapters/navigation.tsx") },

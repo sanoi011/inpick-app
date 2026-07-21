@@ -9,6 +9,12 @@ import { getCurrentMiniAppPath, subscribeMiniAppNavigation } from "./adapters/na
 
 type AuthState = "checking" | "signed_out" | "signing_in" | "ready" | "error";
 
+function hasTossPaymentIdentity(user: {
+  app_metadata?: Record<string, unknown>;
+} | null | undefined) {
+  return !!user?.app_metadata?.toss_user_key_sealed;
+}
+
 function TossLoginGate({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>("checking");
   const [message, setMessage] = useState("");
@@ -24,14 +30,22 @@ function TossLoginGate({ children }: { children: React.ReactNode }) {
     let active = true;
     const supabase = createClient();
 
-    void supabase.auth.getUser().then(({ data }) => {
-      if (active) setState(data.user ? "ready" : "signed_out");
+    void supabase.auth.getUser().then(async ({ data }) => {
+      if (!active) return;
+      if (data.user && hasTossPaymentIdentity(data.user)) {
+        setState("ready");
+        return;
+      }
+      if (data.user) await supabase.auth.signOut();
+      if (active) setState("signed_out");
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (active && session?.user) setState("ready");
+      if (active && session?.user && hasTossPaymentIdentity(session.user)) {
+        setState("ready");
+      }
     });
 
     return () => {

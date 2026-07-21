@@ -10,6 +10,14 @@
       "destination": "/api/unlink"
     },
     {
+      "source": "/api/apps-in-toss/payments/create",
+      "destination": "/api/payment-create"
+    },
+    {
+      "source": "/api/apps-in-toss/payments/execute",
+      "destination": "/api/payment-execute"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/proxy?target=:path*"
     }

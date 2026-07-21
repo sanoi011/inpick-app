@@ -2,7 +2,11 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { createClient } from "@supabase/supabase-js";
 import { Agent, fetch as undiciFetch } from "undici";
 import { applyCors, json } from "../lib/http.js";
-import { hashTossUserKey, tossUserEmail } from "../lib/toss-user.js";
+import {
+  hashTossUserKey,
+  sealTossUserKey,
+  tossUserEmail,
+} from "../lib/toss-user.js";
 
 const TOSS_API_ORIGIN = "https://apps-in-toss-api.toss.im";
 
@@ -35,7 +39,10 @@ async function tossRequest<T>(
   return payload.success;
 }
 
-async function createTokenHash(userKey: string | number): Promise<string> {
+async function createTokenHash(
+  userKey: string | number,
+  referrer: "DEFAULT" | "SANDBOX",
+): Promise<string> {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   const hashSecret = process.env.APPS_IN_TOSS_USER_HASH_SECRET || serviceKey;
@@ -73,6 +80,26 @@ async function createTokenHash(userKey: string | number): Promise<string> {
       options: { data: metadata },
     });
   }
+
+  const user = link.data?.user;
+  if (link.error || !user) throw link.error || new Error("TOSS_USER_NOT_CREATED");
+  const updated = await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: {
+      ...(user.app_metadata || {}),
+      provider: "toss",
+      providers: ["toss"],
+      toss_user_key_sealed: sealTossUserKey(userKey, hashSecret),
+      toss_login_referrer: referrer,
+    },
+  });
+  if (updated.error) throw updated.error;
+
+  // app_metadata 갱신 뒤 새 링크를 발급해 결제 식별 정보가 현재 세션에도 반영되게 한다.
+  link = await admin.auth.admin.generateLink({
+    type: "magiclink",
+    email,
+    options: { data: metadata },
+  });
   const tokenHash = link.data?.properties?.hashed_token;
   if (link.error || !tokenHash) throw link.error || new Error("TOKEN_NOT_CREATED");
   return tokenHash;
@@ -109,7 +136,12 @@ export default async function handler(request: VercelRequest, response: VercelRe
       { method: "GET", accessToken: token.accessToken },
     );
     if (user.userKey == null) throw new Error("USER_KEY_MISSING");
-    return json(response, 200, { tokenHash: await createTokenHash(user.userKey) });
+    return json(response, 200, {
+      tokenHash: await createTokenHash(
+        user.userKey,
+        referrer as "DEFAULT" | "SANDBOX",
+      ),
+    });
   } catch (error) {
     console.error("[inpick-toss-api/session]", error);
     return json(response, 401, { error: "TOSS_LOGIN_FAILED" });

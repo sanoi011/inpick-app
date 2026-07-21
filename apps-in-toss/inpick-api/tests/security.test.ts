@@ -3,7 +3,11 @@ import test from "node:test";
 import { isBlockedBiddingApi, normalizeApiTarget } from "../api/proxy.js";
 import { verifyBasicAuthorization } from "../lib/basic-auth.js";
 import { makeSupabaseSessionCookies } from "../lib/supabase-cookie.js";
-import { tossUserEmail } from "../lib/toss-user.js";
+import {
+  openTossUserKey,
+  sealTossUserKey,
+  tossUserEmail,
+} from "../lib/toss-user.js";
 
 function jwt(payload: Record<string, unknown>, padding = "") {
   return [
@@ -87,4 +91,11 @@ test("Toss user identity is deterministic without exposing the raw user key", ()
   assert.match(email, /^toss-[a-f0-9]{48}@auth\.interiorpick\.co\.kr$/);
   assert.doesNotMatch(email, /123456/);
   assert.equal(email, tossUserEmail(123456, "test-secret"));
+});
+
+test("Toss payment user key is authenticated encryption, not plaintext", () => {
+  const sealed = sealTossUserKey(123456, "test-secret");
+  assert.doesNotMatch(sealed, /123456/);
+  assert.equal(openTossUserKey(sealed, "test-secret"), "123456");
+  assert.throws(() => openTossUserKey(sealed, "wrong-secret"), /INVALID_TOSS_USER_KEY/);
 });
