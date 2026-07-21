@@ -23,6 +23,8 @@ function sha256(file) {
 const tracked = [
   ...walk(path.join(snapshotRoot, "src")),
   ...walk(path.join(snapshotRoot, "public/mode-cards")),
+  ...walk(path.join(snapshotRoot, "public/fonts")),
+  ...walk(path.join(snapshotRoot, "public/legal")),
   path.join(snapshotRoot, "tailwind.config.ts"),
 ].sort();
 

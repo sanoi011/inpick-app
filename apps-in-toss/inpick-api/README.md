@@ -9,3 +9,10 @@
 
 이 프로젝트는 `apps-in-toss/inpick` 클라이언트와 함께 별도 Vercel 프로젝트로 배포한다.
 운영 웹사이트 프로젝트의 코드나 환경변수는 변경하지 않는다.
+
+- Vercel 프로젝트: `inpick-apps-in-toss-api`
+- 운영 URL: `https://inpick-apps-in-toss-api.vercel.app`
+- 검증: `npm run typecheck && npm test`
+
+토스 로그인을 실제로 사용하려면 앱인토스 콘솔에서 워크스페이스 소유자가
+`토스 로그인` 약관에 동의하고 로그인 설정 검토를 요청해야 한다. 이 법적 동의는 코드나 배포 작업에서 대신 수행하지 않는다.

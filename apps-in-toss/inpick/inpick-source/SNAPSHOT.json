@@ -1,8 +1,20 @@
 {
-  "createdAt": "2026-07-21T09:22:37.481Z",
+  "createdAt": "2026-07-21T10:22:39.432Z",
   "source": "App Store / Google Play / web shared InPick workflow",
   "immutableSnapshot": true,
   "sourceFiles": [
+    {
+      "path": "public/fonts/NanumGothic-Bold.ttf",
+      "sha256": "454eb3f503f377782a99eb84fc4bb7dde22a0f075d41b47427737f2985053bc9"
+    },
+    {
+      "path": "public/fonts/NanumGothic-Regular.ttf",
+      "sha256": "10dc859dc65fe34a9e41ce55755605ca76f46170d4e829e17501038981bb2084"
+    },
+    {
+      "path": "public/legal/ftc-standard-contract-10079.pdf",
+      "sha256": "9a223b75cb1928d5ec8c20e177733332a31860f85e5766c761c630a824750682"
+    },
     {
       "path": "public/mode-cards/apartment-drawing-v2.webp",
       "sha256": "ecb39cf19c752407ff8b174258ced06c7c41b14beb1126c4d00b4353f200dae0"

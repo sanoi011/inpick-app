@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
@@ -13,6 +14,7 @@
   "devDependencies": {
     "@types/node": "^20.19.0",
     "@vercel/node": "^5.3.24",
+    "tsx": "^4.20.6",
     "typescript": "^5.9.3"
   }
 }

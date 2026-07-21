@@ -11,10 +11,33 @@ const BLOCKED_BIDDING_APIS = [
   /^\/api\/contractor\/bids(?:\/|$)/,
 ];
 
-function getTarget(request: VercelRequest): string {
-  const raw = request.query.target;
+export function normalizeApiTarget(raw: string | string[] | undefined): string | null {
   const value = Array.isArray(raw) ? raw.join("/") : raw || "";
-  return `/api/${value.replace(/^\/+/, "")}`;
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(value).replace(/^\/+/, "");
+  } catch {
+    return null;
+  }
+  if (
+    !decoded ||
+    decoded.includes("\\") ||
+    decoded.includes("\0") ||
+    decoded.split("/").some((part) => part === "." || part === "..") ||
+    /^[a-z][a-z\d+.-]*:/i.test(decoded)
+  ) {
+    return null;
+  }
+  return `/api/${decoded}`;
+}
+
+function getTarget(request: VercelRequest): string | null {
+  const raw = request.query.target;
+  return normalizeApiTarget(raw);
+}
+
+export function isBlockedBiddingApi(pathname: string): boolean {
+  return BLOCKED_BIDDING_APIS.some((pattern) => pattern.test(pathname));
 }
 
 function requestBody(request: VercelRequest): string | Buffer | undefined {
@@ -30,7 +53,8 @@ export default async function handler(request: VercelRequest, response: VercelRe
   if (request.method === "OPTIONS") return response.status(204).end();
 
   const pathname = getTarget(request);
-  if (BLOCKED_BIDDING_APIS.some((pattern) => pattern.test(pathname))) {
+  if (!pathname) return json(response, 400, { error: "INVALID_API_TARGET" });
+  if (isBlockedBiddingApi(pathname)) {
     return json(response, 404, { error: "FEATURE_NOT_AVAILABLE" });
   }
 
