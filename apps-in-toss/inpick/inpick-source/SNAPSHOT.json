@@ -1,0 +1,459 @@
+{
+  "createdAt": "2026-07-21T09:22:37.481Z",
+  "source": "App Store / Google Play / web shared InPick workflow",
+  "immutableSnapshot": true,
+  "sourceFiles": [
+    {
+      "path": "public/mode-cards/apartment-drawing-v2.webp",
+      "sha256": "ecb39cf19c752407ff8b174258ced06c7c41b14beb1126c4d00b4353f200dae0"
+    },
+    {
+      "path": "public/mode-cards/apartment-drawing.jpg",
+      "sha256": "b8eda3d2c696ae4bb070df3d42d8621c794a8e56f9cac05cc044b54d0405de66"
+    },
+    {
+      "path": "public/mode-cards/photo-commercial-v2.webp",
+      "sha256": "ccfd993c5c8e12e65f7bb68a66e53bbb1fc5fea0d99690857a06b6d18152796f"
+    },
+    {
+      "path": "public/mode-cards/photo-commercial.jpg",
+      "sha256": "f7f1f5febe5f3e009d0b1e4ed0a452a3f8daa8c1fa49be174aa553fbdfba140b"
+    },
+    {
+      "path": "public/mode-cards/photo-residential-v2.webp",
+      "sha256": "68d5e3302b9586266815ab776ea6cdff9ea0a5f042343392b08bebca542714c5"
+    },
+    {
+      "path": "public/mode-cards/photo-residential.jpg",
+      "sha256": "37420baad41ea81e27c64415830b7881c31438570f782dd2f72990cceb72ab0e"
+    },
+    {
+      "path": "src/app/globals.css",
+      "sha256": "b880ece1b758f5eff2024f0e37e1f66d8086cb80323809145c51eacac10dfed5"
+    },
+    {
+      "path": "src/app/workflow/estimate/page.tsx",
+      "sha256": "6962f13d4ded6bad68bb8588117e849f2854ea2910c432d64b72556fbed6fff9"
+    },
+    {
+      "path": "src/app/workflow/page.tsx",
+      "sha256": "981f71ea9b31c671887419e4b76ec7606c0cf0399f4316f24a048f09f5dbe0ac"
+    },
+    {
+      "path": "src/components/billing/TokenPurchaseDrawer.tsx",
+      "sha256": "814f7ad0788cf22718d5b055485d17cb068ebd88d13d2e60865a90a94d2db802"
+    },
+    {
+      "path": "src/components/community/EstimateShareModal.tsx",
+      "sha256": "737053e3d4c4a409d614a65e0698d7eb2c885ac3710fe8e567776df1632d076d"
+    },
+    {
+      "path": "src/components/estimate-pro/EstimateProForm.tsx",
+      "sha256": "2bc42b73de3e747a83341e66dbb7f200c2258a6f1ee80630f4d48c76c238937a"
+    },
+    {
+      "path": "src/components/landing-v4/LenisProvider.tsx",
+      "sha256": "f757338a16e1c136f3097d8d4aee296db671cfd599f9b00b26e5c702734436f5"
+    },
+    {
+      "path": "src/components/payments/EstimatePdfPurchaseModal.tsx",
+      "sha256": "f10a7b41506b8c5a9e7b8e776a4cc24977ae9a5a5186b65dfcbaf0b2b916b91a"
+    },
+    {
+      "path": "src/components/ui/Toast.tsx",
+      "sha256": "1ebf3d63b23a532078055b2985d1adf450a013b14aefdd79a09b5a47d1996cb3"
+    },
+    {
+      "path": "src/components/workflow/BasicInfoCard.tsx",
+      "sha256": "7ff866e0238c233aeefb01139f20227ae5053bc44fef9bb239f08d6fd8551f93"
+    },
+    {
+      "path": "src/components/workflow/ClickableRenderImage.tsx",
+      "sha256": "0a27ac4faa66d8878ee8d2249878be4f10eced033d914f7b538001975cc9bfba"
+    },
+    {
+      "path": "src/components/workflow/MaterialEditor.tsx",
+      "sha256": "0171244f6dd5952a5ee4d3ed4b5eaac9c0607e978a8ec7743870a9ff8ab63a92"
+    },
+    {
+      "path": "src/components/workflow/MaterialShopDrawer.tsx",
+      "sha256": "34998c3f5e1a819db7c7739975cddc0bfeda88b296614ed013f9255c865e3208"
+    },
+    {
+      "path": "src/components/workflow/Notch.tsx",
+      "sha256": "bdcbc957c6794d1e13d40d0b7d2fd6eb8e2143d9b2c30c8c498a98be012d6e25"
+    },
+    {
+      "path": "src/components/workflow/Step1Cards.tsx",
+      "sha256": "65ef0bdfc2d06eeb1ad2b38128253f313b48edd9d1b1af7ce7a4f7463811485f"
+    },
+    {
+      "path": "src/components/workflow/Step2Designer.tsx",
+      "sha256": "dc529731f40aa0acb39ddd3fb709ef567f7811f4c5a0c175918346ed0ca58878"
+    },
+    {
+      "path": "src/components/workflow/TokenBadge.tsx",
+      "sha256": "bb48f48b828ba286819afeb3072a15a61a7ddda362413493721927b67c8ae9b5"
+    },
+    {
+      "path": "src/components/workflow/VisionMaterialPicker.tsx",
+      "sha256": "bfb70ca849660965f29433450b248248a41ea27c5b9d0e2f4a0ff8d2ac8e7973"
+    },
+    {
+      "path": "src/contexts/TokensContext.tsx",
+      "sha256": "0e0fc23e268aabad967305c40732dac8b1fe7c6ba6f4ac1dfc3e0fe4a6736f59"
+    },
+    {
+      "path": "src/hooks/useAuth.ts",
+      "sha256": "4bf63b924264033425ba0ef2c18890e7bb89abc92fc004de831b15633a2e6e75"
+    },
+    {
+      "path": "src/hooks/useSamClient.ts",
+      "sha256": "6771babbcd765fff2614922ddef110ee0d57459b3ba218b4c37273f2903e8702"
+    },
+    {
+      "path": "src/hooks/useTokens.ts",
+      "sha256": "1bdcc62e93dc82fc695532e78205ddd532068f9d98d15f397a962f57430684d6"
+    },
+    {
+      "path": "src/hooks/useVisionMaterials.ts",
+      "sha256": "e6da93eb4908a8cd9674ca8a71571c850ae97fe15655c59885d2add585b6466e"
+    },
+    {
+      "path": "src/lib/analytics/client.ts",
+      "sha256": "76aaa8decb0e8c9c56a871669ac647fffc9014b93c2306606636a36a1d7a9877"
+    },
+    {
+      "path": "src/lib/analytics/events.ts",
+      "sha256": "47ee74e8c959b939e9d1473164c190d03e6afe547e4c6fd20d9ba5249bfe49af"
+    },
+    {
+      "path": "src/lib/auth/access-policy.ts",
+      "sha256": "e0c230961059f0af0ef31efdb7dd25d6ed5787a631e1a22e23fce6c52666b218"
+    },
+    {
+      "path": "src/lib/auth/return-path.ts",
+      "sha256": "bb421dc1e32fc6a988420f5231efff462587ceeff647d06fefc9469610c5aa3e"
+    },
+    {
+      "path": "src/lib/constants/room-segmentation.ts",
+      "sha256": "b57eced56617dbc574cc0175790e29254303d8c35f87140990a880275cdb4d64"
+    },
+    {
+      "path": "src/lib/estimate-pro/cost-model.ts",
+      "sha256": "77f2c26846686aeb420a15d3cd6b00454ffb85a9fd6705fc046e86dea820a1ee"
+    },
+    {
+      "path": "src/lib/estimate-pro/detail-model.ts",
+      "sha256": "6518b63e99f707ac93bfa6db5b3abe75bebce9872a56f0ef90954e2f7a536bba"
+    },
+    {
+      "path": "src/lib/estimate-pro/material-meta.ts",
+      "sha256": "8ca25788cc49b613c80f2c78245fdaa7a960acc6e0ecf9740f08fbc8bfe95337"
+    },
+    {
+      "path": "src/lib/estimate-pro/schedule-model.ts",
+      "sha256": "608049f993e29c30d1540a96419f9de8b2f23b1ab2cfa48efb31ea18554f61f7"
+    },
+    {
+      "path": "src/lib/features.ts",
+      "sha256": "71f2c318162ef2c50fa57dabd51b86fad34e34fb3848152a1c2d1ecdef17b83e"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/adapter.ts",
+      "sha256": "6fbd57910c655ddd77247790ad2abb27fb87696c2e9149725ee06cba05b3a9c5"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/aux-expander.ts",
+      "sha256": "7f538e2e52ae98f3b19e0cc8d9a0ff81b6580abaf26727ba2f7dae674480341e"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/estimate-calculator.ts",
+      "sha256": "52802ee5f46af08e41577da842faadc6639984b30da044e4a3e825d9e8c7da83"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/geometry.ts",
+      "sha256": "42a54602ea5051a2f41ccdf657747048caa7306c510094b2c2347177c346a050"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/quantity-calculator.ts",
+      "sha256": "2698960e38f3ee9164b0e7c687cf1de60170cd45ebc546eaed90f13f54255575"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/surface-calculator.ts",
+      "sha256": "284bb389bf48aa58ea9305862950f9b6cf455ba1a443e474bdfea387371c5f41"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/synthetic-floorplan.ts",
+      "sha256": "2f688e1eddd27088ba0269e14b2643d83ae7805e2b2cb9df315578af67d61d73"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/01-demolition.ts",
+      "sha256": "71563e04e5cabb32e56eae9ea537ccce5d57b7bf65d9c14013cf07e587db6071"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/02-masonry.ts",
+      "sha256": "a4d3baddf9382ceb00891e32cb32086f13be384a667b42fe860129757614a6ef"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/03-plaster.ts",
+      "sha256": "7bd2ab0dd918593abeab3d7c5a732ce25459e0911a7749ba8919916596a17a82"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/04-waterproof.ts",
+      "sha256": "d22c6e53b72cfd4f3cccfa4229a8a296ad94e193868306be80eb29ff00889693"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/05-tile.ts",
+      "sha256": "0b21abfdfa6172b9a48a906d7c76a20db0c5130dcdb20b6c54130d3a061dc10c"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/06-woodwork.ts",
+      "sha256": "6049a95bf4ad774dccfe1ee0ffcba8b859770e23ca35a47fb5a634d51ff21078"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/07-flooring.ts",
+      "sha256": "4e2be572e0887097fa888a87baff3f2eed1428235d22726a9c752175685db3d2"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/08-wallpaper-paint.ts",
+      "sha256": "6e421dfc4987bd75ee69f676b5897c42330b1ee89d8aa37a6dbc73a94a362484"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/09-ceiling.ts",
+      "sha256": "facd7492242da38f77b5a16440f50f2db5f0bd434ade6417ae4b3ec02fc5b6f0"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/10-door-window.ts",
+      "sha256": "85c68e9fd64e3d1ab8feb9213fe9560195b22a9c12d13a520f78f29926ffba42"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/11-hardware.ts",
+      "sha256": "f074cb58b63fed02e7c59d9b51aef0ea04f0da207222ad4bbbeebc65be6cc757"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/12-plumbing.ts",
+      "sha256": "6c3cad9a23375e1c3eca57cfb552b084da0b06d0302b6d97e3ad9c529f6c8292"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/13-sanitary.ts",
+      "sha256": "5e2f045014f9268ea9d5576825508740422f03a09fd5fedb34d8a5e2c040b1ae"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/14-electrical.ts",
+      "sha256": "80488b4a096ec59597d9010e628d6d77fdd6f45834e03f0bccb51bea918baebb"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/15-fixture.ts",
+      "sha256": "248370f71b0f960fa232dd42949c23ee5251b51d3e43efa006cb105529d75358"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/16-baseboard-molding.ts",
+      "sha256": "2d8004415308c978f790bef13919545a1c11f88015ee3c6e6b0bd13a57551255"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/trades/17-cleanup.ts",
+      "sha256": "070c2a5959b7e43d3333da326ca1d49e3eec85fae98503468c0b25cfec3eea8a"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/types.ts",
+      "sha256": "90c46565157e54b1d4c76e5ba8df8b4eaa36f5e3f57619b204b53e01466276f8"
+    },
+    {
+      "path": "src/lib/floor-plan/quantity/unit-price-db.ts",
+      "sha256": "b95aed8495c9faf8870a305203bd9f4d3025a11cda12136ba87e97ecd29b54fc"
+    },
+    {
+      "path": "src/lib/inpick/editable-render/types.ts",
+      "sha256": "31d4b25a1755597d337056b41d3c598a8508590a3c8b9383ca4c7339a2fb3a57"
+    },
+    {
+      "path": "src/lib/inpick/estimate-context/client.ts",
+      "sha256": "2243ab689818ac32cab3fe45f3fc11baa890bca0bcfff9e1ac40ea1c5dfd0ce7"
+    },
+    {
+      "path": "src/lib/inpick/estimate-context/prompt-hints.ts",
+      "sha256": "55ec69d3b8ab2027d773243fcb4eecb1d222a8a71ff2feb302a4c82f3593590a"
+    },
+    {
+      "path": "src/lib/inpick/estimate-context/types.ts",
+      "sha256": "b87f0935159adb49a91fb78f15d5b74a06bb9387369d4a9ed30fc549b1ddc3a3"
+    },
+    {
+      "path": "src/lib/inpick/estimate-documents/pdf/estimate-pdf.ts",
+      "sha256": "038e9318ae52d1361e099cb5107582b3a64ed75495d4f3111677c91a7432ecd4"
+    },
+    {
+      "path": "src/lib/inpick/estimate-documents/pdf/format.ts",
+      "sha256": "762131b4c57725b04921382c9a10dee99c4da62eb5005afe16772ea34ec2766a"
+    },
+    {
+      "path": "src/lib/inpick/estimate-documents/pdf/pages-extra.ts",
+      "sha256": "4b80919c7ad1940bfeb8b9bc8b354813750905ac78d1bbfa993b6a7e08d3535b"
+    },
+    {
+      "path": "src/lib/inpick/estimate-documents/types.ts",
+      "sha256": "9ab640791a752603e341ac37f94047a2746f86212cd0756da73f853ca382e2b4"
+    },
+    {
+      "path": "src/lib/inpick/estimate-precision/precision-level.ts",
+      "sha256": "23f5521e20e545bb3c60ae5ed312b7e9c4bbfe95d016d85e62fa3fc2d4ed5f04"
+    },
+    {
+      "path": "src/lib/inpick/estimate-precision/price-sanity-check.ts",
+      "sha256": "7799a3fa4c89f16f9d7e443f6a65157f9d065ab365dfb0088948cd356e4cdc6c"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/build-construction-estimate.ts",
+      "sha256": "240dcc8459db7e2aa025e935413b1ba5b45360d0bbf405f37628b78db5323b57"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/client-builder.ts",
+      "sha256": "8e436e9b79c9d21b7f998ac7fc7260954d563f739f097722627c9b99836ce5f6"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/commercial-rules.ts",
+      "sha256": "1a593647ba984e8ac52e9eb36395ef8b7c5efee1465b2fa97e5649c6733c4d0a"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/kitchen-plan-builder.ts",
+      "sha256": "3ad71300179b97111ffa71ffa6a04fa21fc0d650d93eef369a880f474c958fc0"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/price-resolver.ts",
+      "sha256": "3d6ee9c5584c6d206eb3fc92344605b7ecde8adee1fb6e10a3ef5450b328ebe7"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/product-resolver.ts",
+      "sha256": "0b3950bd5878adb6a53023810c8242831857d07598407ce0c24b31b0c102ecc2"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/quantity-formulas.ts",
+      "sha256": "cc8e6f62a4771be46b92250f0b5e8ae2c5d89acdf69f3b0cea82ead8a96a6e4d"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/site-condition-answers.ts",
+      "sha256": "5ef25ab1effcf5bf6eca6259cf8d8707bb2ca2128ac8b5b0676ee3016a320855"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/site-condition-pricing.ts",
+      "sha256": "52bd4d57312f9ea5042f390c5f5fc5a75ff64a7be080656f8dbef2711eca4a00"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/surface-plan-builder.ts",
+      "sha256": "3b586e3a6c0fab4acf0494a5c1d5a64b25da0a3f21e6134d5fa54c999dfdab80"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/trades.ts",
+      "sha256": "ebf1f5e289b2b4c53201ec1e037db9f0f17812a9a0def5a73d386b8d89c276e4"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/types.ts",
+      "sha256": "4a86a3e6a86d79bf1b237321f5760cc6cd38371ae6f6771f3a4d9ab35e55d666"
+    },
+    {
+      "path": "src/lib/inpick/estimate-v2/work-package-rules.ts",
+      "sha256": "baa2c1ad20935428e9c51e5957f417a698d1962c4cd621307f700104472e1938"
+    },
+    {
+      "path": "src/lib/inpick/floorplan/normalize-request.ts",
+      "sha256": "deb9b000f6852265c5fca72e979c64416146fbab770c662838e6b23f28cf6d64"
+    },
+    {
+      "path": "src/lib/inpick/korean-apt-dimensions.ts",
+      "sha256": "8e164c0a3d02f8e632c5b17f9501a3118ee3cb24183499c38484570e8298fcd6"
+    },
+    {
+      "path": "src/lib/inpick/lidar-to-floorplan.ts",
+      "sha256": "3b6e4caa5ccb4f9749a2a44b9ef8b37fc59a5f01c267fc5f50a0e822a6d75c66"
+    },
+    {
+      "path": "src/lib/inpick/material-product-category-codes.ts",
+      "sha256": "23d96f56feb19876e3c2ad600e46ef1e057a4cd2a9a115d61adad274015a8ffa"
+    },
+    {
+      "path": "src/lib/inpick/material-product-lookup.ts",
+      "sha256": "75b4bcd65f54a031a441ed5349fb075f629d631aa163251f05d62c2e41cd78b3"
+    },
+    {
+      "path": "src/lib/inpick/material-taxonomy/category-resolver.ts",
+      "sha256": "72c887e5fa152707c24a21a20ff6b823b132747149d0919a6a0dd0292ed6de06"
+    },
+    {
+      "path": "src/lib/inpick/material-taxonomy/category-seed.ts",
+      "sha256": "c9ed28e62a50579b3818e10f7dbfcdd75480fdbce667a5b38d921be7ee15c147"
+    },
+    {
+      "path": "src/lib/inpick/quote-pdf.tsx",
+      "sha256": "2b61b3c53730125c1d69deb6586caeff99530908ae8c52f2bbca2d080ba2328a"
+    },
+    {
+      "path": "src/lib/inpick/render-room-client.ts",
+      "sha256": "aad24039d3b6b9ad8af5c67bb830bfd50f40067b184ead23b607e239155780fa"
+    },
+    {
+      "path": "src/lib/inpick/sam-surface-prompts.ts",
+      "sha256": "c4a851708f367bc6f199cecdde82d183bf63db65e3f65d7099938a4a33a833c3"
+    },
+    {
+      "path": "src/lib/inpick/workflow/project-mode.ts",
+      "sha256": "3f69b3eeda7eec9bca5dc9177097e6225eecebc10fb3367578d907cd4eb8d122"
+    },
+    {
+      "path": "src/lib/inpick/workflow/prompt-room-router.ts",
+      "sha256": "9f5da3ad7414636f097ace5ff9fa6538987b6ad892e52b635b878f5beec8f929"
+    },
+    {
+      "path": "src/lib/mobile/iap.ts",
+      "sha256": "964311a61b9cd1f1924a400ac0d2373dcb8af6a6d8f6d83ab1b8f006b6e883fe"
+    },
+    {
+      "path": "src/lib/mobile/platform.ts",
+      "sha256": "341456caf80614a28416c2f21ec2a8f51a8e810386d561f864e5f9c8a4ef1d10"
+    },
+    {
+      "path": "src/lib/supabase/client.ts",
+      "sha256": "d6de217d366ec861cf758e5f2871c86856710ab4d598b6ba2c07f9a7fe61b4bb"
+    },
+    {
+      "path": "src/lib/vision-materials/price-resolver.ts",
+      "sha256": "367181ddbc02c90a3ecc056ce11bfc403bcff29d53ce7e4e1df9789d4945d22c"
+    },
+    {
+      "path": "src/lib/vision-materials/types.ts",
+      "sha256": "fe5c360d99f42338f8825c845ccbf47110526b2011b35579d0704b6b35dab100"
+    },
+    {
+      "path": "src/types/address.ts",
+      "sha256": "0cf9b89195ff76a8bc91d3c1362d0d0f5bfc324bc689114cfa71f15c36c65044"
+    },
+    {
+      "path": "src/types/community-v2.ts",
+      "sha256": "f57a5b0f5016faef9f9f19c4f357291919c4287d0d93b450073d5c1a1d3b9354"
+    },
+    {
+      "path": "src/types/consumer-project.ts",
+      "sha256": "d32e462c76f911f6ca76cfb85c3a49f53324b7cecc96e7a8add3cec32702a44b"
+    },
+    {
+      "path": "src/types/credits.ts",
+      "sha256": "0d3949e88facac95adba3acd9bb0e72d946166faffa36c3888ab40725dbcf3c1"
+    },
+    {
+      "path": "src/types/floor-plan.ts",
+      "sha256": "d2fe60bb232fef4cdb4a81cfb31021b3db78093561ce4ad5e8e6733958f3e806"
+    },
+    {
+      "path": "src/types/floorplan.ts",
+      "sha256": "992d4d90426cd37af8cfb4c0cb8f113028b7240e3a66746c98d721b9f7f311b6"
+    },
+    {
+      "path": "src/types/segmentation.ts",
+      "sha256": "6ba725a29563ed34fbe6b2ba12b058654a831b2ea41d53048140406198e45976"
+    },
+    {
+      "path": "tailwind.config.ts",
+      "sha256": "69d862e86cedacd75de057dcb3bf041f869b765b65767b3fd7e37c7f09a1fb0c"
+    }
+  ]
+}

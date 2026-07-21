@@ -1,0 +1,18 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "rewrites": [
+    {
+      "source": "/api/apps-in-toss/session",
+      "destination": "/api/session"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/proxy?target=:path*"
+    }
+  ],
+  "functions": {
+    "api/*.ts": {
+      "maxDuration": 300
+    }
+  }
+}
