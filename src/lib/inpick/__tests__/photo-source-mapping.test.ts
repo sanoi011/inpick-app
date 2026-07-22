@@ -18,13 +18,28 @@ test("uploaded photos stay attached to ordered rooms instead of becoming an apar
   assert.equal(mapped.bath?.dataUrl, "data:image/png;base64,bath");
 });
 
-test("one uploaded studio photo is reused as a geometry reference without inventing extra sources", () => {
+test("one uploaded room photo does not leak its geometry into bedroom or bathroom generation", () => {
   const source = { dataUrl: "data:image/jpeg;base64,studio" };
   const mapped = mapPhotoSourcesToRooms({
-    roomKeys: ["living", "kitchen"],
+    roomKeys: ["living", "bedroom", "bath"],
     sourceImages: [source],
   });
 
   assert.equal(mapped.living, source);
-  assert.equal(mapped.kitchen, source);
+  assert.equal(mapped.bedroom, undefined);
+  assert.equal(mapped.bath, undefined);
+});
+
+test("a photo attached while the bathroom tab is active stays bound to bathroom", () => {
+  const bathPhoto = {
+    dataUrl: "data:image/jpeg;base64,bath",
+    targetRoomKey: "bath",
+  };
+  const mapped = mapPhotoSourcesToRooms({
+    roomKeys: ["living", "bedroom", "bath"],
+    sourceImages: [bathPhoto],
+  });
+
+  assert.equal(mapped.living, undefined);
+  assert.equal(mapped.bath, bathPhoto);
 });

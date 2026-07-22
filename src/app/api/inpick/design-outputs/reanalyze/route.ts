@@ -5,7 +5,8 @@
  * 영구히 멈춘 design_outputs를 찾아 분석을 다시 돌린다. analysis_failed도 1회 재시도.
  * (TestFlight 피드백 2026-07-02: "생성된 이미지 분석이 전부 완료되지 않음")
  *
- * 견적 페이지 진입 시 pending이 보이면 자동 호출됨. 직렬 처리, 호출당 최대 8건.
+ * 견적 페이지 진입 시 pending이 보이면 자동 호출됨. 직렬 처리, 호출당 최대 2건.
+ * 서버리스 300초 안에서 끝나도록 작은 청크로 처리하고 클라이언트가 남은 건을 이어 호출한다.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
@@ -19,7 +20,7 @@ export const maxDuration = 300;
 
 // 생성된 지 이 시간이 안 된 pending은 원래 분석이 아직 도는 중일 수 있음 — 건드리지 않음
 const STALE_MS = 90_000;
-const MAX_PER_CALL = 8;
+const MAX_PER_CALL = 2;
 
 function getAdmin() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

@@ -52,6 +52,8 @@ export interface VisionMaterialAnalyzeRequest {
   roomName?: string;
   roomType?: string;
   imageUrl: string;
+  /** 분석 호출용 signed URL과 별개로 DB evidence에 저장할 안정적인 원본 식별자 */
+  sourceImageRef?: string;
   sourceImageKind: SourceImageKind;
   /** 사용자가 클릭한 좌표 (원본 이미지 기준) — 있으면 클릭 주변 우선 분석 */
   clickedPoint?: { x: number; y: number };

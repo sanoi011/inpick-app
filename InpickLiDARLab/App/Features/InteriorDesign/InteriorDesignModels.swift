@@ -19,15 +19,6 @@ enum InteriorStyle: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var promptValue: String {
-        switch self {
-        case .modern: "contemporary modern interior"
-        case .minimal: "calm minimal interior"
-        case .warmNatural: "warm natural interior with wood and soft textures"
-        case .hotel: "refined luxury hotel interior"
-        case .industrial: "polished industrial interior"
-        }
-    }
 }
 
 enum InteriorRoomType: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -49,15 +40,6 @@ enum InteriorRoomType: String, Codable, CaseIterable, Identifiable, Sendable {
         }
     }
 
-    var promptValue: String {
-        switch self {
-        case .livingRoom: "living room"
-        case .bedroom: "bedroom"
-        case .kitchen: "kitchen and dining area"
-        case .office: "small office"
-        case .studio: "compact studio apartment"
-        }
-    }
 }
 
 enum InteriorFinishGrade: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -102,6 +84,9 @@ struct InteriorDesignRecord: Codable, Hashable, Identifiable, Sendable {
     let quote: InteriorQuote
     let generatedImageFileName: String
     let revisedPrompt: String?
+    let model: String?
+    let promptVersion: String?
+    let requestID: String?
 }
 
 struct GenerateInteriorDesignRequest: Codable, Sendable {
@@ -127,4 +112,6 @@ struct GenerateInteriorDesignResponse: Codable, Sendable {
     let mimeType: String
     let revisedPrompt: String?
     let model: String
+    let promptVersion: String?
+    let requestID: String?
 }

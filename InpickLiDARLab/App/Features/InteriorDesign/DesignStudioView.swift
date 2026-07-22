@@ -215,6 +215,18 @@ struct DesignStudioView: View {
                     }
                     .font(InpickTheme.bodyFont(size: 14, weight: .semibold))
                 }
+
+                if let model = latestDesign.model {
+                    Text([model, latestDesign.promptVersion].compactMap { $0 }.joined(separator: " · "))
+                        .font(InpickTheme.bodyFont(size: 11, weight: .medium))
+                        .foregroundStyle(InpickTheme.mutedInk)
+                }
+                if let requestID = latestDesign.requestID {
+                    Text("요청 ID · \(requestID)")
+                        .font(InpickTheme.bodyFont(size: 10).monospaced())
+                        .foregroundStyle(InpickTheme.mutedInk)
+                        .textSelection(.enabled)
+                }
             }
             .inpickCard()
         }

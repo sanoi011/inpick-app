@@ -244,6 +244,11 @@ export interface RenderItem {
     renderSpecKind?: "RenderRoomSpec_v1" | "text_only";
     renderSpecConfidence?: number;
     roomName?: string;
+    model?: string;
+    backend?: string;
+    promptVersion?: string;
+    providerRequestId?: string;
+    projectMode?: "apartment" | "photo_only" | "commercial";
   };
 }
 
@@ -253,6 +258,8 @@ export interface ChatImageAttachment {
   /** Anthropic 전송용 순수 base64 (prefix 제외) */
   base64: string;
   mediaType: "image/jpeg" | "image/png" | "image/webp" | "image/gif";
+  /** 특정 실 탭에서 첨부한 사진은 그 실의 geometry reference로만 사용한다. */
+  targetRoomKey?: string;
   fileName?: string;
 }
 
@@ -457,7 +464,7 @@ export default function Step2Designer({
   const [estimateTransitionProgress, setEstimateTransitionProgress] = useState(0);
   const [estimateTransitionError, setEstimateTransitionError] = useState<string | null>(null);
   const [finalSelectionOpen, setFinalSelectionOpen] = useState(false);
-  const [finalSelectionDraft, setFinalSelectionDraft] = useState<Record<string, number>>({});
+  const [finalSelectionDraft, setFinalSelectionDraft] = useState<Record<string, number | null>>({});
   // 가이드 STEP2-INPUT-ANALYSIS Q3 — 일괄 생성 직렬화 진행률
   const [bulkProgress, setBulkProgress] = useState<{ current: number; total: number; roomLabel: string } | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -499,6 +506,7 @@ export default function Step2Designer({
             dataUrl: image.dataUrl,
             base64: image.base64,
             mediaType: image.mediaType === "image/gif" ? undefined : image.mediaType,
+            targetRoomKey: image.targetRoomKey,
           })),
       }),
     [chatMessages, selectedRoomKeys],
@@ -832,29 +840,45 @@ export default function Step2Designer({
       setEstimateTransitionError("견적에 사용할 디자인 이미지를 먼저 생성해주세요.");
       return;
     }
-    const draft: Record<string, number> = {};
+    const draft: Record<string, number | null> = {};
     for (const room of finalSelectionRooms) {
+      const hasSavedSelection = Object.prototype.hasOwnProperty.call(
+        value.selectedByRoom,
+        room.key,
+      );
       const selected = value.selectedByRoom[room.key];
       draft[room.key] =
-        selected != null && room.renders[selected] ? selected : Math.max(0, room.renders.length - 1);
+        selected != null && room.renders.some((render) => render.selectionIndex === selected)
+          ? selected
+          : hasSavedSelection
+            ? null
+            : room.renders[room.renders.length - 1]?.selectionIndex ?? null;
     }
     setFinalSelectionDraft(draft);
     setEstimateTransitionError(null);
     setFinalSelectionOpen(true);
   };
 
-  const confirmFinalSelection = async (confirmedDraft: Record<string, number>) => {
+  const confirmFinalSelection = async (confirmedDraft: Record<string, number | null>) => {
     const selectedByRoom = { ...value.selectedByRoom };
     const finalSelectedImageUrlsByRoom: Record<string, string> = {};
     for (const room of finalSelectionRooms) {
       const selectedIndex = confirmedDraft[room.key];
-      const render = room.renders[selectedIndex];
+      if (selectedIndex == null) {
+        selectedByRoom[room.key] = null;
+        continue;
+      }
+      const render = room.renders.find((candidate) => candidate.selectionIndex === selectedIndex);
       if (!render) {
-        setEstimateTransitionError(`${room.label}의 최종 이미지를 1장 선택해주세요.`);
+        setEstimateTransitionError(`${room.label}의 선택 이미지를 다시 확인해주세요.`);
         return;
       }
       selectedByRoom[room.key] = selectedIndex;
       finalSelectedImageUrlsByRoom[room.key] = render.refinedUrl || render.url;
+    }
+    if (Object.keys(finalSelectedImageUrlsByRoom).length === 0) {
+      setEstimateTransitionError("견적에 사용할 최종 이미지를 1장 이상 선택해주세요.");
+      return;
     }
     const finalValue: Step2Data = {
       ...value,
@@ -1175,6 +1199,7 @@ export default function Step2Designer({
         body: JSON.stringify({
           sourceImage: sourceUrl.startsWith("data:") ? { dataUrl: sourceUrl } : { url: sourceUrl },
           editPrompt,
+          projectMode: currentProjectMode === "commercial" ? "commercial" : "photo_only",
           preserveGeometry: true,
           targetSurfaces: targetSurfaces.length > 0 ? targetSurfaces : undefined,
           analyzeSurfaces: false,
@@ -1183,6 +1208,9 @@ export default function Step2Designer({
           targetId: roomKey,
           targetNameKo: roomLabel,
           spaceType: roomLabel,
+          residentialType: currentProjectMode === "photo_only" ? photoSpaceType : undefined,
+          businessType: currentProjectMode === "commercial" ? commercialBusiness : undefined,
+          zoneName: currentProjectMode === "commercial" ? roomLabel : undefined,
         }),
       });
       const data = await response.json();
@@ -1196,7 +1224,14 @@ export default function Step2Designer({
         revisedPrompt: data.prompt,
         costUsd: data.costUsd ?? 0.01,
         timestamp: new Date().toISOString(),
-        metadata: sourceRender.metadata,
+        metadata: {
+          ...sourceRender.metadata,
+          model: data.model,
+          backend: data.backend,
+          promptVersion: data.promptVersion,
+          providerRequestId: data.providerRequestId,
+          projectMode: currentProjectMode,
+        },
       };
       const nextRenders = [...roomRenders, editedRender];
       const nextIndex = nextRenders.length - 1;
@@ -1301,7 +1336,12 @@ export default function Step2Designer({
     const userMsg: ChatMessage = {
       role: "user",
       content: userText,
-      images: hasImages ? [...pendingAttachments] : undefined,
+      images: hasImages
+        ? pendingAttachments.map((image) => ({
+            ...image,
+            targetRoomKey: activeRoom === "all" ? undefined : activeRoom,
+          }))
+        : undefined,
     };
     const next = [...chatMessages, userMsg];
     setChatMessages([...next, { role: "assistant", content: "" }]);
@@ -1378,9 +1418,12 @@ export default function Step2Designer({
     }
   };
 
-  // 사진/상가 모드: 도면 없을 때 단일 이미지 생성 (render-photo-style)
-  // MD plan §5-1, §6 — propertyId 없는 사용자가 render-room에 잘못 태워지는 것 차단
-  const handlePhotoStyleGenerate = async (stylePrompt: string) => {
+  // 사진/상가 모드: 첨부 사진이 있으면 구조 보존 edit, 없으면 새 컨셉 이미지 생성.
+  // propertyId 없는 사용자가 render-room에 잘못 태워지는 것을 차단한다.
+  const handlePhotoStyleGenerate = async (
+    stylePrompt: string,
+    unlockImmediately = false,
+  ) => {
     const fallbackKey = activeRoom === "all" ? "living" : activeRoom;
     const fallbackTab = ROOM_TABS.find((tab) => tab.v === fallbackKey);
     const targets = currentProjectMode === "photo_only" && activeRoom === "all"
@@ -1428,16 +1471,19 @@ export default function Step2Designer({
         setBulkProgress(targets.length > 1
           ? { current: index + 1, total: targets.length, roomLabel: targetTab.label }
           : null);
-        const photoSource = currentProjectMode === "photo_only" ? photoSourcesByRoom[targetKey] : undefined;
+        const photoSource = photoSourcesByRoom[targetKey];
         const residentialGuard = photoSpaceType
           ? `${photoSpaceType} 주거 유형과 원본 사진의 구조·개구부·시점·면적감을 유지하고 더 큰 아파트로 바꾸지 마세요. `
+          : "";
+        const commercialGuard = currentProjectMode === "commercial"
+          ? `${commercialBusiness || "상업 공간"} 업종과 ${targetTab.label} 구역의 용도를 유지하고, 원본 사진의 구조·개구부·시점·면적감을 바꾸지 마세요. `
           : "";
         const furnishingOptions = roomFurnishings?.[targetKey] || [];
         const furnishingText = formatPhotoFurnishingRequirements(furnishingOptions).join(", ");
         const requiredPartsPrompt = furnishingText
           ? `필수 부품을 서로 구분해서 보존하세요: ${furnishingText}. `
           : "";
-        const lockedDelivery = targetIsLiving
+        const lockedDelivery = targetIsLiving || unlockImmediately
           ? undefined
           : {
               projectId,
@@ -1459,13 +1505,17 @@ export default function Step2Designer({
                 photoSource
                   ? {
                       sourceImage: photoSource,
-                      editPrompt: `${residentialGuard}${requiredPartsPrompt}${targetTab.label}: ${roomStylePrompt}`,
+                      editPrompt: `${residentialGuard}${commercialGuard}${requiredPartsPrompt}${targetTab.label}: ${roomStylePrompt}`,
+                      projectMode: currentProjectMode === "commercial" ? "commercial" : "photo_only",
                       preserveGeometry: true,
                       analyzeSurfaces: false,
                       projectId,
                       targetId: targetKey,
                       targetNameKo: targetTab.label,
                       spaceType: targetTab.label,
+                      residentialType: currentProjectMode === "photo_only" ? photoSpaceType : undefined,
+                      businessType: currentProjectMode === "commercial" ? commercialBusiness : undefined,
+                      zoneName: currentProjectMode === "commercial" ? targetTab.label : undefined,
                       budgetTier,
                       quality: "low",
                       lockedDelivery,
@@ -1496,6 +1546,13 @@ export default function Step2Designer({
             revisedPrompt: data.prompt,
             costUsd: data.costUsd ?? 0.01,
             timestamp: new Date().toISOString(),
+            metadata: {
+              model: data.model,
+              backend: data.backend,
+              promptVersion: data.promptVersion,
+              providerRequestId: data.providerRequestId,
+              projectMode: currentProjectMode,
+            },
           };
           const roomRenders = [...(next.rendersByRoom[targetKey] || []), item];
           next.rendersByRoom[targetKey] = roomRenders;
@@ -1507,7 +1564,11 @@ export default function Step2Designer({
               targetType: currentProjectMode === "commercial" ? "zone" : "room",
               targetId: targetKey,
               targetName: targetTab.label,
-              renderKind: currentProjectMode === "commercial" ? "zone_render" : "room_render",
+              renderKind: photoSource
+                ? "space_edit"
+                : currentProjectMode === "commercial"
+                  ? "zone_render"
+                  : "room_render",
               imageUrl: data.imageUrl,
               prompt: data.prompt || roomStylePrompt,
             });
@@ -1571,10 +1632,18 @@ export default function Step2Designer({
     }
   };
 
-  const handleGenerate = async (promptOverride?: string) => {
+  const handleGenerate = async (
+    promptOverride?: string,
+    unlockImmediately = false,
+  ) => {
     const promptToUse = (promptOverride ?? currentPrompt).trim();
     if (!promptToUse) {
       setErrorMsg("프롬프트를 입력해주세요. 예: '모던 미니멀, 화이트 + 라이트 우드'");
+      return;
+    }
+    if (workflowEntry === "photo_residential" || workflowEntry === "photo_commercial") {
+      setPrompt("");
+      await handlePhotoStyleGenerate(promptToUse, unlockImmediately);
       return;
     }
     // "전체" 탭에서는 모든 방에 일괄 생성
@@ -1882,7 +1951,7 @@ export default function Step2Designer({
           value.conceptPrompt ||
           currentPrompt.trim() ||
           "거실과 동일한 2026 컨템포러리 인테리어 컨셉";
-        await handleGenerate(prompt);
+        await handleGenerate(prompt, true);
         return;
       }
 
@@ -3312,13 +3381,17 @@ function FinalDesignSelectionModal({
   onConfirm,
 }: {
   rooms: Array<{ key: string; label: string; renders: RenderItem[] }>;
-  selectedByRoom: Record<string, number>;
-  onSelect: (roomKey: string, renderIndex: number) => void;
+  selectedByRoom: Record<string, number | null>;
+  onSelect: (roomKey: string, renderIndex: number | null) => void;
   onClose: () => void;
-  onConfirm: (selectedByRoom: Record<string, number>) => void;
+  onConfirm: (selectedByRoom: Record<string, number | null>) => void;
 }) {
   if (typeof document === "undefined") return null;
-  const ready = rooms.every((room) => room.renders[selectedByRoom[room.key]]);
+  const selectedCount = rooms.filter((room) => {
+    const selectedIndex = selectedByRoom[room.key];
+    return selectedIndex != null && room.renders.some((render) => render.selectionIndex === selectedIndex);
+  }).length;
+  const ready = selectedCount > 0;
 
   return createPortal(
     <>
@@ -3343,7 +3416,7 @@ function FinalDesignSelectionModal({
               견적에 사용할 실별 최종 이미지
             </h2>
             <p className="mt-1 text-xs text-black/48">
-              각 실에서 1장씩 선택하세요. 선택한 이미지만 다음 견적 단계로 전달됩니다.
+              견적에 반영할 실만 최대 1장씩 선택하세요. 선택된 이미지를 다시 누르면 취소됩니다.
             </p>
           </div>
           <button
@@ -3359,9 +3432,20 @@ function FinalDesignSelectionModal({
         <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-7">
           {rooms.map((room) => (
             <section key={room.key}>
-              <div className="mb-2.5 flex items-center justify-between">
+              <div className="mb-2.5 flex items-center justify-between gap-3">
                 <h3 className="text-sm font-semibold text-black">{room.label}</h3>
-                <span className="text-[0.68rem] text-black/38">{room.renders.length}개 시안 · 1장 선택</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[0.68rem] text-black/38">{room.renders.length}개 시안 · 선택은 선택사항</span>
+                  {selectedByRoom[room.key] != null && (
+                    <button
+                      type="button"
+                      onClick={() => onSelect(room.key, null)}
+                      className="rounded-full border border-black/10 px-2.5 py-1 text-[0.68rem] font-semibold text-black/55 hover:bg-black/[0.04]"
+                    >
+                      선택 취소
+                    </button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
                 {room.renders.map((render, renderIndex) => {
@@ -3370,7 +3454,12 @@ function FinalDesignSelectionModal({
                     <button
                       type="button"
                       key={`${render.timestamp}-${renderIndex}`}
-                      onClick={() => onSelect(room.key, render.selectionIndex ?? renderIndex)}
+                      onClick={() =>
+                        onSelect(
+                          room.key,
+                          selected ? null : (render.selectionIndex ?? renderIndex),
+                        )
+                      }
                       aria-pressed={selected}
                       data-testid={`final-design-option-${room.key}-${renderIndex}`}
                       className={`group relative aspect-[4/3] overflow-hidden rounded-2xl border-2 bg-white text-left transition ${
@@ -3402,7 +3491,7 @@ function FinalDesignSelectionModal({
 
         <footer className="flex items-center justify-between gap-3 border-t border-black/[0.07] bg-white px-5 py-4 sm:px-7">
           <p className="hidden text-xs text-black/45 sm:block">
-            {rooms.length}개 실 · 최종 {rooms.length}장
+            {rooms.length}개 실 · 최종 {selectedCount}장
           </p>
           <div className="ml-auto flex gap-2">
             <button

@@ -51,3 +51,5 @@ npm start
 - 서비스 연결 지점: `RoomScannerView`의 완료 콜백→`DesignStudioView`→`POST /v1/designs/generate`
 
 현재 견적은 기능 검증용 시범 단가표입니다. 운영 전에 인픽 파트너 단가, 세금, 철거·설비·폐기물 정책과 실측 확정 단계를 연결해야 합니다.
+
+전체 모드의 프롬프트·API·분석·견적 연결과 운영 점검표는 [`INPICK_WORKFLOW_SIGNAL_AUDIT_2026-07-23.md`](../docs/status/INPICK_WORKFLOW_SIGNAL_AUDIT_2026-07-23.md)를 참고하세요.

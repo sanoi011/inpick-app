@@ -62,6 +62,8 @@ export interface RenderRoomClientResult {
   model?: string;
   backend?: string;
   costUsd?: number;
+  promptVersion?: string;
+  providerRequestId?: string;
   jobId?: string;
   /** sync 응답이면 false. async polling 후 완료면 true. */
   wasAsync: boolean;
@@ -239,6 +241,8 @@ export async function renderRoomViaClient(
       model: postData.model as string | undefined,
       backend: postData.backend as string | undefined,
       costUsd: postData.costUsd as number | undefined,
+      promptVersion: postData.promptVersion as string | undefined,
+      providerRequestId: postData.providerRequestId as string | undefined,
       wasAsync: false,
       metadata: postData.metadata as RenderRoomClientResult["metadata"],
     };
@@ -252,6 +256,8 @@ export async function renderRoomViaClient(
       model: postData.model as string | undefined,
       backend: postData.backend as string | undefined,
       costUsd: postData.costUsd as number | undefined,
+      promptVersion: postData.promptVersion as string | undefined,
+      providerRequestId: postData.providerRequestId as string | undefined,
       jobId: postData.jobId as string | undefined,
       wasAsync: false,
       renderSpec: postData.renderSpec as RenderRoomClientResult["renderSpec"],
@@ -320,6 +326,8 @@ export async function renderRoomViaClient(
         model: pollData.model as string | undefined,
         backend: pollData.backend as string | undefined,
         costUsd: pollData.costUsd as number | undefined,
+        promptVersion: pollData.promptVersion as string | undefined,
+        providerRequestId: pollData.providerRequestId as string | undefined,
         jobId,
         wasAsync: true,
         pollingMs: Date.now() - t0,

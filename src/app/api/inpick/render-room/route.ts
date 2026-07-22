@@ -16,7 +16,10 @@
  *   - 기존 OpenAI path는 backend="openai"로 100% 보존
  */
 import { NextRequest, NextResponse } from "next/server";
-import { type RenderRoomInput } from "@/lib/inpick/openai-client";
+import {
+  ROOM_RENDER_PROMPT_VERSION,
+  type RenderRoomInput,
+} from "@/lib/inpick/openai-client";
 import { hasOpenAIKey } from "@/lib/inpick/openai-env";
 import { renderRoomViaBackend } from "@/lib/inpick/image-backends/select-backend";
 import { getFloorplanUrl, hasFloorplan } from "@/lib/inpick/floorplan-storage";
@@ -185,6 +188,7 @@ export async function POST(req: NextRequest) {
       source: "api",
       props: {
         endpoint: "render-room",
+        prompt_version: ROOM_RENDER_PROMPT_VERSION,
         quality: body.quality ?? "low",
         roomName: body.roomName,
         credit_charged: charge?.charged ?? 0,
@@ -315,6 +319,8 @@ export async function POST(req: NextRequest) {
             endpoint: "render-room",
             backend: result.backend,
             model: result.model,
+            prompt_version: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+            provider_request_id: result.providerRequestId,
             costUsd: result.costUsd,
             latency_ms: Date.now() - startedAt,
             async_mode: true,
@@ -328,6 +334,8 @@ export async function POST(req: NextRequest) {
         imageUrl: result.imageUrl,
         backend: result.backend,
         model: result.model,
+        promptVersion: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+        providerRequestId: result.providerRequestId,
         costUsd: result.costUsd,
         // 호환 — Step2Designer가 imageUrl만 보면 sync 응답으로 처리
         credits_charged: charge?.charged ?? 0,
@@ -369,6 +377,8 @@ export async function POST(req: NextRequest) {
           model_status,
           backend: result.backend,
           model: result.model,
+          prompt_version: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+          provider_request_id: result.providerRequestId,
           refunded,
           latency_ms: Date.now() - startedAt,
         },
@@ -381,6 +391,8 @@ export async function POST(req: NextRequest) {
           model_status,
           backend: result.backend,
           model: result.model,
+          promptVersion: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+          providerRequestId: result.providerRequestId,
           tokenConsumed: !refunded && (charge?.charged ?? 0) > 0,
           refunded,
           // async job 응답 (Phase 2 이후)
@@ -396,11 +408,32 @@ export async function POST(req: NextRequest) {
         result.imageUrl,
         result.revisedPrompt || compiledPrompt || body.style,
       );
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationCompleted,
+        actorType: "consumer",
+        userId: actorUserId,
+        projectId: body.propertyId,
+        projectMode: "apartment",
+        source: "api",
+        props: {
+          endpoint: "render-room",
+          backend: result.backend,
+          model: result.model,
+          prompt_version: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+          provider_request_id: result.providerRequestId,
+          costUsd: result.costUsd,
+          latency_ms: Date.now() - startedAt,
+          credit_charged: charge?.charged ?? 0,
+          locked_delivery: true,
+        },
+      });
       return NextResponse.json({
         asset,
         revisedPrompt: result.revisedPrompt,
         model: result.model,
         backend: result.backend,
+        promptVersion: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+        providerRequestId: result.providerRequestId,
         costUsd: result.costUsd,
         metadata: {
           floorplanUsed: !!floorplanImageUrl,
@@ -441,6 +474,8 @@ export async function POST(req: NextRequest) {
               model_status: "storage_failed",
               backend: result.backend,
               model: result.model,
+              prompt_version: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+              provider_request_id: result.providerRequestId,
               latency_ms: Date.now() - startedAt,
             },
           });
@@ -451,6 +486,8 @@ export async function POST(req: NextRequest) {
                 storageErr instanceof Error ? storageErr.message : String(storageErr),
               backend: result.backend,
               model: result.model,
+              promptVersion: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+              providerRequestId: result.providerRequestId,
             },
             { status: 502 },
           );
@@ -472,6 +509,8 @@ export async function POST(req: NextRequest) {
         endpoint: "render-room",
         backend: result.backend,
         model: result.model,
+        prompt_version: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+        provider_request_id: result.providerRequestId,
         costUsd: result.costUsd,
         latency_ms: Date.now() - startedAt,
         credit_charged: charge?.charged ?? 0,
@@ -484,6 +523,8 @@ export async function POST(req: NextRequest) {
       revisedPrompt: result.revisedPrompt,
       model: result.model,
       backend: result.backend,
+      promptVersion: result.promptVersion || ROOM_RENDER_PROMPT_VERSION,
+      providerRequestId: result.providerRequestId,
       costUsd: result.costUsd,
       jobId: result.jobId,
       credits_charged: charge?.charged ?? 0,

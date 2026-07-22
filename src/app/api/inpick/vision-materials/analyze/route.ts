@@ -64,6 +64,7 @@ function validateRequest(body: unknown): VisionMaterialAnalyzeRequest | string {
     roomName: b.roomName as string | undefined,
     roomType: b.roomType as string | undefined,
     imageUrl: b.imageUrl,
+    sourceImageRef: typeof b.sourceImageRef === "string" ? b.sourceImageRef : undefined,
     sourceImageKind: sourceImageKind as VisionMaterialAnalyzeRequest["sourceImageKind"],
     clickedPoint: b.clickedPoint as { x: number; y: number } | undefined,
     selectedBbox: b.selectedBbox as VisionMaterialAnalyzeRequest["selectedBbox"],
@@ -131,7 +132,7 @@ export async function POST(request: NextRequest) {
     observationToRow(s, {
       projectId: req.projectId,
       roomId: req.roomId,
-      sourceImageUrl: req.imageUrl,
+      sourceImageUrl: req.sourceImageRef || req.imageUrl,
       sourceImageKind: req.sourceImageKind,
     }),
   );
@@ -151,6 +152,13 @@ export async function POST(request: NextRequest) {
       budgetTier: req.budgetTier,
       styleTags: req.styleTags,
       maxCandidates: req.maxCandidates ?? 10,
+    }).catch((error) => {
+      // 한 표면의 카탈로그 검색 실패가 이미지 전체 분석을 실패시키지 않게 한다.
+      console.warn(
+        `[vision-materials/analyze] product retrieval failed for ${obs.surfaceType}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return [];
     });
 
     // Rerank
@@ -159,6 +167,12 @@ export async function POST(request: NextRequest) {
       candidates: rawCandidates,
       topN: 5,
       useVlmRerank: false, // Phase 5 minimal
+    }).catch((error) => {
+      console.warn(
+        `[vision-materials/analyze] rerank failed for ${obs.surfaceType}:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return [];
     });
 
     // candidates 저장 (DB)

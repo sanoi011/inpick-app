@@ -24,8 +24,9 @@ struct InteriorDesignAPIClient: Sendable {
         }
         guard (200..<300).contains(httpResponse.statusCode) else {
             let serverError = try? JSONDecoder().decode(ServerErrorResponse.self, from: data)
+            let requestSuffix = serverError?.requestID.map { " (요청 ID: \($0))" } ?? ""
             throw InteriorDesignAPIError.server(
-                serverError?.error ?? "이미지 생성 서버 오류 (HTTP \(httpResponse.statusCode))"
+                (serverError?.error ?? "이미지 생성 서버 오류 (HTTP \(httpResponse.statusCode))") + requestSuffix
             )
         }
 
@@ -45,6 +46,8 @@ struct InteriorDesignAPIClient: Sendable {
 
 private struct ServerErrorResponse: Decodable {
     let error: String
+    let code: String?
+    let requestID: String?
 }
 
 private struct HealthResponse: Decodable {

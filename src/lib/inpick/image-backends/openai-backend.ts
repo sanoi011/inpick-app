@@ -97,6 +97,8 @@ export class OpenAIBackend implements ImageGenerationBackend {
         backend: "openai",
         model: result.model || DEFAULT_MODEL_ID,
         costUsd: result.costUsd,
+        promptVersion: result.promptVersion,
+        providerRequestId: result.requestId,
         elapsedMs: Date.now() - t0,
       };
     } catch (e) {

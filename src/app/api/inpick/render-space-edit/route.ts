@@ -14,7 +14,7 @@
  * 처리:
  *  1. validation (토큰 차감 전)
  *  2. 토큰 1개 차감
- *  3. OpenAI image edits API (gpt-image-2 → gpt-image-1 폴백)
+ *  3. OpenAI image edits API (gpt-image-2 고정)
  *  4. Supabase Storage 업로드
  *  5. editable_renders DB 생성 (옵션, projectId 있을 때만)
  *  6. analyze 비동기 트리거 — 백그라운드에서 layer 분석
@@ -38,6 +38,12 @@ import {
   type LockedDeliveryRequest,
 } from "@/lib/inpick/locked-design/delivery";
 import { LockedDesignRequestError } from "@/lib/inpick/locked-design/service";
+import { trackServerEventAsync } from "@/lib/analytics/track";
+import { AnalyticsEvents } from "@/lib/analytics/events";
+import {
+  SPACE_EDIT_PROMPT_VERSION,
+  buildSpaceEditPrompt,
+} from "@/lib/inpick/space-edit-prompt";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -53,6 +59,7 @@ interface SourceImage {
 interface RenderSpaceEditBody {
   sourceImage: SourceImage;
   editPrompt: string;
+  projectMode?: "photo_only" | "commercial" | string;
   preserveGeometry?: boolean; // 호환용, 항상 true로 강제
   targetSurfaces?: SurfaceType[];
   /** false면 구형 부위별 자재 분석 파이프라인을 실행하지 않음 */
@@ -63,6 +70,9 @@ interface RenderSpaceEditBody {
   targetId?: string;
   targetNameKo?: string;
   spaceType?: string;
+  residentialType?: string;
+  businessType?: string;
+  zoneName?: string;
   /** 부분 AI 인테리어 전용 모드 — 서버에서 1실 5토큰을 강제 적용 */
   serviceMode?: "partial_ai_room";
   lockedDelivery?: LockedDeliveryRequest;
@@ -89,47 +99,15 @@ async function fetchSourceBuffer(src: SourceImage): Promise<{ buf: Buffer; type:
   throw new Error("sourceImage가 비어있습니다");
 }
 
-function buildEditPrompt(b: RenderSpaceEditBody): string {
-  const lines: string[] = [];
-  lines.push("Preserve the original room geometry, perspective, viewpoint, walls, openings, and major fixtures.");
-  lines.push("Do NOT alter the layout or camera angle.");
-  lines.push("");
-  lines.push("Apply the following interior changes while keeping the structural composition intact:");
-  lines.push(b.editPrompt);
-
-  if (b.budgetTier) {
-    const tier = {
-      basic: "Budget-friendly materials (vinyl, painted finishes, basic LED).",
-      standard: "Mid-range materials (engineered wood or LVT, accent wall, layered lighting).",
-      premium: "Premium materials (natural stone or wide-plank wood, designer fixtures, indirect lighting).",
-    }[b.budgetTier];
-    if (tier) {
-      lines.push("");
-      lines.push("BUDGET TIER:");
-      lines.push(tier);
-    }
-  }
-
-  if (b.targetSurfaces && b.targetSurfaces.length > 0) {
-    lines.push("");
-    lines.push("TARGET SURFACES TO RESTYLE:");
-    lines.push("- " + b.targetSurfaces.join(", "));
-  }
-
-  lines.push("");
-  lines.push("CONSTRAINTS:");
-  lines.push("- Keep the same room dimensions, ceiling height, and door/window positions.");
-  lines.push("- Same camera angle, lens, and lighting direction.");
-  lines.push("- No watermarks, no text overlays, no logos.");
-
-  return lines.join("\n");
-}
-
 export async function POST(req: NextRequest) {
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
+  const startedAt = Date.now();
+  let analyticsMode: "photo_only" | "commercial" = "photo_only";
+  let providerRequestId: string | null = null;
   try {
     const body = (await req.json()) as RenderSpaceEditBody;
     const lockedDelivery = await prepareLockedDelivery(body.lockedDelivery);
+    analyticsMode = body.projectMode === "commercial" ? "commercial" : "photo_only";
 
     // ─── validation (토큰 차감 전) ─────────────────────
     if (!body.sourceImage || (!body.sourceImage.dataUrl && !body.sourceImage.url && !body.sourceImage.base64)) {
@@ -141,6 +119,22 @@ export async function POST(req: NextRequest) {
     if (!body.editPrompt || body.editPrompt.trim().length < 5) {
       return NextResponse.json(
         { error: "missing_edit_prompt", hint: "editPrompt가 5자 이상 필요합니다." },
+        { status: 400 },
+      );
+    }
+    if (body.editPrompt.length > 4_000) {
+      return NextResponse.json(
+        { error: "edit_prompt_too_long", hint: "editPrompt는 4,000자 이하여야 합니다." },
+        { status: 400 },
+      );
+    }
+    if (
+      body.projectMode &&
+      body.projectMode !== "photo_only" &&
+      body.projectMode !== "commercial"
+    ) {
+      return NextResponse.json(
+        { error: "mode_mismatch", hint: "사진 편집 모드는 photo_only 또는 commercial이어야 합니다." },
         { status: 400 },
       );
     }
@@ -199,9 +193,27 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
+    trackServerEventAsync({
+      eventName: AnalyticsEvents.ImageGenerationRequested,
+      actorType: "consumer",
+      userId: actorUserId,
+      projectId: body.projectId,
+      projectMode: analyticsMode,
+      source: "api",
+      props: {
+        endpoint: "render-space-edit",
+        model: "gpt-image-2",
+        prompt_version: SPACE_EDIT_PROMPT_VERSION,
+        quality: body.quality ?? "low",
+        businessType: body.businessType,
+        zoneName: body.zoneName,
+        credit_charged: charge?.charged ?? 0,
+      },
+    });
+
     // ─── source image 로드 ────────────────────
     const { buf, type } = await fetchSourceBuffer(body.sourceImage);
-    const compiledPrompt = buildEditPrompt(body);
+    const compiledPrompt = buildSpaceEditPrompt(body);
     const apiKey = getOpenAIKey()!;
     const size = "1024x1024";
     const quality = body.quality || "low";
@@ -214,12 +226,12 @@ export async function POST(req: NextRequest) {
     let usedModel = "";
     const errors: string[] = [];
     try {
-      for (const modelName of ["gpt-image-2", "gpt-image-1"]) {
-        // 모델 혼잡(429/5xx)은 같은 모델을 한 번 재시도한 뒤 다음 모델로 자동 폴백한다.
+      for (const modelName of ["gpt-image-2"]) {
+        // 모델 혼잡(429/5xx)은 같은 모델을 한 번 재시도하되 구형 모델로 하향하지 않는다.
         for (let attempt = 0; attempt < 2; attempt += 1) {
           const form = new FormData();
           form.append("model", modelName);
-          form.append("image", new Blob([new Uint8Array(buf)], { type }), "source.png");
+          form.append("image[]", new Blob([new Uint8Array(buf)], { type }), "source.png");
           form.append("prompt", compiledPrompt);
           form.append("size", size);
           form.append("quality", quality);
@@ -230,6 +242,7 @@ export async function POST(req: NextRequest) {
             body: form,
             signal: controller.signal,
           });
+          providerRequestId = res.headers.get("x-request-id") || providerRequestId;
           if (res.ok) {
             const data = await res.json();
             const b64 = data.data?.[0]?.b64_json;
@@ -282,6 +295,22 @@ export async function POST(req: NextRequest) {
           "openai-failed:render-space-edit",
         ).catch(() => {});
       }
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: actorUserId,
+        projectId: body.projectId,
+        projectMode: analyticsMode,
+        source: "api",
+        props: {
+          endpoint: "render-space-edit",
+          model: "gpt-image-2",
+          model_status: providerBusy ? "provider_busy" : "provider_error",
+          prompt_version: SPACE_EDIT_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
+          latency_ms: Date.now() - startedAt,
+        },
+      });
       return NextResponse.json(
         {
           error: providerBusy ? "provider_busy" : "provider_error",
@@ -289,6 +318,8 @@ export async function POST(req: NextRequest) {
             ? "이미지 생성 서버가 혼잡합니다. 사용한 토큰은 자동 환불됐으며 잠시 후 다시 시도해주세요."
             : "이미지 생성에 실패했습니다. 사용한 토큰은 자동 환불됐습니다.",
           details: errors.join(" | "),
+          providerRequestId,
+          promptVersion: SPACE_EDIT_PROMPT_VERSION,
         },
         { status: 502 },
       );
@@ -296,15 +327,37 @@ export async function POST(req: NextRequest) {
 
     // ─── Storage 업로드 ──────────────────
     const dataUrl = `data:image/png;base64,${imageBase64}`;
+    const trackCompleted = () => {
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationCompleted,
+        actorType: "consumer",
+        userId: actorUserId,
+        projectId: body.projectId,
+        projectMode: analyticsMode,
+        source: "api",
+        props: {
+          endpoint: "render-space-edit",
+          model: usedModel,
+          prompt_version: SPACE_EDIT_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
+          costUsd: costMap[quality] ?? 0.01,
+          latency_ms: Date.now() - startedAt,
+          credit_charged: charge?.charged ?? 0,
+        },
+      });
+    };
     if (lockedDelivery) {
       const asset = await completeLockedDelivery(lockedDelivery, dataUrl, compiledPrompt);
+      trackCompleted();
       return NextResponse.json({
         asset,
         prompt: compiledPrompt,
         model: usedModel,
         backend: "openai",
+        promptVersion: SPACE_EDIT_PROMPT_VERSION,
+        providerRequestId,
         costUsd: costMap[quality] ?? 0.01,
-        mode: "photo_only",
+        mode: analyticsMode,
         preserveGeometry: true,
       });
     }
@@ -324,7 +377,7 @@ export async function POST(req: NextRequest) {
         projectId: body.projectId,
         targetId: body.targetId,
         targetNameKo: body.targetNameKo,
-        projectMode: "residential",
+        projectMode: analyticsMode === "commercial" ? "commercial" : "residential",
         imageUrl: storedUrl,
         imageWidth: 1024,
         imageHeight: 1024,
@@ -341,7 +394,7 @@ export async function POST(req: NextRequest) {
         body: JSON.stringify({
           projectId: body.projectId,
           imageUrl: storedUrl,
-          projectMode: "residential",
+          projectMode: analyticsMode === "commercial" ? "commercial" : "residential",
           targetId: body.targetId,
           targetNameKo: body.targetNameKo,
           targetSurfaceTypes: body.targetSurfaces ?? ["floor", "wall", "ceiling", "window", "door"],
@@ -349,13 +402,16 @@ export async function POST(req: NextRequest) {
       }).catch((err) => console.warn("[render-space-edit] analyze trigger failed:", err));
     }
 
+    trackCompleted();
     return NextResponse.json({
       imageUrl: storedUrl,
       prompt: compiledPrompt,
       model: usedModel,
       backend: "openai",
+      promptVersion: SPACE_EDIT_PROMPT_VERSION,
+      providerRequestId,
       costUsd: costMap[quality] ?? 0.01,
-      mode: "photo_only",
+      mode: analyticsMode,
       editableRenderId,
       preserveGeometry: true,
       creditsCharged: charge?.charged ?? 0,
@@ -372,7 +428,30 @@ export async function POST(req: NextRequest) {
         charge.charged,
         `internal:render-space-edit:${msg.slice(0, 80)}`,
       ).catch(() => {});
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationFailed,
+        actorType: "consumer",
+        userId: charge.userId,
+        projectMode: analyticsMode,
+        source: "api",
+        props: {
+          endpoint: "render-space-edit",
+          model: "gpt-image-2",
+          prompt_version: SPACE_EDIT_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
+          error: msg.slice(0, 200),
+          latency_ms: Date.now() - startedAt,
+        },
+      });
     }
-    return NextResponse.json({ error: "internal_error", hint: msg }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "internal_error",
+        hint: msg,
+        providerRequestId,
+        promptVersion: SPACE_EDIT_PROMPT_VERSION,
+      },
+      { status: 500 },
+    );
   }
 }

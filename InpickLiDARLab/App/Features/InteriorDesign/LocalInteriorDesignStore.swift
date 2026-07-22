@@ -51,7 +51,10 @@ final class LocalInteriorDesignStore: ObservableObject {
             brief: brief,
             quote: quote,
             generatedImageFileName: fileName,
-            revisedPrompt: response.revisedPrompt
+            revisedPrompt: response.revisedPrompt,
+            model: response.model,
+            promptVersion: response.promptVersion,
+            requestID: response.requestID
         )
         records.insert(record, at: 0)
         do {

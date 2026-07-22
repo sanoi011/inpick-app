@@ -6,6 +6,32 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { DesignOutput, MaterialHint } from "./types";
+import { createLockedDesignSignedUrl } from "@/lib/inpick/storage/image-storage";
+
+const LOCKED_IMAGE_PREFIX = "locked-design:";
+
+async function resolveAnalysisImageUrl(
+  admin: SupabaseClient,
+  output: DesignOutput,
+): Promise<string> {
+  if (!output.imageUrl.startsWith(LOCKED_IMAGE_PREFIX)) return output.imageUrl;
+
+  const assetId = output.imageUrl.slice(LOCKED_IMAGE_PREFIX.length);
+  const { data, error } = await admin
+    .from("locked_design_assets")
+    .select("storage_bucket, original_storage_path")
+    .eq("id", assetId)
+    .eq("project_id", output.projectId)
+    .eq("user_id", output.userId)
+    .maybeSingle();
+  if (error || !data?.original_storage_path) {
+    throw new Error(`LOCKED_ANALYSIS_IMAGE_NOT_FOUND: ${assetId}`);
+  }
+  if (data.storage_bucket && data.storage_bucket !== "private-design-renders") {
+    throw new Error("LOCKED_ANALYSIS_BUCKET_MISMATCH");
+  }
+  return createLockedDesignSignedUrl(admin, data.original_storage_path, 600);
+}
 
 export async function runVisionAnalysisForOutput(opts: {
   admin: SupabaseClient;
@@ -24,6 +50,7 @@ export async function runVisionAnalysisForOutput(opts: {
   try {
     // Step 2: vision-materials/analyze 호출 (서버-내부 호출, 인증 쿠키 그대로 전달)
     const targetSurfaceTypes = inferTargetSurfaceTypes(output);
+    const analysisImageUrl = await resolveAnalysisImageUrl(admin, output);
     const analyzeRes = await fetch(`${origin}/api/inpick/vision-materials/analyze`, {
       method: "POST",
       headers: {
@@ -34,7 +61,8 @@ export async function runVisionAnalysisForOutput(opts: {
         projectId: output.projectId,
         roomId: output.targetId,
         roomName: output.targetName,
-        imageUrl: output.imageUrl,
+        imageUrl: analysisImageUrl,
+        sourceImageRef: output.imageUrl,
         sourceImageKind: "ai_render",
         targetSurfaceTypes,
         maxCandidates: 5,
@@ -111,6 +139,7 @@ export async function runVisionAnalysisForOutput(opts: {
       .update({
         status: "analysis_done",
         material_hints: mergedHints,
+        analysis_error: null,
       })
       .eq("id", output.id);
     return "done";

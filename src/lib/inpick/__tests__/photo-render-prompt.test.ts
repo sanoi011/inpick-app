@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildPhotoRenderPrompt } from "../photo-render-prompt";
+import {
+  PHOTO_RENDER_PROMPT_VERSION,
+  buildPhotoRenderPrompt,
+} from "../photo-render-prompt";
 
 test("officetel photo mode cannot silently fall back to an apartment typology", () => {
   const prompt = buildPhotoRenderPrompt({
@@ -21,6 +24,7 @@ test("officetel photo mode cannot silently fall back to an apartment typology", 
   assert.match(prompt, /하부장/);
   assert.match(prompt, /냉장고장/);
   assert.match(prompt, /김치냉장고장/);
+  assert.match(prompt, new RegExp(PHOTO_RENDER_PROMPT_VERSION));
 });
 
 test("commercial photo mode keeps business and zone identity", () => {

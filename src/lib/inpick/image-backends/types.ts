@@ -131,6 +131,8 @@ export interface RenderRoomResult {
   model: string;
   costUsd?: number;
   elapsedMs?: number;
+  promptVersion?: string;
+  providerRequestId?: string;
 
   // 실패
   error?: string;

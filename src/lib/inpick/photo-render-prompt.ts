@@ -12,6 +12,8 @@ export interface PhotoRenderPromptInput {
   furnishingOptions?: string[];
 }
 
+export const PHOTO_RENDER_PROMPT_VERSION = "inpick-photo-render-v1";
+
 const FURNISHING_LABELS: Record<string, string> = {
   sinkUpper: "상부장 (upper cabinets)",
   sinkLower: "하부장 (lower cabinets)",
@@ -38,6 +40,8 @@ const RESIDENTIAL_TYPE_PROMPTS: Record<string, string> = {
 
 export function buildPhotoRenderPrompt(b: PhotoRenderPromptInput): string {
   const lines: string[] = [
+    `[INPICK PROMPT ${PHOTO_RENDER_PROMPT_VERSION}]`,
+    "",
     "Photorealistic Korean interior concept image, 8K, magazine quality.",
   ];
 

@@ -6,7 +6,7 @@
  * 가이드: c:\Users\user\Desktop\inpick-mode-separated-ai-pipeline-dev-plan-20260512.md §5-1
  *
  * 입력:
- *  - stylePrompt (required) — Claude Vision으로 참고사진/대화에서 추출된 영문 스타일 키워드
+ *  - stylePrompt (required) — 상담/참고사진에서 추출된 스타일 지시
  *  - projectMode: "photo_only" | "commercial"
  *  - areaM2 / pyung, spaceType, businessType, zoneName, budgetTier (optional)
  *
@@ -24,7 +24,10 @@ import {
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
-import { buildPhotoRenderPrompt } from "@/lib/inpick/photo-render-prompt";
+import {
+  PHOTO_RENDER_PROMPT_VERSION,
+  buildPhotoRenderPrompt,
+} from "@/lib/inpick/photo-render-prompt";
 import {
   completeLockedDelivery,
   prepareLockedDelivery,
@@ -58,6 +61,7 @@ export async function POST(req: NextRequest) {
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
   const startedAt = Date.now();
   let analyticsMode: "photo_only" | "commercial" = "photo_only";
+  let providerRequestId: string | null = null;
   try {
     const body = (await req.json()) as RenderPhotoStyleBody;
     const lockedDelivery = await prepareLockedDelivery(body.lockedDelivery);
@@ -157,6 +161,8 @@ export async function POST(req: NextRequest) {
       source: "api",
       props: {
         endpoint: "render-photo-style",
+        model: "gpt-image-2",
+        prompt_version: PHOTO_RENDER_PROMPT_VERSION,
         quality: body.quality ?? "low",
         businessType: body.businessType,
         credit_charged: charge?.charged ?? 0,
@@ -192,6 +198,7 @@ export async function POST(req: NextRequest) {
           }),
           signal: controller.signal,
         });
+        providerRequestId = res.headers.get("x-request-id") || providerRequestId;
         if (res.ok) {
           const data = await res.json();
           const b64 = data.data?.[0]?.b64_json;
@@ -225,6 +232,8 @@ export async function POST(req: NextRequest) {
         props: {
           endpoint: "render-photo-style",
           model_status: "provider_error",
+          prompt_version: PHOTO_RENDER_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
           latency_ms: Date.now() - startedAt,
         },
       });
@@ -233,6 +242,8 @@ export async function POST(req: NextRequest) {
           error: "provider_error",
           hint: "이미지 생성에 실패했습니다. 잠시 후 다시 시도해주세요.",
           details: errors.join(" | "),
+          providerRequestId,
+          promptVersion: PHOTO_RENDER_PROMPT_VERSION,
         },
         { status: 502 },
       );
@@ -240,13 +251,34 @@ export async function POST(req: NextRequest) {
 
     // ─── Storage 업로드 ───────────────────────────────────
     const dataUrl = `data:image/png;base64,${imageBase64}`;
+    const trackCompleted = () => {
+      trackServerEventAsync({
+        eventName: AnalyticsEvents.ImageGenerationCompleted,
+        actorType: "consumer",
+        userId: actorUserId,
+        projectMode: analyticsMode,
+        source: "api",
+        props: {
+          endpoint: "render-photo-style",
+          model: usedModel,
+          prompt_version: PHOTO_RENDER_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
+          costUsd: costMap[quality] ?? 0.01,
+          latency_ms: Date.now() - startedAt,
+          credit_charged: charge?.charged ?? 0,
+        },
+      });
+    };
     if (lockedDelivery) {
       const asset = await completeLockedDelivery(lockedDelivery, dataUrl, compiledPrompt);
+      trackCompleted();
       return NextResponse.json({
         asset,
         prompt: compiledPrompt,
         model: usedModel,
         backend: "openai",
+        promptVersion: PHOTO_RENDER_PROMPT_VERSION,
+        providerRequestId,
         costUsd: costMap[quality] ?? 0.01,
         mode: body.projectMode || "photo_only",
       });
@@ -264,26 +296,15 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── 이미지 생성 성공 계측 ──
-    trackServerEventAsync({
-      eventName: AnalyticsEvents.ImageGenerationCompleted,
-      actorType: "consumer",
-      userId: charge?.userId,
-      projectMode: analyticsMode,
-      source: "api",
-      props: {
-        endpoint: "render-photo-style",
-        model: usedModel,
-        costUsd: costMap[quality] ?? 0.01,
-        latency_ms: Date.now() - startedAt,
-        credit_charged: charge?.charged ?? 0,
-      },
-    });
+    trackCompleted();
 
     return NextResponse.json({
       imageUrl: storedUrl,
       prompt: compiledPrompt,
       model: usedModel,
       backend: "openai",
+      promptVersion: PHOTO_RENDER_PROMPT_VERSION,
+      providerRequestId,
       costUsd: costMap[quality] ?? 0.01,
       mode: body.projectMode || "photo_only",
     });
@@ -305,13 +326,20 @@ export async function POST(req: NextRequest) {
         props: {
           endpoint: "render-photo-style",
           model_status: "unknown",
+          prompt_version: PHOTO_RENDER_PROMPT_VERSION,
+          provider_request_id: providerRequestId,
           error: msg.slice(0, 200),
           latency_ms: Date.now() - startedAt,
         },
       });
     }
     return NextResponse.json(
-      { error: "internal_error", hint: msg },
+      {
+        error: "internal_error",
+        hint: msg,
+        providerRequestId,
+        promptVersion: PHOTO_RENDER_PROMPT_VERSION,
+      },
       { status: 500 },
     );
   }

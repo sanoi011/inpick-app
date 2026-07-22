@@ -155,6 +155,26 @@ function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2
   return `${projectId}-${(hash >>> 0).toString(36)}`;
 }
 
+/**
+ * 최종 선택 모달을 확정한 뒤에는 선택된 1장만 견적 프롬프트 증거로 사용한다.
+ * 선택 취소한 실은 시공 범위에서는 유지하되 이미지·프롬프트 근거는 비운다.
+ */
+function selectedRendersForEstimate(step2: Step2Data): Step2Data["rendersByRoom"] {
+  if (!step2.finalSelectionConfirmedAt) return step2.rendersByRoom || {};
+
+  const finalUrls = step2.finalSelectedImageUrlsByRoom || {};
+  return Object.fromEntries(
+    Object.entries(step2.rendersByRoom || {}).map(([roomKey, renders]) => {
+      const finalUrl = finalUrls[roomKey];
+      if (!finalUrl) return [roomKey, []];
+      const selected = (renders || []).find(
+        (render) => (render.refinedUrl || render.url) === finalUrl,
+      );
+      return [roomKey, selected ? [selected] : []];
+    }),
+  );
+}
+
 function selectedMaterialsForRoom(
   step2: Step2Data,
   roomId?: string,
@@ -705,7 +725,9 @@ function EstimatePage() {
         targetId: roomKey,
         targetName: ROOM_NAME_MAP[roomKey] || roomKey,
         imageUrl,
-        sourceImageUrl: render?.url,
+        sourceImageUrl: render?.lockedAssetId
+          ? `locked-design:${render.lockedAssetId}`
+          : render?.url,
         prompt: render?.revisedPrompt || render?.prompt,
       }];
     });
@@ -805,7 +827,9 @@ function EstimatePage() {
     let stopped = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     let ticks = 0;
-    let reanalyzeRequested = false;
+    let reanalyzeInFlight = false;
+    let reanalyzeRounds = 0;
+    const MAX_REANALYZE_ROUNDS = 4;
     const MAX_ANALYSIS_TICKS = 45; // 약 3분 (4초 × 45) — 재분석 시간 포함, 무한 '진행 중' 방지
 
     const tick = async () => {
@@ -821,14 +845,32 @@ function EstimatePage() {
         else if (o.status === "analysis_done") counts.done++;
         else if (o.status === "analysis_failed") counts.failed++;
       }
-      // 멈춘 분석(analysis_pending 영구 정체·실패) 자동 재실행 — 페이지 진입당 1회
-      if ((counts.pending > 0 || counts.failed > 0) && !reanalyzeRequested) {
-        reanalyzeRequested = true;
-        void fetch("/api/inpick/design-outputs/reanalyze", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId }),
-        }).catch(() => {});
+      const staleBefore = Date.now() - 90_000;
+      const hasRetryableOutput = outputs.some(
+        (output) =>
+          output.status === "analysis_failed" ||
+          ((output.status === "generated" || output.status === "analysis_pending") &&
+            new Date(output.createdAt).getTime() < staleBefore),
+      );
+      // 서버리스 제한을 피하려고 2건씩 재분석하고, 남은 건은 다음 polling tick에서 이어간다.
+      if (
+        hasRetryableOutput &&
+        !reanalyzeInFlight &&
+        reanalyzeRounds < MAX_REANALYZE_ROUNDS
+      ) {
+        reanalyzeInFlight = true;
+        reanalyzeRounds += 1;
+        try {
+          await fetch("/api/inpick/design-outputs/reanalyze", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ projectId }),
+          });
+        } catch {
+          // 다음 polling tick에서 재시도한다.
+        } finally {
+          reanalyzeInFlight = false;
+        }
       }
       ticks++;
       // 일정 시간 내 정밀 분석이 끝나지 않으면 남은 항목을 표준값으로 확정(폴링 종료).
@@ -849,7 +891,8 @@ function EstimatePage() {
       );
       // pending(또는 재분석 중인 실패 건)이 남아있으면 4초 후 재조회
       const stillWorking =
-        counts.pending > 0 || (reanalyzeRequested && counts.failed > 0 && ticks < MAX_ANALYSIS_TICKS);
+        counts.pending > 0 ||
+        (counts.failed > 0 && reanalyzeRounds < MAX_REANALYZE_ROUNDS && ticks < MAX_ANALYSIS_TICKS);
       if (stillWorking && !stopped) {
         timer = setTimeout(() => void tick(), 4000);
       }
@@ -1096,6 +1139,7 @@ function EstimatePage() {
       // photo_commercial → commercial 가견적 (zone×업종×등급+설비)
       // apartment_drawing → 기존 17공종 자재 견적
       const area = s1.basicInfo.selectedPyeong?.exclusiveArea;
+      const evidenceRendersByRoom = selectedRendersForEstimate(s2);
 
       if (s1.workflowEntry === "photo_residential") {
         if (!area) {
@@ -1131,7 +1175,7 @@ function EstimatePage() {
         try {
           const photoRooms = buildPhotoEstimateRooms({
             totalAreaM2: area || 79.3,
-            rendersByRoom: s2.rendersByRoom || {},
+            rendersByRoom: evidenceRendersByRoom,
             requestedRoomKeys: s1.rooms || [],
           });
           const clientEstimate = buildConstructionEstimateClientSide({
@@ -1168,7 +1212,7 @@ function EstimatePage() {
         // 기본 비율 분배 (사용자가 ZoneEditor에서 수정 안 했으면)
         const totalAreaM2 = area || 100;
         // Step2의 rendersByRoom 키를 zone으로 사용
-        const zonesFromRenders = Object.keys(s2.rendersByRoom || {}).filter(
+        const zonesFromRenders = Object.keys(evidenceRendersByRoom).filter(
           (k) => k !== "all",
         );
         const zoneInputs = (zonesFromRenders.length > 0
@@ -1197,7 +1241,7 @@ function EstimatePage() {
         // P7-FIX: commercial도 17공종 client v2 빌드 (zone별)
         try {
           const zoneRooms = zoneInputs.map((z) => {
-            const prompts = (s2.rendersByRoom?.[z.id] || [])
+            const prompts = (evidenceRendersByRoom[z.id] || [])
               .map((r) => r.revisedPrompt || r.prompt)
               .filter(Boolean) as string[];
             return {
@@ -1254,8 +1298,8 @@ function EstimatePage() {
       } else {
         // P0 폴백: Step1 방 선택 없으면 Step2에서 이미지 생성된 방 키로
         // (= 사용자가 실제 시공하려는 공간 = 이미지 만든 공간)
-        const generatedKeys = Object.keys(s2.rendersByRoom || {}).filter(
-          (k) => k !== "all" && k in ROOM_NAME_MAP && (s2.rendersByRoom[k]?.length ?? 0) > 0,
+        const generatedKeys = Object.keys(evidenceRendersByRoom).filter(
+          (k) => k !== "all" && k in ROOM_NAME_MAP && (evidenceRendersByRoom[k]?.length ?? 0) > 0,
         );
         if (generatedKeys.length > 0) {
           selectedRoomKeys = generatedKeys;
@@ -1273,11 +1317,16 @@ function EstimatePage() {
         const koreanName = ROOM_NAME_MAP[key];
         if (!koreanName) continue;
 
-        const renders = s2.rendersByRoom?.[key] || [];
+        const renders = evidenceRendersByRoom[key] || [];
         const idx = s2.selectedByRoom?.[key];
-        const selectedRender =
-          renders.length > 0 ? (idx != null ? renders[idx] : renders[renders.length - 1]) : null;
-        const imageUrl = selectedRender?.refinedUrl || selectedRender?.url;
+        const selectedRender = renders.length > 0
+          ? renders.find((render) =>
+              (render.refinedUrl || render.url) === s2.finalSelectedImageUrlsByRoom?.[key],
+            ) || (idx != null ? renders[idx] : renders[renders.length - 1])
+          : null;
+        const imageUrl = s2.finalSelectionConfirmedAt
+          ? s2.finalSelectedImageUrlsByRoom?.[key]
+          : selectedRender?.refinedUrl || selectedRender?.url;
         // 이미지 있으면 vision 추출, 없으면 build-estimate에서 표준 자재 fallback
 
         // 치수: 정형화 → 평형 표준 → 일반 표준
@@ -1365,8 +1414,8 @@ function EstimatePage() {
           prompts: string[];
           userSelectedMaterials?: ReturnType<typeof selectedMaterialsForRoom>;
         }> = [];
-        const generatedKeys = Object.keys(s2.rendersByRoom || {}).filter(
-          (k) => k !== "all" && (s2.rendersByRoom[k]?.length ?? 0) > 0,
+        const generatedKeys = Object.keys(evidenceRendersByRoom).filter(
+          (k) => k !== "all" && (evidenceRendersByRoom[k]?.length ?? 0) > 0,
         );
         const userRoomKeys = s1.rooms?.includes("all")
           ? Object.keys(ROOM_NAME_MAP)
@@ -1381,7 +1430,7 @@ function EstimatePage() {
           const widthM = norm?.widthMm ? norm.widthMm / 1000 : undefined;
           const depthM = norm?.depthMm ? norm.depthMm / 1000 : undefined;
           const areaM2 = widthM && depthM ? widthM * depthM : undefined;
-          const prompts = (s2.rendersByRoom?.[k] || [])
+          const prompts = (evidenceRendersByRoom[k] || [])
             .map((r) => r.revisedPrompt || r.prompt)
             .filter(Boolean) as string[];
           roomEntries.push({

@@ -14,6 +14,7 @@ import {
 } from "./ai-model-policy";
 
 const OPENAI_BASE = "https://api.openai.com/v1";
+export const ROOM_RENDER_PROMPT_VERSION = "inpick-room-render-v1";
 
 function getKey(): string {
   // 대/소문자 변수명 둘 다 허용 (Vercel 환경변수가 소문자로 등록된 경우 호환)
@@ -78,6 +79,8 @@ export interface RenderRoomResult {
   revisedPrompt?: string;
   model: string;
   costUsd: number;
+  promptVersion: string;
+  requestId?: string;
 }
 
 /**
@@ -282,6 +285,8 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
         revisedPrompt: prompt,
         model: data.model || "gpt-image-2",
         costUsd: costMap[quality] ?? 0.17,
+        promptVersion: ROOM_RENDER_PROMPT_VERSION,
+        requestId: res.headers.get("x-request-id") || undefined,
       };
     }
 
@@ -312,7 +317,7 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
       const form = new FormData();
       form.append("model", modelName);
       form.append(
-        "image",
+        "image[]",
         new Blob([new Uint8Array(fpBuf)], { type: "image/png" }),
         "floorplan.png",
       );
@@ -340,6 +345,8 @@ export async function generateRoomRender(input: RenderRoomInput): Promise<Render
           revisedPrompt: editPrompt,
           model: modelName,
           costUsd: costMap[quality] ?? 0.17,
+          promptVersion: ROOM_RENDER_PROMPT_VERSION,
+          requestId: res.headers.get("x-request-id") || undefined,
         };
       }
 

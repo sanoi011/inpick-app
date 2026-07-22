@@ -23,8 +23,12 @@ npm start
 - `GET /health`: 서버와 모델 설정 상태
 - `POST /v1/designs/generate`: LiDAR 참조 이미지 기반 인테리어 이미지 생성
 
+성공 응답은 생성 이미지와 함께 `model`, `promptVersion`, OpenAI `requestID`, `usage`를 반환합니다. 서버는 `gpt-image-2`와 `image[]` multipart 필드, `1536x1024`, `medium`, JPEG 품질 90을 사용하며 `input_fidelity`는 보내지 않습니다.
+
 ## 테스트
 
 ```bash
 npm test
 ```
+
+전체 요청 필드와 사용자 플로우 감사 문서는 [`INPICK_WORKFLOW_SIGNAL_AUDIT_2026-07-23.md`](../../docs/status/INPICK_WORKFLOW_SIGNAL_AUDIT_2026-07-23.md)를 참고하세요.
