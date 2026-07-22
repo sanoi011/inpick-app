@@ -479,7 +479,7 @@ export default function WorkflowPage() {
 
   return (
     <LenisProvider>
-      <main className="relative min-h-screen overflow-hidden bg-[#f7f7f5] text-[#0d0d0d]">
+      <main className="relative min-h-screen overflow-hidden bg-white text-[#0d0d0d]">
 
         <Notch step={step} total={TOTAL_STEPS} />
 
@@ -497,7 +497,7 @@ export default function WorkflowPage() {
                 animate={{ scale: 1, y: 0 }}
                 className="rounded-[24px] bg-white p-7 shadow-card-hover max-w-sm w-full mx-6 text-center"
               >
-                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full bg-[#f7f7f5] text-black">
+                <div className="mx-auto inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/[0.07] bg-white text-black">
                   <Loader2 className="h-6 w-6 animate-spin" />
                 </div>
                 <h3 className="mt-4 text-lg font-extrabold tracking-tight text-black">
@@ -634,7 +634,7 @@ export default function WorkflowPage() {
                     공간별 AI 디자인
                   </h1>
                   {normalizeError && (
-                    <span className="ml-auto rounded-full border border-black/10 bg-[#f7f7f5] px-2 py-0.5 text-[0.65rem] text-black">
+                    <span className="ml-auto rounded-full border border-black/10 bg-white px-2 py-0.5 text-[0.65rem] text-black">
                       ⚠ 공간 분석 보류 — 평형 평균값으로 진행
                     </span>
                   )}
@@ -679,7 +679,7 @@ export default function WorkflowPage() {
               >
                 <button
                   onClick={() => setQuickOpen(false)}
-                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-black/50 hover:bg-[#f7f7f5] hover:text-black"
+                  className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full text-black/50 hover:bg-zinc-50 hover:text-black"
                   aria-label="닫기"
                 >
                   <X className="h-4 w-4" />
@@ -702,7 +702,7 @@ export default function WorkflowPage() {
                     <button
                       type="button"
                       onClick={() => setQuickMode("photo_residential")}
-                      className="w-full rounded-2xl border-2 border-black/10 bg-[#f7f7f5]/50 p-4 text-left transition hover:border-black/10 hover:bg-[#f7f7f5]/50"
+                      className="w-full rounded-2xl border-2 border-black/10 bg-white p-4 text-left transition hover:border-black/25 hover:bg-zinc-50"
                     >
                       <p className="text-sm font-bold text-black">🏠 내 집 (도면 없이)</p>
                       <p className="mt-1 text-[0.72rem] text-black/60">
@@ -712,7 +712,7 @@ export default function WorkflowPage() {
                     <button
                       type="button"
                       onClick={() => setQuickMode("photo_commercial")}
-                      className="w-full rounded-2xl border-2 border-black/10 bg-[#f7f7f5]/50 p-4 text-left transition hover:border-black/10 hover:bg-[#f7f7f5]/50"
+                      className="w-full rounded-2xl border-2 border-black/10 bg-white p-4 text-left transition hover:border-black/25 hover:bg-zinc-50"
                     >
                       <p className="text-sm font-bold text-black">☕ 상가·사무실</p>
                       <p className="mt-1 text-[0.72rem] text-black/60">
@@ -841,7 +841,7 @@ export default function WorkflowPage() {
                       if (quickMode) setQuickMode(null);
                       else setQuickOpen(false);
                     }}
-                    className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
+                    className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-zinc-50"
                   >
                     {quickMode ? "이전" : "취소"}
                   </button>

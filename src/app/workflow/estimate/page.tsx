@@ -441,7 +441,7 @@ function EstimateLoadingOverlay({ visible }: { visible: boolean }) {
   const current = ESTIMATE_LOADING_STAGES[stage];
   return (
     <div
-      className="fixed inset-0 z-[80] flex min-h-[100dvh] items-center justify-center overflow-hidden bg-[#f7f7f5]/95 px-5 backdrop-blur-2xl"
+      className="fixed inset-0 z-[80] flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white/95 px-5 backdrop-blur-2xl"
       role="status"
       aria-live="polite"
       aria-label={`${current.label}: ${current.detail}`}
@@ -468,7 +468,7 @@ function EstimateLoadingOverlay({ visible }: { visible: boolean }) {
           </div>
         </div>
 
-        <div className="mt-8 rounded-[22px] bg-[#f7f7f5] p-5">
+        <div className="mt-8 rounded-[22px] bg-white p-5">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2.5 w-2.5" aria-hidden>
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-black/35" />
@@ -525,7 +525,7 @@ export default function EstimatePageWithSuspense() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-[#f7f7f5]">
+        <main className="min-h-screen bg-white">
           <EstimateLoadingOverlay visible />
         </main>
       }
@@ -1622,7 +1622,7 @@ function EstimatePage() {
 
   return (
     <LenisProvider>
-      <main className="relative min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
+      <main className="relative min-h-screen bg-white text-[#0d0d0d]">
         <Notch step={3} total={3} />
         <EstimateLoadingOverlay visible={loading} />
         <div className="flex min-h-screen">

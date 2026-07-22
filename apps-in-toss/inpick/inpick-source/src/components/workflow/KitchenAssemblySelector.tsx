@@ -132,7 +132,7 @@ export default function KitchenAssemblySelector({
         </p>
       </header>
 
-      <div className="relative mt-5 h-[31rem] overflow-hidden rounded-3xl bg-gradient-to-b from-slate-50 to-orange-50/60 sm:h-[34rem]">
+      <div className="relative mt-5 h-[31rem] overflow-hidden rounded-3xl bg-white sm:h-[34rem]">
         <div aria-hidden="true" className="absolute inset-0 flex items-center justify-center">
           <svg viewBox="0 0 180 260" className="h-72 w-48 text-slate-400 sm:h-80" fill="none">
             <rect x="28" y="28" width="124" height="50" rx="8" fill="currentColor" opacity=".18" />
@@ -191,7 +191,7 @@ export default function KitchenAssemblySelector({
       </div>
 
       {activePart && activeDefinition ? (
-        <div className="mt-5 rounded-2xl border border-orange-200 bg-orange-50/50 p-4">
+        <div className="mt-5 rounded-2xl border border-orange-200 bg-white p-4">
           <div className="flex items-center justify-between gap-3">
             <h3 className="font-bold text-slate-950">{activeDefinition.labelKo} 카탈로그 검색</h3>
             <button type="button" onClick={() => setActivePart(null)} className="text-sm text-slate-600 underline">

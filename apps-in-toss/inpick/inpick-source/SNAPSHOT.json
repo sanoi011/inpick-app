@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-07-22T13:54:32.864Z",
+  "createdAt": "2026-07-22T17:11:20.979Z",
   "source": "App Store / Google Play / web shared InPick workflow",
   "immutableSnapshot": true,
   "sourceFiles": [
@@ -45,11 +45,11 @@
     },
     {
       "path": "src/app/workflow/estimate/page.tsx",
-      "sha256": "197b2872f4e9779cc1930a258f442977d6aa96c96471e65ca858411fb681d6ce"
+      "sha256": "aa2588be6b266465d84b54f45aab07f2bf4926f937d869c24ed0562d03f1404e"
     },
     {
       "path": "src/app/workflow/page.tsx",
-      "sha256": "967dbce5b11d0a07711be1156d681ed7813eb03062eda26058137367979fa27c"
+      "sha256": "e5e03f8e6e6834e6a55da3ecfe0ddae4f398de0ce8d689033ffced49ab0849bf"
     },
     {
       "path": "src/components/billing/TokenPurchaseDrawer.tsx",
@@ -77,7 +77,7 @@
     },
     {
       "path": "src/components/workflow/BasicInfoCard.tsx",
-      "sha256": "7ff866e0238c233aeefb01139f20227ae5053bc44fef9bb239f08d6fd8551f93"
+      "sha256": "5de23c022f868741e5ebe540e009e1d29ae311c56e2d933d0daf227227c940e2"
     },
     {
       "path": "src/components/workflow/ClickableRenderImage.tsx",
@@ -85,7 +85,7 @@
     },
     {
       "path": "src/components/workflow/KitchenAssemblySelector.tsx",
-      "sha256": "34e133f84feadf666ad4e5d992d9d195718d9192f023688c59851a76f597a0ec"
+      "sha256": "359d6d805047b1e5acdf5cb24561575d740fa46446727f4620c6050483aca702"
     },
     {
       "path": "src/components/workflow/MaterialEditor.tsx",
@@ -100,12 +100,16 @@
       "sha256": "bdcbc957c6794d1e13d40d0b7d2fd6eb8e2143d9b2c30c8c498a98be012d6e25"
     },
     {
+      "path": "src/components/workflow/RoomProductImageSelector.tsx",
+      "sha256": "996d3c74c46482c597da7ed7ec86296d0a4d7f760473ae7c6ef81217272ed25f"
+    },
+    {
       "path": "src/components/workflow/Step1Cards.tsx",
-      "sha256": "65ef0bdfc2d06eeb1ad2b38128253f313b48edd9d1b1af7ce7a4f7463811485f"
+      "sha256": "07d0df6fbb624391f10652e5140461fc25231706993bb3776e69f8321b0266ed"
     },
     {
       "path": "src/components/workflow/Step2Designer.tsx",
-      "sha256": "7c5e0857c380b504ad92994cb7e9b7fb7e61cc9b049961b4f18ccc33e1952559"
+      "sha256": "f23f31f3c38c7e1f7b29ff39859664549ab57aceaa125d56fafa2ee673ef136b"
     },
     {
       "path": "src/components/workflow/TokenBadge.tsx",
@@ -442,6 +446,14 @@
     {
       "path": "src/lib/inpick/render-room-client.ts",
       "sha256": "18517e488e20bfc830f41a74febf8932700d072ae1f2539ca2d1a6a650ebb13b"
+    },
+    {
+      "path": "src/lib/inpick/room-product-customization/catalog.ts",
+      "sha256": "8da022b24a45197611363a12d6805b9f53d86e77c32de3833397f34f6535abb5"
+    },
+    {
+      "path": "src/lib/inpick/room-product-customization/index.ts",
+      "sha256": "f464658102dfa2f6a3eaf84c8fba5e2401dd43f332fcd8beac5e5a709d11342a"
     },
     {
       "path": "src/lib/inpick/sam-surface-prompts.ts",

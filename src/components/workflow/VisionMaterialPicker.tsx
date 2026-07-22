@@ -124,6 +124,12 @@ export default function VisionMaterialPicker({ open, onClose, onSelect, request 
 
             {result && result.observations.length > 0 && (
               <div className="space-y-6">
+                {result.summary.analysisMode === "mock" && (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">
+                    실제 이미지 분석 서버가 연결되지 않아 카테고리 기반 후보를 표시합니다.
+                    제품을 직접 선택하면 선택한 실제 제품 ID와 SKU는 견적에 그대로 반영됩니다.
+                  </div>
+                )}
                 {result.observations.map((analyzed, i) => (
                   <div key={i}>
                     <div className="flex items-center gap-2 mb-3">

@@ -58,14 +58,22 @@ import { AnalyticsEvents } from "@/lib/analytics/events";
 import { routePromptToRoom } from "@/lib/inpick/workflow/prompt-room-router";
 import { mapPhotoSourcesToRooms } from "@/lib/inpick/photo-source-mapping";
 import { formatPhotoFurnishingRequirements } from "@/lib/inpick/photo-render-prompt";
-import KitchenAssemblySelector from "./KitchenAssemblySelector";
 import {
-  buildKitchenAssemblyEstimateMapping,
   buildKitchenAssemblyRenderPrompt,
   type KitchenAssembly,
-  type KitchenCatalogProduct,
-  type KitchenPartCode,
 } from "@/lib/inpick/kitchen-assembly";
+import RoomProductImageSelector from "./RoomProductImageSelector";
+import {
+  bindRoomProductCustomizationToSource,
+  buildRoomProductEstimateMapping,
+  buildRoomProductPromptMarkdown,
+  carryRoomProductCustomizationToSource,
+  inferRoomProductKind,
+  listTargetSurfaces,
+  type RoomCatalogProduct,
+  type RoomProductCustomization,
+  type RoomProductPartCode,
+} from "@/lib/inpick/room-product-customization";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
@@ -271,6 +279,8 @@ export interface Step2Data {
   materialSelections?: Record<string, SelectedEstimateMaterial>;
   /** 주방 조립체의 부품별 실제 SKU 스냅샷 */
   kitchenAssemblies?: Record<string, KitchenAssembly>;
+  /** 실제 생성 이미지 위에서 확정한 실별·부위별 검증 SKU 스냅샷 */
+  roomProductCustomizations?: Record<string, RoomProductCustomization>;
   /** 견적 직전 팝업에서 실별로 확정한 최종 이미지 URL */
   finalSelectedImageUrlsByRoom?: Record<string, string>;
   finalSelectionConfirmedAt?: string;
@@ -292,7 +302,7 @@ export interface SelectedEstimateMaterial {
   observationId?: string;
   confidence: number;
   assemblyId?: string;
-  partCode?: KitchenPartCode;
+  partCode?: string;
   provenance?: { source: string; reference?: string; verifiedAt?: string };
 }
 
@@ -644,48 +654,78 @@ export default function Step2Designer({
   const selectedIdx =
     value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
+  const activeRenderKey =
+    activeRender && selectedIdx != null ? renderUnlockKey(activeRender, selectedIdx) : null;
   const activeTab = availableTabs.find((tab) => tab.v === activeRoom);
   const promptWithKitchenSelections = (prompt: string, roomKey: string) => {
     const assembly = value.kitchenAssemblies?.[roomKey];
     const kitchenPrompt = assembly ? buildKitchenAssemblyRenderPrompt(assembly) : "";
-    return kitchenPrompt ? `${prompt}
-
-${kitchenPrompt}` : prompt;
+    const roomCustomization = value.roomProductCustomizations?.[roomKey];
+    const productPrompt = roomCustomization
+      ? buildRoomProductPromptMarkdown(roomCustomization)
+      : "";
+    return [prompt, kitchenPrompt, productPrompt].filter(Boolean).join("\n\n");
   };
-  const activeRoomIsKitchen = /주방|kitchen/i.test(`${activeRoom} ${activeTab?.label || ""}`);
-  const activeKitchenAssembly: KitchenAssembly = value.kitchenAssemblies?.[activeRoom] || {
-    roomId: activeRoom,
-    assemblyId: `kitchen-${activeRoom}`,
-    selections: {},
-  };
-  const searchKitchenCatalog = async (partCode: KitchenPartCode, query: string) => {
+  const activeRoomName = activeTab?.label || activeRoom;
+  const activeRoomProductKind = inferRoomProductKind(`${activeRoom} ${activeRoomName}`);
+  const storedRoomProductCustomization: RoomProductCustomization =
+    value.roomProductCustomizations?.[activeRoom] || {
+      roomId: activeRoom,
+      roomName: activeRoomName,
+      roomKind: activeRoomProductKind,
+      assemblyId: `room-products-${activeRoom}`,
+      sourceRenderKey: activeRenderKey || undefined,
+      selections: {},
+    };
+  const activeRoomProductCustomization: RoomProductCustomization = activeRenderKey
+    ? bindRoomProductCustomizationToSource(storedRoomProductCustomization, activeRenderKey)
+    : storedRoomProductCustomization;
+  const searchRoomProductCatalog = async (
+    partCode: RoomProductPartCode,
+    query: string,
+  ): Promise<readonly RoomCatalogProduct[]> => {
     const response = await fetch(
-      `/api/inpick/kitchen-catalog?partCode=${encodeURIComponent(partCode)}&q=${encodeURIComponent(query)}`,
+      `/api/inpick/room-product-catalog?roomKind=${encodeURIComponent(activeRoomProductCustomization.roomKind)}&partCode=${encodeURIComponent(partCode)}&q=${encodeURIComponent(query)}`,
     );
-    const data = (await response.json()) as { products?: KitchenCatalogProduct[]; error?: string };
+    const data = (await response.json()) as { products?: RoomCatalogProduct[]; error?: string };
     if (!response.ok) throw new Error(data.error || "CATALOG_QUERY_FAILED");
     return data.products || [];
   };
-  const updateKitchenAssembly = (assembly: KitchenAssembly) => {
-    const mapping = buildKitchenAssemblyEstimateMapping(assembly);
+  const mapRoomProductSurface = (
+    requirement: ReturnType<typeof buildRoomProductEstimateMapping>["requirements"][number],
+  ): MaterialHint["surfaceType"] => {
+    switch (requirement.targetSurface) {
+      case "floor":
+      case "wall":
+      case "ceiling":
+      case "window":
+      case "door":
+      case "counter":
+        return requirement.targetSurface;
+      case "cabinet":
+        return "built_in_furniture";
+      case "tile_wall":
+        return "wall";
+      case "fixture":
+        return requirement.partCode === "main_lighting" ? "lighting" : "unknown";
+      default:
+        return "unknown";
+    }
+  };
+  const updateRoomProductCustomization = (customization: RoomProductCustomization) => {
+    const mapping = buildRoomProductEstimateMapping(customization);
+    const roomProductPrefix = `${customization.roomId}::room-products-`;
     const materialSelections = Object.fromEntries(
-      Object.entries(value.materialSelections || {}).filter(
-        ([key]) => !key.startsWith(`${assembly.roomId}::${assembly.assemblyId}::`),
-      ),
+      Object.entries(value.materialSelections || {}).filter(([key]) => !key.startsWith(roomProductPrefix)),
     ) as Record<string, SelectedEstimateMaterial>;
     for (const requirement of mapping.requirements) {
-      const surfaceType: MaterialHint["surfaceType"] = requirement.partCode === "backsplash"
-        ? "wall"
-        : ["countertop", "sink_bowl", "faucet", "cooktop"].includes(requirement.partCode)
-          ? "counter"
-          : "built_in_furniture";
       materialSelections[requirement.selectionKey] = {
-        roomId: assembly.roomId,
-        roomName: activeTab?.label || "주방",
-        surfaceType,
-        materialCategory: requirement.requirementCode,
+        roomId: requirement.roomId,
+        roomName: requirement.roomName,
+        surfaceType: mapRoomProductSurface(requirement),
+        materialCategory: `room-product.${requirement.partCode}`,
         materialProductId: requirement.materialProductId,
-        materialNameKo: [requirement.brand, requirement.sku, requirement.spec].filter(Boolean).join(" · ") || requirement.labelKo,
+        materialNameKo: requirement.materialNameKo,
         brand: requirement.brand,
         sku: requirement.sku,
         spec: requirement.spec,
@@ -693,20 +733,61 @@ ${kitchenPrompt}` : prompt;
         unitPrice: requirement.unitPrice,
         priceSource: requirement.provenance.reference,
         confidence: 1,
-        assemblyId: assembly.assemblyId,
+        assemblyId: requirement.assemblyId,
         partCode: requirement.partCode,
         provenance: requirement.provenance,
       };
     }
     onChange({
       ...value,
-      kitchenAssemblies: { ...(value.kitchenAssemblies || {}), [assembly.roomId]: assembly },
+      roomProductCustomizations: {
+        ...(value.roomProductCustomizations || {}),
+        [customization.roomId]: customization,
+      },
       materialSelections,
     });
   };
+
+  useEffect(() => {
+    const existing = value.roomProductCustomizations?.[activeRoom];
+    if (!activeRenderKey || !existing || existing.sourceRenderKey === activeRenderKey) return;
+
+    const rebound = bindRoomProductCustomizationToSource(existing, activeRenderKey);
+    const mapping = buildRoomProductEstimateMapping(rebound);
+    const roomProductPrefix = `${rebound.roomId}::room-products-`;
+    const materialSelections = Object.fromEntries(
+      Object.entries(value.materialSelections || {}).filter(([key]) => !key.startsWith(roomProductPrefix)),
+    ) as Record<string, SelectedEstimateMaterial>;
+    for (const requirement of mapping.requirements) {
+      materialSelections[requirement.selectionKey] = {
+        roomId: requirement.roomId,
+        roomName: requirement.roomName,
+        surfaceType: mapRoomProductSurface(requirement),
+        materialCategory: `room-product.${requirement.partCode}`,
+        materialProductId: requirement.materialProductId,
+        materialNameKo: requirement.materialNameKo,
+        brand: requirement.brand,
+        sku: requirement.sku,
+        spec: requirement.spec,
+        unit: requirement.unit,
+        unitPrice: requirement.unitPrice,
+        priceSource: requirement.provenance.reference,
+        confidence: 1,
+        assemblyId: requirement.assemblyId,
+        partCode: requirement.partCode,
+        provenance: requirement.provenance,
+      };
+    }
+    onChange({
+      ...value,
+      roomProductCustomizations: {
+        ...(value.roomProductCustomizations || {}),
+        [activeRoom]: rebound,
+      },
+      materialSelections,
+    });
+  }, [activeRenderKey, activeRoom, onChange, value]);
   const activeRoomIsLiving = isLivingRoom(activeRoom, activeTab?.label);
-  const activeRenderKey =
-    activeRender && selectedIdx != null ? renderUnlockKey(activeRender, selectedIdx) : null;
   const activeRenderUnlocked =
     activeRoomIsLiving ||
     (selectedIdx != null &&
@@ -1127,10 +1208,23 @@ ${kitchenPrompt}` : prompt;
           content: `${roomLabel} 수정 시안을 만들었습니다. 새 이미지는 왼쪽 ${roomLabel} 카테고리에 추가했어요.`,
         },
       ];
+      const sourceCustomization = value.roomProductCustomizations?.[roomKey];
+      const sourceRenderKey = renderUnlockKey(sourceRender, roomSelectedIndex as number);
+      const editedRenderKey = renderUnlockKey(editedRender, nextIndex);
+      const carriedCustomization = sourceCustomization
+        ? carryRoomProductCustomizationToSource(
+            bindRoomProductCustomizationToSource(sourceCustomization, sourceRenderKey),
+            editedRenderKey,
+          )
+        : undefined;
       const nextValue: Step2Data = {
         ...value,
         rendersByRoom: { ...value.rendersByRoom, [roomKey]: nextRenders },
         selectedByRoom: { ...value.selectedByRoom, [roomKey]: nextIndex },
+        roomProductCustomizations: {
+          ...(value.roomProductCustomizations || {}),
+          ...(carriedCustomization ? { [roomKey]: carriedCustomization } : {}),
+        },
         generations: {
           ...value.generations,
           [roomKey]: (value.generations[roomKey] ?? 0) + 1,
@@ -1866,10 +1960,10 @@ ${kitchenPrompt}` : prompt;
   const totalCount = realRoomTabs.length;
 
   return (
-    // 캡처 레퍼런스 레이아웃: 좌측 베이지 사이드바 + 메인 흰색(#F8F9F6) 캔버스
+    // 기존 InPick 순백색 레이아웃: 사이드바와 메인 캔버스 모두 white
     // 채팅 무한 늘어남 X — 화면 높이 고정, 메시지 영역만 스크롤
-    <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-[#f7f7f5] p-3 lg:grid-cols-[268px_1fr]">
-      {/* ─── 좌측 툴바 (베이지 톤 — 대표 지시) ─── */}
+    <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-white p-3 lg:grid-cols-[268px_1fr]">
+      {/* ─── 좌측 툴바 (순백색) ─── */}
       <aside className="flex flex-col gap-3">
         {/* 대표 거실 디자인 생성 — 좌측 상단 (방 선택 위) */}
         <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
@@ -1887,7 +1981,7 @@ ${kitchenPrompt}` : prompt;
                   );
                 }}
                 disabled={generating}
-                className="rounded-lg border border-black/[0.07] bg-[#f7f7f5] px-2 py-1.5 text-[0.7rem] font-semibold text-black/60 transition hover:bg-black/[0.06] hover:text-black disabled:opacity-30"
+                className="rounded-lg border border-black/[0.07] bg-white px-2 py-1.5 text-[0.7rem] font-semibold text-black/60 transition hover:bg-zinc-50 hover:text-black disabled:opacity-30"
               >
                 {preset}
               </button>
@@ -1953,7 +2047,7 @@ ${kitchenPrompt}` : prompt;
                           ? "bg-black text-white"
                           : "bg-black text-white"
                         : isAll
-                          ? "border border-black/[0.08] bg-[#f7f7f5] text-black hover:bg-black/[0.06]"
+                          ? "border border-black/[0.08] bg-white text-black hover:bg-zinc-50"
                           : isSelectedInStep1
                             ? "bg-white text-black/58 hover:bg-black/[0.035] hover:text-black"
                             : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
@@ -1979,7 +2073,7 @@ ${kitchenPrompt}` : prompt;
                     ) : decided ? (
                       <span
                         className={`text-[0.6rem] font-bold tabular px-1.5 py-0.5 rounded inline-flex items-center gap-0.5 ${
-                          sel ? "bg-white/25 text-white" : "bg-[#f7f7f5] text-black"
+                          sel ? "bg-white/25 text-white" : "bg-white text-black"
                         }`}
                       >
                         <Check className="h-2 w-2" strokeWidth={3} />
@@ -2044,7 +2138,7 @@ ${kitchenPrompt}` : prompt;
             })}
             {/* 사용자 실 추가 — 모든 모드 공통 */}
             {showAddTabInput ? (
-              <div className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-[#f7f7f5] px-2 py-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-1.5">
                 <input
                   type="text"
                   value={newTabLabel}
@@ -2106,7 +2200,7 @@ ${kitchenPrompt}` : prompt;
             }}
           />
           <div className="flex items-start gap-2">
-            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7f7f5] text-black">
+            <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-black">
               <Crosshair className="h-4 w-4" />
             </div>
             <div className="min-w-0">
@@ -2232,12 +2326,12 @@ ${kitchenPrompt}` : prompt;
         </motion.div>
       </aside>
 
-      {/* ─── 메인 캔버스: 흰색 톤(#F8F9F6) — 대표 지시 ─── */}
+      {/* ─── 메인 캔버스: 순백색 ─── */}
       <section className="relative flex flex-col">
         <div className="relative flex max-h-[calc(100vh-220px)] min-h-[480px] flex-1 flex-col overflow-hidden rounded-[24px] border border-black/[0.07] bg-white">
           {/* Step1 선택 정보 — 캔버스 최상단 (주소/단지/평형/면적/확장형/예산) */}
           {(basicInfo.selectedAddress || basicInfo.selectedComplex || basicInfo.selectedPyeong) && (
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/[0.06] bg-[#f7f7f5] px-5 py-2 text-[0.7rem] text-black/55">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-black/[0.06] bg-white px-5 py-2 text-[0.7rem] text-black/55">
               {basicInfo.selectedAddress?.roadAddress && (
                 <span className="inline-flex items-center gap-1">
                   <span className="text-black/40">주소</span>
@@ -2289,8 +2383,8 @@ ${kitchenPrompt}` : prompt;
               <div
                 className={`px-5 py-2 border-b text-[0.7rem] ${
                   lowConf
-                    ? "bg-[#f7f7f5]/80 border-black/10 text-black"
-                    : "bg-[#f7f7f5]/60 border-black/10 text-black"
+                    ? "bg-white border-black/10 text-black"
+                    : "bg-white border-black/10 text-black"
                 }`}
               >
                 <div className="flex items-center gap-2 flex-wrap">
@@ -2336,7 +2430,7 @@ ${kitchenPrompt}` : prompt;
             {!hasGenerated && !generating && !(chatMode && chatMessages.length > 0) && (
               <div className="h-full flex items-center justify-center min-h-[40vh]">
                 <div className="text-center max-w-md">
-                  <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f7f7f5] text-black mb-4">
+                  <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-black mb-4">
                     <Sparkles className="h-8 w-8" />
                   </div>
                   <h3 className="text-2xl font-extrabold tracking-tight text-black">
@@ -2376,7 +2470,7 @@ ${kitchenPrompt}` : prompt;
                       <button
                         key={p}
                         onClick={() => setPrompt(currentPrompt ? `${currentPrompt}, ${p}` : p)}
-                        className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-[#f7f7f5] hover:border-black/10"
+                        className="rounded-full border border-black/10 bg-white px-3 py-1.5 text-xs font-semibold text-black hover:bg-zinc-50 hover:border-black/10"
                       >
                         + {p}
                       </button>
@@ -2396,7 +2490,7 @@ ${kitchenPrompt}` : prompt;
                   className={`max-w-md rounded-2xl text-sm leading-relaxed shadow-sm overflow-hidden ${
                     m.role === "user"
                       ? "bg-black text-white rounded-tr-sm"
-                      : "bg-[#f7f7f5] text-black rounded-tl-sm border border-black/10"
+                      : "bg-white text-black rounded-tl-sm border border-black/10"
                   }`}
                 >
                   {/* 첨부 이미지 (user 메시지) */}
@@ -2428,7 +2522,7 @@ ${kitchenPrompt}` : prompt;
             ))}
             {chatMode && chatStreaming && chatMessages[chatMessages.length - 1]?.content === "" && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-tl-sm bg-[#f7f7f5] border border-black/10 px-4 py-2.5 text-sm text-black/70 inline-flex items-center gap-2">
+                <div className="rounded-2xl rounded-tl-sm bg-white border border-black/10 px-4 py-2.5 text-sm text-black/70 inline-flex items-center gap-2">
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   AI 상담 중…
                 </div>
@@ -2492,7 +2586,7 @@ ${kitchenPrompt}` : prompt;
             {/* 생성 중 — 게이지 */}
             {generating && (
               <div className="flex justify-start">
-                <div className="rounded-2xl rounded-tl-sm bg-[#f7f7f5] border border-black/10 px-5 py-4 max-w-md">
+                <div className="rounded-2xl rounded-tl-sm bg-white border border-black/10 px-5 py-4 max-w-md">
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-black" />
                     <p className="text-sm font-bold text-black">
@@ -2540,7 +2634,7 @@ ${kitchenPrompt}` : prompt;
                 ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
                 : "대화 충분 — 언제든 디자인 생성 가능";
             return (
-              <div className="px-4 py-3 border-t border-black/10 bg-[#F8F9F6]">
+              <div className="px-4 py-3 border-t border-black/10 bg-white">
                 <button
                   type="button"
                   onClick={handleChatToImage}
@@ -2581,7 +2675,7 @@ ${kitchenPrompt}` : prompt;
           })()}
 
           {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
-          <div className="border-t border-black/10 bg-[#F8F9F6] p-4">
+          <div className="border-t border-black/10 bg-white p-4">
             {/* 첨부 이미지 미리보기 (chat 모드에서만) */}
             {chatMode && pendingAttachments.length > 0 && (
               <div className="mx-auto max-w-3xl mb-2 flex flex-wrap gap-1.5">
@@ -2623,7 +2717,7 @@ ${kitchenPrompt}` : prompt;
             )}
             <div
               className={`mx-auto max-w-3xl flex items-end gap-2 rounded-2xl transition ${
-                isDraggingFile && chatMode ? "ring-2 ring-black/10 ring-offset-2 bg-[#f7f7f5]/40" : ""
+                isDraggingFile && chatMode ? "ring-2 ring-black/10 ring-offset-2 bg-white" : ""
               }`}
               onDragOver={(e) => {
                 if (!chatMode) return;
@@ -2653,7 +2747,7 @@ ${kitchenPrompt}` : prompt;
                     type="button"
                     onClick={() => chatFileInputRef.current?.click()}
                     disabled={chatStreaming || pendingAttachments.length >= 4}
-                    className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-sm hover:bg-[#f7f7f5] disabled:opacity-40 transition"
+                    className="shrink-0 inline-flex h-12 w-12 items-center justify-center rounded-full border border-black/10 bg-white text-black shadow-sm hover:bg-zinc-50 disabled:opacity-40 transition"
                     aria-label="사진 첨부"
                     title="사진 첨부 (최대 4장 · 8MB 이하)"
                   >
@@ -2744,7 +2838,7 @@ ${kitchenPrompt}` : prompt;
                 initial={{ opacity: 0, scale: 0.98 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.98 }}
-                className="absolute inset-3 rounded-2xl overflow-hidden bg-gradient-to-br from-[#f7f7f5] via-white to-[#f7f7f5] border-2 border-black/10 shadow-2xl pointer-events-auto"
+                className="absolute inset-3 rounded-2xl overflow-hidden bg-white border-2 border-black/10 shadow-2xl pointer-events-auto"
                 style={{ zIndex: 25 }}
               >
                 {/* 이전 이미지 (있으면 흐림 배경으로) */}
@@ -2836,7 +2930,7 @@ ${kitchenPrompt}` : prompt;
               >
                 <button
                   onClick={() => setImageMinimized(true)}
-                  className="absolute top-3 right-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 backdrop-blur border border-black/10 text-black hover:bg-[#f7f7f5] shadow"
+                  className="absolute top-3 right-3 z-30 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/90 backdrop-blur border border-black/10 text-black hover:bg-zinc-50 shadow"
                   title="우측으로 작게"
                 >
                   <Minimize2 className="h-3.5 w-3.5" />
@@ -2898,7 +2992,7 @@ ${kitchenPrompt}` : prompt;
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-3 z-40 overflow-hidden rounded-2xl border border-black/10 bg-[#f1f0ed] shadow-2xl"
+                  className="absolute inset-3 z-40 overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl"
                 >
                   <div className="absolute inset-0 opacity-50">
                     <div className="absolute left-[8%] top-[12%] h-[50%] w-[55%] rounded-[32px] bg-white blur-xl" />
@@ -3020,7 +3114,7 @@ ${kitchenPrompt}` : prompt;
               />
             </div>
           ) : (
-            <div className="mt-4 rounded-2xl border border-dashed border-black/10 bg-[#f7f7f5]/40 p-5 text-center">
+            <div className="mt-4 rounded-2xl border border-dashed border-black/10 bg-white p-5 text-center">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-[0.65rem] font-bold tracking-widest text-black border border-black/10">
                 <Sparkles className="h-3 w-3" />
                 서비스 준비 중
@@ -3036,13 +3130,24 @@ ${kitchenPrompt}` : prompt;
         )}
       </section>
 
-      {activeRoom !== "all" && activeRoomIsKitchen && (
+      {activeRoom !== "all" && activeRender && activeRenderUnlocked && (
         <div className="lg:col-span-2">
-          <KitchenAssemblySelector
-            value={activeKitchenAssembly}
-            onChange={updateKitchenAssembly}
-            searchCatalog={searchKitchenCatalog}
+          <RoomProductImageSelector
+            imageUrl={activeRender.refinedUrl || activeRender.url}
+            value={activeRoomProductCustomization}
+            onChange={updateRoomProductCustomization}
+            searchCatalog={searchRoomProductCatalog}
             disabled={generating}
+            onRegenerate={async () => {
+              const promptMarkdown = buildRoomProductPromptMarkdown(activeRoomProductCustomization);
+              if (!promptMarkdown) throw new Error("재생성할 실제 SKU를 먼저 선택해주세요.");
+              await handlePromptImageEdit(
+                promptMarkdown,
+                activeRoom,
+                activeRoomName,
+                listTargetSurfaces(activeRoomProductCustomization),
+              );
+            }}
           />
         </div>
       )}
@@ -3112,7 +3217,7 @@ ${kitchenPrompt}` : prompt;
               initial={{ opacity: 0, scale: 0.97, y: 18 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.97, y: 18 }}
-              className="fixed inset-2 z-[71] overflow-y-auto rounded-[24px] border border-white/30 bg-[#FFFDFC] shadow-2xl sm:inset-5 lg:inset-8"
+              className="fixed inset-2 z-[71] overflow-y-auto rounded-[24px] border border-white/30 bg-white shadow-2xl sm:inset-5 lg:inset-8"
             >
               <header className="sticky top-0 z-10 flex items-center justify-between border-b border-black/10 bg-white/95 px-5 py-4 backdrop-blur">
                 <div>
@@ -3125,7 +3230,7 @@ ${kitchenPrompt}` : prompt;
                 <button
                   type="button"
                   onClick={() => setMaterialEditorOpen(false)}
-                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black hover:bg-[#f7f7f5]"
+                  className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-black/10 bg-white text-black hover:bg-zinc-50"
                   aria-label="자재 수정 닫기"
                 >
                   <X className="h-4 w-4" />
@@ -3180,7 +3285,7 @@ ${kitchenPrompt}` : prompt;
               <div className="mt-6 flex gap-2">
                 <button
                   onClick={() => setInsufficientOpen(false)}
-                  className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-[#f7f7f5]"
+                  className="flex-1 rounded-full border border-black/10 px-4 py-2.5 text-sm font-semibold text-black/70 hover:bg-zinc-50"
                 >
                   나중에
                 </button>
@@ -3227,7 +3332,7 @@ function FinalDesignSelectionModal({
       <motion.section
         initial={{ opacity: 0, scale: 0.97, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="pointer-events-auto flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-black/10 bg-[#f7f7f5] shadow-2xl"
+        className="pointer-events-auto flex max-h-[calc(100vh-2rem)] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-black/10 bg-white shadow-2xl"
       >
         <header className="flex items-start justify-between gap-4 border-b border-black/[0.07] bg-white px-5 py-4 sm:px-7">
           <div>

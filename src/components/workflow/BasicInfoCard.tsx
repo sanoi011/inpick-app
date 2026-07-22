@@ -838,7 +838,7 @@ function AddressMode({ value, onChange }: Props) {
       )}
 
       {value.selectedAddress && buildingLookupDone && pyeongList.length === 0 && (
-        <div className="mt-3 rounded-xl border border-black/[0.08] bg-[#f7f7f5] p-3">
+        <div className="mt-3 rounded-xl border border-black/[0.08] bg-white p-3">
           <p className="text-xs font-semibold text-black/70">평형 정보를 찾지 못했습니다</p>
           <p className="mt-1 text-[11px] leading-4 text-black/42">
             공급 평형을 직접 입력하면 실별 평균 면적을 백그라운드에서 계산합니다.
@@ -880,7 +880,7 @@ function AddressMode({ value, onChange }: Props) {
       )}
 
       {value.selectedPyeong && value.expansionType && (
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-black/[0.07] bg-[#f7f7f5] px-4 py-3">
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-black/[0.07] bg-white px-4 py-3">
           {value.normalizing ? (
             <Loader2 className="h-4 w-4 shrink-0 animate-spin text-black/55" />
           ) : (

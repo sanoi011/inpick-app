@@ -512,7 +512,7 @@ function SiteConditionQuestions({
   ];
 
   return (
-    <div className="mt-5 rounded-2xl border border-black/[0.08] bg-[#f7f7f5] p-4">
+    <div className="mt-5 rounded-2xl border border-black/[0.08] bg-white p-4">
       <div className="flex items-start gap-2.5">
         <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-black/55" />
         <div>
@@ -633,7 +633,7 @@ function ResidentialRooms({ value, onChange }: { value: Step1Data; onChange: (n:
             return (
               <div
                 key={roomKey}
-                className="rounded-xl border border-black/[0.07] bg-[#f7f7f5] p-2.5"
+                className="rounded-xl border border-black/[0.07] bg-white p-2.5"
               >
                 <p className="mb-1.5 text-[11px] font-semibold text-black/60">
                   ▸ {roomLabel}

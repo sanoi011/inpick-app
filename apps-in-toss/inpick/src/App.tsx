@@ -105,7 +105,7 @@ function TossLoginGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#f7f7f5] px-5 py-10 text-[#0d0d0d]">
+    <main className="flex min-h-screen items-center justify-center bg-white px-5 py-10 text-[#0d0d0d]">
       <section className="w-full max-w-md rounded-[30px] border border-black/[0.07] bg-white p-7 shadow-[0_24px_80px_rgba(0,0,0,0.09)]">
         <div className="flex items-center gap-2.5">
           <span className="hex-mask h-[24px] w-[24px] text-[#F73B20]" />
@@ -118,7 +118,7 @@ function TossLoginGate({ children }: { children: React.ReactNode }) {
         <p className="mt-4 text-sm leading-6 text-black/55">
           주소·평형을 입력하면 실별 AI 디자인을 만들고, 대화로 원하는 부분을 수정한 뒤 선택한 최종 이미지로 견적을 계산합니다.
         </p>
-        <div className="mt-8 rounded-2xl bg-[#f7f7f5] px-4 py-3 text-xs leading-5 text-black/50">
+        <div className="mt-8 rounded-2xl border border-black/[0.07] bg-white px-4 py-3 text-xs leading-5 text-black/50">
           생성형 AI 결과와 예상 견적은 참고용이며 실제 시공 전 현장 실측과 전문가 확인이 필요합니다.
         </div>
         {message ? <p className="mt-4 text-sm font-medium text-red-600">{message}</p> : null}
