@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export async function GET(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   const contractorId = req.nextUrl.searchParams.get("contractorId");
   if (!contractorId) {
     return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+  }
+  if (contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   try {
@@ -20,10 +29,9 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "리뷰 조회 실패" }, { status: 500 });
     }
 
-    // 평균 평점 계산
     const reviews = data || [];
     const avgRating = reviews.length > 0
-      ? reviews.reduce((sum, r) => sum + ((r.overall_rating as number) || (r.rating as number) || 0), 0) / reviews.length
+      ? reviews.reduce((sum, review) => sum + ((review.overall_rating as number) || (review.rating as number) || 0), 0) / reviews.length
       : 0;
 
     return NextResponse.json({
@@ -39,8 +47,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// 업체 답변 등록
 export async function POST(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
+
   try {
     const body = await req.json();
     const { reviewId, contractorId, responseContent } = body;
@@ -48,10 +60,11 @@ export async function POST(req: NextRequest) {
     if (!reviewId || !contractorId || !responseContent) {
       return NextResponse.json({ error: "reviewId, contractorId, responseContent 필수" }, { status: 400 });
     }
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
+    }
 
     const supabase = createClient();
-
-    // 리뷰 소유권 검증
     const { data: review } = await supabase
       .from("contractor_reviews")
       .select("contractor_id")
@@ -65,10 +78,11 @@ export async function POST(req: NextRequest) {
     const { error } = await supabase
       .from("contractor_reviews")
       .update({
-        response_content: responseContent,
+        response_content: responseContent.slice(0, 2000),
         response_at: new Date().toISOString(),
       })
-      .eq("id", reviewId);
+      .eq("id", reviewId)
+      .eq("contractor_id", contractorId);
 
     if (error) {
       console.error("Review response error:", error);

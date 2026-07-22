@@ -9,10 +9,16 @@ export async function POST(
 
   try {
     const body = await req.json();
-    const { consumerName, consumerPhone, consumerEmail, message, projectType, estimatedBudget, consumerId } = body;
+    const {
+      consumerName, consumerPhone, consumerEmail, message, projectType,
+      estimatedBudget, consumerId, sharingAccepted, consentVersion,
+    } = body;
 
     if (!consumerName || !consumerPhone) {
       return NextResponse.json({ error: "이름과 연락처는 필수입니다" }, { status: 400 });
+    }
+    if (sharingAccepted !== true || consentVersion !== "contractor-inquiry-v1") {
+      return NextResponse.json({ error: "정보 공유 동의가 필요합니다" }, { status: 400 });
     }
 
     const supabase = createClient();

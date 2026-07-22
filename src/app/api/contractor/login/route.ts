@@ -1,105 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createToken } from "@/lib/contractor-auth";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import { createToken, verifyPassword } from "@/lib/contractor-auth";
 
 /**
  * POST /api/contractor/login
  *
- * 입력: { email, password }
- * - service_role로 specialty_contractors 조회 (RLS 우회)
- * - 미등록 이메일이면 자동 등록 (이메일 형식 유효 시) + 토큰 발급
- *   → 개발·운영 편의: 별도 회원가입 단계 없이 즉시 접근 가능
- * - is_active=false면 거부
+ * 비밀번호 로그인은 저장된 bcrypt hash를 검증한다.
+ * 비밀번호가 없는 OAuth 교환은 서버가 Supabase 세션과 이메일 소유권을 확인한다.
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const body = await request.json();
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+
     if (!email || !email.includes("@")) {
       return NextResponse.json({ error: "올바른 이메일을 입력해주세요." }, { status: 400 });
     }
+    if (password && password.length < 8) {
+      return NextResponse.json({ error: "비밀번호는 8자 이상이어야 합니다." }, { status: 400 });
+    }
+
+    if (!password) {
+      const supabase = createServerClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user?.email || user.email.toLowerCase() !== email) {
+        return NextResponse.json({ error: "인증된 OAuth 세션이 필요합니다." }, { status: 401 });
+      }
+    }
 
     const admin = createAdminClient();
-
-    // 1) specialty_contractors 조회 (RLS 우회 — service_role)
-    const { data: contractor, error } = await admin
+    const { data: row, error } = await admin
       .from("specialty_contractors")
-      .select(
-        "id, company_name, contact_name, email, region, rating, is_verified, is_active",
-      )
+      .select("id, company_name, contact_name, email, region, rating, is_verified, is_active, password_hash")
       .eq("email", email)
       .maybeSingle();
 
     if (error) {
       console.error("[contractor login] select error:", error);
+      return NextResponse.json({ error: "로그인 처리 중 오류가 발생했습니다." }, { status: 500 });
+    }
+    if (!row) {
       return NextResponse.json(
-        { error: "DB 조회 실패", detail: error.message },
-        { status: 500 },
+        { error: "등록된 사업자 정보를 찾을 수 없습니다. 가입 페이지를 이용해주세요." },
+        { status: 401 },
       );
     }
+    if (!row.is_active) {
+      return NextResponse.json({ error: "비활성화된 계정입니다." }, { status: 403 });
+    }
 
-    let row = contractor;
-
-    // 2) 등록된 사업자 없으면 자동 생성 (테스트 + 신규 가입 자동화)
-    if (!row) {
-      const guess = email.split("@")[0];
-      const { data: created, error: insErr } = await admin
-        .from("specialty_contractors")
-        .insert({
-          email,
-          company_name: `${guess} 사업자`,
-          contact_name: guess,
-          region: "전국",
-          rating: 0,
-          is_verified: false,
-          is_active: true,
-        })
-        .select(
-          "id, company_name, contact_name, email, region, rating, is_verified, is_active",
-        )
-        .single();
-
-      if (insErr || !created) {
-        console.error("[contractor login] auto-create fail:", insErr);
+    if (password) {
+      if (!row.password_hash) {
         return NextResponse.json(
-          {
-            error: "사업자 자동 등록 실패. 가입 페이지에서 직접 등록해주세요.",
-            detail: insErr?.message,
-          },
-          { status: 500 },
+          { error: "OAuth 로그인 또는 비밀번호 재설정 후 이용해주세요." },
+          { status: 403 },
         );
       }
-      row = created;
+      if (!(await verifyPassword(password, row.password_hash))) {
+        return NextResponse.json({ error: "이메일 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
+      }
     }
-
-    if (!row.is_active) {
-      return NextResponse.json(
-        { error: "비활성화된 사업자 계정입니다. 관리자에게 문의해주세요." },
-        { status: 403 },
-      );
-    }
-
-    // 비밀번호는 현재 별도 검증 없음 (소셜·이메일 인증 도입 전 단계)
-    void password;
 
     const token = createToken(row.id, row.email);
-
     return NextResponse.json({
       token,
       contractor: {
         id: row.id,
-        company_name: row.company_name,
-        contact_name: row.contact_name,
+        companyName: row.company_name,
+        contactName: row.contact_name,
         email: row.email,
         region: row.region,
         rating: row.rating,
-        is_verified: row.is_verified,
+        isVerified: row.is_verified,
       },
     });
   } catch (err) {
-    console.error("Contractor login error:", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "로그인 중 오류" },
-      { status: 500 },
-    );
+    console.error("[contractor login] error:", err);
+    return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });
   }
 }

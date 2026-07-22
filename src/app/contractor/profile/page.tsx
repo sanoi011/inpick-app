@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from "react";
 import {
   Loader2, Save, Plus, X, Star, Trash2, Edit3,
-  Building2, Phone, Mail, MapPin, FileText, Briefcase, Image as ImageIcon, Upload,
+  Building2, CheckCircle2, Phone, Mail, MapPin, FileText, Briefcase, Image as ImageIcon, Sparkles, Upload,
 } from "lucide-react";
 import { useContractorAuth } from "@/hooks/useContractorAuth";
 import { toast } from "@/components/ui/Toast";
+import { getContractorProfileReadiness } from "@/lib/contractor-experience";
 
 const TRADE_OPTIONS = [
   { code: "T01", label: "도배" }, { code: "T02", label: "타일" },
@@ -43,7 +44,7 @@ interface PortfolioItem { id: string; title: string; description: string; projec
 interface ReviewItem { id: string; overall_rating?: number; rating?: number; content: string; response_content?: string; response_at?: string; created_at: string; is_verified?: boolean; }
 
 export default function ProfilePage() {
-  const { contractorId, authChecked } = useContractorAuth();
+  const { contractorId, authChecked, authFetch } = useContractorAuth();
   const [tab, setTab] = useState<Tab>("info");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -77,9 +78,9 @@ export default function ProfilePage() {
     setLoading(true);
     try {
       const [profileRes, portfolioRes, reviewRes] = await Promise.all([
-        fetch(`/api/contractor/profile?contractorId=${contractorId}`),
-        fetch(`/api/contractor/portfolio?contractorId=${contractorId}`),
-        fetch(`/api/contractor/reviews?contractorId=${contractorId}`),
+        authFetch(`/api/contractor/profile?contractorId=${contractorId}`),
+        authFetch(`/api/contractor/portfolio?contractorId=${contractorId}`),
+        authFetch(`/api/contractor/reviews?contractorId=${contractorId}`),
       ]);
 
       const profileData = await profileRes.json();
@@ -116,18 +117,25 @@ export default function ProfilePage() {
     } finally {
       setLoading(false);
     }
-  }, [contractorId]);
+  }, [authFetch, contractorId]);
 
   useEffect(() => {
     if (!authChecked || !contractorId) return;
     loadProfile();
   }, [authChecked, contractorId, loadProfile]);
 
+  useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab") as Tab | null;
+    if (requestedTab && ["info", "trades", "docs", "portfolio", "reviews"].includes(requestedTab)) {
+      setTab(requestedTab);
+    }
+  }, []);
+
   async function saveProfile() {
     setSaving(true);
     setMessage("");
     try {
-      const res = await fetch("/api/contractor/profile", {
+      const res = await authFetch("/api/contractor/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contractorId, ...profile, trades, isPublic: isPublic, contractorType }),
@@ -162,7 +170,7 @@ export default function ProfilePage() {
         ...portfolioImageUrls.map((url, i) => ({ url, caption: "", order: i })),
         ...(portfolioForm.imageUrl ? [{ url: portfolioForm.imageUrl, caption: "", order: portfolioImageUrls.length }] : []),
       ];
-      const res = await fetch("/api/contractor/portfolio", {
+      const res = await authFetch("/api/contractor/portfolio", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -186,7 +194,7 @@ export default function ProfilePage() {
 
   async function deletePortfolio(id: string) {
     try {
-      await fetch(`/api/contractor/portfolio?id=${id}&contractorId=${contractorId}`, { method: "DELETE" });
+      await authFetch(`/api/contractor/portfolio?id=${id}&contractorId=${contractorId}`, { method: "DELETE" });
       setPortfolio(portfolio.filter(p => p.id !== id));
     } catch { toast({ type: "error", title: "오류", message: "포트폴리오 삭제에 실패했습니다" }); }
   }
@@ -195,7 +203,7 @@ export default function ProfilePage() {
     const content = responseText[reviewId];
     if (!content?.trim()) return;
     try {
-      const res = await fetch("/api/contractor/reviews", {
+      const res = await authFetch("/api/contractor/reviews", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reviewId, contractorId, responseContent: content }),
@@ -218,17 +226,46 @@ export default function ProfilePage() {
     { key: "portfolio", label: "포트폴리오" },
     { key: "reviews", label: "리뷰" },
   ];
+  const readiness = getContractorProfileReadiness({
+    companyName: profile.companyName,
+    phone: profile.phone,
+    region: profile.region,
+    introduction: profile.introduction,
+    licenseNumber: profile.licenseNumber,
+    businessLicenseUrl: profile.businessLicenseUrl,
+    tradesCount: trades.length,
+    portfolioCount: portfolio.length,
+    isPublic,
+  });
 
   return (
-    <div className="px-6 py-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">프로필 설정</h1>
+    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+      <section className="relative mb-6 overflow-hidden rounded-[30px] border border-black/[0.07] bg-white p-6 sm:p-8">
+        <span className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-[#eaf8f1]" />
+        <span className="absolute right-20 top-16 h-10 w-10 rotate-12 rounded-xl bg-[#fff1ec]" />
+        <div className="relative grid gap-5 sm:grid-cols-[1fr_auto] sm:items-end">
+          <div>
+            <p className="inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.14em] text-[#f15b4a]"><Sparkles className="h-3.5 w-3.5" /> PUBLIC PROFILE</p>
+            <h1 className="mt-3 text-3xl font-black tracking-[-0.045em] text-black">우리 업체를 잘 설명하는 프로필</h1>
+            <p className="mt-2 text-sm leading-6 text-black/48">등록한 근거만 고객에게 보여요. 서류 등록은 사업자 정보 확인 완료와 다릅니다.</p>
+          </div>
+          <div className="min-w-40 rounded-2xl bg-[#f7f7f5] p-4">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-xs font-black">{readiness.label}</span>
+              <strong className="text-lg tabular-nums">{readiness.percent}%</strong>
+            </div>
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/[0.08]"><div className="h-full rounded-full bg-[#f15b4a]" style={{ width: `${readiness.percent}%` }} /></div>
+            <p className="mt-2 flex items-center gap-1 text-[10px] text-black/42"><CheckCircle2 className="h-3 w-3" /> {readiness.completed}/{readiness.total}개 입력 완료</p>
+          </div>
+        </div>
+      </section>
 
       {/* 탭 */}
-      <div className="flex gap-1 mb-6 border-b border-gray-200">
+      <div className="mb-6 flex gap-2 overflow-x-auto rounded-2xl border border-black/[0.07] bg-white p-2">
         {TABS.map(t => (
           <button key={t.key} onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              tab === t.key ? "border-blue-600 text-blue-600" : "border-transparent text-gray-500 hover:text-gray-700"
+            className={`whitespace-nowrap rounded-xl px-4 py-2.5 text-sm font-bold transition-colors ${
+              tab === t.key ? "bg-black text-white" : "text-black/45 hover:bg-[#f7f7f5] hover:text-black"
             }`}>
             {t.label}
           </button>
@@ -375,12 +412,9 @@ export default function ProfilePage() {
         <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
           <div>
             <label className="text-sm font-medium text-gray-700 mb-2 block">사업자등록증</label>
-            <FileDropZone
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              contractorId={contractorId || ""}
-              folder="documents"
-              onUploaded={(url) => setProfile({ ...profile, businessLicenseUrl: url })}
-            />
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+              사업자 서류는 공개 URL로 저장하지 않습니다. 보호 문서 스토리지 연결 후 업로드 기능을 열 예정입니다.
+            </div>
           </div>
           {profile.businessLicenseUrl && (
             <div className="border border-gray-200 rounded-lg p-3">
@@ -434,6 +468,7 @@ export default function ProfilePage() {
                 <label className="text-sm font-medium text-gray-700 mb-2 block">이미지 업로드</label>
                 <FileDropZone
                   accept="image/jpeg,image/png,image/webp"
+                  authFetch={authFetch}
                   contractorId={contractorId || ""}
                   folder="portfolio"
                   onUploaded={(url) => setPortfolioImageUrls(prev => [...prev, url])}
@@ -508,7 +543,7 @@ export default function ProfilePage() {
             <div className="text-center py-12">
               <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
               <p className="text-gray-500">포트폴리오가 없습니다</p>
-              <p className="text-xs text-gray-400 mt-1">시공 사례를 추가하면 입찰 선정 확률이 높아집니다</p>
+              <p className="text-xs text-gray-400 mt-1">시공 사례를 추가하면 고객이 업체 역량을 더 잘 확인할 수 있습니다</p>
             </div>
           )}
         </div>
@@ -578,8 +613,9 @@ export default function ProfilePage() {
   );
 }
 
-function FileDropZone({ accept, contractorId, folder, onUploaded }: {
+function FileDropZone({ accept, authFetch, contractorId, folder, onUploaded }: {
   accept: string;
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>;
   contractorId: string;
   folder: string;
   onUploaded: (url: string) => void;
@@ -602,7 +638,7 @@ function FileDropZone({ accept, contractorId, folder, onUploaded }: {
       formData.append("contractorId", contractorId);
       formData.append("folder", folder);
 
-      const res = await fetch("/api/contractor/upload", {
+      const res = await authFetch("/api/contractor/upload", {
         method: "POST",
         body: formData,
       });

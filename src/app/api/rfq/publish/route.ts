@@ -12,6 +12,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  normalizeSiteConditionAnswers,
+  type SiteConditionAnswers,
+} from "@/lib/inpick/estimate-v2/site-condition-answers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,10 +32,11 @@ interface Body {
   spaceType?: string;
   exclusiveAreaM2?: number;
   addressText?: string;
-  shortlistSize?: 3 | 5;
+  shortlistSize?: 3;
   preferredStart?: string;
   visitPreference?: string;
   notes?: string;
+  siteConditions?: SiteConditionAnswers;
   drawingOptions?: string[];
   designRenders?: Array<{ roomName?: string; roomKey?: string; url: string; refinedUrl?: string }>;
 }
@@ -63,7 +68,7 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient();
-    const shortlistSize: 3 | 5 = body.shortlistSize === 5 ? 5 : 3;
+    const shortlistSize = 3 as const;
 
     // 1) estimates 행 확보 — 없으면 생성(upsert). 워크플로우는 construction_estimates에만
     //    저장하므로 RFQ용 estimates 행이 없을 수 있음(2026-07-05 H2: 공고가 실제로 안 올라가던 원인).
@@ -79,6 +84,7 @@ export async function POST(req: NextRequest) {
       preferredStart: body.preferredStart,
       visitPreference: body.visitPreference,
       notes: body.notes?.slice(0, 2000),
+      siteConditions: normalizeSiteConditionAnswers(body.siteConditions),
       drawingOptions: Array.isArray(body.drawingOptions) ? body.drawingOptions.slice(0, 12) : [],
       designRenders: Array.isArray(body.designRenders)
         ? body.designRenders

@@ -20,10 +20,13 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import CalculatorPopup from "@/components/contractor/CalculatorPopup";
+import { CONTRACTOR_BIDDING_ENABLED } from "@/lib/features";
 
 const NAVIGATION = [
   { label: "대시보드", href: "/contractor", icon: LayoutDashboard },
-  { label: "입찰공고", href: "/contractor/bids", icon: FileText },
+  ...(CONTRACTOR_BIDDING_ENABLED
+    ? [{ label: "입찰공고", href: "/contractor/bids", icon: FileText }]
+    : []),
   { label: "프로젝트", href: "/contractor/projects", icon: Home },
   { label: "일정", href: "/contractor/schedule", icon: CalendarDays },
   { label: "정산", href: "/contractor/finance", icon: ReceiptText },
@@ -97,8 +100,8 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
   };
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-black">
-      <header className="sticky top-0 z-40 bg-[#f7f7f5]/90 backdrop-blur-xl">
+    <div className="min-h-screen bg-white text-black">
+      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <button
             type="button"
@@ -158,7 +161,7 @@ export default function ContractorLayout({ children }: { children: React.ReactNo
       {mobileOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button type="button" aria-label="메뉴 닫기" onClick={() => setMobileOpen(false)} className="absolute inset-0 bg-black/25 backdrop-blur-sm" />
-          <aside className="absolute inset-y-0 left-0 flex w-[min(86vw,360px)] flex-col bg-[#f7f7f5] p-5 shadow-2xl">
+          <aside className="absolute inset-y-0 left-0 flex w-[min(86vw,360px)] flex-col bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <Link href="/contractor" className="flex items-center gap-2">
                 <Hexagon className="h-5 w-5 fill-[#f15b4a] text-[#f15b4a]" />

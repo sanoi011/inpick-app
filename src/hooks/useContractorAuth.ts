@@ -21,7 +21,10 @@ export function useContractorAuth(): ContractorAuth {
     const token = localStorage.getItem("contractor_token");
     const id = localStorage.getItem("contractor_id");
     const name = localStorage.getItem("contractor_name");
-    if (!token) {
+    if (!token || !id) {
+      localStorage.removeItem("contractor_token");
+      localStorage.removeItem("contractor_id");
+      localStorage.removeItem("contractor_name");
       router.replace("/contractor/login");
       return;
     }
@@ -37,12 +40,19 @@ export function useContractorAuth(): ContractorAuth {
     router.replace("/contractor/login");
   }, [router]);
 
-  const authFetch = useCallback((url: string, options?: RequestInit): Promise<Response> => {
+  const authFetch = useCallback(async (url: string, options?: RequestInit): Promise<Response> => {
     const token = localStorage.getItem("contractor_token");
     const headers = new Headers(options?.headers);
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    return fetch(url, { ...options, headers });
-  }, []);
+    const response = await fetch(url, { ...options, headers });
+    if (response.status === 401) {
+      localStorage.removeItem("contractor_token");
+      localStorage.removeItem("contractor_id");
+      localStorage.removeItem("contractor_name");
+      router.replace("/contractor/login");
+    }
+    return response;
+  }, [router]);
 
   return { contractorId, contractorName, authChecked, logout, authFetch };
 }

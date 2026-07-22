@@ -13,10 +13,10 @@ export async function GET(
     const { data: contractor, error } = await supabase
       .from("specialty_contractors")
       .select(`
-        id, company_name, contact_name, phone, email, region, address,
+        id, company_name, contact_name, region,
         contractor_type, rating, total_reviews, completed_projects,
         is_verified, is_featured, subscription_tier, introduction,
-        description, logo_url, license_number, business_license_url,
+        description, logo_url,
         min_project_budget, max_project_budget, created_at,
         contractor_trades(trade_code, trade_name, experience_years, is_primary),
         contractor_portfolio(id, title, description, project_type, completion_date, image_urls, tags),

@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
+
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,18 +17,11 @@ import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
 export default function ContractorLoginPage() {
-  const router = useRouter();
+
   const supabase = createClient();
   const [oauthLoading, setOauthLoading] = useState<OAuthProvider | null>(null);
   const [error, setError] = useState("");
 
-  // 이미 로그인된 사업자면 dashboard로
-  useEffect(() => {
-    const token = localStorage.getItem("contractor_token");
-    if (token) {
-      router.replace("/contractor");
-    }
-  }, [router]);
 
   const handleOAuth = async (provider: OAuthProvider) => {
     setError("");

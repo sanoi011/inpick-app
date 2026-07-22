@@ -28,6 +28,10 @@ import {
 } from "@/lib/inpick/estimate-context/client";
 import type { Step1Data } from "@/components/workflow/Step1Cards";
 import type { Step2Data } from "@/components/workflow/Step2Designer";
+import {
+  normalizeSiteConditionAnswers,
+  siteConditionAnswerSummary,
+} from "@/lib/inpick/estimate-v2/site-condition-answers";
 
 const PERIOD_OPTIONS = [
   { value: 3, label: "3일" },
@@ -67,7 +71,7 @@ const REQUIRED_CONDITIONS = [
   {
     id: "fair_compare",
     title: "동일 조건으로 입찰 비교",
-    description: "총액뿐 아니라 포함 공사, 자재, 일정, 보증 조건을 같은 형식으로 비교합니다.",
+    description: "같은 프로젝트 조건으로 요청하고 업체가 보낸 총액·일정·보증 응답을 나란히 확인합니다.",
   },
 ];
 
@@ -83,7 +87,7 @@ export default function BiddingPage() {
   const [step1, setStep1] = useState<Step1Data | null>(null);
   const [step2, setStep2] = useState<Step2Data | null>(null);
   const [period, setPeriod] = useState(7);
-  const [shortlistSize, setShortlistSize] = useState<3 | 5>(3);
+  const shortlistSize = 3 as const;
   const [preferredStart, setPreferredStart] = useState("1개월 이내");
   const [visitPreference, setVisitPreference] = useState("현장 방문 가능");
   const [pickedOptions, setPickedOptions] = useState<string[]>([]);
@@ -143,6 +147,10 @@ export default function BiddingPage() {
   const deadlineDate = formatDate(new Date(today.getTime() + period * 86_400_000));
   const selectionDate = formatDate(new Date(today.getTime() + (period + 3) * 86_400_000));
   const budgetWon = (step1?.basicInfo.budget || 0) * 10_000;
+  const siteConditionSummary = useMemo(
+    () => siteConditionAnswerSummary(normalizeSiteConditionAnswers(step1?.siteConditions)),
+    [step1?.siteConditions],
+  );
 
   const selectedRenders = useMemo(() => {
     if (!step2?.rendersByRoom) return [];
@@ -174,6 +182,7 @@ export default function BiddingPage() {
         preferredStart,
         visitPreference,
         notes,
+        siteConditions: normalizeSiteConditionAnswers(step1?.siteConditions),
         drawingOptions: pickedOptions,
         designRenders: selectedRenders.map((render) => ({
           roomName: render.roomKey,
@@ -212,8 +221,8 @@ export default function BiddingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#f7f7f5] text-black">
-      <header className="sticky top-0 z-30 bg-[#f7f7f5]/90 backdrop-blur-xl">
+    <main className="min-h-screen bg-white text-black">
+      <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1240px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button
@@ -298,14 +307,26 @@ export default function BiddingPage() {
                   초기 업체 알림에는 시·군·구, 면적, 예산과 공사 조건만 전달됩니다. 상세 주소는 현장 방문을 합의한 업체에게 공개합니다.
                 </p>
               </div>
+              <div className="mt-3 rounded-2xl border border-black/[0.07] px-4 py-3">
+                <p className="text-[11px] font-bold text-black/45">현장확인 조건 · 업체에게 함께 전달</p>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {siteConditionSummary.map((item) => (
+                    <span key={item} className="rounded-full bg-[#f1f1ef] px-2.5 py-1.5 text-[10px] font-bold text-black/60">
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              </div>
             </SectionCard>
 
             <SectionCard number="02" title="매칭 방식" description="검토할 업체 수와 일정을 정합니다.">
               <div className="grid gap-4 sm:grid-cols-2">
-                <ChoiceGroup label="입찰 받을 업체 수">
-                  <ChoiceButton selected={shortlistSize === 3} onClick={() => setShortlistSize(3)} label="3개 업체" note="추천" />
-                  <ChoiceButton selected={shortlistSize === 5} onClick={() => setShortlistSize(5)} label="5개 업체" />
-                </ChoiceGroup>
+                <div className="rounded-[20px] border border-black/[0.07] bg-[#f7f7f5] p-4">
+                  <p className="text-xs font-black">최대 3개 적합 업체</p>
+                  <p className="mt-1.5 text-[11px] leading-5 text-black/45">
+                    지역·공종·예산 조건에 맞는 업체만 연결하며, 적합 업체가 부족하면 1~2곳만 연결될 수 있어요.
+                  </p>
+                </div>
                 <ChoiceGroup label="입찰 진행 기간">
                   {PERIOD_OPTIONS.map((option) => (
                     <ChoiceButton
@@ -456,7 +477,7 @@ export default function BiddingPage() {
               <div className="mt-5 space-y-3 border-y border-black/[0.07] py-4">
                 <SummaryRow label="공고번호" value={noticeNo} />
                 <SummaryRow label="매칭 지역" value={`${region.sido} ${region.gugun}`.trim()} />
-                <SummaryRow label="검토 업체" value={`${shortlistSize}곳`} />
+                <SummaryRow label="검토 업체" value={`최대 ${shortlistSize}곳`} />
                 <SummaryRow label="입찰 마감" value={deadlineDate} />
                 <SummaryRow label="선정 예정" value={selectionDate} />
                 <SummaryRow label="추가 자료" value={optionTokenCost > 0 ? `${optionTokenCost}토큰` : "선택 없음"} />
@@ -468,7 +489,7 @@ export default function BiddingPage() {
                 </div>
                 <ol className="mt-3 space-y-2 text-xs leading-5 text-black/55">
                   <li>1. 조건에 맞는 검증 업체를 우선 매칭</li>
-                  <li>2. 포함 항목·일정·보증을 같은 형식으로 접수</li>
+                  <li>2. 같은 프로젝트 조건으로 업체 응답 접수</li>
                   <li>3. 마이페이지에서 입찰을 나란히 비교 후 선정</li>
                 </ol>
               </div>

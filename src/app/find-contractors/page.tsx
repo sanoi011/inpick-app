@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Search, Building2, ChevronLeft, ChevronRight, Crown, FolderOpen, Loader2 } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, FolderOpen, Info, Loader2, Sparkles } from "lucide-react";
 import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
 import { ContractorCard } from "@/components/contractor/ContractorCard";
 import { ContractorFilters } from "@/components/contractor/ContractorFilters";
+import { ContractorConnectionJourney } from "@/components/contractor/ContractorConnectionJourney";
 import type { PublicContractor, ContractorType } from "@/types/contractor-directory";
 
 export default function FindContractorsPage() {
@@ -40,12 +41,13 @@ export default function FindContractorsPage() {
 
       const res = await fetch(`/api/contractors?${params}`);
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "업체 목록 조회 실패");
 
       setContractors(data.contractors || []);
       setTotal(data.total || 0);
       setTotalPages(data.totalPages || 0);
 
-      // 추천 업체 (첫 페이지, 필터 없을 때)
+      // 상단 노출 업체 (검증/추천과 별개)
       if (page === 1 && !search && type === "all" && !trade && !region) {
         setFeatured((data.contractors || []).filter((c: PublicContractor) => c.isFeatured));
       } else {
@@ -74,7 +76,7 @@ export default function FindContractorsPage() {
     : contractors;
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
+    <div className="min-h-screen bg-white text-[#0d0d0d]">
       <Header />
 
       {/* 히어로 배너 */}
@@ -84,25 +86,18 @@ export default function FindContractorsPage() {
             <Building2 className="h-5 w-5 text-black/55" strokeWidth={1.7} />
             <p className="text-[11px] font-semibold tracking-[0.16em] text-black/38">CONTRACTOR DIRECTORY</p>
           </div>
-          <h1 className="text-[32px] font-medium tracking-[-0.055em] sm:text-[42px]">인테리어 전문업체 찾기</h1>
-          <p className="mb-6 mt-2 text-sm text-black/45">
-            검증된 종합 인테리어 업체와 전문공종 업체를 찾아보세요
+          <h1 className="text-[32px] font-black tracking-[-0.055em] sm:text-[46px]">근거를 보고, 조건을 맞춰<br className="hidden sm:block" /> 인테리어 업체 찾기</h1>
+          <p className="mx-auto mt-3 max-w-3xl break-keep text-sm leading-6 text-black/48">
+            사업자 정보 확인, 공종, 포트폴리오와 등록된 리뷰를 따로 보고 같은 프로젝트 조건으로 견적을 요청하세요.
           </p>
-          {/* 검색 바 (히어로 내) */}
-          <form className="max-w-xl mx-auto relative" onSubmit={(e) => e.preventDefault()}>
-            <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-black/30" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="업체명으로 검색..."
-              className="w-full rounded-full border border-black/[0.09] bg-[#f7f7f5] py-3.5 pl-11 pr-4 text-sm outline-none transition focus:border-black/40"
-            />
-          </form>
         </div>
       </section>
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6 sm:py-10">
+        <div className="mb-8">
+          <ContractorConnectionJourney />
+        </div>
+
         {/* 필터 */}
         <div className="mb-6">
           <ContractorFilters
@@ -149,12 +144,15 @@ export default function FindContractorsPage() {
           </div>
         ) : (
           <>
-            {/* 추천 업체 */}
+            {/* 상단 노출 업체 */}
             {featured.length > 0 && (
               <div className="mb-8">
-                <div className="flex items-center gap-2 mb-3">
-                  <Crown className="w-4 h-4 text-amber-500" />
-                  <h2 className="text-sm font-bold text-gray-900">추천 업체</h2>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <Sparkles className="h-4 w-4 text-[#f15b4a]" />
+                  <h2 className="text-sm font-black text-gray-900">상단 노출</h2>
+                  <span className="inline-flex items-center gap-1 text-[10px] leading-4 text-black/40">
+                    <Info className="h-3 w-3" /> 노출 설정 또는 요금제에 따른 표시이며, 검증 상태와는 별개예요.
+                  </span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {featured.map((c) => (

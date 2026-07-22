@@ -28,17 +28,20 @@ export async function POST(req: NextRequest) {
     }
 
     const token = createResetToken(contractor.id, contractor.email);
-    const origin = req.headers.get("origin") || req.headers.get("referer")?.replace(/\/[^/]*$/, "") || "http://localhost:3000";
-    const resetUrl = `${origin}/contractor/reset-password?token=${token}`;
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const resetUrl = `${appUrl.replace(/\/$/, "")}/contractor/reset-password?token=${token}`;
 
-    // 개발 단계: 콘솔 로그 + 응답에 포함 (프로덕션에서는 이메일 발송으로 교체)
-    console.log(`[forgot-password] Reset URL for ${contractor.email}: ${resetUrl}`);
+    if (process.env.NODE_ENV !== "production") {
+      console.log(`[forgot-password] Development reset URL: ${resetUrl}`);
+      return NextResponse.json({
+        message: "비밀번호 재설정 이메일을 발송했습니다.",
+        resetUrl,
+      });
+    }
 
-    return NextResponse.json({
-      message: "비밀번호 재설정 이메일을 발송했습니다.",
-      // 개발용: 프로덕션에서는 resetUrl 제거
-      resetUrl,
-    });
+    // 운영에서는 reset token을 응답·로그로 노출하지 않는다.
+    // 이메일 provider 연결 전까지는 동일한 중립 응답만 반환한다.
+    return NextResponse.json({ message: "비밀번호 재설정 이메일을 발송했습니다." });
   } catch (err) {
     console.error("[forgot-password] Error:", err);
     return NextResponse.json({ error: "서버 오류가 발생했습니다." }, { status: 500 });

@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getContractorIdFromRequest } from "@/lib/contractor-auth";
 
 export async function GET(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
   const contractorId = req.nextUrl.searchParams.get("contractorId");
   if (!contractorId) {
     return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+  }
+  if (contractorId !== authContractorId) {
+    return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
   }
 
   try {
@@ -13,10 +21,12 @@ export async function GET(req: NextRequest) {
     const { data: contractor, error } = await supabase
       .from("specialty_contractors")
       .select(`
-        *,
-        contractor_trades(*),
-        contractor_portfolio(*),
-        contractor_reviews(*)
+        id, company_name, contact_name, phone, email, address, region,
+        license_number, introduction, description, logo_url,
+        is_public, is_verified, contractor_type,
+        contractor_trades(id, trade_code, trade_name, experience_years, is_primary),
+        contractor_portfolio(id, title, description, project_type, completion_date, images, tags, work_scope, features),
+        contractor_reviews(id, overall_rating, rating, content, response_content, response_at, created_at, is_verified)
       `)
       .eq("id", contractorId)
       .single();
@@ -33,12 +43,19 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const authContractorId = getContractorIdFromRequest(req);
+  if (!authContractorId) {
+    return NextResponse.json({ error: "인증이 필요합니다" }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { contractorId, trades, ...updateFields } = body;
 
     if (!contractorId) {
       return NextResponse.json({ error: "contractorId 필요" }, { status: 400 });
+    }
+    if (contractorId !== authContractorId) {
+      return NextResponse.json({ error: "권한이 없습니다" }, { status: 403 });
     }
 
     const supabase = createClient();
@@ -55,7 +72,7 @@ export async function PATCH(req: NextRequest) {
       introduction: "introduction",
       description: "description",
       logoUrl: "logo_url",
-      businessLicenseUrl: "business_license_url",
+
       isPublic: "is_public",
       contractorType: "contractor_type",
     };

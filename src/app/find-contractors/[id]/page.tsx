@@ -2,16 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowLeft, Star, Shield, MapPin, Crown, Phone, Mail, Briefcase,
-  Clock, Camera, MessageCircle, Building2,
+  ArrowLeft, Star, ShieldCheck, MapPin, Briefcase,
+  Clock, Camera, MessageCircle, Building2, Info, Sparkles,
 } from "lucide-react";
 import { Header } from "@/components/landing/Header";
 import { Footer } from "@/components/landing/Footer";
 import { InquiryModal } from "@/components/contractor/InquiryModal";
 import { CONTRACTOR_TYPE_LABELS, CONTRACTOR_TYPE_COLORS } from "@/types/contractor-directory";
 import type { ContractorType } from "@/types/contractor-directory";
+import { buildContractorEvidence, formatContractorRegion, getPlacementDisclosure } from "@/lib/contractor-experience";
 
 interface ContractorDetail {
   id: string;
@@ -28,8 +30,7 @@ interface ContractorDetail {
   introduction: string;
   description: string;
   logo_url: string;
-  phone: string;
-  email: string;
+
   contractor_trades: { trade_code: string; trade_name: string; experience_years: number; is_primary: boolean }[];
   contractor_portfolio: { id: string; title: string; description: string; project_type: string; completion_date: string; image_urls: string[]; tags: string[] }[];
   contractor_reviews: { id: string; rating: number; title: string; content: string; is_verified: boolean; created_at: string }[];
@@ -59,7 +60,7 @@ export default function ContractorDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#f7f7f5]">
+      <div className="min-h-screen bg-white">
         <Header />
         <main className="mx-auto max-w-4xl px-4 pb-10 pt-[calc(7rem+env(safe-area-inset-top,0px))] sm:px-6">
           <div className="h-5 w-20 bg-gray-200 rounded animate-pulse mb-4" />
@@ -91,7 +92,7 @@ export default function ContractorDetailPage() {
 
   if (!contractor) {
     return (
-      <div className="min-h-screen bg-[#f7f7f5]">
+      <div className="min-h-screen bg-white">
         <Header />
         <div className="mx-auto max-w-3xl px-6 pb-20 pt-[calc(7rem+env(safe-area-inset-top,0px))] text-center">
           <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
@@ -113,6 +114,18 @@ export default function ContractorDetailPage() {
   const reviews = c.contractor_reviews || [];
   const isPremium = c.is_featured || c.subscription_tier === "premium" || c.subscription_tier === "enterprise";
   const maxExp = trades.length > 0 ? Math.max(...trades.map((t) => t.experience_years)) : 0;
+  const subscriptionTier = c.subscription_tier === "premium" || c.subscription_tier === "enterprise"
+    ? c.subscription_tier
+    : "free";
+  const placement = getPlacementDisclosure({ isFeatured: c.is_featured, subscriptionTier });
+  const evidence = buildContractorEvidence({
+    isVerified: c.is_verified,
+    isFeatured: c.is_featured,
+    subscriptionTier,
+    totalReviews: c.total_reviews,
+    completedProjects: c.completed_projects,
+    portfolioThumbnails: portfolio.flatMap((item) => item.image_urls || []).slice(0, 3),
+  });
 
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: "intro", label: "소개" },
@@ -122,7 +135,7 @@ export default function ContractorDetailPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#f7f7f5] text-[#0d0d0d]">
+    <div className="min-h-screen bg-white text-[#0d0d0d]">
       <Header />
 
       <main className="mx-auto max-w-4xl px-4 pb-10 pt-[calc(7rem+env(safe-area-inset-top,0px))] sm:px-6">
@@ -151,8 +164,12 @@ export default function ContractorDetailPage() {
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl font-bold text-gray-900">{c.company_name}</h1>
-                {c.is_verified && <Shield className="w-5 h-5 text-black/55" />}
-                {isPremium && <Crown className="w-5 h-5 text-amber-500" />}
+                {c.is_verified && <ShieldCheck className="h-5 w-5 text-[#197455]" aria-label="사업자 정보 확인" />}
+                {placement && (
+                  <span title={placement.description} className="inline-flex items-center gap-1 rounded-full bg-[#fff1ec] px-2.5 py-1 text-[10px] font-black text-[#b83e2f]">
+                    <Sparkles className="h-3 w-3" /> {placement.label}
+                  </span>
+                )}
                 <span className={`px-2 py-0.5 rounded text-xs font-semibold ${
                   CONTRACTOR_TYPE_COLORS[c.contractor_type || "specialty"]
                 }`}>
@@ -161,14 +178,18 @@ export default function ContractorDetailPage() {
               </div>
 
               <div className="flex items-center gap-3 mt-2 flex-wrap">
-                <span className="flex items-center gap-1 text-sm">
-                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                  <span className="font-bold text-gray-900">{c.rating.toFixed(1)}</span>
-                  <span className="text-gray-400">({c.total_reviews} 리뷰)</span>
-                </span>
+                {c.total_reviews > 0 ? (
+                  <span className="flex items-center gap-1 text-sm">
+                    <Star className="h-4 w-4 fill-yellow-500 text-yellow-500" />
+                    <span className="font-bold text-gray-900">{c.rating.toFixed(1)}</span>
+                    <span className="text-gray-400">({c.total_reviews} 리뷰)</span>
+                  </span>
+                ) : (
+                  <span className="text-sm text-black/40">리뷰 미등록</span>
+                )}
                 <span className="text-gray-300">|</span>
                 <span className="flex items-center gap-1 text-sm text-gray-500">
-                  <MapPin className="w-3.5 h-3.5" /> {c.region || "전국"}
+                  <MapPin className="w-3.5 h-3.5" /> {formatContractorRegion(c.region)}
                 </span>
                 {maxExp > 0 && (
                   <>
@@ -186,15 +207,42 @@ export default function ContractorDetailPage() {
             </div>
 
             {/* CTA */}
-            <button
-              onClick={() => setShowInquiry(true)}
-              className="flex flex-shrink-0 items-center gap-2 rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm font-medium text-white transition hover:bg-black/80"
-            >
-              <MessageCircle className="w-4 h-4" />
-              견적 요청하기
-            </button>
+            <div className="flex shrink-0 flex-col gap-2 sm:items-end">
+              <button
+                onClick={() => setShowInquiry(true)}
+                className="flex items-center justify-center gap-2 rounded-full bg-[#0d0d0d] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-black/80"
+              >
+                <MessageCircle className="h-4 w-4" /> 1:1 문의 보내기
+              </button>
+              <Link href="/workflow/bidding" className="text-center text-[10px] font-bold text-black/42 underline-offset-4 hover:text-black hover:underline">
+                여러 업체에 동일 조건으로 요청
+              </Link>
+            </div>
           </div>
         </div>
+
+        <section className="mb-6 rounded-[24px] border border-black/[0.07] bg-white p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-black">확인 가능한 근거</h2>
+            <span className="inline-flex items-center gap-1 text-[10px] text-black/38">
+              <Info className="h-3 w-3" /> 등록·확인된 데이터만 표시합니다.
+            </span>
+          </div>
+          {evidence.length > 0 ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {evidence.map((item, index) => (
+                <span key={item.kind} className={`rounded-full px-3 py-2 text-[11px] font-bold ${["bg-[#eaf8f1]", "bg-[#f0edff]", "bg-[#fff8db]", "bg-[#fff1ec]"][index % 4]}`}>
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 text-xs leading-5 text-black/42">
+              사업자 정보 확인, 등록된 리뷰, 완료 실적, 포트폴리오 근거가 아직 등록되지 않았습니다.
+            </p>
+          )}
+          {placement && <p className="mt-3 text-[10px] leading-4 text-black/38">{placement.description}</p>}
+        </section>
 
         {/* 탭 */}
         <div className="flex gap-1 border-b border-gray-200 mb-6">
@@ -226,21 +274,9 @@ export default function ContractorDetailPage() {
               </p>
             </div>
 
-            {/* 연락처 (공개 정보) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {c.phone && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Phone className="w-4 h-4 text-gray-400" />
-                  {c.phone}
-                </div>
-              )}
-              {c.email && (
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail className="w-4 h-4 text-gray-400" />
-                  {c.email}
-                </div>
-              )}
-            </div>
+            <p className="text-xs leading-5 text-black/42">
+              연락처는 문의를 보낸 뒤 업체가 확인하는 단계에서만 공유됩니다.
+            </p>
 
             {/* 주요 공종 */}
             {trades.length > 0 && (

@@ -2,108 +2,142 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { Star, Shield, MapPin, Crown } from "lucide-react";
+import {
+  ArrowUpRight,
+  BriefcaseBusiness,
+  Images,
+  MapPin,
+  MessageCircleMore,
+  ShieldCheck,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import type { PublicContractor } from "@/types/contractor-directory";
-import { CONTRACTOR_TYPE_LABELS, CONTRACTOR_TYPE_COLORS } from "@/types/contractor-directory";
+import {
+  CONTRACTOR_TYPE_COLORS,
+  CONTRACTOR_TYPE_LABELS,
+} from "@/types/contractor-directory";
+import {
+  buildContractorEvidence,
+  formatContractorRegion,
+  getPlacementDisclosure,
+} from "@/lib/contractor-experience";
+
+const EVIDENCE_ICONS = {
+  verified: ShieldCheck,
+  review: MessageCircleMore,
+  project: BriefcaseBusiness,
+  portfolio: Images,
+} as const;
 
 export function ContractorCard({ contractor }: { contractor: PublicContractor }) {
-  const isPremium = contractor.isFeatured || contractor.subscriptionTier === "premium" || contractor.subscriptionTier === "enterprise";
+  const placement = getPlacementDisclosure(contractor);
+  const evidence = buildContractorEvidence(contractor);
 
   return (
     <Link
       href={`/find-contractors/${contractor.id}`}
-      className={`block rounded-[22px] border bg-white p-5 transition-all hover:-translate-y-0.5 ${
-        isPremium ? "border-black/25 ring-1 ring-black/[0.04]" : "border-black/[0.07] hover:border-black/20"
-      }`}
+      className="group relative block overflow-hidden rounded-[26px] border border-black/[0.07] bg-white p-5 transition duration-300 hover:-translate-y-1 hover:border-black/20 hover:shadow-[0_18px_50px_rgba(0,0,0,0.07)]"
     >
-      {/* 상단: 로고 + 기본 정보 */}
-      <div className="flex items-start gap-3 mb-3">
+      <span className="pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full bg-[#fff2ed] opacity-0 transition group-hover:opacity-100" />
+
+      <div className="relative flex items-start gap-3">
         {contractor.logoUrl ? (
           <Image
             src={contractor.logoUrl}
             alt={contractor.companyName}
-            width={48}
-            height={48}
-            className="w-12 h-12 rounded-lg object-cover border border-gray-100 flex-shrink-0"
+            width={52}
+            height={52}
+            className="h-[52px] w-[52px] shrink-0 rounded-2xl border border-black/[0.06] object-cover"
           />
         ) : (
-          <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-lg flex-shrink-0">
+          <div className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl bg-[#f0edff] text-lg font-black text-black/60">
             {contractor.companyName.charAt(0)}
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <h3 className="text-sm font-bold text-gray-900 truncate">{contractor.companyName}</h3>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h3 className="truncate text-sm font-black text-black">{contractor.companyName}</h3>
             {contractor.isVerified && (
-              <Shield className="w-3.5 h-3.5 text-black/55 flex-shrink-0" />
+              <span title="사업자 정보 확인">
+                <ShieldCheck className="h-4 w-4 text-[#197455]" />
+              </span>
             )}
-            {isPremium && (
-              <Crown className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
+            {placement && (
+              <span
+                title={placement.description}
+                className="inline-flex items-center gap-1 rounded-full bg-[#fff1ec] px-2 py-1 text-[9px] font-black text-[#b83e2f]"
+              >
+                <Sparkles className="h-3 w-3" /> {placement.label}
+              </span>
             )}
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <span className="flex items-center gap-0.5 text-xs">
-              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-              <span className="font-semibold text-gray-900">{contractor.rating.toFixed(1)}</span>
-              <span className="text-gray-400">({contractor.totalReviews})</span>
-            </span>
-            <span className="text-gray-300">|</span>
-            <span className="flex items-center gap-0.5 text-xs text-gray-500">
-              <MapPin className="w-3 h-3" />
-              {contractor.region || "전국"}
+          <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-black/45">
+            {contractor.totalReviews > 0 ? (
+              <span className="flex items-center gap-1">
+                <Star className="h-3 w-3 fill-[#f6b73c] text-[#f6b73c]" />
+                <strong className="text-black/75">{contractor.rating.toFixed(1)}</strong>
+                <span>리뷰 {contractor.totalReviews}</span>
+              </span>
+            ) : (
+              <span>리뷰 미등록</span>
+            )}
+            <span className="h-2.5 w-px bg-black/10" />
+            <span className="flex items-center gap-1">
+              <MapPin className="h-3 w-3" /> {formatContractorRegion(contractor.region)}
             </span>
           </div>
         </div>
+        <ArrowUpRight className="h-4 w-4 shrink-0 text-black/25 transition group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-black" />
       </div>
 
-      {/* 업체 유형 + 공종 */}
-      <div className="flex flex-wrap gap-1 mb-2">
-        <span className={`px-1.5 py-0.5 rounded text-xs font-semibold ${
-          CONTRACTOR_TYPE_COLORS[contractor.contractorType]
-        }`}>
+      <div className="relative mt-4 flex flex-wrap gap-1.5">
+        <span className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${CONTRACTOR_TYPE_COLORS[contractor.contractorType]}`}>
           {CONTRACTOR_TYPE_LABELS[contractor.contractorType]}
         </span>
-        {contractor.trades.slice(0, 3).map((t) => (
-          <span
-            key={t.code}
-            className="px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600"
-          >
-            {t.name}
+        {contractor.trades.slice(0, 3).map((trade) => (
+          <span key={trade.code} className="rounded-full bg-[#f5f5f3] px-2.5 py-1 text-[10px] font-bold text-black/55">
+            {trade.name}
           </span>
         ))}
         {contractor.trades.length > 3 && (
-          <span className="px-1.5 py-0.5 rounded text-xs text-gray-400">
+          <span className="rounded-full bg-[#f5f5f3] px-2.5 py-1 text-[10px] font-bold text-black/35">
             +{contractor.trades.length - 3}
           </span>
         )}
       </div>
 
-      {/* 소개 */}
       {contractor.introduction && (
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3">
+        <p className="relative mt-3 line-clamp-2 text-xs leading-5 text-black/48">
           {contractor.introduction}
         </p>
       )}
 
-      {/* 포트폴리오 썸네일 */}
       {contractor.portfolioThumbnails.length > 0 && (
-        <div className="flex gap-1.5 mb-3">
-          {contractor.portfolioThumbnails.slice(0, 3).map((url, i) => (
-            <div key={i} className="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0 relative">
-              <Image src={url} alt="" fill className="object-cover" sizes="64px" />
+        <div className="relative mt-4 grid grid-cols-3 gap-1.5 overflow-hidden rounded-2xl">
+          {contractor.portfolioThumbnails.slice(0, 3).map((url, index) => (
+            <div key={`${url}-${index}`} className="relative aspect-[4/3] overflow-hidden bg-[#f3f3f1]">
+              <Image src={url} alt={`${contractor.companyName} 시공 사례 ${index + 1}`} fill className="object-cover transition duration-500 group-hover:scale-[1.03]" sizes="140px" />
             </div>
           ))}
         </div>
       )}
 
-      {/* 하단 */}
-      <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-        <span className="text-xs text-gray-400">
-          시공 {contractor.completedProjects}건
-        </span>
-        <span className="text-xs font-medium text-black/60">
-          상세보기 &rarr;
-        </span>
+      <div className="relative mt-4 border-t border-black/[0.06] pt-3">
+        {evidence.length > 0 ? (
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5">
+            {evidence.map((item) => {
+              const Icon = EVIDENCE_ICONS[item.kind];
+              return (
+                <span key={item.kind} className="inline-flex items-center gap-1 text-[10px] font-bold text-black/48">
+                  <Icon className="h-3 w-3" /> {item.label}
+                </span>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-[10px] leading-4 text-black/35">확인 가능한 리뷰·실적·포트폴리오가 아직 등록되지 않았어요.</p>
+        )}
       </div>
     </Link>
   );

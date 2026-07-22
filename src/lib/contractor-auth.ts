@@ -1,7 +1,13 @@
 import { createHmac } from "crypto";
 import bcrypt from "bcryptjs";
 
-const JWT_SECRET = process.env.CONTRACTOR_JWT_SECRET || process.env.ADMIN_PASSWORD || "inpick-contractor-secret-2026";
+function getJwtSecret(): string {
+  const secret = process.env.CONTRACTOR_JWT_SECRET || process.env.ADMIN_PASSWORD;
+  if (!secret) {
+    throw new Error("CONTRACTOR_JWT_SECRET 또는 ADMIN_PASSWORD가 필요합니다.");
+  }
+  return secret;
+}
 const TOKEN_EXPIRY_HOURS = 24 * 7; // 7 days
 
 // ─── Password ───
@@ -27,8 +33,8 @@ function base64url(str: string): string {
   return Buffer.from(str).toString("base64url");
 }
 
-function sign(payload: string): string {
-  return createHmac("sha256", JWT_SECRET).update(payload).digest("base64url");
+function sign(data: string): string {
+  return createHmac("sha256", getJwtSecret()).update(data).digest("base64url");
 }
 
 export function createToken(contractorId: string, email: string): string {
@@ -124,16 +130,6 @@ export function getContractorIdFromRequest(request: Request): string | null {
   const token = authHeader.replace(/^Bearer\s+/i, "");
   if (!token) return null;
 
-  // 새 HMAC 토큰
   const payload = verifyToken(token);
-  if (payload) return payload.sub;
-
-  // 레거시 base64 토큰 (마이그레이션 기간 호환)
-  try {
-    const decoded = Buffer.from(token, "base64").toString();
-    const parsed = JSON.parse(decoded);
-    if (parsed.id) return parsed.id;
-  } catch { /* not legacy */ }
-
-  return null;
+  return payload?.sub || null;
 }
