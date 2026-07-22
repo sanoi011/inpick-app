@@ -158,7 +158,7 @@ function synthesizeLinesForOutput(
   ];
   for (const sKind of baseSurfaces) {
     const hint = hintsBySurface[sKind];
-    const stdLine = standardLineForSurface(sKind, output.targetName);
+    const stdLine = standardLineForSurface(sKind);
     if (hint) {
       lines.push({
         targetType: output.targetType,
@@ -212,7 +212,7 @@ function synthesizeLinesForOutput(
   for (const hint of output.materialHints ?? []) {
     if (baseSurfaces.includes(hint.surfaceType as "floor" | "wall" | "ceiling"))
       continue;
-    const ext = extraSurfaceLine(hint, output.targetName);
+    const ext = extraSurfaceLine(hint);
     if (!ext) continue;
     lines.push({
       targetType: output.targetType,
@@ -259,7 +259,7 @@ function synthesizeFallbackLines(ctx: ContextRow): ContextEstimateLine[] {
     "ceiling",
   ];
   for (const sKind of baseSurfaces) {
-    const stdLine = standardLineForSurface(sKind, "전체 공간");
+    const stdLine = standardLineForSurface(sKind);
     const quantity =
       sKind === "floor"
         ? areaM2
@@ -346,7 +346,6 @@ const STANDARD_ROOM_AREA: Record<string, number> = {
 /** surface별 표준 단가 (vision 분석 전 1차 폴백) */
 function standardLineForSurface(
   s: "floor" | "wall" | "ceiling",
-  _targetName: string,
 ): {
   materialName: string;
   unit: string;
@@ -377,7 +376,6 @@ function standardLineForSurface(
 
 function extraSurfaceLine(
   hint: MaterialHint,
-  _targetName: string,
 ): { surface: string; materialName: string; unit: string; quantity: number; unitPriceWon: number } | null {
   switch (hint.surfaceType) {
     case "counter":

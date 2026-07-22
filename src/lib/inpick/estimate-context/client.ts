@@ -47,6 +47,24 @@ export function resolveWorkflowVisibleStep(input: {
   return input.lastStep === 2 && input.hasStep2 ? 2 : 1;
 }
 
+/**
+ * 저장소가 비어 있는 일반 진입만 계정의 최신 프로젝트를 복원한다.
+ * `?new=1`은 새 프로젝트라는 명시적 사용자 의사이므로 기존 프로젝트를 재채택하지 않는다.
+ */
+export function shouldAdoptLatestWorkflowProject(input: {
+  freshProjectRequested: boolean;
+  requestedProjectId: string;
+  workflowStateExists: boolean;
+  hasStep2: boolean;
+}): boolean {
+  return (
+    !input.freshProjectRequested &&
+    !input.requestedProjectId &&
+    !input.workflowStateExists &&
+    !input.hasStep2
+  );
+}
+
 const workflowStateCache = new Map<
   string,
   { expiresAt: number; value: WorkflowStateRow | null }
@@ -80,6 +98,18 @@ export function getOrCreateWorkflowProjectId(): string {
   }
 }
 
+/** 비동기 복원 결과가 아직 같은 프로젝트에 속하는지 확인한다. */
+export function isActiveWorkflowProjectId(projectId: string): boolean {
+  if (typeof window === "undefined" || !projectId) return false;
+  try {
+    return (
+      localStorage.getItem(PROJECT_ID_KEY) || sessionStorage.getItem(PROJECT_ID_KEY)
+    ) === projectId;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * 영속 저장용 step2 경량화 — rendersByRoom 각 항목의 순수 base64/dataUrl 제거.
  * (base64는 활성 세션의 Anthropic 편집 전송용일 뿐, 표시는 imageUrl[스토리지 URL]로 충분.
@@ -88,14 +118,37 @@ export function getOrCreateWorkflowProjectId(): string {
  * 메모리상의 state는 그대로 두고, 저장하는 복사본만 경량화한다.
  */
 export function lightenWorkflowStep2<T>(step2: T): T {
-  const s = step2 as unknown as { rendersByRoom?: Record<string, Array<Record<string, unknown>>> };
+  const s = step2 as unknown as {
+    rendersByRoom?: Record<string, Array<Record<string, unknown>>>;
+    unlockedRenderKeys?: Record<string, string[]>;
+  };
   if (!s || typeof s !== "object" || !s.rendersByRoom) return step2;
   const lightened: Record<string, Array<Record<string, unknown>>> = {};
   for (const key of Object.keys(s.rendersByRoom)) {
-    lightened[key] = (s.rendersByRoom[key] || []).map((item) => {
-      const { base64, dataUrl, ...rest } = item as Record<string, unknown> & { base64?: unknown; dataUrl?: unknown };
-      void base64; void dataUrl;
-      return rest;
+    const livingRoom = key === "living" || /거실|living/i.test(key);
+    lightened[key] = (s.rendersByRoom[key] || []).map((item, index) => {
+      const {
+        base64,
+        dataUrl,
+        url,
+        refinedUrl,
+        ...rest
+      } = item as Record<string, unknown> & {
+        base64?: unknown;
+        dataUrl?: unknown;
+        url?: unknown;
+        refinedUrl?: unknown;
+      };
+      void base64;
+      void dataUrl;
+      const renderKey =
+        typeof item.timestamp === "string" ? item.timestamp : `render-${index}`;
+      const unlocked =
+        livingRoom ||
+        item.accessState === "unlocked" ||
+        (s.unlockedRenderKeys?.[key] || []).includes(renderKey);
+      if (item.lockedAssetId || !unlocked || item.accessState === "locked") return rest;
+      return { ...rest, ...(url != null ? { url } : {}), ...(refinedUrl != null ? { refinedUrl } : {}) };
     });
   }
   return { ...(s as object), rendersByRoom: lightened } as unknown as T;
@@ -221,6 +274,41 @@ export function clearWorkflowProjectId() {
     sessionStorage.removeItem(PROJECT_ID_KEY);
   } catch {
     /* ignore */
+  }
+}
+
+/**
+ * 명시적인 "새 프로젝트" 시작 경계.
+ *
+ * 기존 projectId를 재사용한 채 메모리 state만 비우면 마운트 중인 DB/design_outputs
+ * 복원이 이전 프로젝트 이미지를 다시 Step2에 합친다. 따라서 활성 키, 프로젝트별
+ * snapshot, 후속 견적/입찰 임시값을 먼저 제거한 뒤 완전히 새 id를 발급한다.
+ */
+export function startFreshWorkflowSession(forcedProjectId?: string): string {
+  if (typeof window === "undefined") return "";
+  try {
+    const previousProjectId =
+      localStorage.getItem(PROJECT_ID_KEY) || sessionStorage.getItem(PROJECT_ID_KEY) || "";
+    clearWorkflowSessionSnapshot(previousProjectId);
+    sessionStorage.removeItem("workflow_rfq_decision_packet");
+    sessionStorage.removeItem("bidding_post");
+    localStorage.removeItem(PROJECT_ID_KEY);
+    sessionStorage.removeItem(PROJECT_ID_KEY);
+
+    if (previousProjectId) {
+      workflowStateCache.delete(previousProjectId);
+      workflowStateRequests.delete(previousProjectId);
+    }
+
+    const nextProjectId =
+      forcedProjectId ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : fallbackUuid());
+    localStorage.setItem(PROJECT_ID_KEY, nextProjectId);
+    return nextProjectId;
+  } catch {
+    return forcedProjectId || fallbackUuid();
   }
 }
 

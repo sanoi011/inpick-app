@@ -31,6 +31,10 @@ interface MinimalRoom {
   prompts?: string[];
   widthM?: number;
   depthM?: number;
+  kitchenPlan?: {
+    tallCabinetEa: number;
+    tallCabinetLabels: string[];
+  };
   /** 사용자 선택 자재 (있으면 user_selected_material 우선) */
   userSelectedMaterials?: Array<{
     surfaceType: MaterialHint["surfaceType"];
@@ -185,6 +189,11 @@ export function buildConstructionEstimateClientSide(
     projectMode: input.projectMode,
     surfacePlans,
     quantityBasisByRoom,
+    kitchenPlanOverrides: Object.fromEntries(
+      input.rooms
+        .filter((room) => room.kitchenPlan)
+        .map((room) => [room.roomName, room.kitchenPlan!]),
+    ),
     siteConditions: input.siteConditions,
   });
 }

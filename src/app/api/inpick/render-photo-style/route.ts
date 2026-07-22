@@ -24,6 +24,13 @@ import {
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import { buildPhotoRenderPrompt } from "@/lib/inpick/photo-render-prompt";
+import {
+  completeLockedDelivery,
+  prepareLockedDelivery,
+  type LockedDeliveryRequest,
+} from "@/lib/inpick/locked-design/delivery";
+import { LockedDesignRequestError } from "@/lib/inpick/locked-design/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -36,55 +43,16 @@ interface RenderPhotoStyleBody {
   areaM2?: number;
   pyung?: number;
   spaceType?: string;
+  residentialType?: string;
   businessType?: string;
   zoneName?: string;
   budgetTier?: "basic" | "standard" | "premium";
   quality?: "low" | "medium" | "high";
+  furnishingOptions?: string[];
+  lockedDelivery?: LockedDeliveryRequest;
 }
 
 const OPENAI_BASE = "https://api.openai.com/v1";
-
-function buildPrompt(b: RenderPhotoStyleBody): string {
-  const lines: string[] = [];
-  lines.push("Photorealistic Korean interior concept image, 8K, magazine quality.");
-
-  if (b.projectMode === "commercial" && b.businessType) {
-    lines.push(`Business type: ${b.businessType}.`);
-    if (b.zoneName) lines.push(`Target zone: ${b.zoneName}.`);
-  }
-  if (b.spaceType) lines.push(`Space type: ${b.spaceType}.`);
-
-  const area =
-    b.areaM2 ??
-    (b.pyung ? Math.round(b.pyung * 3.305785) : undefined);
-  if (area) lines.push(`Total floor area: ${area} m² (${(area / 3.305785).toFixed(1)} pyung).`);
-
-  if (b.budgetTier) {
-    const tierWords = {
-      basic: "Budget-friendly finishes (vinyl flooring, painted walls, basic lighting).",
-      standard: "Mid-range finishes (engineered wood, accent wall, layered lighting).",
-      premium: "Premium finishes (natural stone or wide-plank wood, designer fixtures, indirect lighting).",
-    }[b.budgetTier];
-    if (tierWords) lines.push(tierWords);
-  }
-
-  lines.push("");
-  lines.push("STYLE DIRECTION:");
-  lines.push(b.stylePrompt);
-
-  if (b.negativePrompt) {
-    lines.push("");
-    lines.push("AVOID: " + b.negativePrompt);
-  }
-
-  lines.push("");
-  lines.push("COMPOSITION:");
-  lines.push("- Realistic perspective, eye-level camera, soft natural lighting mixed with warm interior light.");
-  lines.push("- Show actual usable furniture and accessories suitable for Korean interior context.");
-  lines.push("- No watermarks, no text overlays, no logos.");
-
-  return lines.join("\n");
-}
 
 export async function POST(req: NextRequest) {
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
@@ -92,6 +60,7 @@ export async function POST(req: NextRequest) {
   let analyticsMode: "photo_only" | "commercial" = "photo_only";
   try {
     const body = (await req.json()) as RenderPhotoStyleBody;
+    const lockedDelivery = await prepareLockedDelivery(body.lockedDelivery);
     analyticsMode = body.projectMode === "commercial" ? "commercial" : "photo_only";
 
     // ─── validation (토큰 차감 전) ─────────────────────────
@@ -134,7 +103,7 @@ export async function POST(req: NextRequest) {
       /거실|living/i.test(body.spaceType || "") ||
       (body.projectMode !== "commercial" && !body.spaceType);
     try {
-      charge = await enforceConsume(isLivingRoom ? "render-room-living" : "render-room", {
+      if (!lockedDelivery) charge = await enforceConsume(isLivingRoom ? "render-room-living" : "render-room", {
         feature: "render-photo-style",
         projectMode: body.projectMode,
         businessType: body.businessType,
@@ -161,11 +130,12 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── rate limit ──────────────────────────────────────
+    const actorUserId = lockedDelivery?.userId ?? charge!.userId;
     try {
-      await enforceRateLimit(charge.userId, "render-room");
+      await enforceRateLimit(actorUserId, "render-room");
     } catch (e) {
       if (e instanceof RateLimitError) {
-        await refundCredits(charge.userId, charge.charged, "rate-limited:render-photo-style").catch(() => {});
+        if (charge) await refundCredits(charge.userId, charge.charged, "rate-limited:render-photo-style").catch(() => {});
         return NextResponse.json(
           {
             error: "RATE_LIMIT_EXCEEDED",
@@ -182,19 +152,19 @@ export async function POST(req: NextRequest) {
     trackServerEventAsync({
       eventName: AnalyticsEvents.ImageGenerationRequested,
       actorType: "consumer",
-      userId: charge.userId,
+      userId: actorUserId,
       projectMode: analyticsMode,
       source: "api",
       props: {
         endpoint: "render-photo-style",
         quality: body.quality ?? "low",
         businessType: body.businessType,
-        credit_charged: charge.charged,
+        credit_charged: charge?.charged ?? 0,
       },
     });
 
     // ─── OpenAI generations 호출 ────────────────────────────
-    const compiledPrompt = buildPrompt(body);
+    const compiledPrompt = buildPhotoRenderPrompt(body);
     const apiKey = getOpenAIKey()!;
     const size = "1024x1024";
     const quality = body.quality || "low";
@@ -270,6 +240,17 @@ export async function POST(req: NextRequest) {
 
     // ─── Storage 업로드 ───────────────────────────────────
     const dataUrl = `data:image/png;base64,${imageBase64}`;
+    if (lockedDelivery) {
+      const asset = await completeLockedDelivery(lockedDelivery, dataUrl, compiledPrompt);
+      return NextResponse.json({
+        asset,
+        prompt: compiledPrompt,
+        model: usedModel,
+        backend: "openai",
+        costUsd: costMap[quality] ?? 0.01,
+        mode: body.projectMode || "photo_only",
+      });
+    }
     let storedUrl = dataUrl;
     try {
       const roomLabel =
@@ -307,6 +288,9 @@ export async function POST(req: NextRequest) {
       mode: body.projectMode || "photo_only",
     });
   } catch (e) {
+    if (e instanceof LockedDesignRequestError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[render-photo-style] error:", msg);
     if (charge) {

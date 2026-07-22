@@ -118,6 +118,8 @@ export interface BuildSurfacePlansInput {
   roomAreasByName?: Record<string, number>;
   /** P14-1: 도면 치수 (mm) — Step1 normalizedFloorplan.rooms 기반 */
   floorplanDimsByName?: Record<string, { widthMm?: number; depthMm?: number }>;
+  /** photo_only Step1에서 요청한 실. 이미지 저장/분석 실패와 무관하게 실별 fallback을 만든다. */
+  requestedRooms?: Array<{ roomId: string; roomName: string }>;
 }
 
 export interface BuildSurfacePlansResult {
@@ -296,7 +298,7 @@ export function buildSurfacePlansFromContext(
   }
 
   // 5순위: 각 방의 기본 표준 자재 (design_output에서 안 잡힌 surface 채움)
-  const rooms = collectRoomsFromOutputs(input.designOutputs);
+  const rooms = collectRoomsFromOutputs(input.designOutputs, input.requestedRooms);
   for (const [roomId, roomName] of Array.from(rooms.entries())) {
     const roomType = inferRoomType(roomName);
     const defaultPlans = defaultSurfacePlansForRoom({
@@ -403,12 +405,20 @@ function normalizeMaterialPriceSource(
   }
 }
 
-function collectRoomsFromOutputs(outputs: DesignOutput[]): Map<string, string> {
+function collectRoomsFromOutputs(
+  outputs: DesignOutput[],
+  requestedRooms: Array<{ roomId: string; roomName: string }> = [],
+): Map<string, string> {
   const m = new Map<string, string>();
   for (const o of outputs ?? []) {
     if (o.targetType === "surface") continue;
     const roomId = o.targetId || o.id;
     if (!m.has(roomId)) m.set(roomId, o.targetName);
+  }
+  for (const room of requestedRooms) {
+    if (room.roomId && room.roomName && !m.has(room.roomId)) {
+      m.set(room.roomId, room.roomName);
+    }
   }
   return m;
 }

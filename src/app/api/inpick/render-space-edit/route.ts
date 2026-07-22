@@ -32,6 +32,12 @@ import {
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
 import { insertEditableRender } from "@/lib/inpick/editable-render/repository";
 import type { SurfaceType } from "@/lib/inpick/editable-render/types";
+import {
+  completeLockedDelivery,
+  prepareLockedDelivery,
+  type LockedDeliveryRequest,
+} from "@/lib/inpick/locked-design/delivery";
+import { LockedDesignRequestError } from "@/lib/inpick/locked-design/service";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -59,6 +65,7 @@ interface RenderSpaceEditBody {
   spaceType?: string;
   /** 부분 AI 인테리어 전용 모드 — 서버에서 1실 5토큰을 강제 적용 */
   serviceMode?: "partial_ai_room";
+  lockedDelivery?: LockedDeliveryRequest;
 }
 
 const OPENAI_BASE = "https://api.openai.com/v1";
@@ -122,6 +129,7 @@ export async function POST(req: NextRequest) {
   let charge: Awaited<ReturnType<typeof enforceConsume>> | null = null;
   try {
     const body = (await req.json()) as RenderSpaceEditBody;
+    const lockedDelivery = await prepareLockedDelivery(body.lockedDelivery);
 
     // ─── validation (토큰 차감 전) ─────────────────────
     if (!body.sourceImage || (!body.sourceImage.dataUrl && !body.sourceImage.url && !body.sourceImage.base64)) {
@@ -146,7 +154,7 @@ export async function POST(req: NextRequest) {
     // ─── 토큰 차감 ─────────────────────
     try {
       const billingFeature = body.serviceMode === "partial_ai_room" ? "partial-ai-room" : "render-room";
-      charge = await enforceConsume(billingFeature, {
+      if (!lockedDelivery) charge = await enforceConsume(billingFeature, {
         feature: "render-space-edit",
         serviceMode: body.serviceMode ?? "material_preview",
         preserveGeometry: true,
@@ -173,11 +181,12 @@ export async function POST(req: NextRequest) {
       throw e;
     }
 
+    const actorUserId = lockedDelivery?.userId ?? charge!.userId;
     try {
-      await enforceRateLimit(charge.userId, "render-room");
+      await enforceRateLimit(actorUserId, "render-room");
     } catch (e) {
       if (e instanceof RateLimitError) {
-        await refundCredits(charge.userId, charge.charged, "rate-limited:render-space-edit").catch(() => {});
+        if (charge) await refundCredits(charge.userId, charge.charged, "rate-limited:render-space-edit").catch(() => {});
         return NextResponse.json(
           {
             error: "RATE_LIMIT_EXCEEDED",
@@ -287,6 +296,18 @@ export async function POST(req: NextRequest) {
 
     // ─── Storage 업로드 ──────────────────
     const dataUrl = `data:image/png;base64,${imageBase64}`;
+    if (lockedDelivery) {
+      const asset = await completeLockedDelivery(lockedDelivery, dataUrl, compiledPrompt);
+      return NextResponse.json({
+        asset,
+        prompt: compiledPrompt,
+        model: usedModel,
+        backend: "openai",
+        costUsd: costMap[quality] ?? 0.01,
+        mode: "photo_only",
+        preserveGeometry: true,
+      });
+    }
     let storedUrl = dataUrl;
     try {
       storedUrl = await ensureStorageUrl(dataUrl, {
@@ -340,6 +361,9 @@ export async function POST(req: NextRequest) {
       creditsCharged: charge?.charged ?? 0,
     });
   } catch (e) {
+    if (e instanceof LockedDesignRequestError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[render-space-edit] error:", msg);
     if (charge) {

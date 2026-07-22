@@ -17,7 +17,12 @@
  *   - floorplan-storage.ts와 같은 createAdminClient + storage.from(bucket).upload 패턴
  */
 
-import { createClient as createAdminClient } from "@supabase/supabase-js";
+import { createHash } from "node:crypto";
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
+import { createClient as createAdminClient, type SupabaseClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 // ─── 환경설정 ───
 const PROVIDER = (process.env.IMAGE_STORAGE_PROVIDER || "supabase").toLowerCase() as
@@ -256,4 +261,181 @@ export function getStorageConfig() {
     ready: isStorageReady(),
     productionMode: isProductionMode(),
   };
+}
+
+// Locked originals use a separate fail-closed path: never a public URL or base64 fallback.
+export const LOCKED_DESIGN_BUCKET = "private-design-renders";
+export const MAX_LOCKED_IMAGE_BYTES = 20 * 1024 * 1024;
+const MAX_REMOTE_REDIRECTS = 3;
+
+export class ImageInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ImageInputError";
+  }
+}
+
+export interface NormalizedPrivateImage {
+  bytes: Buffer;
+  mimeType: "image/webp";
+  width: number;
+  height: number;
+  sha256: string;
+}
+
+function isPrivateAddress(address: string): boolean {
+  const normalized = address.toLowerCase().replace(/^\[|\]$/g, "");
+  if (normalized === "::1" || normalized === "::" || normalized.startsWith("fe80:")) return true;
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(normalized)?.[1];
+  const ipv4 = mapped ?? (isIP(normalized) === 4 ? normalized : null);
+  if (!ipv4) return false;
+  const [a, b] = ipv4.split(".").map(Number);
+  return (
+    a === 0 || a === 10 || a === 127 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 0) ||
+    (a === 192 && b === 168) ||
+    (a === 198 && (b === 18 || b === 19)) ||
+    a >= 224
+  );
+}
+
+export async function assertSafeRemoteImageUrl(value: string): Promise<URL> {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ImageInputError("INVALID_IMAGE_URL");
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) {
+    throw new ImageInputError("UNSAFE_IMAGE_URL");
+  }
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost")) {
+    throw new ImageInputError("UNSAFE_IMAGE_HOST");
+  }
+  if (isIP(hostname)) {
+    if (isPrivateAddress(hostname)) throw new ImageInputError("UNSAFE_IMAGE_HOST");
+    return url;
+  }
+  let addresses: Array<{ address: string; family: number }>;
+  try {
+    addresses = await lookup(hostname, { all: true, verbatim: true });
+  } catch {
+    throw new ImageInputError("IMAGE_HOST_LOOKUP_FAILED");
+  }
+  if (addresses.length === 0 || addresses.some(({ address }) => isPrivateAddress(address))) {
+    throw new ImageInputError("UNSAFE_IMAGE_HOST");
+  }
+  return url;
+}
+
+async function readBoundedBody(response: Response): Promise<Buffer> {
+  const declaredLength = Number(response.headers.get("content-length") ?? "0");
+  if (declaredLength > MAX_LOCKED_IMAGE_BYTES) throw new ImageInputError("IMAGE_TOO_LARGE");
+  if (!response.body) throw new ImageInputError("EMPTY_IMAGE_RESPONSE");
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_LOCKED_IMAGE_BYTES) {
+      await reader.cancel();
+      throw new ImageInputError("IMAGE_TOO_LARGE");
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, total);
+}
+
+async function downloadRemoteImage(source: string): Promise<Buffer> {
+  let current = await assertSafeRemoteImageUrl(source);
+  for (let redirect = 0; redirect <= MAX_REMOTE_REDIRECTS; redirect++) {
+    const response = await fetch(current, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(15_000),
+      headers: { Accept: "image/png,image/jpeg,image/webp" },
+    });
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location || redirect === MAX_REMOTE_REDIRECTS) {
+        throw new ImageInputError("IMAGE_REDIRECT_REJECTED");
+      }
+      current = await assertSafeRemoteImageUrl(new URL(location, current).toString());
+      continue;
+    }
+    if (!response.ok) throw new ImageInputError("IMAGE_DOWNLOAD_FAILED");
+    const contentType = (response.headers.get("content-type") ?? "").split(";", 1)[0].trim();
+    if (!contentType.startsWith("image/")) throw new ImageInputError("UNSUPPORTED_IMAGE_TYPE");
+    return readBoundedBody(response);
+  }
+  throw new ImageInputError("IMAGE_REDIRECT_REJECTED");
+}
+
+function decodeImageDataUrl(source: string): Buffer {
+  const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]+={0,2})$/.exec(source);
+  if (!match) throw new ImageInputError("INVALID_IMAGE_DATA_URL");
+  const bytes = Buffer.from(match[2], "base64");
+  if (bytes.length === 0 || bytes.length > MAX_LOCKED_IMAGE_BYTES) {
+    throw new ImageInputError(bytes.length === 0 ? "EMPTY_IMAGE" : "IMAGE_TOO_LARGE");
+  }
+  return bytes;
+}
+
+export async function normalizeImageSource(source: string): Promise<NormalizedPrivateImage> {
+  if (typeof source !== "string" || source.length === 0) throw new ImageInputError("IMAGE_SOURCE_REQUIRED");
+  const input = source.startsWith("data:") ? decodeImageDataUrl(source) : await downloadRemoteImage(source);
+  try {
+    const pipeline = sharp(input, { failOn: "warning", limitInputPixels: 40_000_000 }).rotate();
+    const metadata = await pipeline.metadata();
+    if (!metadata.width || !metadata.height || metadata.width > 8192 || metadata.height > 8192) {
+      throw new ImageInputError("INVALID_IMAGE_DIMENSIONS");
+    }
+    const bytes = await pipeline.webp({ quality: 92, effort: 4 }).toBuffer();
+    return {
+      bytes,
+      mimeType: "image/webp",
+      width: metadata.width,
+      height: metadata.height,
+      sha256: createHash("sha256").update(bytes).digest("hex"),
+    };
+  } catch (error) {
+    if (error instanceof ImageInputError) throw error;
+    throw new ImageInputError("INVALID_IMAGE_CONTENT");
+  }
+}
+
+export async function uploadLockedDesignImage(
+  admin: SupabaseClient,
+  storagePath: string,
+  image: NormalizedPrivateImage,
+): Promise<void> {
+  const { error } = await admin.storage.from(LOCKED_DESIGN_BUCKET).upload(storagePath, image.bytes, {
+    contentType: image.mimeType,
+    cacheControl: "0",
+    upsert: false,
+  });
+  if (error) throw new Error(`LOCKED_IMAGE_UPLOAD_FAILED: ${error.message}`);
+}
+
+export async function removeLockedDesignImage(admin: SupabaseClient, storagePath: string): Promise<void> {
+  await admin.storage.from(LOCKED_DESIGN_BUCKET).remove([storagePath]);
+}
+
+export async function createLockedDesignSignedUrl(
+  admin: SupabaseClient,
+  storagePath: string,
+  expiresInSeconds = 480,
+): Promise<string> {
+  if (expiresInSeconds < 300 || expiresInSeconds > 600) throw new Error("INVALID_SIGNED_URL_TTL");
+  const { data, error } = await admin.storage
+    .from(LOCKED_DESIGN_BUCKET)
+    .createSignedUrl(storagePath, expiresInSeconds);
+  if (error || !data?.signedUrl) throw new Error(`SIGNED_URL_FAILED: ${error?.message ?? "missing URL"}`);
+  return data.signedUrl;
 }

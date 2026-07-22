@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-07-21T10:22:39.432Z",
+  "createdAt": "2026-07-22T13:54:32.864Z",
   "source": "App Store / Google Play / web shared InPick workflow",
   "immutableSnapshot": true,
   "sourceFiles": [
@@ -45,11 +45,11 @@
     },
     {
       "path": "src/app/workflow/estimate/page.tsx",
-      "sha256": "6962f13d4ded6bad68bb8588117e849f2854ea2910c432d64b72556fbed6fff9"
+      "sha256": "197b2872f4e9779cc1930a258f442977d6aa96c96471e65ca858411fb681d6ce"
     },
     {
       "path": "src/app/workflow/page.tsx",
-      "sha256": "981f71ea9b31c671887419e4b76ec7606c0cf0399f4316f24a048f09f5dbe0ac"
+      "sha256": "967dbce5b11d0a07711be1156d681ed7813eb03062eda26058137367979fa27c"
     },
     {
       "path": "src/components/billing/TokenPurchaseDrawer.tsx",
@@ -84,6 +84,10 @@
       "sha256": "0a27ac4faa66d8878ee8d2249878be4f10eced033d914f7b538001975cc9bfba"
     },
     {
+      "path": "src/components/workflow/KitchenAssemblySelector.tsx",
+      "sha256": "34e133f84feadf666ad4e5d992d9d195718d9192f023688c59851a76f597a0ec"
+    },
+    {
       "path": "src/components/workflow/MaterialEditor.tsx",
       "sha256": "0171244f6dd5952a5ee4d3ed4b5eaac9c0607e978a8ec7743870a9ff8ab63a92"
     },
@@ -101,7 +105,7 @@
     },
     {
       "path": "src/components/workflow/Step2Designer.tsx",
-      "sha256": "dc529731f40aa0acb39ddd3fb709ef567f7811f4c5a0c175918346ed0ca58878"
+      "sha256": "7c5e0857c380b504ad92994cb7e9b7fb7e61cc9b049961b4f18ccc33e1952559"
     },
     {
       "path": "src/components/workflow/TokenBadge.tsx",
@@ -276,12 +280,20 @@
       "sha256": "b95aed8495c9faf8870a305203bd9f4d3025a11cda12136ba87e97ecd29b54fc"
     },
     {
+      "path": "src/lib/inpick/design-chat-client.ts",
+      "sha256": "33893854315540f712d8a760480b72bd948aed228a67d13b2bf741e847138413"
+    },
+    {
       "path": "src/lib/inpick/editable-render/types.ts",
       "sha256": "31d4b25a1755597d337056b41d3c598a8508590a3c8b9383ca4c7339a2fb3a57"
     },
     {
+      "path": "src/lib/inpick/estimate-client.ts",
+      "sha256": "3654ae5126b5f91bf2b264f3177e995cb6697ca9b115bb424e701d97e79a5837"
+    },
+    {
       "path": "src/lib/inpick/estimate-context/client.ts",
-      "sha256": "2243ab689818ac32cab3fe45f3fc11baa890bca0bcfff9e1ac40ea1c5dfd0ce7"
+      "sha256": "a2c6059e29c174e5dc0aaf83e6aaefd75c215089ec3e6879d39ff11232a7efc1"
     },
     {
       "path": "src/lib/inpick/estimate-context/prompt-hints.ts",
@@ -317,11 +329,11 @@
     },
     {
       "path": "src/lib/inpick/estimate-v2/build-construction-estimate.ts",
-      "sha256": "240dcc8459db7e2aa025e935413b1ba5b45360d0bbf405f37628b78db5323b57"
+      "sha256": "1b0c256c2afa7771fee22e3ea94e6d7cff35a48ae24213a960eb665419745279"
     },
     {
       "path": "src/lib/inpick/estimate-v2/client-builder.ts",
-      "sha256": "8e436e9b79c9d21b7f998ac7fc7260954d563f739f097722627c9b99836ce5f6"
+      "sha256": "1c1b06b762a18a312b291ee25e9c8991ac7953c73cd9205daaa0dbe9c36bd9ce"
     },
     {
       "path": "src/lib/inpick/estimate-v2/commercial-rules.ts",
@@ -329,7 +341,7 @@
     },
     {
       "path": "src/lib/inpick/estimate-v2/kitchen-plan-builder.ts",
-      "sha256": "3ad71300179b97111ffa71ffa6a04fa21fc0d650d93eef369a880f474c958fc0"
+      "sha256": "f53de7f7ba058957a7498180fa8f05b950e00d761f6ab554e8ae8f1e15376b20"
     },
     {
       "path": "src/lib/inpick/estimate-v2/price-resolver.ts",
@@ -353,7 +365,7 @@
     },
     {
       "path": "src/lib/inpick/estimate-v2/surface-plan-builder.ts",
-      "sha256": "3b586e3a6c0fab4acf0494a5c1d5a64b25da0a3f21e6134d5fa54c999dfdab80"
+      "sha256": "082ccd2c2588b3cea273dcedb44d0bd0a753a1f2567011998377315027082f37"
     },
     {
       "path": "src/lib/inpick/estimate-v2/trades.ts",
@@ -372,12 +384,28 @@
       "sha256": "deb9b000f6852265c5fca72e979c64416146fbab770c662838e6b23f28cf6d64"
     },
     {
+      "path": "src/lib/inpick/kitchen-assembly/conversions.ts",
+      "sha256": "28a9ab1d59f391e5bdab9a12069bebbc2438c713f1c821f8eeaaef990a107a2d"
+    },
+    {
+      "path": "src/lib/inpick/kitchen-assembly/index.ts",
+      "sha256": "d2ac079ad6ca530e6deede6c8eb7a5de57881d2846fa8f8f7c64d441354a7659"
+    },
+    {
+      "path": "src/lib/inpick/kitchen-assembly/types.ts",
+      "sha256": "0f21df231a807a0af14817c30dc2760ee621c1248d0e1f2b3c5adffcd77762fe"
+    },
+    {
       "path": "src/lib/inpick/korean-apt-dimensions.ts",
       "sha256": "8e164c0a3d02f8e632c5b17f9501a3118ee3cb24183499c38484570e8298fcd6"
     },
     {
       "path": "src/lib/inpick/lidar-to-floorplan.ts",
       "sha256": "3b6e4caa5ccb4f9749a2a44b9ef8b37fc59a5f01c267fc5f50a0e822a6d75c66"
+    },
+    {
+      "path": "src/lib/inpick/locked-design/contracts.ts",
+      "sha256": "575280958b9d43e8eff23c68209fac167e548f8d0f2f40426b1ac476f9cf2367"
     },
     {
       "path": "src/lib/inpick/material-product-category-codes.ts",
@@ -396,12 +424,24 @@
       "sha256": "c9ed28e62a50579b3818e10f7dbfcdd75480fdbce667a5b38d921be7ee15c147"
     },
     {
+      "path": "src/lib/inpick/photo-estimate-rooms.ts",
+      "sha256": "0fa985bab27234105f80696168803755f2c624904c8bc1aff506975b4de219bf"
+    },
+    {
+      "path": "src/lib/inpick/photo-render-prompt.ts",
+      "sha256": "2bfaedad4298abd49992790bf800df856ce57f10e339de390cbd8883eca843fb"
+    },
+    {
+      "path": "src/lib/inpick/photo-source-mapping.ts",
+      "sha256": "1a81c17ffdcb1df9f99c422b4d2ec005e59254ecfdae5b11253e7b1bc68450c3"
+    },
+    {
       "path": "src/lib/inpick/quote-pdf.tsx",
       "sha256": "2b61b3c53730125c1d69deb6586caeff99530908ae8c52f2bbca2d080ba2328a"
     },
     {
       "path": "src/lib/inpick/render-room-client.ts",
-      "sha256": "aad24039d3b6b9ad8af5c67bb830bfd50f40067b184ead23b607e239155780fa"
+      "sha256": "18517e488e20bfc830f41a74febf8932700d072ae1f2539ca2d1a6a650ebb13b"
     },
     {
       "path": "src/lib/inpick/sam-surface-prompts.ts",

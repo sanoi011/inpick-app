@@ -24,6 +24,11 @@ import {
   selectFinalDesignOutputs,
   type FinalSelectedDesign,
 } from "@/lib/inpick/estimate-context/final-selection";
+import {
+  collectFinalSelectionImageUrls,
+  filterRecordsForSelectedRooms,
+  normalizeEstimateStep1Snapshot,
+} from "@/lib/inpick/estimate-context/photo-context";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -119,6 +124,10 @@ export async function POST(req: NextRequest) {
     .slice(0, 50);
   const finalImagesOnly =
     body.selectionMode === "final_images_only" && requestedSelections.length > 0;
+  const step1Snapshot = normalizeEstimateStep1Snapshot(
+    body.step1Snapshot,
+    body.projectMode,
+  );
   const designOutputs = finalImagesOnly
     ? selectFinalDesignOutputs(allDesignOutputs, requestedSelections, {
         projectId: body.projectId,
@@ -129,9 +138,15 @@ export async function POST(req: NextRequest) {
 
   // 2) material evidence 조회 — material_vision_observations 테이블 (있다면)
   //    P3에서 실제 분석 결과가 채워지면 의미 있어짐. 현재는 빈 배열 fallback.
-  const materialEvidence = finalImagesOnly
-    ? []
-    : await fetchMaterialEvidence(admin, body.projectId, designOutputs);
+  const relevantImageUrls = finalImagesOnly
+    ? collectFinalSelectionImageUrls(designOutputs, requestedSelections)
+    : undefined;
+  const materialEvidence = await fetchMaterialEvidence(
+    admin,
+    body.projectId,
+    designOutputs,
+    relevantImageUrls,
+  );
 
   // 3) commercial scope 조회
   const scopeSnapshot = await fetchScopeSnapshot(
@@ -142,20 +157,21 @@ export async function POST(req: NextRequest) {
   );
 
   // 4) user_material_edits (편집기 자재 선택)
+  const allUserMaterialEdits = dedupeMaterialEdits([
+    ...(await fetchUserMaterialEdits(admin, body.projectId, userId)),
+    ...materialEvidence
+      .filter((evidence) => evidence.decisionType === "user_selected")
+      .map(materialEvidenceToUserEdit),
+    ...(Array.isArray(body.userMaterialEdits) ? body.userMaterialEdits : []),
+  ]);
   const userMaterialEdits = finalImagesOnly
-    ? []
-    : dedupeMaterialEdits([
-        ...(await fetchUserMaterialEdits(admin, body.projectId, userId)),
-        ...materialEvidence
-          .filter((evidence) => evidence.decisionType === "user_selected")
-          .map(materialEvidenceToUserEdit),
-        ...(Array.isArray(body.userMaterialEdits) ? body.userMaterialEdits : []),
-      ]);
+    ? filterRecordsForSelectedRooms(allUserMaterialEdits, designOutputs)
+    : allUserMaterialEdits;
 
   // 5) readiness 계산
   const readiness = computeEstimateReadiness({
     projectMode: body.projectMode,
-    step1Snapshot: body.step1Snapshot ?? null,
+    step1Snapshot,
     scopeSnapshot,
     designOutputs,
     materialEvidence,
@@ -169,7 +185,7 @@ export async function POST(req: NextRequest) {
       project_id: body.projectId,
       user_id: userId,
       project_mode: body.projectMode,
-      step1_snapshot: body.step1Snapshot ?? {},
+      step1_snapshot: step1Snapshot,
       scope_snapshot: scopeSnapshot ?? {},
       design_outputs_snapshot: designOutputs,
       material_evidence_snapshot: materialEvidence,
@@ -235,6 +251,7 @@ async function fetchMaterialEvidence(
   admin: NonNullable<ReturnType<typeof getAdmin>>,
   projectId: string,
   designOutputs: DesignOutput[],
+  relevantImageUrls?: Set<string>,
 ): Promise<MaterialEvidenceSnapshot[]> {
   try {
     const { data: observationData, error } = await admin
@@ -244,7 +261,8 @@ async function fetchMaterialEvidence(
       .order("created_at", { ascending: false })
       .limit(100);
     if (error) return [];
-    const allowedImages = new Set(designOutputs.map((output) => output.imageUrl));
+    const allowedImages =
+      relevantImageUrls ?? new Set(designOutputs.map((output) => output.imageUrl));
     const observations = (observationData ?? []).filter((row) =>
       allowedImages.has(String(row.source_image_url || "")),
     );

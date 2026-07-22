@@ -29,8 +29,10 @@ export interface KitchenPlan {
   lowerCabinetLengthM: number;
   /** 상부장 길이 (m) — 창문 영역 차감으로 보통 counterLengthM × 0.8 */
   upperCabinetLengthM: number;
-  /** 키큰장 개수 — 1ea (냉장고장) 또는 2ea (냉장고장 + 팬트리) */
+  /** 키큰장 개수 — 냉장고장/김치냉장고장/팬트리를 각각 계산 */
   tallCabinetEa: number;
+  /** 사용자가 명시한 키큰장 구성. 상세 견적 설명에 보존한다. */
+  tallCabinetLabels: string[];
   /** 상판 길이 (m) — 기본 counterLengthM과 동일 */
   worktopLengthM: number;
   sinkEa: number;
@@ -133,8 +135,13 @@ export function buildKitchenPlan(input: BuildKitchenPlanInput): KitchenPlan {
   // 상부장 — 창문/후드 차감으로 카운터의 80%
   const upperCabinetLengthM =
     input.userInput?.upperCabinetLengthM ?? Math.round(counterLengthM * 0.8 * 10) / 10;
-  // 키큰장 — 기본 1ea (냉장고장)
+  // 키큰장 — 기본 1ea (냉장고장), 사용자 요구가 있으면 구성과 수량을 보존
   const tallCabinetEa = input.userInput?.tallCabinetEa ?? 1;
+  const tallCabinetLabels =
+    input.userInput?.tallCabinetLabels ??
+    (tallCabinetEa === 1
+      ? ["냉장고장"]
+      : Array.from({ length: tallCabinetEa }, (_, index) => `키큰장 ${index + 1}`));
   // 백스플래시 m² = counter × 0.6m (상하부장 사이 높이)
   const backsplashM2 = Math.round(counterLengthM * 0.6 * 10) / 10;
 
@@ -146,6 +153,7 @@ export function buildKitchenPlan(input: BuildKitchenPlanInput): KitchenPlan {
     lowerCabinetLengthM: counterLengthM,
     upperCabinetLengthM,
     tallCabinetEa,
+    tallCabinetLabels,
     worktopLengthM: counterLengthM,
     sinkEa: input.userInput?.sinkEa ?? 1,
     faucetEa: input.userInput?.faucetEa ?? 1,

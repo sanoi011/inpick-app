@@ -22,6 +22,11 @@
  *   - AbortSignal 지원 (호출자가 timeout/취소 가능)
  */
 
+import type {
+  LockedDeliveryRequest,
+  SanitizedLockedAsset,
+} from "@/lib/inpick/locked-design/contracts";
+
 export interface RenderRoomBody {
   roomName: string;
   widthMm: number;
@@ -47,6 +52,7 @@ export interface RenderRoomBody {
   // geometry-first (Phase 4+ optional)
   roomGeometry?: Record<string, unknown>;
   camera?: Record<string, unknown>;
+  lockedDelivery?: LockedDeliveryRequest;
 }
 
 export interface RenderRoomClientResult {
@@ -80,6 +86,7 @@ export interface RenderRoomClientResult {
     renderSpecConfidence?: number;
     roomName?: string;
   };
+  lockedAsset?: SanitizedLockedAsset;
 }
 
 export interface RenderRoomClientError {
@@ -221,6 +228,19 @@ export async function renderRoomViaClient(
       modelStatus: postData.model_status as string | undefined,
       jobId: postData.jobId as string | undefined,
       backend: postData.backend as string | undefined,
+    };
+  }
+
+  if (postData.asset && typeof postData.asset === "object") {
+    return {
+      imageUrl: "",
+      lockedAsset: postData.asset as SanitizedLockedAsset,
+      revisedPrompt: postData.revisedPrompt as string | undefined,
+      model: postData.model as string | undefined,
+      backend: postData.backend as string | undefined,
+      costUsd: postData.costUsd as number | undefined,
+      wasAsync: false,
+      metadata: postData.metadata as RenderRoomClientResult["metadata"],
     };
   }
 

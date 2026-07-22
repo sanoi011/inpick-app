@@ -58,6 +58,8 @@ export interface BuildConstructionEstimateInput {
   projectMode: ProjectMode;
   surfacePlans: SurfacePlan[];
   quantityBasisByRoom: Record<string, RoomQuantityBasis>;
+  /** 사용자 프롬프트/직접 선택에서 확정된 주방 부품 수량·구성 */
+  kitchenPlanOverrides?: Record<string, Partial<KitchenPlan>>;
   rateOverrides?: Partial<EstimateRateConfig>;
   siteConditions?: SiteConditionAnswers;
 }
@@ -92,6 +94,7 @@ export async function buildConstructionEstimateWithProductResolution(
           roomName: sp.roomName,
           kitchenBasis: basis,
           floorplanRoom,
+          userInput: input.kitchenPlanOverrides?.[sp.roomId],
         }),
       );
     }
@@ -128,6 +131,11 @@ export async function buildConstructionEstimateWithProductResolution(
             line.totalAmount = line.materialAmount + line.laborAmount + line.expenseAmount;
             line.quantityFormulaKo = `KitchenPlan ${template.subTradeCode} · ${kitchenPlan.source}`;
             line.assumptions.push(`주방 ${template.subTradeNameKo}: ${kitchenPlan.source} 기반 ${newQty}${template.unit}`);
+            if (template.subTradeCode === "12-13" && kitchenPlan.tallCabinetLabels.length > 0) {
+              const labels = kitchenPlan.tallCabinetLabels.join(" · ");
+              line.itemNameKo = labels;
+              line.assumptions.push(`사용자 요구 주방장 구성: ${labels}`);
+            }
           }
         }
         // P12: 재료비 있는 line만 resolver 실행 (노무비/경비만 있는 라인은 skip)
@@ -276,6 +284,24 @@ export function buildConstructionEstimate(
   input: BuildConstructionEstimateInput,
 ): ConstructionEstimate {
   const rawLines: ConstructionEstimateLine[] = [];
+  const kitchenPlansByRoom = new Map<string, KitchenPlan>();
+  for (const sp of input.surfacePlans) {
+    if (sp.roomType !== "kitchen" || kitchenPlansByRoom.has(sp.roomId)) continue;
+    const basis = input.quantityBasisByRoom[sp.roomId];
+    kitchenPlansByRoom.set(
+      sp.roomId,
+      buildKitchenPlan({
+        projectId: input.projectId,
+        roomName: sp.roomName,
+        kitchenBasis: basis,
+        floorplanRoom:
+          basis?.widthM && basis?.depthM
+            ? { widthMm: basis.widthM * 1000, depthMm: basis.depthM * 1000 }
+            : undefined,
+        userInput: input.kitchenPlanOverrides?.[sp.roomId],
+      }),
+    );
+  }
 
   for (const surfacePlan of input.surfacePlans) {
     const basis = input.quantityBasisByRoom[surfacePlan.roomId];
@@ -291,10 +317,28 @@ export function buildConstructionEstimate(
       continue;
     }
 
+    const kitchenPlan = kitchenPlansByRoom.get(surfacePlan.roomId);
     for (const rule of matchedRules) {
       for (const template of rule.outputLines) {
         if (!shouldIncludeTemplate(template, surfacePlan, basis)) continue;
         const line = createEstimateLine(surfacePlan, basis, template);
+        if (kitchenPlan) {
+          const planQty = getKitchenLineQuantity(template.subTradeCode, kitchenPlan);
+          if (planQty != null && planQty > 0) {
+            const newQty = Math.round(planQty * (1 + (template.wasteFactor ?? 0)) * 10) / 10;
+            line.quantity = newQty;
+            line.materialAmount = Math.round(line.materialUnitPrice * newQty);
+            line.laborAmount = Math.round(line.laborUnitPrice * newQty);
+            line.expenseAmount = Math.round(line.expenseUnitPrice * newQty);
+            line.totalAmount = line.materialAmount + line.laborAmount + line.expenseAmount;
+            line.quantityFormulaKo = `KitchenPlan ${template.subTradeCode} · ${kitchenPlan.source}`;
+            if (template.subTradeCode === "12-13" && kitchenPlan.tallCabinetLabels.length > 0) {
+              const labels = kitchenPlan.tallCabinetLabels.join(" · ");
+              line.itemNameKo = labels;
+              line.assumptions.push(`사용자 요구 주방장 구성: ${labels}`);
+            }
+          }
+        }
         rawLines.push(line);
       }
     }

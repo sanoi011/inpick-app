@@ -19,17 +19,19 @@ import LenisProvider from "@/components/landing-v4/LenisProvider";
 // P8: workflow 상태 사용자×프로젝트 DB 영속화 + design_outputs 이미지 복원
 import {
   clearActiveWorkflowSessionSnapshot,
-  clearWorkflowSessionSnapshot,
   fetchDesignOutputs,
   fetchWorkflowState,
   fetchWorkflowProjects,
   getOrCreateWorkflowProjectId,
+  isActiveWorkflowProjectId,
   readWorkflowSessionSnapshot,
   resolveWorkflowLastStep,
   resolveWorkflowVisibleStep,
   saveWorkflowSessionSnapshot,
   setWorkflowProjectId,
   saveWorkflowState,
+  shouldAdoptLatestWorkflowProject,
+  startFreshWorkflowSession,
   lightenWorkflowStep2,
 } from "@/lib/inpick/estimate-context/client";
 import type { DesignOutput } from "@/lib/inpick/estimate-context/types";
@@ -148,6 +150,7 @@ export default function WorkflowPage() {
 
   const startQuickPhotoFlow = () => {
     if (!quickMode) return;
+    startFreshWorkflowSession();
     const pyeong = Math.max(5, Math.min(500, Math.round(quickPyeong || 24)));
     const exclusiveArea = Math.round(pyeong * 3.3058 * 10) / 10;
 
@@ -195,7 +198,10 @@ export default function WorkflowPage() {
       const params = new URLSearchParams(window.location.search);
       const requestedProjectId = params.get("projectId")?.trim() || "";
       const requestedStep2 = params.get("step") === "2";
-      const previousProjectId = getOrCreateWorkflowProjectId();
+      const freshProjectRequested = params.get("new") === "1";
+      const previousProjectId = freshProjectRequested
+        ? startFreshWorkflowSession()
+        : getOrCreateWorkflowProjectId();
       let projectId = requestedProjectId || previousProjectId;
 
       // 프로젝트 id를 교체하기 전에 프로젝트별 캐시를 읽어야
@@ -252,7 +258,12 @@ export default function WorkflowPage() {
           // 계정 복원은 projectId가 없는 일반 진입에서만 수행한다.
           // 명시적으로 선택한 프로젝트를 최신 프로젝트로 바꾸지 않는다.
           // (재로그인 / 스토리지 초기화 / 다른 기기) 계정의 최신 프로젝트를 채택해 그대로 복원.
-          if (!requestedProjectId && (!dbRow?.exists || !dbRow.workflowState) && !s2) {
+          if (shouldAdoptLatestWorkflowProject({
+            freshProjectRequested,
+            requestedProjectId,
+            workflowStateExists: Boolean(dbRow?.exists && dbRow.workflowState),
+            hasStep2: Boolean(s2),
+          })) {
             const projects = await fetchWorkflowProjects();
             if (cancelled) return;
             const latest = projects
@@ -288,7 +299,11 @@ export default function WorkflowPage() {
       if (s2) {
         try {
           const outputs = await outputsPromise;
-          if (cancelled || outputs.length === 0) return;
+          if (
+            cancelled ||
+            outputs.length === 0 ||
+            !isActiveWorkflowProjectId(projectId)
+          ) return;
           setStep2((current) => mergeDesignOutputs(current, outputs));
         } catch (e) {
           console.warn("[workflow] design_outputs 보강 실패 (non-fatal):", e);
@@ -593,15 +608,7 @@ export default function WorkflowPage() {
                         promptByRoom: {},
                       });
                       setStep(1);
-                      try {
-                        const projectId = getOrCreateWorkflowProjectId();
-                        clearWorkflowSessionSnapshot(projectId);
-                        // P1: workflow projectId도 함께 초기화 (새 세션 시작) — localStorage가 정본
-                        sessionStorage.removeItem("workflow_project_id");
-                        localStorage.removeItem("workflow_project_id");
-                      } catch {
-                        /* private mode */
-                      }
+                      startFreshWorkflowSession();
                       setNormalizeError(null);
                     }}
                   />

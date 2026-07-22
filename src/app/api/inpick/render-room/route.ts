@@ -44,6 +44,12 @@ import {
 import { enforceRateLimit, RateLimitError } from "@/lib/inpick/rate-limit";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import {
+  completeLockedDelivery,
+  prepareLockedDelivery,
+  type LockedDeliveryRequest,
+} from "@/lib/inpick/locked-design/delivery";
+import { LockedDesignRequestError } from "@/lib/inpick/locked-design/service";
 
 export const runtime = "nodejs";
 // gpt-image-2는 40~80초 소요 — Vercel Pro maxDuration 800초 한도 내에서 300초로 설정
@@ -57,6 +63,7 @@ interface RenderBody extends RenderRoomInput {
   quality?: "low" | "medium" | "high";
   /** 모드 검증 — apartment 외 모드에서 잘못 호출되는 것 차단 (mode_mismatch) */
   projectMode?: "residential" | "commercial" | "photo_only" | string;
+  lockedDelivery?: LockedDeliveryRequest;
 }
 
 export async function POST(req: NextRequest) {
@@ -66,6 +73,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = (await req.json()) as RenderBody;
+    const lockedDelivery = await prepareLockedDelivery(body.lockedDelivery);
     if (!body.roomName || !body.widthMm || !body.depthMm) {
       return NextResponse.json(
         { error: "roomName, widthMm, depthMm 필수" },
@@ -120,7 +128,7 @@ export async function POST(req: NextRequest) {
           ? "render-room-living"
           : "render-room";
     try {
-      charge = await enforceConsume(feature, {
+      if (!lockedDelivery) charge = await enforceConsume(feature, {
         propertyId: body.propertyId,
         roomName: body.roomName,
         quality: body.quality ?? "low",
@@ -145,12 +153,13 @@ export async function POST(req: NextRequest) {
     }
 
     // ─── v2 §5-5 사용자별 rate limit (KV 미설정 시 fail-open) ──
+    const actorUserId = lockedDelivery?.userId ?? charge!.userId;
     try {
-      await enforceRateLimit(charge.userId, "render-room");
+      await enforceRateLimit(actorUserId, "render-room");
     } catch (e) {
       if (e instanceof RateLimitError) {
         // 차감은 이미 됐으니 환불
-        await refundCredits(charge.userId, charge.charged, "rate-limited:render-room").catch(() => {});
+        if (charge) await refundCredits(charge.userId, charge.charged, "rate-limited:render-room").catch(() => {});
         return NextResponse.json(
           {
             error: "RATE_LIMIT_EXCEEDED",
@@ -170,7 +179,7 @@ export async function POST(req: NextRequest) {
     trackServerEventAsync({
       eventName: AnalyticsEvents.ImageGenerationRequested,
       actorType: "consumer",
-      userId: charge.userId,
+      userId: actorUserId,
       projectId: body.propertyId,
       projectMode: "apartment",
       source: "api",
@@ -178,7 +187,7 @@ export async function POST(req: NextRequest) {
         endpoint: "render-room",
         quality: body.quality ?? "low",
         roomName: body.roomName,
-        credit_charged: charge.charged,
+        credit_charged: charge?.charged ?? 0,
       },
     });
 
@@ -261,10 +270,10 @@ export async function POST(req: NextRequest) {
     // RunPod backend는 async 권장, OpenAI backend는 sync only (즉시 반환).
     const asyncMode = process.env.IMAGE_GEN_MODE === "async";
     const preferredBackend = (process.env.IMAGE_GEN_BACKEND || "openai").toLowerCase();
-    if (asyncMode && preferredBackend !== "openai" && isJobsRepoReady()) {
+    if (!lockedDelivery && asyncMode && preferredBackend !== "openai" && isJobsRepoReady()) {
       // Job 생성 + backend submit (즉시 반환)
       const job = await createJob({
-        userId: charge?.userId,
+        userId: actorUserId,
         backend: "runpod",
         request: renderInput,
         metadata: { mode: "async", chargedCredits: charge?.charged ?? 0 },
@@ -298,7 +307,7 @@ export async function POST(req: NextRequest) {
               ? AnalyticsEvents.ImageGenerationCompleted
               : AnalyticsEvents.ImageGenerationFailed,
           actorType: "consumer",
-          userId: charge?.userId,
+          userId: actorUserId,
           projectId: body.propertyId,
           projectMode: "apartment",
           source: "api",
@@ -351,7 +360,7 @@ export async function POST(req: NextRequest) {
       trackServerEventAsync({
         eventName: AnalyticsEvents.ImageGenerationFailed,
         actorType: "consumer",
-        userId: charge?.userId,
+        userId: actorUserId,
         projectId: body.propertyId,
         projectMode: "apartment",
         source: "api",
@@ -381,6 +390,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (lockedDelivery) {
+      const asset = await completeLockedDelivery(
+        lockedDelivery,
+        result.imageUrl,
+        result.revisedPrompt || compiledPrompt || body.style,
+      );
+      return NextResponse.json({
+        asset,
+        revisedPrompt: result.revisedPrompt,
+        model: result.model,
+        backend: result.backend,
+        costUsd: result.costUsd,
+        metadata: {
+          floorplanUsed: !!floorplanImageUrl,
+          propertyId: body.propertyId,
+          referenceMode: floorplanImageUrl ? "floorplan" : "area_average",
+          renderSpecKind: renderRoomSpec ? "RenderRoomSpec_v1" : "text_only",
+          renderSpecConfidence: renderRoomSpec?.confidence,
+          roomName: body.roomName,
+        },
+      });
+    }
+
     // ─── Phase 3: base64 → storage URL 자동 변환 ───
     // production 모드에서 data: URL 그대로 응답 X (storage URL로 변환)
     // PoC 모드에서는 base64 fallback 허용 (ensureStorageUrl이 처리)
@@ -400,7 +432,7 @@ export async function POST(req: NextRequest) {
           trackServerEventAsync({
             eventName: AnalyticsEvents.ImageGenerationFailed,
             actorType: "consumer",
-            userId: charge?.userId,
+            userId: actorUserId,
             projectId: body.propertyId,
             projectMode: "apartment",
             source: "api",
@@ -432,7 +464,7 @@ export async function POST(req: NextRequest) {
     trackServerEventAsync({
       eventName: AnalyticsEvents.ImageGenerationCompleted,
       actorType: "consumer",
-      userId: charge?.userId,
+      userId: actorUserId,
       projectId: body.propertyId,
       projectMode: "apartment",
       source: "api",
@@ -487,6 +519,9 @@ export async function POST(req: NextRequest) {
         : undefined,
     });
   } catch (e) {
+    if (e instanceof LockedDesignRequestError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
     // backend adapter 외부 에러 (예상 외) — 환불 + 일반 에러
     const msg = e instanceof Error ? e.message : String(e);
     console.warn("[render-room] unexpected error:", msg);

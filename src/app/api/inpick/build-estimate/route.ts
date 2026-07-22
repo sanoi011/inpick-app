@@ -38,6 +38,11 @@ import type { MaterialHint } from "@/lib/inpick/estimate-context/types";
 // P12: async 버전 — DB product/price resolver 호출하여 line에 brand/sku/source 채움
 import { buildConstructionEstimateWithProductResolution } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
+import {
+  deriveKitchenPlanOverridesFromStep1,
+  deriveRequestedRoomsFromStep1,
+  normalizeEstimateStep1Snapshot,
+} from "@/lib/inpick/estimate-context/photo-context";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
@@ -478,11 +483,20 @@ async function buildConstructionEstimateFromContextId(
     return null;
   }
   // step1_snapshot에서 방 면적 추출
-  const step1 = (data.step1_snapshot ?? {}) as {
+  const step1 = normalizeEstimateStep1Snapshot(
+    (data.step1_snapshot ?? {}) as Record<string, unknown>,
+    data.project_mode as "apartment" | "photo_only" | "commercial",
+  ) as {
     basicInfo?: { selectedPyeong?: { exclusiveArea?: number } };
+    selectedPyeong?: { exclusiveArea?: number };
+    areaM2?: number;
     normalizedFloorplan?: { rooms?: Array<{ name: string; widthMm?: number; depthMm?: number }> };
+    rooms?: string[];
+    roomFurnishings?: Record<string, string[]>;
     siteConditions?: unknown;
   };
+  const requestedRooms =
+    data.project_mode === "photo_only" ? deriveRequestedRoomsFromStep1(step1) : [];
   const roomAreasByName: Record<string, number> = {};
   // P14-1: 방 도면 치수 (mm) → KitchenPlan/RoomQuantityBasis에 전달
   const floorplanDimsByName: Record<string, { widthMm?: number; depthMm?: number }> = {};
@@ -494,8 +508,15 @@ async function buildConstructionEstimateFromContextId(
     }
   }
   // 전체 평수도 옵션
-  const totalAreaM2 = step1.basicInfo?.selectedPyeong?.exclusiveArea;
-  if (totalAreaM2 && Object.keys(roomAreasByName).length === 0) {
+  const totalAreaM2 =
+    step1.areaM2 ??
+    step1.selectedPyeong?.exclusiveArea ??
+    step1.basicInfo?.selectedPyeong?.exclusiveArea;
+  if (
+    totalAreaM2 &&
+    Object.keys(roomAreasByName).length === 0 &&
+    requestedRooms.length === 0
+  ) {
     roomAreasByName["전체"] = totalAreaM2;
   }
 
@@ -515,7 +536,12 @@ async function buildConstructionEstimateFromContextId(
       : [],
     roomAreasByName,
     floorplanDimsByName,
+    requestedRooms,
   });
+  const kitchenPlanOverrides = deriveKitchenPlanOverridesFromStep1(
+    step1,
+    quantityBasisByRoom,
+  );
 
   // P12: server-side에서 DB product/price resolver 호출 → line에 brand/sku/manufacturer/source 채움
   const constructionEstimate: ConstructionEstimate =
@@ -524,6 +550,7 @@ async function buildConstructionEstimateFromContextId(
       projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
       surfacePlans,
       quantityBasisByRoom,
+      kitchenPlanOverrides,
       siteConditions: normalizeSiteConditionAnswers(step1.siteConditions),
     });
 

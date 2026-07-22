@@ -30,6 +30,7 @@ import {
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
 import { renderRoomViaClient, type RenderRoomBody } from "@/lib/inpick/render-room-client";
+import { extractDesignPrompt } from "@/lib/inpick/design-chat-client";
 import {
   classifyPyeong,
   estimateRoomDimsFromPyeong,
@@ -55,6 +56,16 @@ import type {
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
 import { routePromptToRoom } from "@/lib/inpick/workflow/prompt-room-router";
+import { mapPhotoSourcesToRooms } from "@/lib/inpick/photo-source-mapping";
+import { formatPhotoFurnishingRequirements } from "@/lib/inpick/photo-render-prompt";
+import KitchenAssemblySelector from "./KitchenAssemblySelector";
+import {
+  buildKitchenAssemblyEstimateMapping,
+  buildKitchenAssemblyRenderPrompt,
+  type KitchenAssembly,
+  type KitchenCatalogProduct,
+  type KitchenPartCode,
+} from "@/lib/inpick/kitchen-assembly";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
@@ -200,6 +211,12 @@ function isInternalRenderPrompt(p: string): boolean {
 
 export interface RenderItem {
   url: string;
+  /** 서버 private 원본을 가리키는 공개 불가능 ID */
+  lockedAssetId?: string;
+  accessState?: "free" | "locked" | "unlocked";
+  viewExpiresAt?: string;
+  /** 최종 선택 모달에서 원래 render index를 보존 */
+  selectionIndex?: number;
   prompt: string;
   revisedPrompt?: string;
   costUsd: number;
@@ -252,6 +269,8 @@ export interface Step2Data {
   unlockedRenderKeys?: Record<string, string[]>;
   /** 이미지 위에서 사용자가 직접 확정한 실제 material_products 제품 */
   materialSelections?: Record<string, SelectedEstimateMaterial>;
+  /** 주방 조립체의 부품별 실제 SKU 스냅샷 */
+  kitchenAssemblies?: Record<string, KitchenAssembly>;
   /** 견적 직전 팝업에서 실별로 확정한 최종 이미지 URL */
   finalSelectedImageUrlsByRoom?: Record<string, string>;
   finalSelectionConfirmedAt?: string;
@@ -272,6 +291,9 @@ export interface SelectedEstimateMaterial {
   priceSource?: string;
   observationId?: string;
   confidence: number;
+  assemblyId?: string;
+  partCode?: KitchenPartCode;
+  provenance?: { source: string; reference?: string; verifiedAt?: string };
 }
 
 type ConsumeFeature = "ai_render" | "image_unlock" | "drawing_option";
@@ -304,6 +326,19 @@ function isLivingRoom(roomKey: string, roomLabel?: string): boolean {
 
 function renderUnlockKey(render: RenderItem, index: number): string {
   return render.timestamp || `render-${index}`;
+}
+
+function isRenderAccessible(
+  roomKey: string,
+  roomLabel: string | undefined,
+  render: RenderItem | null | undefined,
+  index: number,
+  unlockedRenderKeys: Record<string, string[]> | undefined,
+): boolean {
+  if (!render) return false;
+  if (isLivingRoom(roomKey, roomLabel) || render.accessState === "free") return true;
+  if (render.accessState === "unlocked") return true;
+  return (unlockedRenderKeys?.[roomKey] || []).includes(renderUnlockKey(render, index));
 }
 
 interface Props {
@@ -385,8 +420,6 @@ export default function Step2Designer({
     setCustomTabs((prev) => prev.filter((t) => t.v !== v));
   };
 
-  void photoSpaceType; // 향후 세분화 hook
-
   const availableTabs = useMemo(
     () => ROOM_TABS.filter((t) => !RENDER_EXCLUDED.includes(t.v)),
     [ROOM_TABS],
@@ -445,6 +478,21 @@ export default function Step2Designer({
   // 상담과 이미지 수정은 하나의 공용 프롬프트가 문맥에 따라 자동 분기한다.
   const chatMode = true;
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(value.chatMessages ?? []);
+  const photoSourcesByRoom = useMemo(
+    () =>
+      mapPhotoSourcesToRooms({
+        roomKeys: selectedRoomKeys,
+        sourceImages: chatMessages
+          .filter((message) => message.role === "user")
+          .flatMap((message) => message.images || [])
+          .map((image) => ({
+            dataUrl: image.dataUrl,
+            base64: image.base64,
+            mediaType: image.mediaType === "image/gif" ? undefined : image.mediaType,
+          })),
+      }),
+    [chatMessages, selectedRoomKeys],
+  );
   const [chatStreaming, setChatStreaming] = useState(false);
   const [extractingPrompt, setExtractingPrompt] = useState(false);
   // 다음 user 메시지에 함께 보낼 첨부 이미지 (전송 후 초기화)
@@ -597,12 +645,78 @@ export default function Step2Designer({
     value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
   const activeTab = availableTabs.find((tab) => tab.v === activeRoom);
+  const promptWithKitchenSelections = (prompt: string, roomKey: string) => {
+    const assembly = value.kitchenAssemblies?.[roomKey];
+    const kitchenPrompt = assembly ? buildKitchenAssemblyRenderPrompt(assembly) : "";
+    return kitchenPrompt ? `${prompt}
+
+${kitchenPrompt}` : prompt;
+  };
+  const activeRoomIsKitchen = /주방|kitchen/i.test(`${activeRoom} ${activeTab?.label || ""}`);
+  const activeKitchenAssembly: KitchenAssembly = value.kitchenAssemblies?.[activeRoom] || {
+    roomId: activeRoom,
+    assemblyId: `kitchen-${activeRoom}`,
+    selections: {},
+  };
+  const searchKitchenCatalog = async (partCode: KitchenPartCode, query: string) => {
+    const response = await fetch(
+      `/api/inpick/kitchen-catalog?partCode=${encodeURIComponent(partCode)}&q=${encodeURIComponent(query)}`,
+    );
+    const data = (await response.json()) as { products?: KitchenCatalogProduct[]; error?: string };
+    if (!response.ok) throw new Error(data.error || "CATALOG_QUERY_FAILED");
+    return data.products || [];
+  };
+  const updateKitchenAssembly = (assembly: KitchenAssembly) => {
+    const mapping = buildKitchenAssemblyEstimateMapping(assembly);
+    const materialSelections = Object.fromEntries(
+      Object.entries(value.materialSelections || {}).filter(
+        ([key]) => !key.startsWith(`${assembly.roomId}::${assembly.assemblyId}::`),
+      ),
+    ) as Record<string, SelectedEstimateMaterial>;
+    for (const requirement of mapping.requirements) {
+      const surfaceType: MaterialHint["surfaceType"] = requirement.partCode === "backsplash"
+        ? "wall"
+        : ["countertop", "sink_bowl", "faucet", "cooktop"].includes(requirement.partCode)
+          ? "counter"
+          : "built_in_furniture";
+      materialSelections[requirement.selectionKey] = {
+        roomId: assembly.roomId,
+        roomName: activeTab?.label || "주방",
+        surfaceType,
+        materialCategory: requirement.requirementCode,
+        materialProductId: requirement.materialProductId,
+        materialNameKo: [requirement.brand, requirement.sku, requirement.spec].filter(Boolean).join(" · ") || requirement.labelKo,
+        brand: requirement.brand,
+        sku: requirement.sku,
+        spec: requirement.spec,
+        unit: requirement.unit,
+        unitPrice: requirement.unitPrice,
+        priceSource: requirement.provenance.reference,
+        confidence: 1,
+        assemblyId: assembly.assemblyId,
+        partCode: requirement.partCode,
+        provenance: requirement.provenance,
+      };
+    }
+    onChange({
+      ...value,
+      kitchenAssemblies: { ...(value.kitchenAssemblies || {}), [assembly.roomId]: assembly },
+      materialSelections,
+    });
+  };
   const activeRoomIsLiving = isLivingRoom(activeRoom, activeTab?.label);
   const activeRenderKey =
     activeRender && selectedIdx != null ? renderUnlockKey(activeRender, selectedIdx) : null;
   const activeRenderUnlocked =
     activeRoomIsLiving ||
-    (!!activeRenderKey && (value.unlockedRenderKeys?.[activeRoom] || []).includes(activeRenderKey));
+    (selectedIdx != null &&
+      isRenderAccessible(
+        activeRoom,
+        activeTab?.label,
+        activeRender,
+        selectedIdx,
+        value.unlockedRenderKeys,
+      ));
   const hasGenerated = renders.length > 0;
   const allRoomsDecided = realRoomTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
   const firstGeneratedRoom = availableTabs.find(
@@ -612,9 +726,24 @@ export default function Step2Designer({
   const finalSelectionRooms = useMemo(
     () =>
       availableTabs
-        .filter((tab) => tab.v !== "all" && (value.rendersByRoom[tab.v]?.length ?? 0) > 0)
-        .map((tab) => ({ key: tab.v, label: tab.label, renders: value.rendersByRoom[tab.v] || [] })),
-    [availableTabs, value.rendersByRoom],
+        .filter((tab) => tab.v !== "all")
+        .map((tab) => ({
+          key: tab.v,
+          label: tab.label,
+          renders: (value.rendersByRoom[tab.v] || [])
+            .map((render, index) => ({ ...render, selectionIndex: index }))
+            .filter((render) =>
+              isRenderAccessible(
+                tab.v,
+                tab.label,
+                render,
+                render.selectionIndex ?? 0,
+                value.unlockedRenderKeys,
+              ),
+            ),
+        }))
+        .filter((room) => room.renders.length > 0),
+    [availableTabs, value.rendersByRoom, value.unlockedRenderKeys],
   );
 
   const openFinalSelection = () => {
@@ -1158,17 +1287,27 @@ export default function Step2Designer({
   // 사진/상가 모드: 도면 없을 때 단일 이미지 생성 (render-photo-style)
   // MD plan §5-1, §6 — propertyId 없는 사용자가 render-room에 잘못 태워지는 것 차단
   const handlePhotoStyleGenerate = async (stylePrompt: string) => {
-    const targetKey = activeRoom === "all" ? "living" : activeRoom;
-    const targetTab = ROOM_TABS.find((t) => t.v === targetKey);
-    const targetIsLiving = isLivingRoom(targetKey, targetTab?.label);
-    const requiredTokens = targetIsLiving ? 5 : 1;
-    if (tokenBalance < requiredTokens) {
+    const fallbackKey = activeRoom === "all" ? "living" : activeRoom;
+    const fallbackTab = ROOM_TABS.find((tab) => tab.v === fallbackKey);
+    const targets = currentProjectMode === "photo_only" && activeRoom === "all"
+      ? realRoomTabs.filter((tab) => (value.rendersByRoom[tab.v] || []).length === 0)
+      : fallbackTab
+        ? [fallbackTab]
+        : [];
+    if (targets.length === 0) {
+      setErrorMsg("선택한 모든 공간의 디자인이 이미 생성되어 있습니다.");
+      return;
+    }
+    const requiresLivingCharge = targets.some((tab) => isLivingRoom(tab.v, tab.label));
+    if (requiresLivingCharge && tokenBalance < 5) {
       setInsufficientOpen(true);
       return;
     }
+
     setGenerating(true);
     setProgress(0);
     setErrorMsg(null);
+    setBulkProgress(targets.length > 1 ? { current: 0, total: targets.length, roomLabel: "" } : null);
     try {
       const areaM2 = basicInfo.selectedPyeong?.exclusiveArea;
       const budgetTier =
@@ -1177,70 +1316,124 @@ export default function Step2Designer({
           : basicInfo.budget && basicInfo.budget >= 5000
             ? "standard"
             : "basic";
-      const res = await fetch("/api/inpick/render-photo-style", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          projectMode: currentProjectMode === "commercial" ? "commercial" : "photo_only",
-          stylePrompt,
-          spaceType: targetTab?.label,
-          businessType: commercialBusiness,
-          zoneName: currentProjectMode === "commercial" ? targetTab?.label : undefined,
-          areaM2,
-          budgetTier,
-          quality: "low",
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.hint || data.error || "이미지 생성 실패");
-      }
-      // 결과를 현재 활성 탭(또는 "all")에 추가 — 기존 UI 호환
-      const item: RenderItem = {
-        url: data.imageUrl,
-        prompt: stylePrompt,
-        revisedPrompt: data.prompt,
-        costUsd: data.costUsd ?? 0.01,
-        timestamp: new Date().toISOString(),
-      };
-      onChange({
+      const projectId = getOrCreateWorkflowProjectId();
+      const next: Step2Data = {
         ...value,
-        rendersByRoom: {
-          ...value.rendersByRoom,
-          [targetKey]: [...(value.rendersByRoom[targetKey] || []), item],
-        },
-        selectedByRoom: {
-          ...value.selectedByRoom,
-          [targetKey]: (value.rendersByRoom[targetKey] || []).length,
-        },
+        rendersByRoom: { ...value.rendersByRoom },
+        selectedByRoom: { ...value.selectedByRoom },
+        generations: { ...value.generations },
         conceptPrompt: value.conceptPrompt || stylePrompt,
-        unlockedRenderKeys: targetIsLiving
-          ? value.unlockedRenderKeys
+      };
+      const failures: string[] = [];
+
+      for (let index = 0; index < targets.length; index += 1) {
+        const targetTab = targets[index];
+        const targetKey = targetTab.v;
+        const roomStylePrompt = promptWithKitchenSelections(stylePrompt, targetKey);
+        const targetIsLiving = isLivingRoom(targetKey, targetTab.label);
+        setBulkProgress(targets.length > 1
+          ? { current: index + 1, total: targets.length, roomLabel: targetTab.label }
+          : null);
+        const photoSource = currentProjectMode === "photo_only" ? photoSourcesByRoom[targetKey] : undefined;
+        const residentialGuard = photoSpaceType
+          ? `${photoSpaceType} 주거 유형과 원본 사진의 구조·개구부·시점·면적감을 유지하고 더 큰 아파트로 바꾸지 마세요. `
+          : "";
+        const furnishingOptions = roomFurnishings?.[targetKey] || [];
+        const furnishingText = formatPhotoFurnishingRequirements(furnishingOptions).join(", ");
+        const requiredPartsPrompt = furnishingText
+          ? `필수 부품을 서로 구분해서 보존하세요: ${furnishingText}. `
+          : "";
+        const lockedDelivery = targetIsLiving
+          ? undefined
           : {
-              ...(value.unlockedRenderKeys || {}),
-              [targetKey]: [
-                ...(value.unlockedRenderKeys?.[targetKey] || []),
-                renderUnlockKey(item, (value.rendersByRoom[targetKey] || []).length),
-              ],
+              projectId,
+              projectMode: currentProjectMode === "commercial" ? "commercial" as const : "photo_only" as const,
+              targetType: currentProjectMode === "commercial" ? "zone" as const : "room" as const,
+              targetId: targetKey,
+              targetName: targetTab.label,
+              renderKind: photoSource ? "space_edit" as const : "room_render" as const,
+              unlockCost: 1 as const,
+              prompt: roomStylePrompt,
+            };
+        try {
+          const response = await fetch(
+            photoSource ? "/api/inpick/render-space-edit" : "/api/inpick/render-photo-style",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(
+                photoSource
+                  ? {
+                      sourceImage: photoSource,
+                      editPrompt: `${residentialGuard}${requiredPartsPrompt}${targetTab.label}: ${roomStylePrompt}`,
+                      preserveGeometry: true,
+                      analyzeSurfaces: false,
+                      projectId,
+                      targetId: targetKey,
+                      targetNameKo: targetTab.label,
+                      spaceType: targetTab.label,
+                      budgetTier,
+                      quality: "low",
+                      lockedDelivery,
+                    }
+                  : {
+                      projectMode: currentProjectMode === "commercial" ? "commercial" : "photo_only",
+                      stylePrompt: roomStylePrompt,
+                      spaceType: targetTab.label,
+                      residentialType: currentProjectMode === "photo_only" ? photoSpaceType : undefined,
+                      businessType: commercialBusiness,
+                      zoneName: currentProjectMode === "commercial" ? targetTab.label : undefined,
+                      areaM2,
+                      budgetTier,
+                      furnishingOptions,
+                      quality: "low",
+                      lockedDelivery,
+                    },
+              ),
             },
-      });
+          );
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.hint || data.error || "이미지 생성 실패");
+          const item: RenderItem = {
+            url: typeof data.imageUrl === "string" ? data.imageUrl : "",
+            lockedAssetId: data.asset?.id,
+            accessState: data.asset ? "locked" : "free",
+            prompt: roomStylePrompt,
+            revisedPrompt: data.prompt,
+            costUsd: data.costUsd ?? 0.01,
+            timestamp: new Date().toISOString(),
+          };
+          const roomRenders = [...(next.rendersByRoom[targetKey] || []), item];
+          next.rendersByRoom[targetKey] = roomRenders;
+          next.selectedByRoom[targetKey] = roomRenders.length - 1;
+          next.generations[targetKey] = (next.generations[targetKey] ?? 0) + 1;
+          if (!data.asset && data.imageUrl) {
+            void saveDesignOutputAfterRender({
+              projectMode: currentProjectMode,
+              targetType: currentProjectMode === "commercial" ? "zone" : "room",
+              targetId: targetKey,
+              targetName: targetTab.label,
+              renderKind: currentProjectMode === "commercial" ? "zone_render" : "room_render",
+              imageUrl: data.imageUrl,
+              prompt: data.prompt || roomStylePrompt,
+            });
+          }
+        } catch (error) {
+          failures.push(`${targetTab.label}: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
+
+      onChange(next);
+      if (targets.some((target) => (next.rendersByRoom[target.v] || []).length > 0)) {
+        setImageMinimized(true);
+      }
       setProgress(100);
-      setImageMinimized(true);
       await onTokensChanged?.();
-      // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
-      void saveDesignOutputAfterRender({
-        projectMode: currentProjectMode,
-        targetType: currentProjectMode === "commercial" ? "zone" : "whole",
-        targetId: targetKey,
-        targetName: targetTab?.label || targetKey,
-        renderKind:
-          currentProjectMode === "commercial" ? "zone_render" : "full_render",
-        imageUrl: data.imageUrl,
-        prompt: data.prompt || stylePrompt,
-      });
-    } catch (e) {
-      setErrorMsg(e instanceof Error ? e.message : String(e));
+      if (failures.length > 0) {
+        setErrorMsg(`일부 공간 실패: ${failures.slice(0, 2).join(" / ")}`);
+      }
     } finally {
+      setBulkProgress(null);
       setGenerating(false);
     }
   };
@@ -1250,15 +1443,9 @@ export default function Step2Designer({
     setErrorMsg(null);
     setExtractingPrompt(true);
     try {
-      const res = await fetch("/api/inpick/design-chat/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: chatMessages }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.image_prompt) {
-        throw new Error(data.error || "상담 내용 정리 실패");
-      }
+      // 이미지 attachment의 base64/data URL은 prompt 추출에 필요하지 않다.
+      // text-only로 제한해 Vercel 413 plain-text 응답과 JSON parse crash를 방지한다.
+      const data = await extractDesignPrompt(chatMessages);
       // 모드 분기 — workflowEntry 명시적으로만 결정 (MD §3 silent fallback 금지)
       // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasSpatialBasis =
@@ -1307,6 +1494,7 @@ export default function Step2Designer({
     const isFirstGen = renders.length === 0;
     const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
     const roomIsLiving = isLivingRoom(activeRoom, tab?.label);
+    const roomPromptToUse = promptWithKitchenSelections(promptToUse, activeRoom);
     const requiredTokens = roomIsLiving ? 5 : 1;
     if (tokenBalance < requiredTokens) {
       setInsufficientOpen(true);
@@ -1338,7 +1526,7 @@ export default function Step2Designer({
         widthMm: dim.widthMm,
         depthMm: dim.depthMm,
         heightMm: dim.heightMm,
-        style: promptToUse,
+        style: roomPromptToUse,
         expansion: basicInfo.expansionType === "extended",
         size: "1024x1024",
         quality,                                          // Q2 — 1차 low / 재생성 high
@@ -1371,7 +1559,7 @@ export default function Step2Designer({
       }
       const item: RenderItem = {
         url: result.imageUrl,
-        prompt: promptToUse,
+        prompt: roomPromptToUse,
         revisedPrompt: result.revisedPrompt,
         costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
@@ -1387,7 +1575,7 @@ export default function Step2Designer({
         renderKind:
           currentProjectMode === "commercial" ? "zone_render" : "room_render",
         imageUrl: result.imageUrl,
-        prompt: result.revisedPrompt || promptToUse,
+        prompt: result.revisedPrompt || roomPromptToUse,
       });
       // Launch-critical: renderSpec 응답 저장
       if (result.renderSpec) {
@@ -1432,17 +1620,15 @@ export default function Step2Designer({
   };
 
   const handleBulkGenerate = async (conceptPrompt: string) => {
-    // 대표 컨셉 생성은 거실 1장만 만든다. 다른 공간은 각 탭에서 1토큰으로 개별 생성·공개한다.
-    const livingTab =
-      availableTabs.find((t) => t.v !== "all" && isLivingRoom(t.v, t.label)) ||
-      realRoomTabs[0];
-    const emptyTabs =
-      livingTab && (value.rendersByRoom[livingTab.v] || []).length === 0 ? [livingTab] : [];
+    const emptyTabs = realRoomTabs
+      .filter((tab) => (value.rendersByRoom[tab.v] || []).length === 0)
+      .sort((left, right) => Number(isLivingRoom(right.v, right.label)) - Number(isLivingRoom(left.v, left.label)));
     if (emptyTabs.length === 0) {
-      setErrorMsg("대표 거실 디자인이 이미 있습니다. 다른 공간은 해당 탭에서 1토큰으로 열 수 있습니다.");
+      setErrorMsg("선택한 모든 공간의 디자인이 이미 생성되어 있습니다.");
       return;
     }
-    if (tokenBalance < 5) {
+    const requiresLivingCharge = emptyTabs.some((tab) => isLivingRoom(tab.v, tab.label));
+    if (requiresLivingCharge && tokenBalance < 5) {
       setInsufficientOpen(true);
       return;
     }
@@ -1459,6 +1645,7 @@ export default function Step2Designer({
 
       for (let i = 0; i < emptyTabs.length; i++) {
         const tab = emptyTabs[i];
+        const roomConceptPrompt = promptWithKitchenSelections(conceptPrompt, tab.v);
         setBulkProgress({ current: i + 1, total: emptyTabs.length, roomLabel: tab.label });
         try {
           const dim = roomDims[tab.dimKey] || roomDims["거실"];
@@ -1470,12 +1657,13 @@ export default function Step2Designer({
             basicInfo.normalizedImageUrl ||
             basicInfo.cleanedImageUrl ||
             basicInfo.uploadedFloorplan?.dataUrl;
+          const tabIsLiving = isLivingRoom(tab.v, tab.label);
           const bulkBody: RenderRoomBody = {
             roomName: tab.label,
             widthMm: dim.widthMm,
             depthMm: dim.depthMm,
             heightMm: dim.heightMm,
-            style: conceptPrompt,
+            style: roomConceptPrompt,
             expansion: basicInfo.expansionType === "extended",
             size: "1024x1024",
             quality: "low",                              // Q2 — 1차 low
@@ -1491,6 +1679,18 @@ export default function Step2Designer({
             furnishingOptions: roomFurnishings?.[tab.v] || [],
             propertyId: basicInfo.floorplanPropertyId,
             floorplanImageUrl: floorplanReferenceUrl,
+            lockedDelivery: tabIsLiving
+              ? undefined
+              : {
+                  projectId: getOrCreateWorkflowProjectId(),
+                  projectMode: "apartment",
+                  targetType: "room",
+                  targetId: tab.v,
+                  targetName: tab.label,
+                  renderKind: "room_render",
+                  unlockCost: 1,
+                  prompt: roomConceptPrompt,
+                },
           };
           // Phase 9 — sync/async 자동 처리 (jobId 응답 시 polling)
           const result = await renderRoomViaClient(bulkBody, {
@@ -1511,7 +1711,9 @@ export default function Step2Designer({
               ok: true,
               item: {
                 url: result.imageUrl,
-                prompt: conceptPrompt,
+                lockedAssetId: result.lockedAsset?.id,
+                accessState: result.lockedAsset ? "locked" : "free",
+                prompt: roomConceptPrompt,
                 revisedPrompt: result.revisedPrompt,
                 costUsd: result.costUsd ?? 0.01,            // low quality 기본 $0.01
                 timestamp: new Date().toISOString(),
@@ -1519,8 +1721,8 @@ export default function Step2Designer({
                 metadata: result.metadata,
               } as RenderItem,
             });
-            // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
-            void saveDesignOutputAfterRender({
+            // 잠긴 결과는 private 등록 과정에서 design_output도 함께 생성된다.
+            if (!result.lockedAsset) void saveDesignOutputAfterRender({
               projectMode: currentProjectMode,
               targetType: currentProjectMode === "commercial" ? "zone" : "room",
               targetId: tab.v,
@@ -1528,7 +1730,7 @@ export default function Step2Designer({
               renderKind:
                 currentProjectMode === "commercial" ? "zone_render" : "room_render",
               imageUrl: result.imageUrl,
-              prompt: result.revisedPrompt || conceptPrompt,
+              prompt: result.revisedPrompt || roomConceptPrompt,
             });
           }
         } catch (e) {
@@ -1587,6 +1789,43 @@ export default function Step2Designer({
           currentPrompt.trim() ||
           "거실과 동일한 2026 컨템포러리 인테리어 컨셉";
         await handleGenerate(prompt);
+        return;
+      }
+
+      if (activeRender.lockedAssetId) {
+        const unlockResponse = await fetch(
+          `/api/inpick/locked-design/assets/${encodeURIComponent(activeRender.lockedAssetId)}/unlock`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              idempotencyKey: `unlock:${activeRender.lockedAssetId}`,
+            }),
+          },
+        );
+        const unlockData = (await unlockResponse.json().catch(() => ({}))) as {
+          url?: string;
+          expiresAt?: string;
+          error?: string;
+          hint?: string;
+        };
+        if (!unlockResponse.ok || !unlockData.url) {
+          if (unlockResponse.status === 402) setInsufficientOpen(true);
+          throw new Error(unlockData.hint || unlockData.error || "이미지 잠금 해제에 실패했습니다.");
+        }
+        const nextRenders = [...renders];
+        nextRenders[selectedIdx] = {
+          ...activeRender,
+          url: unlockData.url,
+          accessState: "unlocked",
+          viewExpiresAt: unlockData.expiresAt,
+        };
+        onChange({
+          ...value,
+          rendersByRoom: { ...value.rendersByRoom, [activeRoom]: nextRenders },
+        });
+        setImageMinimized(true);
+        await onTokensChanged?.();
         return;
       }
 
@@ -2587,7 +2826,7 @@ export default function Step2Designer({
 
           {/* 풀스크린 이미지 오버랩 (선택된 시안 큰 보기) */}
           <AnimatePresence>
-            {activeRender && !imageMinimized && hasGenerated && !generating && (
+            {activeRender && activeRenderUnlocked && !imageMinimized && hasGenerated && !generating && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -2661,18 +2900,10 @@ export default function Step2Designer({
                   exit={{ opacity: 0 }}
                   className="absolute inset-3 z-40 overflow-hidden rounded-2xl border border-black/10 bg-[#f1f0ed] shadow-2xl"
                 >
-                  {activeRender ? (
-                    <img
-                      src={activeRender.refinedUrl || activeRender.url}
-                      alt="잠긴 디자인 이미지"
-                      className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-[28px]"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 opacity-50">
-                      <div className="absolute left-[8%] top-[12%] h-[50%] w-[55%] rounded-[32px] bg-white blur-xl" />
-                      <div className="absolute bottom-[10%] right-[8%] h-[42%] w-[48%] rounded-full bg-black/10 blur-2xl" />
-                    </div>
-                  )}
+                  <div className="absolute inset-0 opacity-50">
+                    <div className="absolute left-[8%] top-[12%] h-[50%] w-[55%] rounded-[32px] bg-white blur-xl" />
+                    <div className="absolute bottom-[10%] right-[8%] h-[42%] w-[48%] rounded-full bg-black/10 blur-2xl" />
+                  </div>
                   <div className="absolute inset-0 bg-white/60 backdrop-blur-md" />
                   <div className="relative flex h-full items-center justify-center p-6 text-center">
                     <div className="w-full max-w-sm rounded-[24px] border border-black/10 bg-white/95 p-6 shadow-xl">
@@ -2804,6 +3035,17 @@ export default function Step2Designer({
           )
         )}
       </section>
+
+      {activeRoom !== "all" && activeRoomIsKitchen && (
+        <div className="lg:col-span-2">
+          <KitchenAssemblySelector
+            value={activeKitchenAssembly}
+            onChange={updateKitchenAssembly}
+            searchCatalog={searchKitchenCatalog}
+            disabled={generating}
+          />
+        </div>
+      )}
 
       {/* Phase 7 — Vision Material Picker 모달 */}
       {PARTIAL_MATERIAL_VIEW_ENABLED && <VisionMaterialPicker
@@ -3018,12 +3260,12 @@ function FinalDesignSelectionModal({
               </div>
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
                 {room.renders.map((render, renderIndex) => {
-                  const selected = selectedByRoom[room.key] === renderIndex;
+                  const selected = selectedByRoom[room.key] === (render.selectionIndex ?? renderIndex);
                   return (
                     <button
                       type="button"
                       key={`${render.timestamp}-${renderIndex}`}
-                      onClick={() => onSelect(room.key, renderIndex)}
+                      onClick={() => onSelect(room.key, render.selectionIndex ?? renderIndex)}
                       aria-pressed={selected}
                       data-testid={`final-design-option-${room.key}-${renderIndex}`}
                       className={`group relative aspect-[4/3] overflow-hidden rounded-2xl border-2 bg-white text-left transition ${

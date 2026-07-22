@@ -55,6 +55,9 @@ import Notch from "@/components/workflow/Notch";
 import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
 import { constructionEstimateToDetailLines } from "@/lib/estimate-pro/detail-model";
 import { useTokens } from "@/hooks/useTokens";
+import { CONTRACTOR_BIDDING_ENABLED } from "@/lib/features";
+import { postEstimateJson } from "@/lib/inpick/estimate-client";
+import { buildPhotoEstimateRooms } from "@/lib/inpick/photo-estimate-rooms";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -265,6 +268,37 @@ interface EstimateRoom {
   auxTotalWon: number;
   laborTotalWon: number;
   totalWon: number;
+}
+
+interface RoughEstimateApiResponse {
+  warnings?: string[];
+  pyung?: number;
+  areaM2?: number;
+  totalPyung?: number;
+  totalAreaM2?: number;
+  businessType?: string;
+  disclaimerKo?: string;
+  grandTotalWon?: number;
+  breakdown?: {
+    directCostWon?: number;
+    zonesDirectCostWon?: number;
+    systemSurchargeWon?: number;
+  };
+}
+
+interface ApartmentEstimateApiResponse {
+  estimates?: EstimateRoom[];
+  fallbackRooms?: Array<{ roomName: string; reason?: string }>;
+  warnings?: string[];
+  quotationType?: string;
+  matchMetaByRoom?: Record<
+    string,
+    Array<{
+      matchStatus?: "confirmed" | "recommended" | "fallback";
+      confidence?: number;
+      surface?: string;
+    }>
+  >;
 }
 
 const ROOM_NAME_MAP: Record<string, string> = {
@@ -676,19 +710,16 @@ function EstimatePage() {
       }];
     });
     try {
-      const res = await fetch("/api/inpick/estimate-context/finalize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const data = await postEstimateJson<{ contextId?: string }>(
+        "/api/inpick/estimate-context/finalize",
+        {
           projectId,
           projectMode,
           step1Snapshot: s1,
           selectionMode: selectedDesigns.length > 0 ? "final_images_only" : undefined,
           selectedDesigns,
-        }),
-      });
-      if (!res.ok) return null;
-      const data = (await res.json()) as { contextId?: string };
+        },
+      );
       return data.contextId || null;
     } catch (error) {
       console.warn("[estimate] context finalize skipped — legacy estimate fallback", error);
@@ -1072,19 +1103,16 @@ function EstimatePage() {
             "Step1에서 면적/평수를 입력하지 않아 기본값으로 가견적을 산출합니다.",
           );
         }
-        const res = await fetch("/api/inpick/build-estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = await postEstimateJson<RoughEstimateApiResponse>(
+          "/api/inpick/build-estimate",
+          {
             projectMode: "photo_only",
             areaM2: area || undefined, // API가 평수 기본값 폴백 처리
             siteConditions: s1.siteConditions,
             budgetTier:
               s1.basicInfo.expansionType === "extended" ? "premium" : "standard",
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.hint || "견적 생성 실패");
+          },
+        );
         if (Array.isArray(data.warnings)) accumulatedWarnings.push(...data.warnings);
         setWarnings(accumulatedWarnings);
         // 가견적 결과를 estimates 형식으로 변환 (UI 호환)
@@ -1101,21 +1129,25 @@ function EstimatePage() {
         ]);
         // P7-FIX: photo_residential도 17공종 client v2 빌드
         try {
-          const prompts = Object.values(s2.rendersByRoom || {})
-            .flat()
-            .map((r) => r.revisedPrompt || r.prompt)
-            .filter(Boolean) as string[];
+          const photoRooms = buildPhotoEstimateRooms({
+            totalAreaM2: area || 79.3,
+            rendersByRoom: s2.rendersByRoom || {},
+            requestedRoomKeys: s1.rooms || [],
+          });
           const clientEstimate = buildConstructionEstimateClientSide({
             projectId: getOrCreateWorkflowProjectId() || "preview",
             projectMode: "photo_only",
-            rooms: [
-              {
-                roomName: "전체 공간",
-                areaM2: area || 79.3,
-                prompts,
-                userSelectedMaterials: selectedMaterialsForRoom(s2),
-              },
-            ],
+            rooms: photoRooms.map((room) => ({
+              roomName: room.roomName,
+              areaM2: room.areaM2,
+              prompts: room.prompts,
+              kitchenPlan: room.kitchenPlan,
+              userSelectedMaterials: selectedMaterialsForRoom(
+                s2,
+                room.roomKey,
+                room.roomName,
+              ),
+            })),
             siteConditions: s1.siteConditions,
           });
           setConstructionEstimate(clientEstimate);
@@ -1148,10 +1180,9 @@ function EstimatePage() {
           type: zoneKey,
           areaM2: totalAreaM2 / arr.length, // 균등 분배 (사용자 입력 없으면)
         }));
-        const res = await fetch("/api/inpick/build-estimate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        const data = await postEstimateJson<RoughEstimateApiResponse>(
+          "/api/inpick/build-estimate",
+          {
             projectMode: "commercial",
             businessType: s1.commercialBusiness || "other_commercial",
             budgetTier:
@@ -1159,10 +1190,8 @@ function EstimatePage() {
             zones: zoneInputs,
             requiredSystems: [],
             siteConditions: s1.siteConditions,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || data.hint || "견적 생성 실패");
+          },
+        );
         if (Array.isArray(data.warnings)) accumulatedWarnings.push(...data.warnings);
         setWarnings(accumulatedWarnings);
         // P7-FIX: commercial도 17공종 client v2 빌드 (zone별)
@@ -1289,34 +1318,32 @@ function EstimatePage() {
       //   (Step1 방 선택 없음 + Step2 이미지 생성 없음 → 평수만으로도 가견적 가능)
       // P5: projectId 전달 — API가 design_outputs DB의 materialHints를 자동 활용
       const workflowProjectId = getOrCreateWorkflowProjectId();
-      const res = await fetch("/api/inpick/build-estimate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const data = await postEstimateJson<ApartmentEstimateApiResponse>(
+        "/api/inpick/build-estimate",
+        {
           rooms: requestRooms,
           projectId: workflowProjectId,
           // API 폴백을 위해 평수/면적도 전달
           areaM2: area,
           pyung: area ? area / 3.305785 : undefined,
           siteConditions: s1.siteConditions,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "견적 생성 실패");
+        },
+      );
       const list: EstimateRoom[] = data.estimates || [];
+      const fallbackRooms = data.fallbackRooms ?? [];
       // 이제 빈 결과 거의 없음 — 표준 자재 fallback이 항상 동작
       // (이미지 있으면 vision 추출, 없으면 표준)
-      if (data.fallbackRooms?.length > 0) {
+      if (fallbackRooms.length > 0) {
         // 정보 로그 — 사용자에게 강제 안내는 안 함 (선택사항이라)
         console.info(
           "[estimate] 표준 자재 적용된 방:",
-          data.fallbackRooms.map((r: { roomName: string }) => r.roomName).join(", "),
+          fallbackRooms.map((r) => r.roomName).join(", "),
         );
       }
       // P0: API 폴백/표준자재 적용 시 warnings UI에 표시
       if (Array.isArray(data.warnings)) accumulatedWarnings.push(...data.warnings);
-      if (data.fallbackRooms?.length > 0) {
-        const names = data.fallbackRooms.map((r: { roomName: string }) => r.roomName).join(", ");
+      if (fallbackRooms.length > 0) {
+        const names = fallbackRooms.map((r) => r.roomName).join(", ");
         accumulatedWarnings.push(
           `${names}는 이미지 분석 결과가 없어 표준 자재로 산출했습니다. 정확도를 높이려면 해당 방의 이미지를 생성하거나 자재를 직접 선택해주세요.`,
         );
@@ -1403,7 +1430,7 @@ function EstimatePage() {
       }
       // P5: legacy 경로에서 vision이 작동했는지 추정 — fallbackRooms 비어있고 imageUrl 있는 방이 있으면 legacy_vision, 아니면 legacy_standard
       const hadAnyImage = requestRooms.some((r) => "renderImageUrl" in r);
-      const allFellBack = (data.fallbackRooms?.length ?? 0) >= requestRooms.length;
+      const allFellBack = fallbackRooms.length >= requestRooms.length;
       setEstimatePath({
         path: hadAnyImage && !allFellBack ? "legacy_vision" : "legacy_standard",
         quotationType: data.quotationType,
@@ -1665,13 +1692,15 @@ function EstimatePage() {
                   <RefreshCw className={`h-3.5 w-3.5 ${loading ? "animate-spin" : ""}`} />
                   재산출
                 </button>
-                <button
-                  onClick={() => router.push("/workflow/bidding")}
-                  disabled={loading || estimates.length === 0}
-                  className="inline-flex items-center gap-1 rounded-full bg-black px-4 py-2 text-sm font-semibold tracking-tight text-white transition hover:bg-black/75 disabled:opacity-35"
-                >
-                  업체 매칭으로 <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+                {CONTRACTOR_BIDDING_ENABLED && (
+                  <button
+                    onClick={() => router.push("/workflow/bidding")}
+                    disabled={loading || estimates.length === 0}
+                    className="inline-flex items-center gap-1 rounded-full bg-black px-4 py-2 text-sm font-semibold tracking-tight text-white transition hover:bg-black/75 disabled:opacity-35"
+                  >
+                    업체 매칭으로 <ArrowRight className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
             </div>
 

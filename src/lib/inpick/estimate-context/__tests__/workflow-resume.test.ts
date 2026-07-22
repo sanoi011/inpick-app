@@ -3,11 +3,15 @@ import { beforeEach, test } from "node:test";
 
 import {
   fetchWorkflowState,
+  isActiveWorkflowProjectId,
+  lightenWorkflowStep2,
   readWorkflowSessionSnapshot,
   resolveWorkflowLastStep,
   resolveWorkflowVisibleStep,
   saveWorkflowSessionSnapshot,
   saveWorkflowState,
+  shouldAdoptLatestWorkflowProject,
+  startFreshWorkflowSession,
 } from "../client";
 
 class MemoryStorage implements Storage {
@@ -110,6 +114,98 @@ test("project-scoped snapshot survives switching the active project", () => {
     step2: { room: "living" },
     lastStep: 1,
   });
+});
+
+test("fresh project requests never adopt the account's latest existing project", () => {
+  assert.equal(
+    shouldAdoptLatestWorkflowProject({
+      freshProjectRequested: true,
+      requestedProjectId: "",
+      workflowStateExists: false,
+      hasStep2: false,
+    }),
+    false,
+  );
+});
+
+test("ordinary empty sessions may recover the account's latest project", () => {
+  assert.equal(
+    shouldAdoptLatestWorkflowProject({
+      freshProjectRequested: false,
+      requestedProjectId: "",
+      workflowStateExists: false,
+      hasStep2: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldAdoptLatestWorkflowProject({
+      freshProjectRequested: false,
+      requestedProjectId: "selected-project",
+      workflowStateExists: false,
+      hasStep2: false,
+    }),
+    false,
+  );
+});
+
+test("starting a new project removes every active and scoped image snapshot before assigning a new id", () => {
+  local.setItem("workflow_project_id", "project-a");
+  session.setItem("workflow_project_id", "project-a");
+  saveWorkflowSessionSnapshot({
+    projectId: "project-a",
+    step1: { name: "old" },
+    step2: { rendersByRoom: { living: [{ url: "old-image" }] } },
+    lastStep: 2,
+  });
+  session.setItem("workflow_rfq_decision_packet", "old-packet");
+  session.setItem("bidding_post", "old-bid");
+
+  const nextProjectId = startFreshWorkflowSession("project-b");
+
+  assert.equal(nextProjectId, "project-b");
+  assert.equal(local.getItem("workflow_project_id"), "project-b");
+  assert.equal(session.getItem("workflow_project_id"), null);
+  assert.equal(session.getItem("workflow_step1"), null);
+  assert.equal(session.getItem("workflow_step2"), null);
+  assert.equal(session.getItem("workflow_step"), null);
+  assert.equal(session.getItem("workflow_snapshot:project-a"), null);
+  assert.equal(session.getItem("workflow_rfq_decision_packet"), null);
+  assert.equal(session.getItem("bidding_post"), null);
+  assert.equal(readWorkflowSessionSnapshot("project-b"), null);
+});
+
+test("locked room snapshots never persist original or refined image URLs", () => {
+  const lightened = lightenWorkflowStep2({
+    unlockedRenderKeys: { kitchen: [] },
+    rendersByRoom: {
+      living: [{ timestamp: "living-1", url: "https://cdn/living.png" }],
+      kitchen: [
+        {
+          timestamp: "kitchen-1",
+          url: "https://cdn/private-kitchen.png",
+          refinedUrl: "https://cdn/private-kitchen-hd.png",
+          lockedAssetId: "asset-kitchen-1",
+          accessState: "locked",
+        },
+      ],
+    },
+  });
+
+  assert.equal(lightened.rendersByRoom.living[0].url, "https://cdn/living.png");
+  assert.equal("url" in lightened.rendersByRoom.kitchen[0], false);
+  assert.equal("refinedUrl" in lightened.rendersByRoom.kitchen[0], false);
+  assert.equal(lightened.rendersByRoom.kitchen[0].lockedAssetId, "asset-kitchen-1");
+});
+
+test("late design output restore is rejected after the active project changes", () => {
+  local.setItem("workflow_project_id", "project-a");
+  assert.equal(isActiveWorkflowProjectId("project-a"), true);
+
+  startFreshWorkflowSession("project-b");
+
+  assert.equal(isActiveWorkflowProjectId("project-a"), false);
+  assert.equal(isActiveWorkflowProjectId("project-b"), true);
 });
 
 test("parallel workflow-state readers share one request and successful save invalidates cache", async () => {
