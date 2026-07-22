@@ -41,6 +41,8 @@
 - [x] OAuth 세션 이메일 검증 후 사업자 토큰 교환 복구
 - [x] 401·stale token 자동 폐기 및 로그인 redirect loop 제거
 - [x] 문의 정보 공유 동의·버전을 서버에서도 검증
+- [x] 문의 동의 버전·서버 UTC 시각을 호환 감사 마커로 영구 저장
+- [x] RFQ 현장조건을 사업자 입찰 상세에 정규화해 표시
 - [x] 프로필 응답을 명시적 allowlist로 제한해 password hash·내부 필드 제외
 - [x] dashboard/profile fetch에 Authorization 전달
 - [x] 입찰 feature flag가 꺼진 환경에서는 비활성 입찰 UI 숨김
@@ -51,7 +53,7 @@
 - [x] profile API auth 회귀 테스트
 - [x] 변경 파일 ESLint 0
 - [x] 관련 Node 테스트 전부 통과
-- [x] 인증·공개정보·shortlist·동의 회귀 테스트 23개 통과
+- [x] 인증·공개정보·shortlist·동의·현장조건 회귀 테스트 25개 통과
 - [x] Next.js production build 성공 및 정적 페이지 165개 생성
 - [x] 앱인토스 snapshot 변경 0 확인
 - [x] Android Capacitor sync 성공
@@ -70,6 +72,7 @@
 - [ ] 비밀번호 없는 legacy 사업자 계정의 재설정·OAuth 전환 운영 안내
 - [ ] 운영 비밀번호 재설정 이메일 provider 연결 및 전달 성공·만료 E2E
 - [ ] 기존 `uploads/documents` 객체를 private bucket으로 migration하고 만료 signed URL 적용
+- [ ] 문의 동의 감사 마커를 전용 `consent_version`·`consent_at` 컬럼으로 정규화
 - [ ] 소비자 shortlist 저장 및 업체 간 근거 비교표
 - [ ] Decision Packet에 포함·제외 공사, SKU, 수량, 일정, 보증, 현장 확인 조건을 고정 schema로 저장
 - [ ] 업체 문의 상태 타임라인: 접수 → 연락 → 현장 방문 합의 → 견적 수신 → 종료

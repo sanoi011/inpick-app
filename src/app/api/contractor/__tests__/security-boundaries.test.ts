@@ -76,3 +76,18 @@ test("프로필 API는 allowlist를 사용하고 문서 공개 업로드를 막�
   assert.match(upload, /folder === "documents"/);
   assert.match(upload, /보호 문서 스토리지 연결 후/);
 });
+
+test("사업자 RFQ 응답과 상세는 정규화된 현장조건을 전달하고 표시한다", () => {
+  const route = source("src/app/api/contractor/rfqs/route.ts");
+  const page = source("src/app/contractor/bids/page.tsx");
+  assert.match(route, /siteConditions:\s*normalizeSiteConditionAnswers/);
+  assert.match(page, /siteConditionAnswerSummary/);
+  assert.match(page, /현장 조건/);
+});
+
+test("문의 동의 감사 마커는 서버 시각과 버전으로 영구 저장된다", () => {
+  const route = source("src/app/api/contractors/[id]/inquiry/route.ts");
+  assert.match(route, /INPICK_CONSENT_AUDIT/);
+  assert.match(route, /new Date\(\)\.toISOString\(\)/);
+  assert.match(route, /message: messageWithConsentAudit/);
+});

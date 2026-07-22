@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getContractorIdFromRequest } from "@/lib/contractor-auth";
+import { normalizeSiteConditionAnswers } from "@/lib/inpick/estimate-v2/site-condition-answers";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -137,6 +138,7 @@ export async function GET(request: NextRequest) {
           preferredDuration: asString(rfq.preferredDuration),
           visitPreference: asString(rfq.visitPreference),
           notes: asString(rfq.notes) || asString(rfq.specialNotes),
+          siteConditions: normalizeSiteConditionAnswers(rfq.siteConditions),
           drawingOptions: asStringArray(rfq.drawingOptions, 12),
           comparisonFields: asStringArray(rfq.comparisonFields, 12),
           addressVisibility: asString(rfq.addressVisibility) || "district_only",

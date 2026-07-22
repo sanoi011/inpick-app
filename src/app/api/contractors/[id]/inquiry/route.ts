@@ -21,6 +21,13 @@ export async function POST(
       return NextResponse.json({ error: "정보 공유 동의가 필요합니다" }, { status: 400 });
     }
 
+    const consentAcceptedAt = new Date().toISOString();
+    const consentAudit = `[INPICK_CONSENT_AUDIT version=${consentVersion} acceptedAt=${consentAcceptedAt}]`;
+    const inquiryMessage = typeof message === "string" ? message.trim().slice(0, 5000) : "";
+    const messageWithConsentAudit = inquiryMessage
+      ? `${inquiryMessage}\n\n${consentAudit}`
+      : consentAudit;
+
     const supabase = createClient();
 
     // consumerId가 제공된 경우 인증된 사용자와 일치하는지 확인
@@ -54,7 +61,7 @@ export async function POST(
         consumer_name: consumerName,
         consumer_phone: consumerPhone,
         consumer_email: consumerEmail || null,
-        message: message || null,
+        message: messageWithConsentAudit,
         project_type: projectType || null,
         estimated_budget: estimatedBudget || null,
         status: "pending",

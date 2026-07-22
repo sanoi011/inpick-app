@@ -11,8 +11,6 @@ import {
   Check,
   ChevronRight,
   CircleCheck,
-  Clock3,
-  Eye,
   FileText,
   Gavel,
   ImageIcon,
@@ -38,6 +36,10 @@ import DesignGalleryModal, {
   type DesignRender,
 } from "@/components/contractor/DesignGalleryModal";
 import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
+import {
+  siteConditionAnswerSummary,
+  type SiteConditionAnswers,
+} from "@/lib/inpick/estimate-v2/site-condition-answers";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => (
@@ -74,6 +76,7 @@ interface RfqData {
   preferredDuration?: string;
   visitPreference?: string;
   notes?: string;
+  siteConditions: SiteConditionAnswers;
   drawingOptions: string[];
   comparisonFields: string[];
   addressVisibility?: string;
@@ -815,6 +818,7 @@ function NoticeDetail({
     ? new Date(notice.rfq_data.deadlineAt).toLocaleDateString("ko-KR", { year: "numeric", month: "long", day: "numeric" })
     : "일정 협의";
   const renderCount = notice.rfq_data.designRenders.length;
+  const siteConditions = siteConditionAnswerSummary(notice.rfq_data.siteConditions);
 
   return (
     <div className="overflow-hidden rounded-[28px] border border-black/[0.07] bg-white shadow-[0_20px_70px_rgba(0,0,0,0.045)]">
@@ -842,6 +846,18 @@ function NoticeDetail({
           <InfoLine label="착공 희망" value={notice.rfq_data.preferredStart || "일정 협의"} />
           <InfoLine label="상담 방식" value={notice.rfq_data.visitPreference || "현장 방문 협의"} />
           <InfoLine label="예상 공기" value={notice.rfq_data.preferredDuration || "사업자 제안"} />
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-black/[0.07] bg-white px-4 py-4">
+          <p className="text-[11px] font-black tracking-[0.08em] text-black/35">현장 조건</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {siteConditions.map((condition) => (
+              <div key={condition} className="rounded-xl bg-[#f5f5f3] px-3 py-2.5 text-xs font-bold text-black/65">
+                {condition}
+              </div>
+            ))}
+          </div>
+          <p className="mt-3 text-[11px] leading-5 text-black/42">고객이 입력한 조건이며, 수량·난이도·작업 가능 시간은 현장 방문 후 다시 확인하세요.</p>
         </div>
 
         <div className="mt-5 flex items-start gap-3 rounded-2xl bg-[#f5f5f3] px-4 py-4">
