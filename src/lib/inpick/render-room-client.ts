@@ -107,6 +107,66 @@ export interface RenderRoomClientOptions {
   postTimeoutMs?: number;
 }
 
+interface DecodedApiResponse {
+  data: Record<string, unknown>;
+  decodeError?: RenderRoomClientError;
+}
+
+function nonJsonResponseError(response: Response, bodyText: string): RenderRoomClientError {
+  const payloadTooLarge =
+    response.status === 413 || /request entity too large|payload too large/i.test(bodyText);
+  if (payloadTooLarge) {
+    return {
+      error: `요청 데이터가 너무 큽니다 (HTTP ${response.status || 413})`,
+      hint: "도면 이미지를 다시 업로드하거나 저장이 완료된 뒤 이미지 생성을 다시 시도해주세요.",
+    };
+  }
+  return {
+    error: response.ok
+      ? `이미지 생성 서버 응답 형식 오류 (HTTP ${response.status})`
+      : `이미지 생성 서버 응답 오류 (HTTP ${response.status})`,
+    hint: "잠시 후 다시 시도해주세요. 문제가 계속되면 관리자에게 문의해주세요.",
+  };
+}
+
+async function decodeApiResponse(response: Response): Promise<DecodedApiResponse> {
+  const bodyText = await response.text();
+  if (!bodyText.trim()) {
+    return {
+      data: {},
+      decodeError: {
+        error: `이미지 생성 서버가 빈 응답을 반환했습니다 (HTTP ${response.status})`,
+        hint: "잠시 후 다시 시도해주세요.",
+      },
+    };
+  }
+  try {
+    const parsed = JSON.parse(bodyText) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return { data: parsed as Record<string, unknown> };
+    }
+  } catch {
+    // Vercel/proxy 오류는 text 또는 HTML일 수 있다. 원문을 노출하지 않고 정규화한다.
+  }
+  return { data: {}, decodeError: nonJsonResponseError(response, bodyText) };
+}
+
+function prepareRequestBody(body: RenderRoomBody): RenderRoomBody {
+  const floorplanImageUrl = body.floorplanImageUrl?.trim();
+  const browserLocalReference =
+    floorplanImageUrl?.startsWith("data:") || floorplanImageUrl?.startsWith("blob:");
+  if (!browserLocalReference) return body;
+
+  // Base64 도면을 JSON에 넣으면 Vercel request-body 제한을 넘어 413 text 응답이 난다.
+  // propertyId가 있으면 서버가 Storage URL을 복구하고, 없으면 실 치수 기반 생성으로 안전하게 폴백한다.
+  const requestBody = { ...body };
+  delete requestBody.floorplanImageUrl;
+  return {
+    ...requestBody,
+    isFromFloorplan: Boolean(body.propertyId),
+  };
+}
+
 /**
  * /api/inpick/render-room 호출 + 필요 시 polling.
  *
@@ -139,9 +199,11 @@ export async function renderRoomViaClient(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: postCtrl.signal,
-      body: JSON.stringify(body),
+      body: JSON.stringify(prepareRequestBody(body)),
     });
-    postData = (await postRes.json()) as Record<string, unknown>;
+    const decoded = await decodeApiResponse(postRes);
+    if (decoded.decodeError) return decoded.decodeError;
+    postData = decoded.data;
   } catch (e) {
     return {
       error: e instanceof Error ? e.message : String(e),
@@ -208,7 +270,11 @@ export async function renderRoomViaClient(
       pollRes = await fetch(`/api/inpick/render-room/jobs/${jobId}`, {
         signal: opts.signal,
       });
-      pollData = (await pollRes.json()) as Record<string, unknown>;
+      const decoded = await decodeApiResponse(pollRes);
+      if (decoded.decodeError) {
+        return { ...decoded.decodeError, jobId };
+      }
+      pollData = decoded.data;
     } catch (e) {
       // network 에러 — 한번 더 재시도 가능, 일단 polling 종료
       return {

@@ -30,6 +30,7 @@ import {
 import type { BasicInfoData } from "./BasicInfoCard";
 import type { NormalizedFloorplan } from "./Step1Cards";
 import { renderRoomViaClient, type RenderRoomBody } from "@/lib/inpick/render-room-client";
+import { extractDesignPrompt } from "@/lib/inpick/design-chat-client";
 import {
   classifyPyeong,
   estimateRoomDimsFromPyeong,
@@ -1250,15 +1251,9 @@ export default function Step2Designer({
     setErrorMsg(null);
     setExtractingPrompt(true);
     try {
-      const res = await fetch("/api/inpick/design-chat/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: chatMessages }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.image_prompt) {
-        throw new Error(data.error || "상담 내용 정리 실패");
-      }
+      // 이미지 attachment의 base64/data URL은 prompt 추출에 필요하지 않다.
+      // text-only로 제한해 Vercel 413 plain-text 응답과 JSON parse crash를 방지한다.
+      const data = await extractDesignPrompt(chatMessages);
       // 모드 분기 — workflowEntry 명시적으로만 결정 (MD §3 silent fallback 금지)
       // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasSpatialBasis =
