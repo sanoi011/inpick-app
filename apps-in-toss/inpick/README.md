@@ -17,7 +17,8 @@ Apps in Toss의 CSR WebView 런타임에서 실행한다. 토스 빌드는 운�
 
 - 토스 로그인 인가 코드를 `/api/apps-in-toss/session`에서 Supabase 사용자 세션으로 교환
 - 토큰 충전과 계약견적서 구매를 앱인토스 `IAP.createOneTimePurchaseOrder`로 처리
-- 앱 시작 시 `getPendingOrders`로 미지급 주문을 자동 복구하고 환불 상태를 재검증
+- 토스 네이티브 `Storage`에 구매 문맥을 보존하고 앱 시작 시 `getPendingOrders`로
+  미지급 주문을 자동 복구한 뒤 환불 상태를 재검증
 - 패키지 오리진의 상대 API 요청에 Supabase Bearer 세션을 붙여 운영 API로 전달
 - Next 클라이언트 라우터를 토스 WebView history로 연결
 - 로그인·실행 셸 외 제품 UI와 기능은 해시로 검증된 `inpick-source/` 격리 복사본에서 import

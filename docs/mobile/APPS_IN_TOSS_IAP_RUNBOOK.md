@@ -17,7 +17,7 @@
   → InPick API /api/apps-in-toss/iap/grant
   → mTLS 주문 상태 API로 orderId + Toss userKey + SKU 검증
   → payment_intents / payments / apps_in_toss_iap_orders 기록
-  → token_ledger 또는 user_entitlements에 멱등 지급
+  → 지급 RPC에서 wallet / ledger / 실사용 잔액 또는 PDF 권한을 원자적·멱등 지급
   → true 반환 후 Toss가 지급 완료 처리
 ```
 
@@ -25,6 +25,11 @@
 재처리하고, 성공한 주문은 `completeProductGrant()`로 완료합니다. 환불 내역은
 `getCompletedOrRefundedOrders()`로 확인한 뒤 서버에서 mTLS 재검증하여
 `payment_reconciliation_jobs`에 회수 검토 작업을 만듭니다.
+
+구매 직전 상품·프로젝트 문맥과 `processProductGrant`에서 받은 `orderId`는 토스
+네이티브 `Storage`에 7일 동안 보관합니다. 결제 도중 앱이 종료돼도 PDF 권한을 원래
+견적에 연결해 복구할 수 있고, 기기 변경처럼 문맥을 복원할 수 없는 경우에는 미지정
+scope의 1회용 PDF 바우처로 지급해 다음 견적 1건에 사용할 수 있습니다.
 
 ## 2. 콘솔 선행 조건
 
@@ -79,10 +84,11 @@ PNG / 1024×1024 / RGB / SHA-256:
 
 ## 4. 콘솔 SKU를 Supabase에 연결
 
-먼저 마이그레이션을 적용합니다.
+먼저 아래 마이그레이션을 순서대로 적용합니다.
 
 ```text
 supabase/migrations/20260723020000_apps_in_toss_iap.sql
+supabase/migrations/20260723025000_apps_in_toss_atomic_provisioning.sql
 ```
 
 그 다음 콘솔에서 발급된 SKU와 실제 판매가를 아래 템플릿에 넣어 실행합니다.
@@ -92,36 +98,51 @@ SKU를 모르는 상태에서 임의 문자열을 만들면 안 됩니다.
 UPDATE payment_products
 SET apps_in_toss_sku = '<ai_credit_10 콘솔 SKU>',
     apps_in_toss_sale_amount_krw = <콘솔 판매가>,
-    apps_in_toss_enabled = TRUE
+    apps_in_toss_enabled = FALSE
 WHERE code = 'ai_credit_10';
 
 UPDATE payment_products
 SET apps_in_toss_sku = '<ai_credit_30 콘솔 SKU>',
     apps_in_toss_sale_amount_krw = <콘솔 판매가>,
-    apps_in_toss_enabled = TRUE
+    apps_in_toss_enabled = FALSE
 WHERE code = 'ai_credit_30';
 
 UPDATE payment_products
 SET apps_in_toss_sku = '<ai_credit_100 콘솔 SKU>',
     apps_in_toss_sale_amount_krw = <콘솔 판매가>,
-    apps_in_toss_enabled = TRUE
+    apps_in_toss_enabled = FALSE
 WHERE code = 'ai_credit_100';
 
 UPDATE payment_products
 SET apps_in_toss_sku = '<ai_credit_300 콘솔 SKU>',
     apps_in_toss_sale_amount_krw = <콘솔 판매가>,
-    apps_in_toss_enabled = TRUE
+    apps_in_toss_enabled = FALSE
 WHERE code = 'ai_credit_300';
 
 UPDATE payment_products
 SET apps_in_toss_sku = '<estimate_pdf_single 콘솔 SKU>',
     apps_in_toss_sale_amount_krw = <콘솔 판매가>,
-    apps_in_toss_enabled = TRUE
+    apps_in_toss_enabled = FALSE
 WHERE code = 'estimate_pdf_single';
 ```
 
 등록이 끝나기 전에는 `apps_in_toss_enabled=FALSE`이므로, 잘못된 상품이나 가격이
-사용자에게 노출되지 않습니다.
+사용자에게 노출되지 않습니다. 아래 항목을 모두 확인한 뒤 샌드박스 테스트 직전에만
+대상 5개를 `TRUE`로 바꿉니다.
+
+```sql
+UPDATE payment_products
+SET apps_in_toss_enabled = TRUE
+WHERE code IN (
+  'ai_credit_10',
+  'ai_credit_30',
+  'ai_credit_100',
+  'ai_credit_300',
+  'estimate_pdf_single'
+)
+  AND apps_in_toss_sku IS NOT NULL
+  AND apps_in_toss_product_type = 'CONSUMABLE';
+```
 
 ## 5. 배포 순서
 
@@ -140,6 +161,7 @@ WHERE code = 'estimate_pdf_single';
 - 상품명, 이미지, `displayAmount`가 콘솔과 같은지
 - 토큰 상품 결제 후 정확한 유료/보너스 토큰이 한 번만 지급되는지
 - 계약견적서 결제 후 현재 견적의 PDF 권한이 생기는지
+- 두 결제를 동시에 완료해도 잔액 증가분이 서로 덮어써지지 않는지
 
 ### 결제 성공 + 지급 실패
 
@@ -147,12 +169,14 @@ WHERE code = 'estimate_pdf_single';
 - 사용자에게 지급 지연 안내가 보이는지
 - 앱 재실행 시 `getPendingOrders()`로 자동 복구되는지
 - 복구 후 `completeProductGrant()`가 호출되고 잔액이 갱신되는지
+- PDF 구매 도중 앱을 종료해도 원래 프로젝트 문맥으로 권한이 복구되는지
 
 ### 오류와 중복
 
 - 사용자 취소 시 오류 경고를 띄우지 않는지
 - 네트워크 오류 시 재실행 복구 안내가 보이는지
 - 동일 `orderId`를 반복 호출해도 토큰/권한이 한 번만 지급되는지
+- 지급 RPC 중 한 쓰기라도 실패하면 wallet·ledger·실사용 잔액이 모두 롤백되는지
 - 다른 Toss userKey의 주문을 지급할 수 없는지
 - 환불 주문이 `refunded`로 기록되고 회수 검토 작업이 생성되는지
 

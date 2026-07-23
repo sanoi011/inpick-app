@@ -28,7 +28,9 @@
 
 클라이언트의 `orderId`, SKU, 가격은 그대로 신뢰하지 않는다. 토스 로그인으로 얻은
 userKey와 mTLS 주문 상태 API로 사용자·주문·SKU를 다시 검증하고,
-`apps_in_toss_iap_orders`와 token ledger의 멱등 키로 중복 지급을 막는다.
+`apps_in_toss_iap_orders`와 token ledger의 멱등 키로 중복 지급을 막는다. 실제 지급은
+`provision_apps_in_toss_tokens_v1` 또는 `provision_apps_in_toss_pdf_v1` RPC 한
+트랜잭션에서 처리하므로 부분 지급과 동시 충전 잔액 덮어쓰기도 차단한다.
 콘솔 상품 등록 및 SKU 연결 절차는
 `docs/mobile/APPS_IN_TOSS_IAP_RUNBOOK.md`를 따른다.
 
