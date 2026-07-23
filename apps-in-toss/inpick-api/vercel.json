@@ -18,6 +18,18 @@
       "destination": "/api/payment-execute"
     },
     {
+      "source": "/api/apps-in-toss/iap/catalog",
+      "destination": "/api/iap-catalog"
+    },
+    {
+      "source": "/api/apps-in-toss/iap/grant",
+      "destination": "/api/iap-grant"
+    },
+    {
+      "source": "/api/apps-in-toss/iap/reconcile",
+      "destination": "/api/iap-reconcile"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/proxy?target=:path*"
     }

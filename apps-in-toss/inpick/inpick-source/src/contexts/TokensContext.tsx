@@ -53,6 +53,11 @@ interface TokensContextValue extends TokenState {
     amount: number,
     feature: NonNullable<TokenTransaction["feature"]>,
   ) => Promise<boolean>;
+  purchase: (
+    amount: number,
+    paymentId: string,
+    metadata?: Record<string, unknown>,
+  ) => Promise<boolean>;
   refresh: () => Promise<void>;
 }
 
@@ -267,9 +272,59 @@ export function TokensProvider({ children }: { children: ReactNode }) {
     [supabase, loadFromSupabase],
   );
 
+  const purchase = useCallback(
+    async (
+      amount: number,
+      paymentId: string,
+      metadata?: Record<string, unknown>,
+    ): Promise<boolean> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data, error } = await supabase.rpc("purchase_tokens", {
+          p_user_id: user.id,
+          p_amount: amount,
+          p_payment_id: paymentId,
+          p_metadata: metadata ?? {},
+        });
+        if (error || !data?.success) return false;
+        await loadFromSupabase(user.id);
+        return true;
+      }
+      setState((curr) => {
+        const tx: TokenTransaction = {
+          id: `p_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          type: "purchase",
+          feature: "manual",
+          amount,
+          balance_after: curr.balance + amount,
+          payment_id: paymentId,
+          created_at: new Date().toISOString(),
+        };
+        const next = {
+          ...curr,
+          balance: curr.balance + amount,
+          totalPurchased: curr.totalPurchased + amount,
+          history: [tx, ...curr.history],
+        };
+        writeFallback({
+          balance: next.balance,
+          totalUsed: next.totalUsed,
+          totalPurchased: next.totalPurchased,
+          history: next.history,
+        });
+        return next;
+      });
+      return true;
+    },
+    [supabase, loadFromSupabase],
+  );
+
   const value: TokensContextValue = {
     ...state,
     consume,
+    purchase,
     refresh,
   };
 
@@ -286,6 +341,7 @@ export function useTokens(): TokensContextValue {
     return {
       ...initial,
       consume: async () => false,
+      purchase: async () => false,
       refresh: async () => {},
     };
   }

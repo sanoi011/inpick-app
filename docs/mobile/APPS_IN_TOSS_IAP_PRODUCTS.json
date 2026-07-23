@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "appName": "inpick",
+  "generatedAt": "2026-07-23",
+  "commonImage": {
+    "path": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+    "width": 1024,
+    "height": 1024,
+    "format": "PNG",
+    "sha256": "6e6584065eb4e8b9920672eeddeeadb64695d5b372f923dc0281e1a739477795"
+  },
+  "products": [
+    {
+      "internalProductCode": "ai_credit_10",
+      "catalogKey": "inpick.token.10",
+      "sku": null,
+      "type": "CONSUMABLE",
+      "displayName": "인픽 토큰 10개",
+      "description": "AI 인테리어 이미지 10장 생성에 사용할 수 있는 소모성 토큰 10개",
+      "supplyAmountKrw": 4550,
+      "expectedSaleAmountKrw": 5005,
+      "sourceSaleAmountKrw": 5000,
+      "grant": {
+        "paidTokens": 10,
+        "bonusTokens": 0,
+        "totalTokens": 10
+      },
+      "image": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+      "exposure": false
+    },
+    {
+      "internalProductCode": "ai_credit_30",
+      "catalogKey": "inpick.token.33",
+      "sku": null,
+      "type": "CONSUMABLE",
+      "displayName": "인픽 토큰 30개 + 보너스 3개",
+      "description": "AI 인테리어 이미지 생성용 토큰 30개와 보너스 토큰 3개, 총 33개",
+      "supplyAmountKrw": 13640,
+      "expectedSaleAmountKrw": 15004,
+      "sourceSaleAmountKrw": 15000,
+      "grant": {
+        "paidTokens": 30,
+        "bonusTokens": 3,
+        "totalTokens": 33
+      },
+      "image": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+      "exposure": false
+    },
+    {
+      "internalProductCode": "ai_credit_100",
+      "catalogKey": "inpick.token.115",
+      "sku": null,
+      "type": "CONSUMABLE",
+      "displayName": "인픽 토큰 100개 + 보너스 15개",
+      "description": "상가·사무실 디자인에 적합한 토큰 100개와 보너스 15개, 총 115개",
+      "supplyAmountKrw": 45450,
+      "expectedSaleAmountKrw": 49995,
+      "sourceSaleAmountKrw": 50000,
+      "grant": {
+        "paidTokens": 100,
+        "bonusTokens": 15,
+        "totalTokens": 115
+      },
+      "image": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+      "exposure": false
+    },
+    {
+      "internalProductCode": "ai_credit_300",
+      "catalogKey": "inpick.token.360",
+      "sku": null,
+      "type": "CONSUMABLE",
+      "displayName": "인픽 토큰 300개 + 보너스 60개",
+      "description": "대규모 프로젝트용 토큰 300개와 보너스 60개, 총 360개",
+      "supplyAmountKrw": 136360,
+      "expectedSaleAmountKrw": 149996,
+      "sourceSaleAmountKrw": 150000,
+      "grant": {
+        "paidTokens": 300,
+        "bonusTokens": 60,
+        "totalTokens": 360
+      },
+      "image": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+      "exposure": false
+    },
+    {
+      "internalProductCode": "estimate_pdf_single",
+      "catalogKey": "inpick.pdf.single",
+      "sku": null,
+      "type": "CONSUMABLE",
+      "displayName": "인픽 계약견적서 패키지 1회",
+      "description": "현재 견적 1건에 계약견적서 패키지 PDF 다운로드 권한 1회를 부여하는 상품",
+      "supplyAmountKrw": 9000,
+      "expectedSaleAmountKrw": 9900,
+      "sourceSaleAmountKrw": 9900,
+      "grant": {
+        "entitlementType": "estimate_pdf_single",
+        "quantity": 1
+      },
+      "image": "apps-in-toss/inpick/inpick-source/public/iap/inpick-token-1024.png",
+      "exposure": false
+    }
+  ]
+}

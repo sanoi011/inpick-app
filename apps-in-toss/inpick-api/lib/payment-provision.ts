@@ -20,7 +20,11 @@ async function creditTokens(input: {
   userId: string;
   paymentId: string;
   product: ProvisionProduct;
+  channel?: "apps_in_toss_pay" | "apps_in_toss_iap";
 }) {
+  const channel = input.channel || "apps_in_toss_pay";
+  const channelLabel =
+    channel === "apps_in_toss_iap" ? "앱인토스 인앱결제" : "앱인토스 페이";
   const marker = `payment:${input.paymentId}:credit`;
   const existing = await input.admin
     .from("token_ledger")
@@ -72,8 +76,8 @@ async function creditTokens(input: {
       source_type: "payment",
       source_id: input.paymentId,
       idempotency_key: marker,
-      reason_ko: `${input.product.nameKo} 구매 (앱인토스 페이)`,
-      metadata: { productCode: input.product.code, channel: "apps_in_toss_pay" },
+      reason_ko: `${input.product.nameKo} 구매 (${channelLabel})`,
+      metadata: { productCode: input.product.code, channel },
     })
     .select("id")
     .single();
@@ -105,7 +109,7 @@ async function creditTokens(input: {
       source_id: input.paymentId,
       idempotency_key: `payment:${input.paymentId}:bonus`,
       reason_ko: `${input.product.code} 보너스`,
-      metadata: { productCode: input.product.code, channel: "apps_in_toss_pay" },
+      metadata: { productCode: input.product.code, channel },
     });
     if (bonusLedger.error && !/idempotency_key|duplicate/i.test(bonusLedger.error.message)) {
       throw bonusLedger.error;
@@ -150,7 +154,7 @@ async function creditTokens(input: {
       user_id: input.userId,
       type: "CHARGE",
       amount: paidCredits + bonusCredits,
-      description: `토큰 충전 (${liveMarker}, apps-in-toss-pay)`,
+      description: `토큰 충전 (${liveMarker}, ${channel.replaceAll("_", "-")})`,
     });
     if (transaction.error) throw transaction.error;
   }
@@ -168,7 +172,9 @@ async function grantEstimatePdf(input: {
   paymentId: string;
   estimateId?: string | null;
   consumerProjectId?: string | null;
+  channel?: "apps_in_toss_pay" | "apps_in_toss_iap";
 }) {
+  const channel = input.channel || "apps_in_toss_pay";
   const existing = await input.admin
     .from("user_entitlements")
     .select("id")
@@ -195,7 +201,7 @@ async function grantEstimatePdf(input: {
       scope_id: scopeId,
       metadata: {
         granted_via: "estimate_pdf_purchase",
-        channel: "apps_in_toss_pay",
+        channel,
       },
     })
     .select("id")
@@ -213,6 +219,7 @@ export async function provisionAppsInTossPayment(input: {
   product: ProvisionProduct;
   estimateId?: string | null;
   consumerProjectId?: string | null;
+  channel?: "apps_in_toss_pay" | "apps_in_toss_iap";
 }) {
   if (["token_pack", "ai_credit_pack"].includes(input.product.productType)) {
     return {

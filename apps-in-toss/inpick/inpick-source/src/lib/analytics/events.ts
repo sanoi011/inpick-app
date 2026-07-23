@@ -38,13 +38,6 @@ export const AnalyticsEvents = {
   MaterialSearchOpened: "material_search_opened",
   MaterialApplied: "material_applied",
 
-  // InPick Living native — identity/project are derived server-side from session authority.
-  LivingSessionStarted: "living_session_started",
-  LivingSurfaceSelected: "living_surface_selected",
-  LivingMaterialApplied: "living_material_applied",
-  LivingEstimateSaved: "living_estimate_saved",
-  LivingSessionEnded: "living_session_ended",
-
   // 연구용 행동 데이터 (2026-07-05 연구소 요구 항목 — 자재/디자인 선택 행동)
   //   개인식별정보는 제외, 익명 ID·세션 기준 집계만.
   DesignConceptSelected: "design_concept_selected",   // 시안 선택(비교/변경 포함)

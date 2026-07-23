@@ -1,5 +1,5 @@
 {
-  "createdAt": "2026-07-22T17:11:20.979Z",
+  "createdAt": "2026-07-23T04:49:44.774Z",
   "source": "App Store / Google Play / web shared InPick workflow",
   "immutableSnapshot": true,
   "sourceFiles": [
@@ -105,11 +105,11 @@
     },
     {
       "path": "src/components/workflow/Step1Cards.tsx",
-      "sha256": "07d0df6fbb624391f10652e5140461fc25231706993bb3776e69f8321b0266ed"
+      "sha256": "7ccbd3377ec7f0309e182b5bee3e6d56045c8fd490498d5c76384be12d306720"
     },
     {
       "path": "src/components/workflow/Step2Designer.tsx",
-      "sha256": "f23f31f3c38c7e1f7b29ff39859664549ab57aceaa125d56fafa2ee673ef136b"
+      "sha256": "03c5ceb5c582409b32bcd986775b419f759a4eba267f480fbe57d838f72e24ca"
     },
     {
       "path": "src/components/workflow/TokenBadge.tsx",
@@ -121,7 +121,7 @@
     },
     {
       "path": "src/contexts/TokensContext.tsx",
-      "sha256": "0e0fc23e268aabad967305c40732dac8b1fe7c6ba6f4ac1dfc3e0fe4a6736f59"
+      "sha256": "057cc133b47ae4b3f1fcc246e48508302901137e8d7e1d5f90b2dfab48937844"
     },
     {
       "path": "src/hooks/useAuth.ts",
@@ -145,7 +145,7 @@
     },
     {
       "path": "src/lib/analytics/events.ts",
-      "sha256": "47ee74e8c959b939e9d1473164c190d03e6afe547e4c6fd20d9ba5249bfe49af"
+      "sha256": "6db35cf0887ed9753d2d2fa515040796d91a587e2686987ba0db67b1e4f27f86"
     },
     {
       "path": "src/lib/auth/access-policy.ts",

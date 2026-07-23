@@ -16,14 +16,16 @@ Apps in Toss의 CSR WebView 런타임에서 실행한다. 토스 빌드는 운�
 ## 토스 전용 어댑터
 
 - 토스 로그인 인가 코드를 `/api/apps-in-toss/session`에서 Supabase 사용자 세션으로 교환
-- 토큰 충전과 계약견적서 구매를 앱인토스 페이 `checkoutPayment`로만 처리
+- 토큰 충전과 계약견적서 구매를 앱인토스 `IAP.createOneTimePurchaseOrder`로 처리
+- 앱 시작 시 `getPendingOrders`로 미지급 주문을 자동 복구하고 환불 상태를 재검증
 - 패키지 오리진의 상대 API 요청에 Supabase Bearer 세션을 붙여 운영 API로 전달
 - Next 클라이언트 라우터를 토스 WebView history로 연결
 - 로그인·실행 셸 외 제품 UI와 기능은 해시로 검증된 `inpick-source/` 격리 복사본에서 import
 
 서버에는 콘솔에서 발급한 `APPS_IN_TOSS_MTLS_CERT`, `APPS_IN_TOSS_MTLS_KEY`와
-`APPS_IN_TOSS_USER_HASH_SECRET`가 필요하다. 토스페이먼츠 JS SDK, 앱스토어·구글플레이
-인앱결제, 개발용 모의결제는 토스 전용 번들 결제 경로에서 사용하지 않는다.
+`APPS_IN_TOSS_USER_HASH_SECRET`가 필요하다. 상품과 가격은 앱인토스 콘솔의 IAP
+카탈로그를 정본으로 표시하고, 콘솔 SKU는 Supabase `payment_products`에 연결한다.
+토스페이먼츠 JS SDK나 개발용 모의결제는 토스 전용 번들 결제 경로에서 사용하지 않는다.
 
 ## 명령
 

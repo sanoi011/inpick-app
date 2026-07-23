@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, Loader2, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "../../inpick-source/src/hooks/useAuth";
+import { ESTIMATE_PDF_PRODUCT_CODE } from "../../inpick-source/src/types/credits";
 import {
-  ESTIMATE_PDF_PRICE_KRW,
-  ESTIMATE_PDF_PRODUCT_CODE,
-} from "../../inpick-source/src/types/credits";
-import { purchaseWithAppsInTossPay } from "./apps-in-toss-pay";
+  loadAppsInTossIapCatalog,
+  purchaseWithAppsInTossIap,
+  type AppsInTossIapCatalogProduct,
+} from "./apps-in-toss-iap";
 
 interface Props {
   open: boolean;
@@ -24,36 +25,70 @@ export default function EstimatePdfPurchaseModal({
 }: Props) {
   const { user } = useAuth();
   const [submitting, setSubmitting] = useState(false);
+  const [loadingProduct, setLoadingProduct] = useState(false);
+  const [product, setProduct] = useState<AppsInTossIapCatalogProduct | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let active = true;
+    setLoadingProduct(true);
+    setError(null);
+    void loadAppsInTossIapCatalog()
+      .then((catalog) => {
+        if (!active) return;
+        const matched =
+          catalog.products.find(
+            (item) => item.productId === ESTIMATE_PDF_PRODUCT_CODE,
+          ) || null;
+        setProduct(matched);
+        if (!matched) {
+          setError("계약견적서 인앱 상품이 아직 콘솔에 연결되지 않았습니다.");
+        }
+      })
+      .catch((cause) => {
+        if (active) {
+          setError(
+            cause instanceof Error
+              ? cause.message
+              : "인앱 상품을 불러오지 못했습니다.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setLoadingProduct(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   if (!open) return null;
 
   const handlePurchase = async () => {
     setError(null);
-    setSuccess(null);
     if (!user) {
       setError("로그인 후 결제 가능합니다.");
       return;
     }
+    if (!product) {
+      setError("구매 가능한 계약견적서 인앱 상품을 찾지 못했습니다.");
+      return;
+    }
     setSubmitting(true);
     try {
-      const result = await purchaseWithAppsInTossPay({
+      const result = await purchaseWithAppsInTossIap({
         productCode: ESTIMATE_PDF_PRODUCT_CODE,
+        sku: product.sku,
         estimateId,
         consumerProjectId,
-        returnPath: "/workflow/estimate",
       });
-      if (result.testMode) {
-        setSuccess(result.message || "샌드박스 결제 인증 테스트가 완료됐습니다.");
-        return;
-      }
       if (result.ok && result.provisioned && result.entitlementId) {
         onPaid({ entitlementId: result.entitlementId });
         return;
       }
       if (!result.cancelled) {
-        setError(result.error || "앱인토스 페이 결제를 완료하지 못했습니다.");
+        setError(result.error || "인앱결제를 완료하지 못했습니다.");
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "";
@@ -94,9 +129,8 @@ export default function EstimatePdfPurchaseModal({
             </p>
             <div className="mt-3 flex items-baseline gap-1">
               <strong className="text-2xl text-primary-900">
-                {ESTIMATE_PDF_PRICE_KRW.toLocaleString()}
+                {product?.displayAmount || "가격 확인 중"}
               </strong>
-              <span className="text-sm font-semibold text-primary-900/70">원</span>
               <span className="ml-2 rounded bg-white px-1.5 py-0.5 text-[0.65rem] font-semibold text-primary-700">
                 부가세 포함
               </span>
@@ -112,14 +146,9 @@ export default function EstimatePdfPurchaseModal({
           <div className="mt-3 flex items-center gap-2 rounded-lg bg-emerald-50 p-2.5 text-emerald-800">
             <ShieldCheck className="h-4 w-4 shrink-0" />
             <p className="text-[0.7rem]">
-              토스 앱 안에서 앱인토스 페이로만 안전하게 결제됩니다.
+              토스 앱 안에서 앱마켓 인앱결제로 안전하게 결제됩니다.
             </p>
           </div>
-          {success ? (
-            <div className="mt-3 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
-              {success}
-            </div>
-          ) : null}
           {error ? (
             <div className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
               {error}
@@ -128,15 +157,16 @@ export default function EstimatePdfPurchaseModal({
 
           <button
             onClick={handlePurchase}
-            disabled={submitting || !user}
+            disabled={submitting || loadingProduct || !user || !product}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 px-4 py-3 text-sm font-bold text-white shadow-md disabled:opacity-50"
           >
-            {submitting ? (
+            {submitting || loadingProduct ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> 결제 진행 중…
+                <Loader2 className="h-4 w-4 animate-spin" />{" "}
+                {loadingProduct ? "상품 확인 중…" : "결제 진행 중…"}
               </>
             ) : (
-              <>{ESTIMATE_PDF_PRICE_KRW.toLocaleString()}원 토스페이 결제</>
+              <>{product?.displayAmount} 인앱 결제</>
             )}
           </button>
           <button

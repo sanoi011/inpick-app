@@ -3,9 +3,13 @@ import { appLogin, closeView } from "./toss-bridge.js";
 import WorkflowPage from "../inpick-source/src/app/workflow/page";
 import EstimatePage from "../inpick-source/src/app/workflow/estimate/page";
 import { ToastContainer } from "../inpick-source/src/components/ui/Toast";
-import { TokensProvider } from "../inpick-source/src/contexts/TokensContext";
+import {
+  TokensProvider,
+  useTokens,
+} from "../inpick-source/src/contexts/TokensContext";
 import { createClient } from "../inpick-source/src/lib/supabase/client";
 import { getCurrentMiniAppPath, subscribeMiniAppNavigation } from "./adapters/navigation";
+import { restorePendingAppsInTossPurchases } from "./payments/apps-in-toss-iap";
 
 type AuthState = "checking" | "signed_out" | "signing_in" | "ready" | "error";
 
@@ -142,9 +146,59 @@ function InPickApp() {
 
   return (
     <TokensProvider>
+      <IapPurchaseRecovery />
       {path.startsWith("/workflow/estimate") ? <EstimatePage /> : <WorkflowPage />}
       <ToastContainer />
     </TokensProvider>
+  );
+}
+
+function IapPurchaseRecovery() {
+  const { refresh } = useTokens();
+  const [message, setMessage] = useState("");
+  const [warning, setWarning] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    let timer: number | undefined;
+    void restorePendingAppsInTossPurchases()
+      .then(async (result) => {
+        if (!active) return;
+        if (result.restored > 0) {
+          await refresh();
+          if (!active) return;
+          setWarning(false);
+          setMessage(`미지급 인앱 상품 ${result.restored}건을 복구했습니다.`);
+          timer = window.setTimeout(() => setMessage(""), 5_000);
+        } else if (result.failed > 0) {
+          setWarning(true);
+          setMessage(
+            `미지급 인앱 상품 ${result.failed}건을 확인 중입니다. 잠시 후 다시 열어 주세요.`,
+          );
+        }
+      })
+      .catch(() => {
+        // 앱 시작 자체는 막지 않는다. 미결 주문은 다음 실행에서 다시 복구한다.
+      });
+    return () => {
+      active = false;
+      if (timer) window.clearTimeout(timer);
+    };
+  }, [refresh]);
+
+  if (!message) return null;
+  return (
+    <div
+      className={`fixed inset-x-4 top-4 z-[120] mx-auto max-w-md rounded-2xl border px-4 py-3 text-sm font-semibold shadow-lg ${
+        warning
+          ? "border-amber-200 bg-amber-50 text-amber-900"
+          : "border-blue-200 bg-blue-50 text-blue-900"
+      }`}
+      role="status"
+      aria-live="polite"
+    >
+      {message}
+    </div>
   );
 }
 

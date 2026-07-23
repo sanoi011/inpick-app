@@ -1,24 +1,10 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Coins, Loader2, Sparkles, Star, X } from "lucide-react";
-import { purchaseWithAppsInTossPay } from "./apps-in-toss-pay";
-
-type Product = {
-  productId: string;
-  productType: string;
-  displayName: string;
-  description: string | null;
-  amountKrw: number;
-  tokenAmount: number | null;
-  bonusTokenAmount: number | null;
-  totalTokenAmount: number | null;
-  effectiveUnitPriceKrw: number | null;
-  isPopular: boolean;
-};
-
-type BillingProducts = {
-  pricing: { imageGenerationTokenCost: number } | null;
-  products: Product[];
-};
+import {
+  loadAppsInTossIapCatalog,
+  purchaseWithAppsInTossIap,
+  type AppsInTossIapCatalog,
+} from "./apps-in-toss-iap";
 
 export interface TokenPurchaseDrawerProps {
   open: boolean;
@@ -40,7 +26,7 @@ export function TokenPurchaseDrawer({
   onProvisioned,
 }: TokenPurchaseDrawerProps) {
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<BillingProducts | null>(null);
+  const [data, setData] = useState<AppsInTossIapCatalog | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,11 +37,7 @@ export function TokenPurchaseDrawer({
     let cancelled = false;
     setLoading(true);
     setError(null);
-    void fetch("/api/billing/products", { cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("상품 목록을 불러오지 못했습니다.");
-        return (await response.json()) as BillingProducts;
-      })
+    void loadAppsInTossIapCatalog()
       .then((payload) => {
         if (cancelled) return;
         setData(payload);
@@ -94,15 +76,11 @@ export function TokenPurchaseDrawer({
     setError(null);
     setSuccess(null);
     try {
-      const result = await purchaseWithAppsInTossPay({
+      const result = await purchaseWithAppsInTossIap({
         productCode: selected.productId,
+        sku: selected.sku,
         projectId,
-        returnPath: "/workflow",
       });
-      if (result.testMode) {
-        setSuccess(result.message || "샌드박스 결제 인증 테스트가 완료됐습니다.");
-        return;
-      }
       if (result.ok && result.provisioned) {
         setSuccess(
           `충전 완료! +${result.creditsAdded ?? selected.totalTokenAmount ?? 0}토큰`,
@@ -112,7 +90,7 @@ export function TokenPurchaseDrawer({
         return;
       }
       if (!result.cancelled) {
-        setError(result.error || "앱인토스 페이 결제를 완료하지 못했습니다.");
+        setError(result.error || "인앱결제를 완료하지 못했습니다.");
       }
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "결제 처리 중 오류가 발생했습니다.");
@@ -156,7 +134,9 @@ export function TokenPurchaseDrawer({
             <Loader2 className="h-6 w-6 animate-spin text-gray-400" />
           </div>
         ) : tokenPacks.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500">충전 가능한 상품이 없습니다.</div>
+          <div className="p-8 text-center text-sm text-gray-500">
+            {error || "충전 가능한 상품이 없습니다."}
+          </div>
         ) : (
           <div className="space-y-4 p-5">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -175,11 +155,20 @@ export function TokenPurchaseDrawer({
                       <Star className="h-2.5 w-2.5" /> 인기
                     </span>
                   ) : null}
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="text-sm font-semibold text-gray-900">{product.displayName}</p>
-                    <p className="text-xl font-bold text-gray-900">
-                      {product.amountKrw.toLocaleString()}원
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={product.iconUrl}
+                      alt=""
+                      className="h-12 w-12 shrink-0 rounded-xl border border-blue-100 object-cover"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {product.displayName}
+                      </p>
+                      <p className="mt-0.5 text-lg font-bold text-gray-900">
+                        {product.displayAmount}
+                      </p>
+                    </div>
                   </div>
                   <p className="mt-2 text-2xl font-bold text-orange-600">
                     {product.totalTokenAmount}
@@ -209,7 +198,7 @@ export function TokenPurchaseDrawer({
               <p className="text-sm text-gray-500">
                 결제 금액{" "}
                 <strong className="text-base text-gray-900">
-                  {selected ? `${selected.amountKrw.toLocaleString()}원` : "—"}
+                  {selected?.displayAmount || "—"}
                 </strong>
               </p>
               <button
@@ -218,11 +207,11 @@ export function TokenPurchaseDrawer({
                 className="inline-flex items-center gap-2 rounded-full bg-orange-500 px-6 py-2.5 text-sm font-bold text-white hover:bg-orange-600 disabled:bg-gray-300"
               >
                 {purchasing ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-                토스페이로 결제
+                인앱 결제
               </button>
             </div>
             <p className="text-center text-[11px] text-gray-400">
-              토스 앱 안에서 앱인토스 페이로만 안전하게 결제됩니다.
+              토스 앱 안에서 앱마켓 인앱결제로 안전하게 결제됩니다.
             </p>
           </div>
         )}
