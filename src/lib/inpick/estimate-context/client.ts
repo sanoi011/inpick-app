@@ -14,6 +14,7 @@ import type {
   ProjectMode,
   RenderKind,
 } from "./types";
+import type { SanitizedLockedAsset } from "@/lib/inpick/locked-design/contracts";
 
 const PROJECT_ID_KEY = "workflow_project_id";
 const WORKFLOW_SNAPSHOT_PREFIX = "workflow_snapshot:";
@@ -132,22 +133,33 @@ export function lightenWorkflowStep2<T>(step2: T): T {
         dataUrl,
         url,
         refinedUrl,
+        viewExpiresAt,
         ...rest
       } = item as Record<string, unknown> & {
         base64?: unknown;
         dataUrl?: unknown;
         url?: unknown;
         refinedUrl?: unknown;
+        viewExpiresAt?: unknown;
       };
       void base64;
       void dataUrl;
+      void viewExpiresAt;
       const renderKey =
         typeof item.timestamp === "string" ? item.timestamp : `render-${index}`;
       const unlocked =
         livingRoom ||
         item.accessState === "unlocked" ||
         (s.unlockedRenderKeys?.[key] || []).includes(renderKey);
-      if (item.lockedAssetId || !unlocked || item.accessState === "locked") return rest;
+      if (item.lockedAssetId) {
+        return {
+          ...rest,
+          accessState: "locked",
+          entitlementGranted:
+            item.entitlementGranted === true || item.accessState === "unlocked",
+        };
+      }
+      if (!unlocked || item.accessState === "locked") return rest;
       return { ...rest, ...(url != null ? { url } : {}), ...(refinedUrl != null ? { refinedUrl } : {}) };
     });
   }
@@ -312,6 +324,47 @@ export function startFreshWorkflowSession(forcedProjectId?: string): string {
   }
 }
 
+/**
+ * 마이페이지에서 삭제한 프로젝트의 브라우저 잔여 상태를 함께 제거한다.
+ * 활성 프로젝트가 삭제된 경우 새 UUID를 즉시 발급해 뒤늦은 네트워크 응답이
+ * 삭제된 Step2를 다시 활성 화면에 합치지 못하게 한다.
+ */
+export function clearDeletedWorkflowProjects(
+  projectIds: readonly string[],
+  forcedNextProjectId?: string,
+): { activeProjectDeleted: boolean; nextProjectId?: string } {
+  if (typeof window === "undefined") return { activeProjectDeleted: false };
+  const ids = new Set(projectIds.map((id) => id.trim()).filter(Boolean));
+  if (ids.size === 0) return { activeProjectDeleted: false };
+
+  let activeProjectId = "";
+  try {
+    activeProjectId =
+      localStorage.getItem(PROJECT_ID_KEY) || sessionStorage.getItem(PROJECT_ID_KEY) || "";
+  } catch {
+    /* private mode */
+  }
+
+  for (const projectId of Array.from(ids)) {
+    try {
+      sessionStorage.removeItem(`${WORKFLOW_SNAPSHOT_PREFIX}${projectId}`);
+    } catch {
+      /* private mode */
+    }
+    workflowStateCache.delete(projectId);
+    workflowStateRequests.delete(projectId);
+  }
+
+  if (!activeProjectId || !ids.has(activeProjectId)) {
+    return { activeProjectDeleted: false };
+  }
+
+  return {
+    activeProjectDeleted: true,
+    nextProjectId: startFreshWorkflowSession(forcedNextProjectId),
+  };
+}
+
 export interface SaveDesignOutputInput {
   projectMode: ProjectMode;
   targetType: DesignTargetType;
@@ -471,6 +524,27 @@ export async function fetchDesignOutputs(projectId: string): Promise<DesignOutpu
     return data.outputs ?? [];
   } catch (err) {
     console.warn("[design-outputs] fetch error (non-fatal):", err);
+    return [];
+  }
+}
+
+/**
+ * 잠금 디자인 메타 + 영구 access grant 조회.
+ * grant가 있으면 서버가 짧은 유효기간의 열람 URL을 함께 돌려준다.
+ */
+export async function fetchLockedDesignAssets(
+  projectId: string,
+): Promise<SanitizedLockedAsset[]> {
+  try {
+    const res = await fetch(
+      `/api/inpick/locked-design/assets?projectId=${encodeURIComponent(projectId)}`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return [];
+    const data = (await res.json()) as { assets?: SanitizedLockedAsset[] };
+    return data.assets ?? [];
+  } catch (err) {
+    console.warn("[locked-design] restore error (non-fatal):", err);
     return [];
   }
 }

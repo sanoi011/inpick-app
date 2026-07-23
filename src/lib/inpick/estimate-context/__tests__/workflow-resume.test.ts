@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 
 import {
+  clearDeletedWorkflowProjects,
   fetchWorkflowState,
   isActiveWorkflowProjectId,
   lightenWorkflowStep2,
@@ -175,6 +176,39 @@ test("starting a new project removes every active and scoped image snapshot befo
   assert.equal(readWorkflowSessionSnapshot("project-b"), null);
 });
 
+test("deleting the active project clears its Step2 snapshot and rotates the active id", () => {
+  local.setItem("workflow_project_id", "project-a");
+  saveWorkflowSessionSnapshot({
+    projectId: "project-a",
+    step1: { name: "old" },
+    step2: { rendersByRoom: { bath: [{ url: "paid-image" }] } },
+    lastStep: 2,
+  });
+
+  const result = clearDeletedWorkflowProjects(["project-a"], "project-new");
+
+  assert.deepEqual(result, {
+    activeProjectDeleted: true,
+    nextProjectId: "project-new",
+  });
+  assert.equal(local.getItem("workflow_project_id"), "project-new");
+  assert.equal(session.getItem("workflow_snapshot:project-a"), null);
+  assert.equal(session.getItem("workflow_step2"), null);
+});
+
+test("deleting another project preserves the active workflow", () => {
+  local.setItem("workflow_project_id", "project-active");
+  session.setItem("workflow_snapshot:project-old", JSON.stringify({ projectId: "project-old" }));
+  session.setItem("workflow_step2", JSON.stringify({ room: "living" }));
+
+  const result = clearDeletedWorkflowProjects(["project-old"]);
+
+  assert.deepEqual(result, { activeProjectDeleted: false });
+  assert.equal(local.getItem("workflow_project_id"), "project-active");
+  assert.equal(session.getItem("workflow_snapshot:project-old"), null);
+  assert.notEqual(session.getItem("workflow_step2"), null);
+});
+
 test("locked room snapshots never persist original or refined image URLs", () => {
   const lightened = lightenWorkflowStep2({
     unlockedRenderKeys: { kitchen: [] },
@@ -196,6 +230,28 @@ test("locked room snapshots never persist original or refined image URLs", () =>
   assert.equal("url" in lightened.rendersByRoom.kitchen[0], false);
   assert.equal("refinedUrl" in lightened.rendersByRoom.kitchen[0], false);
   assert.equal(lightened.rendersByRoom.kitchen[0].lockedAssetId, "asset-kitchen-1");
+  assert.equal(lightened.rendersByRoom.kitchen[0].accessState, "locked");
+});
+
+test("a paid locked snapshot keeps its entitlement hint but requires a fresh signed URL", () => {
+  const lightened = lightenWorkflowStep2({
+    rendersByRoom: {
+      bath: [
+        {
+          timestamp: "bath-1",
+          url: "https://signed/expired-soon.webp",
+          lockedAssetId: "asset-bath-1",
+          accessState: "unlocked",
+          viewExpiresAt: "2026-07-24T00:08:00.000Z",
+        },
+      ],
+    },
+  });
+
+  assert.equal("url" in lightened.rendersByRoom.bath[0], false);
+  assert.equal("viewExpiresAt" in lightened.rendersByRoom.bath[0], false);
+  assert.equal(lightened.rendersByRoom.bath[0].accessState, "locked");
+  assert.equal(lightened.rendersByRoom.bath[0].entitlementGranted, true);
 });
 
 test("late design output restore is rejected after the active project changes", () => {

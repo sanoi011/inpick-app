@@ -20,6 +20,7 @@ import LenisProvider from "@/components/landing-v4/LenisProvider";
 import {
   clearActiveWorkflowSessionSnapshot,
   fetchDesignOutputs,
+  fetchLockedDesignAssets,
   fetchWorkflowState,
   fetchWorkflowProjects,
   getOrCreateWorkflowProjectId,
@@ -34,7 +35,7 @@ import {
   startFreshWorkflowSession,
   lightenWorkflowStep2,
 } from "@/lib/inpick/estimate-context/client";
-import type { DesignOutput } from "@/lib/inpick/estimate-context/types";
+import { mergeRestoredDesigns } from "@/lib/inpick/workflow/restore-designs";
 
 const Step2Designer = dynamic(() => import("@/components/workflow/Step2Designer"), {
   ssr: false,
@@ -68,51 +69,25 @@ function sanitizeRestoredStep1(state: Step1Data): Step1Data {
   };
 }
 
-function mergeDesignOutputs(step2: Step2Data, outputs: DesignOutput[]): Step2Data {
-  if (outputs.length === 0) return step2;
-
-  const next: Step2Data = {
-    ...step2,
-    selectedByRoom: { ...(step2.selectedByRoom || {}) },
-    rendersByRoom: { ...(step2.rendersByRoom || {}) },
+function createInitialStep1(): Step1Data {
+  return {
+    basicInfo: {
+      mode: "address",
+      budget: 3500,
+      expansionType: "basic",
+    },
+    buildingType: null,
+    rooms: [],
   };
-  const roomKeyMap: Record<string, string> = {
-    거실: "living",
-    안방: "master",
-    주방: "kitchen",
-    부엌: "kitchen",
-    "욕실1": "bath",
-    욕실: "bath",
-    "침실1": "bedroom",
-    침실: "bedroom",
-    현관: "entrance",
-    발코니: "balcony",
-    드레스룸: "dress",
+}
+
+function createInitialStep2(): Step2Data {
+  return {
+    selectedByRoom: {},
+    generations: {},
+    rendersByRoom: {},
+    promptByRoom: {},
   };
-  let changed = false;
-
-  for (const output of outputs) {
-    if (!output.imageUrl) continue;
-    const key = roomKeyMap[output.targetName] || output.targetId || "living";
-    const existing = next.rendersByRoom[key] || [];
-    if (existing.some((render) => render.url === output.imageUrl || render.refinedUrl === output.imageUrl)) {
-      continue;
-    }
-    const cleaned = existing.filter(
-      (render) => !render.url?.startsWith("[base64") && !render.refinedUrl?.startsWith("[base64"),
-    );
-    cleaned.push({
-      url: output.imageUrl,
-      prompt: output.prompt || "",
-      costUsd: 0,
-      timestamp: output.createdAt || new Date().toISOString(),
-    });
-    next.rendersByRoom[key] = cleaned;
-    if (next.selectedByRoom[key] == null) next.selectedByRoom[key] = cleaned.length - 1;
-    changed = true;
-  }
-
-  return changed ? next : step2;
 }
 
 export default function WorkflowPage() {
@@ -120,21 +95,8 @@ export default function WorkflowPage() {
   const { balance, consume, refresh: refreshTokens } = useTokens();
 
   const [step, setStep] = useState<1 | 2>(1);
-  const [step1, setStep1] = useState<Step1Data>({
-    basicInfo: {
-      mode: "address",
-      budget: 3500,
-      expansionType: "basic", // 기본형 자동 선택 (사용자가 변경 가능)
-    },
-    buildingType: null,
-    rooms: [],
-  });
-  const [step2, setStep2] = useState<Step2Data>({
-    selectedByRoom: {},
-    generations: {},
-    rendersByRoom: {},
-    promptByRoom: {},
-  });
+  const [step1, setStep1] = useState<Step1Data>(createInitialStep1);
+  const [step2, setStep2] = useState<Step2Data>(createInitialStep2);
 
   const [normalizing, setNormalizing] = useState(false);
   const [normalizeError, setNormalizeError] = useState<string | null>(null);
@@ -215,12 +177,14 @@ export default function WorkflowPage() {
       let s1 = cached?.step1
         ? sanitizeRestoredStep1(cached.step1 as Step1Data)
         : null;
-      let s2 = (cached?.step2 as Step2Data | undefined) ?? null;
+      let s2 = cached?.step2
+        ? lightenWorkflowStep2(cached.step2 as Step2Data)
+        : null;
       let lastStep: 1 | 2 = cached?.lastStep === 2 ? 2 : 1;
-      const localLastStep = cached && (cached.step1 != null || cached.step2 != null)
+      let localLastStep = cached && (cached.step1 != null || cached.step2 != null)
         ? cached.lastStep
         : undefined;
-      const openedFromCompleteCache = !!s1 && !!s2;
+      let openedFromCompleteCache = !!s1 && !!s2;
 
       const applyRestoredState = (ready: boolean) => {
         if (cancelled) return;
@@ -248,13 +212,35 @@ export default function WorkflowPage() {
 
       let outputsPromise = projectId
         ? fetchDesignOutputs(projectId)
-        : Promise.resolve([] as DesignOutput[]);
+        : Promise.resolve([]);
+      let lockedAssetsPromise = projectId
+        ? fetchLockedDesignAssets(projectId)
+        : Promise.resolve([]);
 
       // DB 상태와 렌더 결과를 병렬로 시작한다.
       if (projectId) {
         try {
           let dbRow = await fetchWorkflowState(projectId);
           if (cancelled) return;
+          // 삭제된 프로젝트의 브라우저 스냅샷은 서버의 exists=false가 최종 권위다.
+          // 새로 발급한 아직 미저장 프로젝트는 cached/requested가 없으므로 초기화하지 않는다.
+          if (
+            !freshProjectRequested &&
+            dbRow?.exists === false &&
+            (Boolean(cached) || Boolean(requestedProjectId))
+          ) {
+            projectId = startFreshWorkflowSession();
+            s1 = null;
+            s2 = null;
+            lastStep = 1;
+            localLastStep = undefined;
+            outputsPromise = Promise.resolve([]);
+            lockedAssetsPromise = Promise.resolve([]);
+            openedFromCompleteCache = false;
+            setStep1(createInitialStep1());
+            setStep2(createInitialStep2());
+            setStep(1);
+          }
           // 계정 복원은 projectId가 없는 일반 진입에서만 수행한다.
           // 명시적으로 선택한 프로젝트를 최신 프로젝트로 바꾸지 않는다.
           // (재로그인 / 스토리지 초기화 / 다른 기기) 계정의 최신 프로젝트를 채택해 그대로 복원.
@@ -272,8 +258,10 @@ export default function WorkflowPage() {
             if (latest?.id && latest.id !== projectId) {
               projectId = latest.id;
               setWorkflowProjectId(projectId);
+              openedFromCompleteCache = false;
               dbRow = await fetchWorkflowState(projectId);
               outputsPromise = fetchDesignOutputs(projectId);
+              lockedAssetsPromise = fetchLockedDesignAssets(projectId);
               if (cancelled) return;
             }
           }
@@ -282,7 +270,9 @@ export default function WorkflowPage() {
             if (!s1 && ws.step1) {
               s1 = sanitizeRestoredStep1(ws.step1 as unknown as Step1Data);
             }
-            if (!s2 && ws.step2) s2 = ws.step2 as unknown as Step2Data;
+            if (!s2 && ws.step2) {
+              s2 = lightenWorkflowStep2(ws.step2 as unknown as Step2Data);
+            }
             // 현재 브라우저의 단계 선택이 DB 디바운스 저장보다 최대 1.2초 최신이다.
             // 로컬 스냅샷이 있으면 뒤늦은 DB lastStep이 화면을 자동 이동시키지 못하게 한다.
             lastStep = resolveWorkflowLastStep(localLastStep, ws.lastStep);
@@ -296,18 +286,21 @@ export default function WorkflowPage() {
       if (!openedFromCompleteCache) applyRestoredState(true);
 
       // 렌더 이미지는 늦게 도착해도 현재 사용자 수정을 덮어쓰지 않고 병합한다.
-      if (s2) {
-        try {
-          const outputs = await outputsPromise;
-          if (
-            cancelled ||
-            outputs.length === 0 ||
-            !isActiveWorkflowProjectId(projectId)
-          ) return;
-          setStep2((current) => mergeDesignOutputs(current, outputs));
-        } catch (e) {
-          console.warn("[workflow] design_outputs 보강 실패 (non-fatal):", e);
-        }
+      try {
+        const [outputs, lockedAssets] = await Promise.all([
+          outputsPromise,
+          lockedAssetsPromise,
+        ]);
+        if (
+          cancelled ||
+          (outputs.length === 0 && lockedAssets.length === 0) ||
+          !isActiveWorkflowProjectId(projectId)
+        ) return;
+        setStep2((current) =>
+          mergeRestoredDesigns(current, outputs, lockedAssets),
+        );
+      } catch (e) {
+        console.warn("[workflow] design_outputs 보강 실패 (non-fatal):", e);
       }
     };
     void run();

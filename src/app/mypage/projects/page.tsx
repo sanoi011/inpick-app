@@ -11,6 +11,7 @@ import { toast } from "@/components/ui/Toast";
 import { SkeletonProjectCard } from "@/components/ui/Skeleton";
 import { ProjectProgress } from "@/components/ui/ProjectProgress";
 import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
+import { clearDeletedWorkflowProjects } from "@/lib/inpick/estimate-context/client";
 import {
   CONSUMER_PROJECT_STATUS_LABELS,
   CONSUMER_PROJECT_STATUS_COLORS,
@@ -95,7 +96,8 @@ export default function MyPageProjects() {
       // 서버 삭제 (로그인 상태)
       if (user) {
         const res = await fetch(`/api/consumer-projects?id=${id}`, { method: "DELETE" });
-        if (!res.ok) {
+        // 404는 서버에서 이미 삭제된 상태다. 브라우저 잔여 데이터는 그대로 정리한다.
+        if (!res.ok && res.status !== 404) {
           const data = await res.json();
           toast({ type: "error", title: "삭제 실패", message: data.error || "프로젝트를 삭제할 수 없습니다" });
           setDeletingId(null);
@@ -104,6 +106,7 @@ export default function MyPageProjects() {
       }
       // localStorage 삭제
       localStorage.removeItem(`inpick_project_${id}`);
+      clearDeletedWorkflowProjects([id]);
       setProjects((prev) => prev.filter((p) => p.id !== id));
       toast({ type: "success", title: "삭제 완료", message: "프로젝트가 삭제되었습니다" });
     } catch {
@@ -131,6 +134,7 @@ export default function MyPageProjects() {
     if (!confirm(confirmMsg)) return;
     setBulkDeleting(true);
     try {
+      const locallyDeletableIds: string[] = [];
       // 서버 삭제 — 100개씩 chunking (URL 길이 안전)
       if (user) {
         for (let i = 0; i < ids.length; i += 100) {
@@ -142,17 +146,28 @@ export default function MyPageProjects() {
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
             toast({ type: "error", title: "일부 삭제 실패", message: data.error || "서버 오류" });
-            // 부분 실패해도 계속 — 마지막에 다시 로드
             break;
           }
+          // 서버 응답에서 제외된 ID는 이미 삭제된 로컬 잔여 프로젝트일 수 있다.
+          // 성공한 chunk 전체를 브라우저에서 제거하되 실패/미처리 chunk는 보존한다.
+          locallyDeletableIds.push(...chunk);
         }
+      } else {
+        locallyDeletableIds.push(...ids);
       }
       // localStorage 삭제
-      for (const id of ids) {
+      for (const id of locallyDeletableIds) {
         try { localStorage.removeItem(`inpick_project_${id}`); } catch { /* ignore */ }
       }
-      setProjects((prev) => prev.filter((p) => !ids.includes(p.id)));
-      toast({ type: "success", title: "삭제 완료", message: `${ids.length}개 프로젝트가 삭제되었습니다` });
+      clearDeletedWorkflowProjects(locallyDeletableIds);
+      setProjects((prev) => prev.filter((p) => !locallyDeletableIds.includes(p.id)));
+      if (locallyDeletableIds.length > 0) {
+        toast({
+          type: "success",
+          title: "삭제 완료",
+          message: `${locallyDeletableIds.length}개 프로젝트가 삭제되었습니다`,
+        });
+      }
       exitSelectMode();
     } catch {
       toast({ type: "error", title: "오류", message: "일괄 삭제 중 오류가 발생했습니다" });

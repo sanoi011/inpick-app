@@ -222,6 +222,8 @@ export interface RenderItem {
   /** 서버 private 원본을 가리키는 공개 불가능 ID */
   lockedAssetId?: string;
   accessState?: "free" | "locked" | "unlocked";
+  /** 서버 access grant는 있으나 단기 URL 재발급이 필요한 상태 */
+  entitlementGranted?: boolean;
   viewExpiresAt?: string;
   /** 최종 선택 모달에서 원래 render index를 보존 */
   selectionIndex?: number;
@@ -1869,7 +1871,9 @@ export default function Step2Designer({
 
   const handleUnlockActiveImage = async () => {
     if (activeRoom === "all" || activeRoomIsLiving || unlockingImage) return;
-    if (tokenBalance < 1) {
+    // 서버 자산은 기존 grant가 있으면 charged=false로 URL만 재발급한다.
+    // 로컬 잔액으로 먼저 막으면 이미 결제한 사용자가 이미지를 복원할 수 없다.
+    if (!activeRender?.lockedAssetId && tokenBalance < 1) {
       setInsufficientOpen(true);
       return;
     }
@@ -1912,6 +1916,7 @@ export default function Step2Designer({
           ...activeRender,
           url: unlockData.url,
           accessState: "unlocked",
+          entitlementGranted: true,
           viewExpiresAt: unlockData.expiresAt,
         };
         onChange({
@@ -3008,7 +3013,9 @@ export default function Step2Designer({
                         {activeTab?.label || "추가 공간"} 디자인
                       </h3>
                       <p className="mt-1.5 text-xs leading-relaxed text-black/52">
-                        {activeRender
+                        {activeRender?.entitlementGranted
+                          ? "이미 결제한 이미지입니다. 추가 과금 없이 다시 불러옵니다."
+                          : activeRender
                           ? "이미지가 준비되어 있습니다. 1토큰으로 선명하게 공개할 수 있어요."
                           : "거실과 같은 컨셉으로 이 공간 이미지를 만들고 바로 공개합니다."}
                       </p>
@@ -3023,7 +3030,11 @@ export default function Step2Designer({
                         ) : (
                           <Eye className="h-4 w-4" />
                         )}
-                        {activeRender ? "1토큰으로 이미지 보기" : "1토큰으로 생성하고 보기"}
+                        {activeRender?.entitlementGranted
+                          ? "결제한 이미지 다시 보기"
+                          : activeRender
+                            ? "1토큰으로 이미지 보기"
+                            : "1토큰으로 생성하고 보기"}
                       </button>
                     </div>
                   </div>
