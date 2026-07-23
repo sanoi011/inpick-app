@@ -30,6 +30,10 @@
       "destination": "/api/iap-reconcile"
     },
     {
+      "source": "/api/apps-in-toss/health",
+      "destination": "/api/health"
+    },
+    {
       "source": "/api/:path*",
       "destination": "/api/proxy?target=:path*"
     }
