@@ -43,6 +43,7 @@ export default async function handler(
         )
         .eq("is_active", true)
         .eq("apps_in_toss_enabled", true)
+        .eq("apps_in_toss_product_type", "CONSUMABLE")
         .not("apps_in_toss_sku", "is", null)
         .order("sort_order", { ascending: true }),
       context.admin

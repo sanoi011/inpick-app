@@ -75,3 +75,7 @@ export function getCompletedOrRefundedIapOrders(
     }
   | undefined
 >;
+
+export function getTossStorageItem(key: string): Promise<string | null>;
+export function setTossStorageItem(key: string, value: string): Promise<void>;
+export function removeTossStorageItem(key: string): Promise<void>;

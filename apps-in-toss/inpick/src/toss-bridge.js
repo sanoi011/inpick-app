@@ -2,6 +2,7 @@
 // InPick application type graph. The web bridge itself is framework agnostic.
 import {
   IAP,
+  Storage,
   appLogin,
   checkoutPayment,
   closeView,
@@ -31,4 +32,16 @@ export function completeIapProductGrant(orderId) {
 
 export function getCompletedOrRefundedIapOrders(key) {
   return IAP.getCompletedOrRefundedOrders({ key: key ?? null });
+}
+
+export function getTossStorageItem(key) {
+  return Storage.getItem(key);
+}
+
+export function setTossStorageItem(key, value) {
+  return Storage.setItem(key, value);
+}
+
+export function removeTossStorageItem(key) {
+  return Storage.removeItem(key);
 }

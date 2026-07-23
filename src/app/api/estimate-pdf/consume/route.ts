@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "entitlementId required" }, { status: 400 });
   }
 
-  const result = await consumeEntitlement(body.entitlementId);
+  const result = await consumeEntitlement({
+    entitlementId: body.entitlementId,
+    userId: user.id,
+  });
   // 발급권 소비 = PDF 실제 다운로드 완료 계측 (fire-and-forget)
   if (result.consumed) {
     trackServerEventAsync({

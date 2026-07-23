@@ -4,6 +4,9 @@ import {
   getCompletedOrRefundedIapOrders,
   getIapProductItemList,
   getPendingIapOrders,
+  getTossStorageItem,
+  removeTossStorageItem,
+  setTossStorageItem,
   type IapProductListItem,
   type IapPurchaseSuccess,
 } from "../toss-bridge.js";
@@ -64,6 +67,139 @@ export type AppsInTossIapPurchaseResult = {
   message?: string;
   error?: string;
 };
+
+type IapRecoveryContext = {
+  productCode: string;
+  sku: string;
+  projectId?: string;
+  estimateId?: string | null;
+  consumerProjectId?: string | null;
+  createdAt: string;
+};
+
+type IapRecoveryState = {
+  version: 1;
+  intents: Record<string, IapRecoveryContext>;
+  orders: Record<string, IapRecoveryContext>;
+  productCodes: Record<string, string>;
+};
+
+const IAP_RECOVERY_STORAGE_KEY = "inpick:iap:recovery:v1";
+const IAP_RECOVERY_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1_000;
+
+function emptyRecoveryState(): IapRecoveryState {
+  return { version: 1, intents: {}, orders: {}, productCodes: {} };
+}
+
+function isFreshRecoveryContext(
+  value: IapRecoveryContext | undefined,
+): value is IapRecoveryContext {
+  return (
+    !!value &&
+    typeof value.productCode === "string" &&
+    typeof value.sku === "string" &&
+    Number.isFinite(Date.parse(value.createdAt)) &&
+    Date.now() - Date.parse(value.createdAt) <= IAP_RECOVERY_MAX_AGE_MS
+  );
+}
+
+async function readIapRecoveryState(): Promise<IapRecoveryState> {
+  try {
+    const raw = await getTossStorageItem(IAP_RECOVERY_STORAGE_KEY);
+    if (!raw) return emptyRecoveryState();
+    const parsed = JSON.parse(raw) as Partial<IapRecoveryState>;
+    return {
+      version: 1,
+      intents:
+        parsed.intents && typeof parsed.intents === "object"
+          ? parsed.intents
+          : {},
+      orders:
+        parsed.orders && typeof parsed.orders === "object" ? parsed.orders : {},
+      productCodes:
+        parsed.productCodes && typeof parsed.productCodes === "object"
+          ? parsed.productCodes
+          : {},
+    };
+  } catch {
+    return emptyRecoveryState();
+  }
+}
+
+async function writeIapRecoveryState(state: IapRecoveryState): Promise<void> {
+  for (const [sku, context] of Object.entries(state.intents)) {
+    if (!isFreshRecoveryContext(context)) delete state.intents[sku];
+  }
+  for (const [orderId, context] of Object.entries(state.orders)) {
+    if (!isFreshRecoveryContext(context)) delete state.orders[orderId];
+  }
+  if (
+    Object.keys(state.intents).length === 0 &&
+    Object.keys(state.orders).length === 0 &&
+    Object.keys(state.productCodes).length === 0
+  ) {
+    await removeTossStorageItem(IAP_RECOVERY_STORAGE_KEY);
+    return;
+  }
+  await setTossStorageItem(IAP_RECOVERY_STORAGE_KEY, JSON.stringify(state));
+}
+
+async function rememberCatalogProducts(
+  products: AppsInTossIapCatalogProduct[],
+): Promise<void> {
+  const state = await readIapRecoveryState();
+  for (const product of products) {
+    state.productCodes[product.sku] = product.productId;
+  }
+  await writeIapRecoveryState(state);
+}
+
+async function rememberPurchaseIntent(
+  context: IapRecoveryContext,
+): Promise<void> {
+  const state = await readIapRecoveryState();
+  state.intents[context.sku] = context;
+  state.productCodes[context.sku] = context.productCode;
+  await writeIapRecoveryState(state);
+}
+
+async function bindOrderRecoveryContext(
+  orderId: string,
+  context: IapRecoveryContext,
+): Promise<void> {
+  const state = await readIapRecoveryState();
+  state.orders[orderId] = context;
+  state.intents[context.sku] = context;
+  state.productCodes[context.sku] = context.productCode;
+  await writeIapRecoveryState(state);
+}
+
+async function clearOrderRecoveryContext(
+  orderId: string,
+  sku: string,
+): Promise<void> {
+  const state = await readIapRecoveryState();
+  delete state.orders[orderId];
+  delete state.intents[sku];
+  await writeIapRecoveryState(state);
+}
+
+async function recoveryContextForOrder(input: {
+  orderId: string;
+  sku: string;
+}): Promise<IapRecoveryContext | null> {
+  const state = await readIapRecoveryState();
+  const context = state.orders[input.orderId] || state.intents[input.sku];
+  if (isFreshRecoveryContext(context)) return context;
+  const productCode = state.productCodes[input.sku];
+  return productCode
+    ? {
+        productCode,
+        sku: input.sku,
+        createdAt: new Date().toISOString(),
+      }
+    : null;
+}
 
 function errorCode(error: unknown): string {
   if (error && typeof error === "object") {
@@ -169,7 +305,7 @@ export async function loadAppsInTossIapCatalog(): Promise<AppsInTossIapCatalog> 
     const consoleProduct = bySku.get(product.sku);
     if (
       !consoleProduct ||
-      consoleProduct.type === "SUBSCRIPTION" ||
+      consoleProduct.type !== "CONSUMABLE" ||
       consoleProduct.type !== product.iapProductType
     ) {
       return [];
@@ -191,6 +327,7 @@ export async function loadAppsInTossIapCatalog(): Promise<AppsInTossIapCatalog> 
     );
   }
 
+  await rememberCatalogProducts(products).catch(() => undefined);
   return { pricing: catalog.pricing, products };
 }
 
@@ -201,6 +338,12 @@ export async function purchaseWithAppsInTossIap(input: {
   estimateId?: string | null;
   consumerProjectId?: string | null;
 }): Promise<AppsInTossIapPurchaseResult> {
+  const recoveryContext: IapRecoveryContext = {
+    ...input,
+    createdAt: new Date().toISOString(),
+  };
+  await rememberPurchaseIntent(recoveryContext).catch(() => undefined);
+
   return new Promise((resolve) => {
     let cleanup: (() => void) | undefined;
     let settled = false;
@@ -229,6 +372,10 @@ export async function purchaseWithAppsInTossIap(input: {
         options: {
           sku: input.sku,
           processProductGrant: async ({ orderId }) => {
+            await bindOrderRecoveryContext(
+              orderId,
+              recoveryContext,
+            ).catch(() => undefined);
             grantResult = await postGrant({
               orderId,
               sku: input.sku,
@@ -239,8 +386,12 @@ export async function purchaseWithAppsInTossIap(input: {
             return grantResult.success === true && grantResult.provisioned === true;
           },
         },
-        onEvent: (event) => {
+        onEvent: async (event) => {
           if (grantResult?.success && grantResult.provisioned) {
+            await clearOrderRecoveryContext(
+              event.data.orderId,
+              input.sku,
+            ).catch(() => undefined);
             finish({
               ok: true,
               paid: true,
@@ -303,16 +454,28 @@ async function runPendingAppsInTossPurchaseRestore(): Promise<RestoreResult> {
   let failed = 0;
   for (const order of pending.orders) {
     try {
+      const recoveryContext = await recoveryContextForOrder(order);
       const result = await postGrant({
         orderId: order.orderId,
         sku: order.sku,
+        projectId: recoveryContext?.projectId,
+        estimateId: recoveryContext?.estimateId,
+        consumerProjectId: recoveryContext?.consumerProjectId,
       });
       if (!result.success || !result.provisioned) {
         failed += 1;
         continue;
       }
-      await completeIapProductGrant(order.orderId);
-      restored += 1;
+      const completed = await completeIapProductGrant(order.orderId);
+      if (completed === true) {
+        await clearOrderRecoveryContext(
+          order.orderId,
+          order.sku,
+        ).catch(() => undefined);
+        restored += 1;
+      } else {
+        failed += 1;
+      }
     } catch {
       failed += 1;
     }
@@ -351,6 +514,8 @@ async function runPendingAppsInTossPurchaseRestore(): Promise<RestoreResult> {
 }
 
 export function restorePendingAppsInTossPurchases(): Promise<RestoreResult> {
-  restoreTask ||= runPendingAppsInTossPurchaseRestore();
+  restoreTask ||= runPendingAppsInTossPurchaseRestore().finally(() => {
+    restoreTask = null;
+  });
   return restoreTask;
 }

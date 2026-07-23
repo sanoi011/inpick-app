@@ -56,7 +56,8 @@ export interface EntitlementRow {
  *   1) pdf_unlimited (관리자/구독 무제한 — 영구 사용)
  *   2) estimate_pdf_single 중 같은 estimate_id + estimate_version, asset_url 채워진 것
  *      → 재다운로드 무료 (reissue_of_same_version)
- *   3) estimate_pdf_single 중 미사용(asset_url null + consumed_at null) + scope 일치
+ *   3) estimate_pdf_single 중 미사용(asset_url null + consumed_at null)
+ *      + scope 일치 또는 복구용 미지정 scope
  *      → 새 발급 사용 가능 (single_available)
  *   4) 없음 → 결제 필요
  */
@@ -126,6 +127,9 @@ export async function checkEstimatePdfAccess(input: {
     if (input.estimateId) orFilters.push(`and(scope_type.eq.estimate,scope_id.eq.${input.estimateId})`);
     if (input.consumerProjectId)
       orFilters.push(`and(scope_type.eq.project,scope_id.eq.${input.consumerProjectId})`);
+    // IAP 지급 당시 앱이 종료되거나 기기가 바뀌면 주문 복구 콜백에는 원래 프로젝트
+    // 문맥이 없을 수 있다. 이때 발급한 scope 미지정 단발권은 1회용 바우처로 사용한다.
+    orFilters.push("and(scope_type.is.null,scope_id.is.null)");
     const { data: single } = await admin
       .from("user_entitlements")
       .select("id, scope_type, scope_id, consumed_at, revoked_at, asset_url")
@@ -153,14 +157,18 @@ export async function checkEstimatePdfAccess(input: {
  * 단발성 entitlement 사용 처리 (다운로드 직후 호출).
  * 무제한 권한은 consume 호출해도 NOOP.
  */
-export async function consumeEntitlement(entitlementId: string): Promise<{ consumed: boolean }> {
+export async function consumeEntitlement(input: {
+  entitlementId: string;
+  userId: string;
+}): Promise<{ consumed: boolean }> {
   const admin = getAdmin();
   if (!admin) return { consumed: false };
 
   const { data, error } = await admin
     .from("user_entitlements")
     .update({ consumed_at: new Date().toISOString() })
-    .eq("id", entitlementId)
+    .eq("id", input.entitlementId)
+    .eq("user_id", input.userId)
     .is("consumed_at", null)
     .eq("entitlement_type", "estimate_pdf_single")
     .select("id")
