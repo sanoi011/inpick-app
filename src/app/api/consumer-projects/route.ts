@@ -1,5 +1,83 @@
 import { NextRequest, NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+
+interface LockedStorageObject {
+  storage_bucket: string;
+  original_storage_path: string;
+}
+
+async function captureLockedStorageObjects(
+  userId: string,
+  projectIds: string[],
+): Promise<LockedStorageObject[]> {
+  if (projectIds.length === 0) return [];
+  try {
+    const admin = createAdminClient();
+    const { data, error } = await admin
+      .from("locked_design_assets")
+      .select("storage_bucket, original_storage_path")
+      .eq("user_id", userId)
+      .in("project_id", projectIds);
+    if (error) {
+      console.warn("[consumer-projects] locked storage lookup skipped:", error.message);
+      return [];
+    }
+    return (data ?? []) as LockedStorageObject[];
+  } catch (error) {
+    console.warn(
+      "[consumer-projects] locked storage lookup unavailable:",
+      error instanceof Error ? error.message : "unknown",
+    );
+    return [];
+  }
+}
+
+async function cleanupDeletedProjectArtifacts(
+  supabase: SupabaseClient,
+  userId: string,
+  projectIds: string[],
+  storageObjects: LockedStorageObject[],
+) {
+  if (projectIds.length === 0) return;
+
+  // 신규 FK migration 적용 전에도 삭제된 프로젝트의 Step2 evidence가 남지 않게 한다.
+  const { error: outputsError } = await supabase
+    .from("design_outputs")
+    .delete()
+    .eq("user_id", userId)
+    .in("project_id", projectIds);
+  if (outputsError) {
+    console.error("[consumer-projects] design output cleanup failed:", outputsError.message);
+  }
+
+  if (storageObjects.length === 0) return;
+  try {
+    const admin = createAdminClient();
+    const pathsByBucket = new Map<string, string[]>();
+    for (const item of storageObjects) {
+      const paths = pathsByBucket.get(item.storage_bucket) ?? [];
+      paths.push(item.original_storage_path);
+      pathsByBucket.set(item.storage_bucket, paths);
+    }
+    for (const [bucket, paths] of Array.from(pathsByBucket.entries())) {
+      for (let offset = 0; offset < paths.length; offset += 100) {
+        const { error } = await admin.storage
+          .from(bucket)
+          .remove(paths.slice(offset, offset + 100));
+        if (error) {
+          console.error("[consumer-projects] private image cleanup failed:", error.message);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(
+      "[consumer-projects] private image cleanup unavailable:",
+      error instanceof Error ? error.message : "unknown",
+    );
+  }
+}
 
 // GET: 단일 또는 목록 조회
 export async function GET(request: NextRequest) {
@@ -126,6 +204,7 @@ export async function DELETE(request: NextRequest) {
       if (ids.length === 0) {
         return NextResponse.json({ error: "삭제할 id가 없습니다." }, { status: 400 });
       }
+      const storageObjects = await captureLockedStorageObjects(user.id, ids);
       const { data, error } = await supabase
         .from("consumer_projects")
         .delete()
@@ -140,6 +219,12 @@ export async function DELETE(request: NextRequest) {
 
       const deletedIds = (data || []).map((r) => r.id as string);
       if (deletedIds.length > 0) {
+        await cleanupDeletedProjectArtifacts(
+          supabase,
+          user.id,
+          deletedIds,
+          storageObjects,
+        );
         await supabase
           .from("estimates")
           .update({ consumer_project_id: null })
@@ -160,6 +245,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "id 또는 ids가 필요합니다." }, { status: 400 });
     }
 
+    const storageObjects = await captureLockedStorageObjects(user.id, [id]);
     const { data, error } = await supabase
       .from("consumer_projects")
       .delete()
@@ -172,6 +258,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "프로젝트를 찾을 수 없거나 권한이 없습니다." }, { status: 404 });
     }
 
+    await cleanupDeletedProjectArtifacts(supabase, user.id, [id], storageObjects);
     await supabase
       .from("estimates")
       .update({ consumer_project_id: null })

@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  createLockedDesignSignedUrl,
   normalizeImageSource,
   removeLockedDesignImage,
   uploadLockedDesignImage,
@@ -18,6 +19,7 @@ const RENDER_KINDS = new Set([
   "surface_render",
   "space_edit",
 ]);
+const SIGNED_URL_TTL_SECONDS = 480;
 
 export class LockedDesignRequestError extends Error {
   constructor(
@@ -178,7 +180,7 @@ export async function listLockedDesigns(
 
   const { data: assets, error: assetsError } = await admin
     .from("locked_design_assets")
-    .select("id, design_output_id, project_id, status, unlock_cost, mime_type, width, height, byte_size, created_at")
+    .select("id, design_output_id, project_id, status, unlock_cost, mime_type, width, height, byte_size, created_at, original_storage_path")
     .eq("project_id", projectId)
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
@@ -208,7 +210,7 @@ export async function listLockedDesigns(
     (grants ?? []).map((grant) => [grant.asset_id, grant.id]),
   );
 
-  return assets.flatMap((asset) => {
+  const sanitized = assets.flatMap((asset) => {
     const output = outputsById.get(asset.design_output_id);
     if (!output) return [];
     return [sanitizeLockedAsset({
@@ -222,4 +224,33 @@ export async function listLockedDesigns(
       grant_id: grantsByAsset.get(asset.id) ?? null,
     })];
   });
+
+  const storagePathByAsset = new Map(
+    assets.map((asset) => [asset.id, asset.original_storage_path]),
+  );
+  const expiresAt = new Date(Date.now() + SIGNED_URL_TTL_SECONDS * 1000).toISOString();
+
+  return Promise.all(
+    sanitized.map(async (asset) => {
+      if (!asset.unlocked) return asset;
+      const storagePath = storagePathByAsset.get(asset.id);
+      if (!storagePath) return asset;
+      try {
+        const viewUrl = await createLockedDesignSignedUrl(
+          admin,
+          storagePath,
+          SIGNED_URL_TTL_SECONDS,
+        );
+        return { ...asset, viewUrl, viewExpiresAt: expiresAt };
+      } catch (error) {
+        // grant는 유지한다. 클라이언트가 unlock 엔드포인트를 재호출하면
+        // charged=false 경로로 URL만 다시 발급할 수 있다.
+        console.warn(
+          "[locked-design] signed restore URL skipped",
+          error instanceof Error ? error.message : "unknown",
+        );
+        return asset;
+      }
+    }),
+  );
 }

@@ -33,6 +33,9 @@ export interface SanitizedLockedAsset {
   byteSize: number;
   createdAt: string;
   unlocked: boolean;
+  /** 기존 access grant가 있을 때만 발급되는 단기 열람 URL */
+  viewUrl?: string;
+  viewExpiresAt?: string;
 }
 
 export interface LockedDeliveryRequest {
