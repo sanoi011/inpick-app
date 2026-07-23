@@ -8,8 +8,9 @@ import {
   useTokens,
 } from "../inpick-source/src/contexts/TokensContext";
 import { createClient } from "../inpick-source/src/lib/supabase/client";
-import { getCurrentMiniAppPath, subscribeMiniAppNavigation } from "./adapters/navigation";
+import { getCurrentMiniAppPath, navigateMiniApp, subscribeMiniAppNavigation } from "./adapters/navigation";
 import { restorePendingAppsInTossPurchases } from "./payments/apps-in-toss-iap";
+import { TokenPurchaseDrawer } from "./payments/TokenPurchaseDrawer";
 
 type AuthState = "checking" | "signed_out" | "signing_in" | "ready" | "error";
 
@@ -141,15 +142,45 @@ function TossLoginGate({ children }: { children: React.ReactNode }) {
 
 function InPickApp() {
   const [path, setPath] = useState(getCurrentMiniAppPath);
+  // 웹의 /account/tokens 충전 페이지는 미니앱에서 IAP 드로어로 대체한다.
+  // 드로어가 떠 있는 동안 뒤에는 직전 페이지를 그대로 유지한다.
+  const [pagePath, setPagePath] = useState(getCurrentMiniAppPath);
 
   useEffect(() => subscribeMiniAppNavigation(setPath), []);
+
+  const showTokenCharge = path.startsWith("/account/tokens");
+
+  useEffect(() => {
+    if (!showTokenCharge) setPagePath(path);
+  }, [path, showTokenCharge]);
 
   return (
     <TokensProvider>
       <IapPurchaseRecovery />
-      {path.startsWith("/workflow/estimate") ? <EstimatePage /> : <WorkflowPage />}
+      {pagePath.startsWith("/workflow/estimate") ? <EstimatePage /> : <WorkflowPage />}
+      {showTokenCharge ? <TokenChargeRoute /> : null}
       <ToastContainer />
     </TokensProvider>
+  );
+}
+
+function TokenChargeRoute() {
+  const { balance, refresh } = useTokens();
+
+  return (
+    <TokenPurchaseDrawer
+      open
+      onOpenChange={(open) => {
+        if (open) return;
+        if (window.history.length > 1) window.history.back();
+        else navigateMiniApp("/workflow", true);
+      }}
+      reason="manual_topup"
+      currentTokens={balance}
+      onProvisioned={() => {
+        void refresh();
+      }}
+    />
   );
 }
 
