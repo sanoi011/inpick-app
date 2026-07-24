@@ -56,6 +56,30 @@ export function compileRenderPrompt(input: CompilePromptInput): string {
     lines.push(
       `- Target room: ${spec.targetRoom.name} / ${spec.targetRoom.type}.`,
     );
+    if (spec.targetRoom.bbox) {
+      lines.push(
+        `- Target room measured box: x=${spec.targetRoom.bbox.x.toFixed(2)}m, y=${spec.targetRoom.bbox.y.toFixed(2)}m, width=${spec.targetRoom.bbox.width.toFixed(2)}m, depth=${spec.targetRoom.bbox.height.toFixed(2)}m.`,
+      );
+    }
+    if (spec.targetRoom.areaM2) {
+      lines.push(`- Target room floor area: ${spec.targetRoom.areaM2.toFixed(2)}m².`);
+    }
+    const mappedRooms = spec.rooms.filter(
+      (room) => room.bbox || room.polygon || room.areaM2,
+    );
+    if (mappedRooms.length > 0) {
+      lines.push("- Selected unit room map (do not replace with a standard apartment):");
+      for (const room of mappedRooms) {
+        const box = room.bbox
+          ? ` bbox=(${room.bbox.x.toFixed(2)},${room.bbox.y.toFixed(2)}) ${room.bbox.width.toFixed(2)}×${room.bbox.height.toFixed(2)}m`
+          : "";
+        const polygon = room.polygon?.length
+          ? ` polygon=${room.polygon.length} vertices`
+          : "";
+        const area = room.areaM2 ? ` area=${room.areaM2.toFixed(2)}m²` : "";
+        lines.push(`  - ${room.name} / ${room.type}:${box}${polygon}${area}`);
+      }
+    }
 
     // attachedZones
     for (const zone of spec.attachedZones) {

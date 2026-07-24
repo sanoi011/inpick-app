@@ -93,6 +93,12 @@ export function buildRenderRoomSpec(input: BuildRenderRoomSpecInput): RenderRoom
         r.name.replace(/\s+/g, "").toLowerCase() === tn ||
         r.name.replace(/\s+/g, "").toLowerCase().includes(tn),
     );
+    if (!targetRoom) {
+      const targetType = normalizeRoomType(input.targetRoomName);
+      if (targetType !== "unknown") {
+        targetRoom = graph.rooms.find((room) => room.type === targetType);
+      }
+    }
   }
   if (!targetRoom) {
     // 방 없으면 minimal spec (fallback)

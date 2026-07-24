@@ -10,6 +10,10 @@ import {
   SITE_CONDITION_OPTIONS,
   type SiteConditionAnswers,
 } from "@/lib/inpick/estimate-v2/site-condition-answers";
+import type {
+  WorkflowFloorplanRoom,
+  WorkflowNormalizedFloorplan,
+} from "@/lib/inpick/floorplan/workflow-floorplan-context";
 
 type BuildingType = "apartment" | "house" | "store" | "etc";
 
@@ -43,20 +47,8 @@ const STORE_USAGES = [
   "기타",
 ];
 
-export interface NormalizedRoom {
-  name: string;
-  widthMm: number;
-  depthMm: number;
-  heightMm: number;
-  source: "vision" | "standard";
-}
-
-export interface NormalizedFloorplan {
-  pyeong: string;
-  rooms: NormalizedRoom[];
-  openings: Array<{ wall?: string; type?: string; widthMm?: number; heightMm?: number }>;
-  notes: string;
-}
+export type NormalizedRoom = WorkflowFloorplanRoom;
+export type NormalizedFloorplan = WorkflowNormalizedFloorplan;
 
 /**
  * Workflow entry mode — 사용자가 어떤 흐름으로 진입했는지.
@@ -189,17 +181,24 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
         ? !!value.storeUsage
         : false);
 
-  // 주소 모드는 구조 분석을 백그라운드로 유지한다. Step2는 면적·형태와
-  // 원본 참조로 즉시 시작하고, 분석 결과가 준비되면 정밀 공간정보를 사용한다.
+  // 실제 도면 기반 모드는 구조 분석이 끝난 뒤에만 Step2로 이동한다.
+  // 분석 전 진입을 허용하면 Step2가 평형 평균 치수로 고정된 채 생성된다.
   const normalizing = !!value.basicInfo.normalizing;
   const floorplanProcessingFailed =
     isApartmentDrawingMode &&
     value.basicInfo.mode === "address" &&
     !!value.basicInfo.normalizationWarning;
+  const addressFloorplanReady =
+    !isApartmentDrawingMode ||
+    value.basicInfo.mode !== "address" ||
+    (!!value.basicInfo.normalizedRooms?.length &&
+      (value.basicInfo.normalizationPipelineVersion || 0) >= 8);
   const allOk =
     basicDone &&
     scopeOk &&
-    (value.basicInfo.mode === "address" || (!normalizing && !floorplanProcessingFailed));
+    !normalizing &&
+    !floorplanProcessingFailed &&
+    addressFloorplanReady;
   // 안내 메시지 — 미완료 시 어디가 부족한지 명확히
   const missing: string[] = [];
   if (!inputDone) missing.push("주소·평형 또는 도면");
@@ -207,8 +206,18 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
   if (!value.buildingType) missing.push("건물 유형");
   if (isResidential && value.rooms.length === 0) missing.push("공사할 공간");
   if (isCommercial && !value.storeUsage) missing.push("용도");
-  if (value.basicInfo.mode !== "address" && normalizing) missing.push("도면 정리 완료 대기");
-  if (value.basicInfo.mode !== "address" && floorplanProcessingFailed) missing.push("도면 다시 처리");
+  if (normalizing) missing.push("도면 구조 분석 완료 대기");
+  if (
+    isApartmentDrawingMode &&
+    value.basicInfo.mode === "address" &&
+    value.basicInfo.selectedPyeong &&
+    !addressFloorplanReady &&
+    !normalizing &&
+    !floorplanProcessingFailed
+  ) {
+    missing.push("도면 구조 분석 시작 대기");
+  }
+  if (floorplanProcessingFailed) missing.push("도면 다시 처리");
 
   // 3-mode entry card 선택 시 workflowEntry + buildingType 함께 세팅
   const selectMode = (entry: WorkflowEntry) => {
@@ -324,6 +333,8 @@ export default function Step1Cards({ value, onChange, onNext, onReset }: Props) 
                       rooms: next.normalizedRooms,
                       openings: next.normalizedOpenings || [],
                       notes: next.normalizedNotes || "평형 통계 평균값",
+                      totalWidthMm: next.totalWidthMm,
+                      totalDepthMm: next.totalDepthMm,
                     }
                   : undefined,
               })

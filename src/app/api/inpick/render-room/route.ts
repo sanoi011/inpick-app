@@ -63,6 +63,8 @@ interface RenderBody extends RenderRoomInput {
   quality?: "low" | "medium" | "high";
   /** 모드 검증 — apartment 외 모드에서 잘못 호출되는 것 차단 (mode_mismatch) */
   projectMode?: "residential" | "commercial" | "photo_only" | string;
+  /** Step1에서 분석한 전체 세대의 실 좌표·인접·개구부. */
+  parsedFloorPlan?: ParsedFloorPlanLike;
   lockedDelivery?: LockedDeliveryRequest;
 }
 
@@ -205,8 +207,7 @@ export async function POST(req: NextRequest) {
         const fp: ParsedFloorPlanLike =
           (body as unknown as { normalizedFloorplan?: ParsedFloorPlanLike })
             .normalizedFloorplan ||
-          (body as unknown as { parsedFloorPlan?: ParsedFloorPlanLike })
-            .parsedFloorPlan || {
+          body.parsedFloorPlan || {
             rooms: [
               {
                 id: "target",

@@ -36,6 +36,11 @@ import {
   estimateRoomDimsFromPyeong,
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
+import {
+  buildParsedFloorPlanFromWorkflow,
+  buildWorkflowFloorplanEvidence,
+  findWorkflowFloorplanRoom,
+} from "@/lib/inpick/floorplan/workflow-floorplan-context";
 import MaterialEditor from "./MaterialEditor";
 import VisionMaterialPicker from "./VisionMaterialPicker";
 import type {
@@ -208,6 +213,12 @@ const GLOBAL_PROMPT_KEY = "__global__";
  * 2026-07-14 정밀 선택 UX + GPT Image 2 영역 편집 파이프라인으로 재공개.
  */
 const PARTIAL_MATERIAL_VIEW_ENABLED = false;
+
+/**
+ * 실제 제품/SKU를 이미지 경계에 적용하는 기능은 정확도 검증이 끝날 때까지 숨긴다.
+ * 구현과 저장 데이터는 유지하되 생성 prompt에도 과거 SKU를 자동 주입하지 않는다.
+ */
+const ROOM_PRODUCT_CUSTOMIZATION_ENABLED = false;
 
 /**
  * 내부 생성용 기술 프롬프트 감지 — 채팅 말풍선에 그대로 노출하지 않는다.
@@ -703,8 +714,11 @@ export default function Step2Designer({
   }, [openRoomPopup]);
 
   const roomDims: Record<string, RoomDim> = useMemo(() => {
+    const area = basicInfo.selectedPyeong?.exclusiveArea;
+    const map: Record<string, RoomDim> = area
+      ? { ...estimateRoomDimsFromPyeong(area) }
+      : { ...estimateRoomDimsFromPyeong("30평") };
     if (normalizedFloorplan?.rooms?.length) {
-      const map: Record<string, RoomDim> = {};
       for (const r of normalizedFloorplan.rooms) {
         map[r.name] = {
           name: r.name,
@@ -713,11 +727,34 @@ export default function Step2Designer({
           heightMm: r.heightMm,
         };
       }
-      return map;
+      // UI 명칭(부엌/욕실/침실)과 도면 명칭(주방/욕실1/침실1)을 연결한다.
+      for (const alias of [
+        "거실",
+        "안방",
+        "부엌",
+        "주방",
+        "욕실",
+        "욕실1",
+        "침실",
+        "침실1",
+        "현관",
+        "베란다",
+        "발코니",
+        "드레스룸",
+        "다용도실",
+        "다이닝",
+      ]) {
+        const matched = findWorkflowFloorplanRoom(normalizedFloorplan, alias);
+        if (!matched) continue;
+        map[alias] = {
+          name: matched.name,
+          widthMm: matched.widthMm,
+          depthMm: matched.depthMm,
+          heightMm: matched.heightMm,
+        };
+      }
     }
-    const area = basicInfo.selectedPyeong?.exclusiveArea;
-    if (area) return estimateRoomDimsFromPyeong(area);
-    return estimateRoomDimsFromPyeong("30평");
+    return map;
   }, [normalizedFloorplan, basicInfo.selectedPyeong?.exclusiveArea]);
 
   const pyeongLabel = useMemo(() => {
@@ -725,14 +762,23 @@ export default function Step2Designer({
     return area ? classifyPyeong(area) : "30평";
   }, [basicInfo.selectedPyeong?.exclusiveArea]);
 
+  const parsedFloorPlan = useMemo(
+    () => buildParsedFloorPlanFromWorkflow(normalizedFloorplan),
+    [normalizedFloorplan],
+  );
+  const hasMeasuredFloorplan = useMemo(
+    () => Boolean(normalizedFloorplan?.rooms?.some((room) => room.source === "vision")),
+    [normalizedFloorplan],
+  );
+
   // 진행 카운트 대상 — Step1 선택 방만 (없으면 전체)
   const realRoomTabs = useMemo(
     () => availableTabs.filter((t) => t.v !== "all" && selectedRoomKeys.includes(t.v)),
     [availableTabs, selectedRoomKeys],
   );
   const renders = value.rendersByRoom[activeRoom] || [];
-  const currentPrompt =
-    value.promptByRoom?.[GLOBAL_PROMPT_KEY] ?? value.promptByRoom?.[activeRoom] ?? "";
+  const activePromptKey = activeRoom === "all" ? GLOBAL_PROMPT_KEY : activeRoom;
+  const currentPrompt = value.promptByRoom?.[activePromptKey] ?? "";
   const selectedIdx =
     value.selectedByRoom[activeRoom] ?? (renders.length > 0 ? renders.length - 1 : null);
   const activeRender = selectedIdx != null ? renders[selectedIdx] : null;
@@ -741,9 +787,12 @@ export default function Step2Designer({
   const activeTab = availableTabs.find((tab) => tab.v === activeRoom);
   const promptWithKitchenSelections = (prompt: string, roomKey: string) => {
     const assembly = value.kitchenAssemblies?.[roomKey];
-    const kitchenPrompt = assembly ? buildKitchenAssemblyRenderPrompt(assembly) : "";
+    const kitchenPrompt =
+      ROOM_PRODUCT_CUSTOMIZATION_ENABLED && assembly
+        ? buildKitchenAssemblyRenderPrompt(assembly)
+        : "";
     const roomCustomization = value.roomProductCustomizations?.[roomKey];
-    const productPrompt = roomCustomization
+    const productPrompt = ROOM_PRODUCT_CUSTOMIZATION_ENABLED && roomCustomization
       ? buildRoomProductPromptMarkdown(roomCustomization)
       : "";
     return [prompt, kitchenPrompt, productPrompt].filter(Boolean).join("\n\n");
@@ -1095,7 +1144,7 @@ export default function Step2Designer({
   const setPrompt = (text: string) => {
     onChange({
       ...value,
-      promptByRoom: { ...(value.promptByRoom || {}), [GLOBAL_PROMPT_KEY]: text },
+      promptByRoom: { ...(value.promptByRoom || {}), [activePromptKey]: text },
     });
   };
 
@@ -1111,9 +1160,17 @@ export default function Step2Designer({
     let doors = 0;
     const windowWalls: string[] = [];
     const doorWalls: string[] = [];
+    const matchedRoom = findWorkflowFloorplanRoom(normalizedFloorplan, roomLabel);
+    const roomNames = [roomLabel, matchedRoom?.name].filter(
+      (name): name is string => Boolean(name),
+    );
+    const openingMatchesRoom = (op: NormalizedFloorplan["openings"][number]) => {
+      const text = [op.wall, op.fromRoom, op.toRoom].filter(Boolean).join(" ");
+      return roomNames.some((name) => text.includes(name));
+    };
     if (normalizedFloorplan?.openings) {
       for (const op of normalizedFloorplan.openings) {
-        if (!op.wall || !op.wall.includes(roomLabel)) continue;
+        if (!openingMatchesRoom(op)) continue;
         if (op.type === "window" || op.type === "sliding") {
           windows++;
           if (op.wall) windowWalls.push(op.wall);
@@ -1123,18 +1180,22 @@ export default function Step2Designer({
         }
       }
     }
-    if (windows === 0 && isExterior) windows = 1;
+    // 실제 도면 분석 결과가 있으면 감지되지 않은 창을 전형값으로 임의 추가하지 않는다.
+    if (windows === 0 && isExterior && matchedRoom?.source !== "vision") windows = 1;
 
     // 인접 방 추출 — Vision 좌표 기반 단순 매칭
     const adjacentRooms: string[] = [];
     if (normalizedFloorplan?.rooms) {
-      const me = normalizedFloorplan.rooms.find((r) => r.name === roomLabel);
+      const me = matchedRoom;
       if (me) {
         for (const other of normalizedFloorplan.rooms) {
           if (other.name === me.name) continue;
           // openings.wall 텍스트에 두 방 이름이 같이 있으면 인접
           const sharedDoor = (normalizedFloorplan.openings || []).some(
-            (op) => op.wall?.includes(me.name) && op.wall?.includes(other.name),
+            (op) => {
+              const text = [op.wall, op.fromRoom, op.toRoom].filter(Boolean).join(" ");
+              return text.includes(me.name) && text.includes(other.name);
+            },
           );
           if (sharedDoor) adjacentRooms.push(other.name);
         }
@@ -1155,7 +1216,7 @@ export default function Step2Designer({
   // 모델이 평면도 이미지 외에도 정확한 형태/벽 위치를 텍스트로 받아 보존률 ↑
   const buildWallLayout = (roomLabel: string): string => {
     if (!normalizedFloorplan?.rooms?.length) return "";
-    const me = normalizedFloorplan.rooms.find((r) => r.name === roomLabel);
+    const me = findWorkflowFloorplanRoom(normalizedFloorplan, roomLabel);
     if (!me) return "";
 
     const w = (me.widthMm / 1000).toFixed(2);
@@ -1169,8 +1230,9 @@ export default function Step2Designer({
       north: [], south: [], east: [], west: [], other: [],
     };
     (normalizedFloorplan.openings || []).forEach((op) => {
-      if (!op.wall || !op.wall.includes(roomLabel)) return;
-      const wallText = op.wall;
+      const openingText = [op.wall, op.fromRoom, op.toRoom].filter(Boolean).join(" ");
+      if (!openingText.includes(me.name) && !openingText.includes(roomLabel)) return;
+      const wallText = op.wall || openingText;
       const opType = op.type === "window" || op.type === "sliding"
         ? `${op.type === "sliding" ? "sliding" : "fixed"} window`
         : "door";
@@ -1197,9 +1259,15 @@ export default function Step2Designer({
     const hasExactFloorplanReference = Boolean(
       basicInfo.normalizedImageUrl ||
       basicInfo.cleanedImageUrl ||
-      basicInfo.uploadedFloorplan?.dataUrl,
+      basicInfo.uploadedFloorplan?.dataUrl ||
+      basicInfo.selectedPyeong?.grandPlanUrl,
+    );
+    const floorplanEvidence = buildWorkflowFloorplanEvidence(
+      normalizedFloorplan,
+      roomLabel,
     );
     const lines = [
+      floorplanEvidence,
       hasExactFloorplanReference
         ? `Floor plan layout (reading from the user's floor-plan reference):`
         : `Estimated room layout (Korean apartment average derived from selected floor area; not a measured plan):`,
@@ -1212,6 +1280,9 @@ export default function Step2Designer({
       wallLine("east", d, false),
       wallLine("south", w, isExterior),
       wallLine("west", d, false),
+      ...(wallOpenings.other.length > 0
+        ? [`  - Other detected openings: ${wallOpenings.other.join(", ")}`]
+        : []),
     ];
 
     return lines.join("\n");
@@ -1897,7 +1968,6 @@ export default function Step2Designer({
     }
     // "전체" 탭에서는 모든 방에 일괄 생성
     if (activeRoom === "all") {
-      setPrompt("");
       await handleBulkGenerate(promptToUse);
       return;
     }
@@ -1905,6 +1975,17 @@ export default function Step2Designer({
 
     const isFirstGen = renders.length === 0;
     const tab = ROOM_TABS.find((t) => t.v === activeRoom)!;
+    if (
+      currentProjectMode === "apartment" &&
+      hasMeasuredFloorplan &&
+      !activeRoom.startsWith("custom_") &&
+      !findWorkflowFloorplanRoom(normalizedFloorplan, tab.label)
+    ) {
+      setErrorMsg(
+        `선택한 도면에서 ${tab.label} 구조를 확인하지 못했습니다. Step1에서 도면을 다시 분석해주세요.`,
+      );
+      return;
+    }
     const roomIsLiving = isLivingRoom(activeRoom, tab?.label);
     const roomPromptToUse = promptWithKitchenSelections(promptToUse, activeRoom);
     const requiredTokens = roomIsLiving ? 5 : 1;
@@ -1933,7 +2014,8 @@ export default function Step2Designer({
       const floorplanReferenceUrl =
         basicInfo.normalizedImageUrl ||
         basicInfo.cleanedImageUrl ||
-        basicInfo.uploadedFloorplan?.dataUrl;
+        basicInfo.uploadedFloorplan?.dataUrl ||
+        basicInfo.selectedPyeong?.grandPlanUrl;
       const renderBody: RenderRoomBody = {
         roomName: tab.label,
         widthMm: dim.widthMm,
@@ -1953,10 +2035,11 @@ export default function Step2Designer({
         furnishingOptions: roomFurnishings?.[activeRoom] || [],
         // 도면 기반 정보 강화
         aspectRatio: dim.widthMm / dim.depthMm,
-        isFromFloorplan: !!floorplanReferenceUrl,
+        isFromFloorplan: Boolean(floorplanReferenceUrl || hasMeasuredFloorplan),
         // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
         propertyId: basicInfo.floorplanPropertyId,
         floorplanImageUrl: floorplanReferenceUrl,
+        parsedFloorPlan,
         previousReference,
       };
       // Phase 9 — sync/async 자동 처리 (jobId 응답 시 polling)
@@ -2022,7 +2105,7 @@ export default function Step2Designer({
                 nextRenderKey,
               ],
             },
-        promptByRoom: { ...(value.promptByRoom || {}), [GLOBAL_PROMPT_KEY]: "" },
+        promptByRoom: { ...(value.promptByRoom || {}) },
       });
       await onTokensChanged?.();
       setImageMinimized(true);
@@ -2060,9 +2143,26 @@ export default function Step2Designer({
 
       for (let i = 0; i < emptyTabs.length; i++) {
         const tab = emptyTabs[i];
-        const roomConceptPrompt = promptWithKitchenSelections(conceptPrompt, tab.v);
+        const roomSpecificPrompt = value.promptByRoom?.[tab.v]?.trim();
+        const combinedPrompt = [
+          conceptPrompt.trim(),
+          roomSpecificPrompt && roomSpecificPrompt !== conceptPrompt.trim()
+            ? `실별 추가 요청 (${tab.label}): ${roomSpecificPrompt}`
+            : "",
+        ]
+          .filter(Boolean)
+          .join("\n\n");
+        const roomConceptPrompt = promptWithKitchenSelections(combinedPrompt, tab.v);
         setBulkProgress({ current: i + 1, total: emptyTabs.length, roomLabel: tab.label });
         try {
+          if (
+            currentProjectMode === "apartment" &&
+            hasMeasuredFloorplan &&
+            !tab.v.startsWith("custom_") &&
+            !findWorkflowFloorplanRoom(normalizedFloorplan, tab.label)
+          ) {
+            throw new Error("도면에서 이 실의 구조를 확인하지 못했습니다. Step1 재분석이 필요합니다.");
+          }
           const dim = roomDims[tab.dimKey] || roomDims["거실"];
           const struct = inferStructure(tab.label);
           const wallLayout = buildWallLayout(tab.label);  // Q1
@@ -2071,7 +2171,8 @@ export default function Step2Designer({
           const floorplanReferenceUrl =
             basicInfo.normalizedImageUrl ||
             basicInfo.cleanedImageUrl ||
-            basicInfo.uploadedFloorplan?.dataUrl;
+            basicInfo.uploadedFloorplan?.dataUrl ||
+            basicInfo.selectedPyeong?.grandPlanUrl;
           const tabIsLiving = isLivingRoom(tab.v, tab.label);
           const bulkBody: RenderRoomBody = {
             roomName: tab.label,
@@ -2090,10 +2191,11 @@ export default function Step2Designer({
             adjacentRooms: struct.adjacentRooms,
             wallLayout,                                  // Q1
             aspectRatio: dim.widthMm / dim.depthMm,
-            isFromFloorplan: !!floorplanReferenceUrl,
+            isFromFloorplan: Boolean(floorplanReferenceUrl || hasMeasuredFloorplan),
             furnishingOptions: roomFurnishings?.[tab.v] || [],
             propertyId: basicInfo.floorplanPropertyId,
             floorplanImageUrl: floorplanReferenceUrl,
+            parsedFloorPlan,
             lockedDelivery: tabIsLiving
               ? undefined
               : {
@@ -2290,10 +2392,12 @@ export default function Step2Designer({
     <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-white p-3 lg:grid-cols-[268px_1fr]">
       {/* ─── 좌측 툴바 (순백색) ─── */}
       <aside className="flex flex-col gap-3">
-        {/* 대표 거실 디자인 생성 — 좌측 상단 (방 선택 위) */}
+        {/* 선택한 실의 이미지 생성 프롬프트 — 좌측 상단 */}
         <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <p className="mb-2 text-xs font-semibold text-black">
-            대표 거실 디자인 생성
+            {activeRoom === "all"
+              ? "전체 공간 공통 스타일"
+              : `${activeTab?.label || "선택 공간"} 이미지 프롬프트`}
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {STYLE_PRESETS.map((preset) => (
@@ -2313,7 +2417,9 @@ export default function Step2Designer({
             ))}
           </div>
           <p className="mt-1.5 text-[0.65rem] leading-snug text-black/38">
-            컨셉 선택 후 거실 1장을 먼저 생성 · 5토큰
+            {activeRoom === "all"
+              ? "공통 컨셉에 각 실 전용 요청을 합쳐 순서대로 생성"
+              : "선택한 실에만 저장·적용되는 스타일 요청"}
           </p>
         </div>
 
@@ -3040,6 +3146,18 @@ export default function Step2Designer({
                 마음에 드는 인테리어 사진을 첨부하면 AI가 더 정확하게 추천해요 — 클립을 누르거나 여기로 끌어다 놓으세요
               </p>
             )}
+            {!chatMode && (
+              <div className="mx-auto mb-2 flex max-w-3xl items-center justify-between px-1">
+                <p className="text-[0.7rem] font-semibold text-black/65">
+                  {activeRoom === "all"
+                    ? "전체 공간 공통 프롬프트"
+                    : `${activeTab?.label || "선택 공간"} 전용 이미지 생성 프롬프트`}
+                </p>
+                <span className="text-[0.62rem] text-black/38">
+                  실을 바꾸면 입력 내용도 따로 저장됩니다
+                </span>
+              </div>
+            )}
             <div
               className={`mx-auto max-w-3xl flex items-end gap-2 rounded-2xl transition ${
                 isDraggingFile && chatMode ? "ring-2 ring-black/10 ring-offset-2 bg-white" : ""
@@ -3091,9 +3209,15 @@ export default function Step2Designer({
                       else handleGenerate();
                     }
                   }}
-                  placeholder={pendingAttachments.length > 0
-                    ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요"
-                    : "상담 또는 수정 요청 — 예) 안방 문만 밝은 오크로 바꿔줘"}
+                  placeholder={
+                    pendingAttachments.length > 0
+                      ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요"
+                      : chatMode
+                        ? "상담 또는 수정 요청 — 예) 안방을 밝은 오크 톤으로 꾸며줘"
+                        : activeRoom === "all"
+                          ? "전체 공통 스타일 — 예) 따뜻한 내추럴 우드, 무광 화이트"
+                          : `${activeTab?.label || "이 공간"} 전용 요청 — 구조는 도면 그대로, 원하는 마감과 분위기를 적어주세요`
+                  }
                   rows={hasGenerated || chatMode ? 1 : 2}
                   className="w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-black/40"
                 />
@@ -3124,7 +3248,7 @@ export default function Step2Designer({
                 ) : activeRoom === "all" ? (
                   <>
                     <Send className="h-3.5 w-3.5" />
-                    <span>거실 생성</span>
+                    <span>전체 공간 생성</span>
                     <span className="rounded bg-white/20 px-1.5 py-0.5 text-[0.6rem] font-bold inline-flex items-center gap-0.5">
                       <Hexagon className="h-2.5 w-2.5 fill-white/30" />5
                     </span>
@@ -3464,7 +3588,10 @@ export default function Step2Designer({
         )}
       </section>
 
-      {activeRoom !== "all" && activeRender && activeRenderUnlocked && (
+      {ROOM_PRODUCT_CUSTOMIZATION_ENABLED &&
+        activeRoom !== "all" &&
+        activeRender &&
+        activeRenderUnlocked && (
         <div className="lg:col-span-2">
           <RoomProductImageSelector
             imageUrl={activeRender.refinedUrl || activeRender.url}

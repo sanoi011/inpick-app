@@ -25,3 +25,29 @@ test("SKU 재생성은 SAM 경계 마스크와 고정 project identity를 사용
   assert.match(source, /isActiveWorkflowProjectId\(workflowProjectId\)/);
   assert.match(source, /request\.region\.sourceRenderKey !== sourceRenderKey/);
 });
+
+test("출시 UI에서는 실제 제품 교체를 숨기고 과거 SKU prompt도 주입하지 않는다", () => {
+  assert.match(source, /const ROOM_PRODUCT_CUSTOMIZATION_ENABLED = false/);
+  assert.match(
+    source,
+    /ROOM_PRODUCT_CUSTOMIZATION_ENABLED &&\s*activeRoom !== "all"/,
+  );
+  assert.match(
+    source,
+    /ROOM_PRODUCT_CUSTOMIZATION_ENABLED && roomCustomization/,
+  );
+});
+
+test("이미지 생성 prompt는 전체 공통과 각 실을 독립 key로 저장한다", () => {
+  assert.match(
+    source,
+    /const activePromptKey = activeRoom === "all" \? GLOBAL_PROMPT_KEY : activeRoom/,
+  );
+  assert.match(source, /\[activePromptKey\]: text/);
+});
+
+test("실별 렌더 요청에 전체 도면 그래프를 전달한다", () => {
+  assert.match(source, /buildParsedFloorPlanFromWorkflow\(normalizedFloorplan\)/);
+  assert.match(source, /parsedFloorPlan,/);
+  assert.match(source, /buildWorkflowFloorplanEvidence\(/);
+});

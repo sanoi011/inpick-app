@@ -92,7 +92,7 @@ interface StructureAnalysisResult {
     | "standard-area-average";
 }
 
-const ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면도입니다.
+const LEGACY_ANALYZE_PROMPT = `이 이미지는 한국 아파트 또는 주택 평면도입니다.
 워터마크·로고는 무시하세요.
 
 반드시 valid JSON으로 응답:
@@ -154,6 +154,44 @@ async function estimateAreaAverageStructure(
     engine: "standard-area-average",
   };
 }
+
+const ANALYZE_PROMPT = `이 이미지는 사용자가 선택한 한국 아파트 또는 주택의 실제 평면도입니다.
+워터마크·로고는 무시하되, 평형 평균이나 전형적인 3Bay/4Bay 구조로 대체하지 마세요.
+
+반드시 valid JSON으로 응답:
+{
+  "totalWidthMm": <전체 가로 mm>,
+  "totalDepthMm": <전체 세로 mm>,
+  "rooms": [{
+    "name": "거실|안방|주방|침실1|욕실1|현관|발코니|드레스룸|다이닝",
+    "xMm": <도면 좌상단 기준 절대 mm>,
+    "yMm": <도면 좌상단 기준 절대 mm>,
+    "widthMm": <가로>,
+    "depthMm": <세로>,
+    "shape": "rectangular|l_shaped|irregular",
+    "polygonMm": [{ "x": <절대 mm>, "y": <절대 mm> }]
+  }],
+  "openings": [{
+    "wall": "거실 남측 외벽|거실-주방 경계벽처럼 구체적으로",
+    "type": "door|window|sliding",
+    "fromRoom": "거실",
+    "toRoom": "발코니 또는 null",
+    "orientation": "north|south|east|west|unknown",
+    "widthMm": <>,
+    "heightMm": <>
+  }],
+  "detectedAreaM2": <m²>,
+  "notes": "확실하지 않은 항목과 이 세대만의 고유 구조 요약"
+}
+
+규칙:
+- 이미지의 벽선, 실명, 치수선, 창호 기호를 순서대로 직접 추적
+- xMm,yMm와 polygonMm은 도면 좌상단 기준 절대 좌표이며 공유 벽의 좌표가 맞닿아야 함
+- L자·꺾인 공간은 사각형으로 단순화하지 말고 polygonMm에 모든 꼭짓점 기록
+- 문·창호마다 연결 실(fromRoom/toRoom)과 방위를 기록하고 외부면이면 toRoom 생략
+- 인쇄 치수를 최우선 사용하고 미표시 치수만 주변 치수선과 축척으로 추정
+- 동일 이름은 욕실1/욕실2, 침실1/침실2처럼 구분
+- 거실·주방을 임의로 합치거나 통상적인 아파트 구조를 가정하지 말 것`;
 
 /** 평면도 raster cleaning — GPT Image 2 단일 */
 async function cleanFloorplanRaster(
@@ -452,18 +490,39 @@ export async function POST(req: NextRequest) {
             apiKey,
           );
         }
-        if (processingMode === "structure_only" && localInferenceConfigured) {
-          const local = await callFloorplanAIAny(
-            imageBuf,
-            imageMimeType.includes("jpeg") ? "floorplan.jpg" : "floorplan.png",
-            LOCAL_INFERENCE_TIMEOUT_MS,
-          );
-          if (local) {
-            return {
-              content: JSON.stringify(floorplanAIToStructure(local)),
-              engine: "inpick-floorplan-ai",
-            };
+        if (processingMode === "structure_only") {
+          // v4.7 로컬 파서는 polygon을 제공하지 않아 방을 정사각형으로 가정한다.
+          // 실제 도면이 있으면 VLM 정밀 분석을 우선하고 로컬 파서는 장애 시에만 사용한다.
+          if (apiKey) {
+            try {
+              const result = await analyzeImageVision({
+                imageBase64: imageBuf.toString("base64"),
+                imageMimeType,
+                prompt: ANALYZE_PROMPT,
+                responseFormat: "json_object",
+                maxOutputTokens: 6_144,
+                reasoningEffort: "high",
+                requestTimeoutMs: 45_000,
+              });
+              return { content: result.content, engine: "openai-vision" };
+            } catch (error) {
+              console.warn("[FLOORPLAN] precision vision failed, trying local parser:", error);
+            }
           }
+          if (localInferenceConfigured) {
+            const local = await callFloorplanAIAny(
+              imageBuf,
+              imageMimeType.includes("jpeg") ? "floorplan.jpg" : "floorplan.png",
+              20_000,
+            );
+            if (local) {
+              return {
+                content: JSON.stringify(floorplanAIToStructure(local)),
+                engine: "inpick-floorplan-ai",
+              };
+            }
+          }
+          throw new Error("structure analyzer unavailable");
         }
         if (!apiKey) throw new Error("structure analyzer unavailable");
         const result = await analyzeImageVision({
@@ -531,6 +590,18 @@ export async function POST(req: NextRequest) {
     } else {
       console.warn("[FLOORPLAN] vision fallback:", visionRes.reason);
     }
+    if (processingMode === "structure_only" && !parsed.rooms?.length) {
+      return NextResponse.json(
+        {
+          error: "실제 도면에서 실별 구조를 추출하지 못했습니다.",
+          detail:
+            visionRes.status === "rejected"
+              ? String(visionRes.reason).slice(0, 300)
+              : "structure response contained no rooms",
+        },
+        { status: 502 },
+      );
+    }
 
     const areaM2 = body.exclusiveAreaM2 ?? parsed.detectedAreaM2 ?? 84.9;
     const pyeong: PyungType = classifyPyeong(areaM2);
@@ -549,7 +620,15 @@ export async function POST(req: NextRequest) {
 
     // 실 머지 (Vision + 표준 fallback)
     const visionRooms = parsed.rooms || [];
-    const merged: Array<RoomDim & { source: "vision" | "standard"; xMm?: number; yMm?: number }> = [];
+    const merged: Array<
+      RoomDim & {
+        source: "vision" | "standard";
+        xMm?: number;
+        yMm?: number;
+        shape?: string;
+        polygonMm?: Array<{ x: number; y: number }>;
+      }
+    > = [];
     const seen = new Set<string>();
     for (const vr of visionRooms) {
       if (!vr.name) continue;
@@ -561,12 +640,14 @@ export async function POST(req: NextRequest) {
         heightMm: vr.heightMm ?? std?.heightMm ?? 2400,
         xMm: vr.xMm,
         yMm: vr.yMm,
+        shape: vr.shape,
+        polygonMm: vr.polygonMm,
         source:
           !areaAverageMode && vr.widthMm && vr.depthMm ? "vision" : "standard",
       });
       seen.add(vr.name);
     }
-    if (!areaAverageMode || merged.length === 0) {
+    if (areaAverageMode || merged.length === 0) {
       for (const [name, dim] of Object.entries(standard)) {
         if (seen.has(name)) continue;
         merged.push({ ...dim, source: "standard" });

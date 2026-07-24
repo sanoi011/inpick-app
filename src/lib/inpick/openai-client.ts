@@ -90,18 +90,18 @@ export interface RenderRoomResult {
  */
 function getRoomSpecificDescription(roomName: string, expansion?: boolean): string {
   const map: Record<string, string> = {
-    거실: "Living room (거실): main social space, largest room in apartment, " +
-          "TV wall + wide wall + balcony-side full-window wall. " +
-          "Modern Korean apartment living room, open feel.",
+    거실: "Living room (거실): follow the selected unit's detected wall topology, " +
+          "aspect ratio, openings and adjacency. Do not default to a TV-wall-plus-full-window " +
+          "3-bay/4-bay composition when the floor-plan evidence differs.",
     안방: "Master bedroom (안방): largest bedroom, dedicated dressing closet wall " +
           "(built-in only), one full window on outer wall.",
     침실: "Bedroom (침실): standard size, one outer-wall window, " +
           "simple finish for furniture move-in.",
-    부엌: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
-          "upper + lower cabinets, range hood, refrigerator alcove. " +
-          "Modern Korean apartment kitchen.",
-    주방: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
-          "upper + lower cabinets, range hood, refrigerator alcove.",
+    부엌: "Kitchen (부엌/주방): place built-in upper/lower cabinets only along walls " +
+          "supported by the selected unit's floor-plan evidence. Do not default to a U-shape, " +
+          "L-shape, island, or open-living layout. Preserve detected doors and passages.",
+    주방: "Kitchen (부엌/주방): derive the cabinet run and circulation from the selected " +
+          "unit's detected walls and openings. Do not impose a generic U/L-shaped kitchen or island.",
     욕실: "Bathroom (욕실): compact wet space, full tile walls + floor, " +
           "vanity/toilet/shower built-in. Korean apartment bathroom.",
     현관: "Korean apartment entryway / foyer (현관): " +

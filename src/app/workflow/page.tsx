@@ -413,7 +413,10 @@ export default function WorkflowPage() {
     const bi = step1.basicInfo;
 
     // BasicInfoCard에서 이미 정형화 끝났으면 재호출 없이 그대로 복사
-    if (bi.normalizedRooms?.length) {
+    if (
+      bi.normalizedRooms?.length &&
+      (bi.mode !== "address" || (bi.normalizationPipelineVersion || 0) >= 8)
+    ) {
       setStep1((prev) => ({
         ...prev,
         normalizedFloorplan: {
@@ -421,6 +424,8 @@ export default function WorkflowPage() {
           rooms: bi.normalizedRooms!,
           openings: bi.normalizedOpenings || [],
           notes: bi.normalizedNotes || "",
+          totalWidthMm: bi.totalWidthMm,
+          totalDepthMm: bi.totalDepthMm,
         },
       }));
       setStep(2);
@@ -437,11 +442,13 @@ export default function WorkflowPage() {
       return;
     }
 
-    // 주소 모드는 공간 분석을 백그라운드로 유지한다. 완료 여부와 무관하게
-    // 면적·형태·원본 참조로 Step2를 열고 분석 요청을 중복 생성하지 않는다.
+    // 실제 주소 도면은 분석 완료 전 Step2로 보내지 않는다.
+    // Step1Cards에서도 버튼을 잠그지만, 저장 상태/빠른 클릭 경로를 한 번 더 방어한다.
     if (bi.mode === "address" && imageUrl) {
-      if (bi.normalizationWarning) setNormalizeError(bi.normalizationWarning);
-      setStep(2);
+      setNormalizeError(
+        bi.normalizationWarning ||
+          "선택한 도면의 실별 구조 분석이 끝난 뒤 디자인을 시작할 수 있습니다.",
+      );
       return;
     }
 
@@ -469,6 +476,8 @@ export default function WorkflowPage() {
           rooms: data.rooms,
           openings: data.openings,
           notes: data.notes,
+          totalWidthMm: data.totalWidthMm,
+          totalDepthMm: data.totalDepthMm,
         },
       }));
       setStep(2);
@@ -543,7 +552,7 @@ export default function WorkflowPage() {
                 </h3>
                 <p className="mt-2 text-sm text-black/70 leading-relaxed">
                   실별 치수·구조·개구부를 자동 추출하고 있습니다.
-                  <br />약 10–20초 소요
+                  <br />도면 복잡도에 따라 약 30–60초 소요
                 </p>
               </motion.div>
             </motion.div>

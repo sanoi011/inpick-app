@@ -7,6 +7,8 @@ export interface InferredRoom {
   heightMm?: number;
   xMm?: number;
   yMm?: number;
+  shape?: string;
+  polygonMm?: Array<{ x: number; y: number }>;
 }
 
 export interface InferredFloorplanStructure {
@@ -16,6 +18,9 @@ export interface InferredFloorplanStructure {
     type?: string;
     widthMm?: number;
     heightMm?: number;
+    fromRoom?: string;
+    toRoom?: string;
+    orientation?: string;
   }>;
   detectedAreaM2?: number;
   totalWidthMm?: number;

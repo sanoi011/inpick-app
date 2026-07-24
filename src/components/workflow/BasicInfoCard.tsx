@@ -30,9 +30,13 @@ import {
   FLOORPLAN_STALE_STATE_MS,
   FloorplanRequestError,
 } from "@/lib/inpick/floorplan/normalize-request";
+import type {
+  WorkflowFloorplanOpening,
+  WorkflowFloorplanRoom,
+} from "@/lib/inpick/floorplan/workflow-floorplan-context";
 
 type InputMode = "address" | "upload" | "lidar";
-const FLOORPLAN_PIPELINE_VERSION = 7;
+const FLOORPLAN_PIPELINE_VERSION = 8;
 
 export interface BasicInfoData {
   mode: InputMode;
@@ -69,14 +73,8 @@ export interface BasicInfoData {
   floorplanQuality?: "medium" | "high";
   layoutVariant?: "basic" | "extended";
   analysisEngine?: string;
-  normalizedRooms?: Array<{
-    name: string;
-    widthMm: number;
-    depthMm: number;
-    heightMm: number;
-    source: "vision" | "standard";
-  }>;
-  normalizedOpenings?: Array<{ wall?: string; type?: string; widthMm?: number; heightMm?: number }>;
+  normalizedRooms?: WorkflowFloorplanRoom[];
+  normalizedOpenings?: WorkflowFloorplanOpening[];
   normalizedNotes?: string;
   normalizedPyeong?: string;
 }
@@ -360,7 +358,8 @@ function AddressMode({ value, onChange }: Props) {
     if (
       value.selectedPyeong &&
       value.expansionType &&
-      !value.normalizedRooms?.length &&
+      (!value.normalizedRooms?.length ||
+        value.normalizationPipelineVersion !== FLOORPLAN_PIPELINE_VERSION) &&
       !value.normalizing &&
       !value.normalizationWarning
     ) {
@@ -372,6 +371,7 @@ function AddressMode({ value, onChange }: Props) {
     value.selectedPyeong?.pyeongNo,
     value.expansionType,
     value.normalizedRooms?.length,
+    value.normalizationPipelineVersion,
     value.normalizing,
     value.normalizationWarning,
   ]);
@@ -559,10 +559,11 @@ function AddressMode({ value, onChange }: Props) {
             unitName: aptName,
             address,
             aptName,
-            // 도면이 있으면 형식을 재생성하지 않고 워터마크만 최소 정리한다.
-            // 도면이 없으면 평형 통계 평균값으로 실별 치수를 산출한다.
+            // 실제 도면이 있으면 도면 자체를 구조 분석한다.
+            // watermark_only는 구조를 평형 평균으로 대체해 서로 다른 세대가
+            // 같은 형태로 렌더되는 원인이므로 이미지가 있으면 사용하지 않는다.
             skipImageClean: !sourceUrl,
-            processingMode: sourceUrl ? "watermark_only" : "area_average",
+            processingMode: sourceUrl ? "structure_only" : "area_average",
             expansion: expansion === "extended",
             layoutVariant: expansion,
           }),
@@ -894,10 +895,10 @@ function AddressMode({ value, onChange }: Props) {
             </p>
             <p className="mt-0.5 text-[11px] leading-4 text-black/40">
               {value.normalizationWarning
-                ? "분석은 보류하고 선택한 평형 평균값으로 디자인과 가견적을 진행합니다."
+                ? "정밀 구조 분석을 완료하지 못했습니다. 다시 분석한 뒤 디자인을 시작해주세요."
                 : value.selectedPyeong.grandPlanUrl
-                  ? "원본 형식은 유지하고 워터마크만 정리하며, 실별 면적은 평형 평균값으로 계산합니다."
-                  : "선택한 평형의 실별 평균 면적을 계산하며 다음 단계는 바로 진행할 수 있습니다."}
+                  ? "실제 도면의 벽선·실 좌표·문·창호를 정밀 분석하고 원본 참조와 함께 저장합니다."
+                  : "도면이 없어 선택한 평형의 실별 평균 면적을 계산합니다. 분석 완료 후 다음 단계로 이동합니다."}
             </p>
           </div>
           {value.normalizationWarning && (

@@ -24,6 +24,52 @@ test("Step 2 routes one prompt to a room edit and carries only final room images
   const masterEdited = imageData("안방 문 수정", "#7a563d", "#d2b38c");
   let editRequest: Record<string, unknown> = {};
 
+  // 로컬 dummy Supabase 빌드에서도 보호된 workflow 화면을 실제 브라우저로 검증한다.
+  // 외부/운영 baseURL에서는 실제 인증 정책을 건드리지 않는다.
+  const baseURL = String(testInfo.project.use.baseURL || "");
+  if (/127\.0\.0\.1|localhost/.test(baseURL)) {
+    const user = {
+      id: "e2e-workflow-user",
+      aud: "authenticated",
+      role: "authenticated",
+      email: "workflow-e2e@inpick.local",
+      app_metadata: {},
+      user_metadata: {},
+      created_at: "2026-07-24T00:00:00.000Z",
+    };
+    const expiresAt = Math.floor(Date.now() / 1000) + 3_600;
+    const jwtPart = (value: object) =>
+      Buffer.from(JSON.stringify(value)).toString("base64url");
+    const accessToken = `${jwtPart({ alg: "HS256", typ: "JWT" })}.${jwtPart({
+      sub: user.id,
+      role: user.role,
+      aud: user.aud,
+      exp: expiresAt,
+    })}.e2e`;
+    const session = {
+      access_token: accessToken,
+      refresh_token: "e2e-refresh-token",
+      expires_in: 3_600,
+      expires_at: expiresAt,
+      token_type: "bearer",
+      user,
+    };
+    await page.context().addCookies([
+      {
+        name: "sb-example-auth-token",
+        value: `base64-${Buffer.from(JSON.stringify(session)).toString("base64url")}`,
+        url: baseURL,
+      },
+    ]);
+    await page.route("https://example.supabase.co/auth/v1/user**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify(user),
+      });
+    });
+  }
+
   const step1 = {
     basicInfo: {
       mode: "address",

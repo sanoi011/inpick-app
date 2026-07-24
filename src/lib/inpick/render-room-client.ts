@@ -26,6 +26,7 @@ import type {
   LockedDeliveryRequest,
   SanitizedLockedAsset,
 } from "@/lib/inpick/locked-design/contracts";
+import type { ParsedFloorPlanLike } from "@/lib/inpick/floorplan/render-room-spec-builder";
 
 export interface RenderRoomBody {
   roomName: string;
@@ -48,6 +49,8 @@ export interface RenderRoomBody {
   isFromFloorplan?: boolean;
   propertyId?: string;
   floorplanImageUrl?: string;
+  /** Step1 전체 도면에서 만든 실 좌표·인접·개구부 그래프 */
+  parsedFloorPlan?: ParsedFloorPlanLike;
   previousReference?: string;
   // geometry-first (Phase 4+ optional)
   roomGeometry?: Record<string, unknown>;
@@ -170,7 +173,7 @@ function prepareRequestBody(body: RenderRoomBody): RenderRoomBody {
   delete requestBody.floorplanImageUrl;
   return {
     ...requestBody,
-    isFromFloorplan: Boolean(body.propertyId),
+    isFromFloorplan: Boolean(body.propertyId || body.parsedFloorPlan?.rooms?.length),
   };
 }
 

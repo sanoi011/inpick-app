@@ -78,6 +78,47 @@ test("data URL floorplan is omitted from the render request", async () => {
   assert.equal(capturedBody.isFromFloorplan, false);
 });
 
+test("inline floorplan image is omitted but the parsed room graph is retained", async () => {
+  let sentBody: Record<string, unknown> | null = null;
+  await withMockFetch(
+    async (_input, init) => {
+      sentBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return Response.json({ imageUrl: "https://example.com/render.png" });
+    },
+    async () => {
+      await renderRoomViaClient({
+        ...requestBody,
+        floorplanImageUrl: "data:image/png;base64," + "A".repeat(2_000_000),
+        isFromFloorplan: true,
+        parsedFloorPlan: {
+          rooms: [
+            {
+              id: "living",
+              name: "거실",
+              bbox: { x: 0, y: 0, width: 5.2, height: 4.1 },
+              areaM2: 21.32,
+            },
+            {
+              id: "kitchen",
+              name: "주방",
+              bbox: { x: 5.2, y: 0, width: 3.1, height: 3.4 },
+              areaM2: 10.54,
+            },
+          ],
+        },
+      });
+    },
+  );
+  assert.ok(sentBody);
+  const capturedBody = sentBody as Record<string, unknown>;
+  assert.equal(capturedBody.floorplanImageUrl, undefined);
+  assert.equal(capturedBody.isFromFloorplan, true);
+  assert.equal(
+    (capturedBody.parsedFloorPlan as { rooms: unknown[] }).rooms.length,
+    2,
+  );
+});
+
 test("JSON error response preserves the server error envelope", async () => {
   await withMockFetch(
     async () =>
