@@ -35,10 +35,12 @@ export interface DetailLine {
   quantity: number;     // 수량(면적 등)
   matUnit: number;      // 재료비 단가
   labUnit: number;      // 노무비 단가
+  expenseUnit: number;  // 경비 단가
   labWas?: number;      // 보정 전 노무단가 (있으면 보정됨)
   labNote?: string;     // 노무 보정 사유
   matAmount: number;    // 재료비 금액
   labAmount: number;    // 노무비 금액
+  expenseAmount: number;// 경비 금액
   amount: number;       // 합계 금액
   room: string;         // 실(室)
   source: string;       // 단가 근거
@@ -59,8 +61,6 @@ export interface DetailLine {
   quantityBasis?: string;
   /** 원가를 구성하는 철거·바탕·마감·부대공정. 공종별 원본 라인은 별도로 유지된다. */
   workBreakdown?: DetailWorkBreakdownLine[];
-  /** v2 원본의 경비. 기존 UI 합계를 보존하기 위해 labAmount에는 이미 포함되어 있다. */
-  expenseAmount?: number;
 }
 
 export interface DetailWorkBreakdownLine {
@@ -85,6 +85,7 @@ export interface DetailGroup {
   lines: DetailLine[];
   matSum: number;
   labSum: number;
+  expenseSum: number;
   sum: number;
 }
 
@@ -92,6 +93,7 @@ export interface DetailSheet {
   groups: DetailGroup[];
   directMaterial: number;
   directLabor: number;
+  directExpense: number;
   directTotal: number;
   lineCount: number;
 }
@@ -151,9 +153,11 @@ function fromEngine(line: EstimateLine): DetailLine {
   // 노무 시장가 보정 (itemCode 기준)
   const calib = LABOR_CALIBRATION[line.itemCode];
   const labUnit = calib ? calib.labor : line.laborCost;
+  const expenseUnit = 0;
   const matUnit = line.materialCost;
   const matAmount = round(qty * matUnit);
   const labAmount = round(qty * labUnit);
+  const expenseAmount = 0;
 
   return {
     id: nextId(),
@@ -171,11 +175,13 @@ function fromEngine(line: EstimateLine): DetailLine {
     quantity: qty,
     matUnit,
     labUnit,
+    expenseUnit,
     labWas: calib ? calib.was : undefined,
     labNote: calib ? calib.note : undefined,
     matAmount,
     labAmount,
-    amount: matAmount + labAmount,
+    expenseAmount,
+    amount: matAmount + labAmount + expenseAmount,
     room: line.roomName || '공통',
     source: line.priceSource || '',
     optional: false,
@@ -192,13 +198,15 @@ function add(
   const meta = resolveMaterialMeta(itemName);
   const matAmount = round(qty * matUnit);
   const labAmount = round(qty * labUnit);
+  const expenseUnit = 0;
+  const expenseAmount = 0;
   return {
     id: nextId(),
     trade, order: orderOf(trade), itemCode: '',
     itemName, part: meta.part, spec,
     brand: meta.brand, product: meta.product, priceBand: meta.priceBand, imageHint: meta.imageHint,
-    unit, quantity: qty, matUnit, labUnit, matAmount, labAmount,
-    amount: matAmount + labAmount,
+    unit, quantity: qty, matUnit, labUnit, expenseUnit, matAmount, labAmount,
+    expenseAmount, amount: matAmount + labAmount + expenseAmount,
     room: opts.room || '공통',
     source: opts.source || '2025 서울 실거래 기준(보강)',
     optional: opts.optional || false,
@@ -321,18 +329,29 @@ export function assembleSheet(all: DetailLine[]): DetailSheet {
     .map(([trade, lines]) => {
       const matSum = lines.reduce((s, x) => s + x.matAmount, 0);
       const labSum = lines.reduce((s, x) => s + x.labAmount, 0);
-      return { trade, order: orderOf(trade), lines, matSum, labSum, sum: matSum + labSum };
+      const expenseSum = lines.reduce((s, x) => s + x.expenseAmount, 0);
+      return {
+        trade,
+        order: orderOf(trade),
+        lines,
+        matSum,
+        labSum,
+        expenseSum,
+        sum: matSum + labSum + expenseSum,
+      };
     })
     .sort((a, b) => a.order - b.order);
 
   const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
   const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
+  const directExpense = groups.reduce((s, g) => s + g.expenseSum, 0);
 
   return {
     groups,
     directMaterial,
     directLabor,
-    directTotal: directMaterial + directLabor,
+    directExpense,
+    directTotal: directMaterial + directLabor + directExpense,
     lineCount: all.length,
   };
 }
@@ -359,13 +378,30 @@ export function assembleByRoom(all: DetailLine[]): DetailSheet {
       .sort((a, b) => (PART_ORDER[a.part] ?? 99) - (PART_ORDER[b.part] ?? 99));
     const matSum = sorted.reduce((s, x) => s + x.matAmount, 0);
     const labSum = sorted.reduce((s, x) => s + x.labAmount, 0);
-    return { trade: room, order: ++idx, lines: sorted, matSum, labSum, sum: matSum + labSum };
+    const expenseSum = sorted.reduce((s, x) => s + x.expenseAmount, 0);
+    return {
+      trade: room,
+      order: ++idx,
+      lines: sorted,
+      matSum,
+      labSum,
+      expenseSum,
+      sum: matSum + labSum + expenseSum,
+    };
   });
   groups.sort((a, b) => (a.trade === '공통' ? 1 : 0) - (b.trade === '공통' ? 1 : 0)); // 공통 맨 뒤
   const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
   const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
+  const directExpense = groups.reduce((s, g) => s + g.expenseSum, 0);
   const lineCount = groups.reduce((sum, group) => sum + group.lines.length, 0);
-  return { groups, directMaterial, directLabor, directTotal: directMaterial + directLabor, lineCount };
+  return {
+    groups,
+    directMaterial,
+    directLabor,
+    directExpense,
+    directTotal: directMaterial + directLabor + directExpense,
+    lineCount,
+  };
 }
 
 const PACKAGE_PARTS = new Set<PartCode>(['바닥', '벽', '천장']);
@@ -437,10 +473,11 @@ function createSurfaceWorkPackage(lines: DetailLine[]): DetailLine {
     quantity,
     matUnit: quantity > 0 ? round(matAmount / quantity) : 0,
     labUnit: quantity > 0 ? round(labAmount / quantity) : 0,
+    expenseUnit: quantity > 0 ? round(expenseAmount / quantity) : 0,
     matAmount,
     labAmount,
     expenseAmount,
-    amount: matAmount + labAmount,
+    amount: matAmount + labAmount + expenseAmount,
     source,
     isWorkPackage: true,
     quantityBasis: quantityBasisLine.quantityBasis || `${finish.part} 순면적`,
@@ -455,8 +492,8 @@ function createSurfaceWorkPackage(lines: DetailLine[]): DetailLine {
       quantity: line.quantity,
       quantityBasis: line.quantityBasis || '-',
       matAmount: line.matAmount,
-      laborAmount: Math.max(0, line.labAmount - (line.expenseAmount || 0)),
-      expenseAmount: line.expenseAmount || 0,
+      laborAmount: line.labAmount,
+      expenseAmount: line.expenseAmount,
       amount: line.amount,
     })),
     contractorEditable: false,
@@ -577,10 +614,11 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
     const spec = l.spec || l.productSpec || meta.priceBand || '-';
     const qty = Math.round((l.quantity || 0) * 100) / 100;
     const matUnit = Math.round(l.materialUnitPrice || 0);
-    // v2의 경비(expense)는 우리 모델의 노무 측에 합산 (총액 일치 보존)
-    const labUnit = Math.round((l.laborUnitPrice || 0) + (l.expenseUnitPrice || 0));
+    const labUnit = Math.round(l.laborUnitPrice || 0);
+    const expenseUnit = Math.round(l.expenseUnitPrice || 0);
     const matAmount = Math.round(l.materialAmount || 0);
-    const labAmount = Math.round((l.laborAmount || 0) + (l.expenseAmount || 0));
+    const labAmount = Math.round(l.laborAmount || 0);
+    const expenseAmount = Math.round(l.expenseAmount || 0);
     const surfacePlanRefs = Array.from(new Set(
       (l.evidenceRefs || [])
         .filter((ref) => ref.type === 'surface_plan')
@@ -605,9 +643,11 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       quantity: qty,
       matUnit,
       labUnit,
+      expenseUnit,
       matAmount,
       labAmount,
-      amount: matAmount + labAmount,
+      expenseAmount,
+      amount: matAmount + labAmount + expenseAmount,
       room: l.roomName || '공통',
       source:
         l.materialPriceSource ||
@@ -624,7 +664,6 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       siteConditionAdjustmentReason: l.siteConditionAdjustmentReason,
       workPackageKey,
       quantityBasis: l.quantityFormulaKo,
-      expenseAmount: Math.round(l.expenseAmount || 0),
     };
   });
 }
@@ -637,14 +676,18 @@ export function masterToSheet(items: MasterItem[], opts: { dropZeroQty?: boolean
     .map((m) => {
       const matAmount = round(m.quantity * m.matUnit);
       const labAmount = round(m.quantity * m.labUnit);
+      const expenseUnit = 0;
+      const expenseAmount = 0;
       return {
         id: `m-${i++}`,
         trade: m.trade, order: m.order, itemCode: '', itemName: m.itemName,
         part: m.part, spec: m.spec, brand: m.brand, product: m.product,
         priceBand: m.priceBand, imageHint: m.imageHint,
         unit: m.unit, quantity: m.quantity, matUnit: m.matUnit, labUnit: m.labUnit,
+        expenseUnit,
         labWas: m.labWas, labNote: m.labNote,
-        matAmount, labAmount, amount: matAmount + labAmount,
+        matAmount, labAmount, expenseAmount,
+        amount: matAmount + labAmount + expenseAmount,
         room: '전체', source: m.source, optional: m.optional, added: false,
       };
     });

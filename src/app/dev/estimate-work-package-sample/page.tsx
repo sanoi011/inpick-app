@@ -246,6 +246,14 @@ export default function EstimateWorkPackageSamplePage() {
           areaLabel={`거실 ${LIVING_ROOM.floorM2}㎡ · 욕실 ${BATHROOM.floorM2}㎡ · 주방 ${KITCHEN.floorM2}㎡`}
           visionBadge="로컬 다실 샘플 · 전기/설비 분리 · 원가 합계 보존"
           initialExpandedGroups={["욕실", "주방"]}
+          initialTab="cover"
+          documentNo="INPICK-DEMO-20260724-001"
+          clientName="샘플 발주처"
+          vendorName="INPICK 제휴 시공사"
+          estimateDate="2026-07-24"
+          validUntil="2026-08-23"
+          siteAddress="로컬 검수용 표준 현장"
+          expectedPeriodDays={30}
         />
       </div>
     </main>

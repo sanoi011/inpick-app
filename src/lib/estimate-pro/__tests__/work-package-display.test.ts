@@ -7,6 +7,10 @@ import {
   constructionEstimateToDetailLines,
 } from "../detail-model";
 import {
+  computeCostSheet,
+  defaultJebiItems,
+} from "../cost-model";
+import {
   buildConstructionEstimate,
   hasMaterialIntent,
 } from "@/lib/inpick/estimate-v2/build-construction-estimate";
@@ -114,7 +118,14 @@ test("실별 견적은 바닥·벽·천장을 각각 하나의 공사 패키지�
   // 화면 표시만 묶고 원가와 공종별 원본은 보존한다.
   assert.equal(roomSheet.directMaterial, tradeSheet.directMaterial);
   assert.equal(roomSheet.directLabor, tradeSheet.directLabor);
+  assert.equal(roomSheet.directExpense, tradeSheet.directExpense);
   assert.equal(roomSheet.directTotal, tradeSheet.directTotal);
+  assert.equal(
+    tradeSheet.directTotal,
+    estimate.lines
+      .filter((line) => line.included)
+      .reduce((sum, line) => sum + line.totalAmount, 0),
+  );
   assert.ok(tradeSheet.lineCount > roomSheet.lineCount);
 });
 
@@ -126,6 +137,31 @@ test("상품 resolver는 최종 마감재 라인에만 실행된다", () => {
   assert.equal(hasMaterialIntent(demolition), false);
   assert.equal(hasMaterialIntent(substrate), false);
   assert.equal(hasMaterialIntent(finish), true);
+});
+
+test("정식 원가계산서는 직접경비를 노무비와 분리하고 총액에 한 번만 반영한다", () => {
+  const cost = computeCostSheet({
+    directMaterial: 1_000_000,
+    directLabor: 500_000,
+    directExpense: 100_000,
+    jebi: defaultJebiItems(),
+    margins: {
+      generalAdmin: 0,
+      profit: 0,
+      lossInsurance: 0,
+      lossInsuranceInclude: false,
+      vat: 0,
+    },
+    includeJebi: false,
+  });
+
+  assert.equal(cost.directMaterial, 1_000_000);
+  assert.equal(cost.directLabor, 500_000);
+  assert.equal(cost.directExpense, 100_000);
+  assert.equal(cost.indirectExpenseSubtotal, 0);
+  assert.equal(cost.expenseSubtotal, 100_000);
+  assert.equal(cost.netConstructionCost, 1_600_000);
+  assert.equal(cost.contractPrice, 1_600_000);
 });
 
 test("욕실 벽 수량은 0이 아니라 실제 타일·방수 면적으로 산출된다", () => {
@@ -328,5 +364,6 @@ test("욕실·주방은 타일 중복 없이 전기·설비를 별도 세부 라
 
   const roomSheet = assembleByRoom(detailLines);
   const tradeSheet = assembleSheet(detailLines);
+  assert.equal(roomSheet.directExpense, tradeSheet.directExpense);
   assert.equal(roomSheet.directTotal, tradeSheet.directTotal);
 });

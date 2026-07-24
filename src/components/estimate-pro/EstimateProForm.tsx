@@ -28,8 +28,22 @@ type Row = DetailLine;
 function recalc(r: Row): Row {
   const matAmount = Math.round(r.quantity * r.matUnit);
   const labAmount = Math.round(r.quantity * r.labUnit);
-  return { ...r, matAmount, labAmount, amount: matAmount + labAmount };
+  const expenseAmount = Math.round(r.quantity * r.expenseUnit);
+  return {
+    ...r,
+    matAmount,
+    labAmount,
+    expenseAmount,
+    amount: matAmount + labAmount + expenseAmount,
+  };
 }
+
+export type EstimateProTab =
+  | "cover"
+  | "summary"
+  | "rollup"
+  | "detail"
+  | "schedule";
 
 export interface EstimateProFormProps {
   lines: DetailLine[];
@@ -40,6 +54,15 @@ export interface EstimateProFormProps {
   visionBadge?: string;
   /** 로컬 샘플·검수 화면에서 처음부터 열어둘 실/공종 */
   initialExpandedGroups?: string[];
+  /** 정식 견적서는 갑지부터 시작하고, 특정 검수 화면만 다른 탭을 지정한다. */
+  initialTab?: EstimateProTab;
+  documentNo?: string;
+  clientName?: string;
+  vendorName?: string;
+  estimateDate?: string;
+  siteAddress?: string;
+  validUntil?: string;
+  expectedPeriodDays?: number;
 }
 
 export default function EstimateProForm({
@@ -49,16 +72,34 @@ export default function EstimateProForm({
   areaLabel,
   visionBadge,
   initialExpandedGroups = [],
+  initialTab = "cover",
+  documentNo = "",
+  clientName = "",
+  vendorName = "INPICK 제휴 시공사",
+  estimateDate = "",
+  siteAddress = "",
+  validUntil = "",
+  expectedPeriodDays = 30,
 }: EstimateProFormProps) {
   const [role, setRole] = useState<"owner" | "bidder">("owner");
-  const [tab, setTab] = useState<"cover" | "summary" | "rollup" | "detail" | "schedule">("detail");
-  const [includeJebi, setIncludeJebi] = useState(true);
+  const [tab, setTab] = useState<EstimateProTab>(initialTab);
+  // 민간 소규모 인테리어 견적의 기본값. 공공공사 제비율은 사업자가 필요할 때 켠다.
+  const [includeJebi, setIncludeJebi] = useState(false);
   const [targetDays, setTargetDays] = useState(30);
   // 세부내역서 기본 전체 접힘 — 대분류·소계만 먼저 보이게 (모바일 시인성)
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(initialExpandedGroups),
   );
-  const [meta, setMeta] = useState({ projectName: projectName || "", client: "", vendor: "INPICK 제휴 시공사", date: "" });
+  const [meta, setMeta] = useState({
+    documentNo,
+    projectName: projectName || "",
+    siteAddress,
+    client: clientName,
+    vendor: vendorName,
+    date: estimateDate,
+    validUntil,
+    expectedPeriodDays,
+  });
 
   const [rows, setRows] = useState<Row[]>(lines);
   const [jebi, setJebi] = useState<JebiItem[]>(() => defaultJebiItems());
@@ -74,8 +115,22 @@ export default function EstimateProForm({
   const detailSheet = useMemo(() => (groupBy === "room" ? assembleByRoom(rows) : tradeSheet), [groupBy, rows, tradeSheet]);
   const sheet = tradeSheet;
   const cost = useMemo(
-    () => computeCostSheet({ directMaterial: sheet.directMaterial, directLabor: sheet.directLabor, jebi, margins, includeJebi }),
-    [sheet.directMaterial, sheet.directLabor, jebi, margins, includeJebi]
+    () => computeCostSheet({
+      directMaterial: sheet.directMaterial,
+      directLabor: sheet.directLabor,
+      directExpense: sheet.directExpense,
+      jebi,
+      margins,
+      includeJebi,
+    }),
+    [
+      sheet.directMaterial,
+      sheet.directLabor,
+      sheet.directExpense,
+      jebi,
+      margins,
+      includeJebi,
+    ]
   );
   const schedule = useMemo(() => buildSchedule(sheet.groups, targetDays), [sheet.groups, targetDays]);
 
@@ -126,11 +181,15 @@ export default function EstimateProForm({
       </div>
 
       <div className="p-4">
-        <SiteConditionSummary rows={rows} role={role} />
         {tab === "cover" && <CoverTab meta={meta} setMeta={setMeta} cost={cost} category={category} areaLabel={areaLabel} lineCount={sheet.lineCount} tradeCount={sheet.groups.length} />}
         {tab === "summary" && <CostTab cost={cost} jebi={jebi} margins={margins} role={role} includeJebi={includeJebi} setIncludeJebi={setIncludeJebi} updateJebi={updateJebi} setMargins={setMargins} />}
         {tab === "rollup" && <RollupTab sheet={sheet} cost={cost} />}
-        {tab === "detail" && <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} role={role} />}
+        {tab === "detail" && (
+          <>
+            <SiteConditionSummary rows={rows} role={role} />
+            <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} role={role} />
+          </>
+        )}
         {tab === "schedule" && <ScheduleTab schedule={schedule} targetDays={targetDays} setTargetDays={setTargetDays} />}
       </div>
     </div>
@@ -199,7 +258,7 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
 
           {role === "bidder" && (
             <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600">
-              <Pencil className="h-3 w-3" /> 세부내역서에서 현장 확인 수량·재료단가·노무단가를 수정하면 합계가 즉시 재계산됩니다.
+              <Pencil className="h-3 w-3" /> 세부내역서에서 수량·재료단가·노무단가·경비단가를 수정하면 합계가 즉시 재계산됩니다.
             </p>
           )}
         </div>
@@ -210,42 +269,126 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
 
 /* 1. 갑지 */
 function CoverTab({ meta, setMeta, cost, category, areaLabel, lineCount, tradeCount }: any) {
-  const fld = "w-full text-xs border-b border-slate-200 focus:border-black focus:outline-none py-1 bg-transparent";
+  const fld = "w-full border-b border-slate-300 bg-transparent py-1.5 text-xs text-slate-800 outline-none focus:border-black";
   return (
-    <div className="max-w-3xl mx-auto bg-white border border-gray-200 rounded-xl shadow-sm p-8">
-      <div className="text-center border-b-2 border-slate-800 pb-5 mb-6">
-        <p className="text-xs font-semibold tracking-[0.3em] text-black/55">INPICK ESTIMATE</p>
-        <h1 className="text-3xl font-bold text-slate-900 mt-2 tracking-tight">견　적　서</h1>
-        <p className="text-[11px] text-slate-400 mt-2">{category === "residential" ? "공동주택(아파트) 인테리어" : "상가·근린생활시설 인테리어"}{areaLabel ? ` · ${areaLabel}` : ""}</p>
+    <div className="mx-auto max-w-4xl border border-slate-300 bg-white p-5 shadow-sm sm:p-9">
+      <div className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-5">
+        <div>
+          <p className="text-[10px] font-bold tracking-[0.24em] text-slate-400">
+            INPICK CONSTRUCTION ESTIMATE
+          </p>
+          <h1 className="mt-2 text-3xl font-black tracking-[0.28em] text-slate-950">
+            견 적 서
+          </h1>
+          <p className="mt-2 text-[11px] text-slate-500">
+            {category === "residential"
+              ? "공동주택 인테리어 공사"
+              : "상가·근린생활시설 인테리어 공사"}
+            {areaLabel ? ` · ${areaLabel}` : ""}
+          </p>
+        </div>
+        <div className="w-56 border border-slate-300 text-[11px]">
+          <DocumentMetaRow label="견적번호" value={meta.documentNo} placeholder="INPICK-YYYYMMDD-001" onChange={(value) => setMeta({ ...meta, documentNo: value })} />
+          <DocumentMetaRow label="견적일자" value={meta.date} placeholder="YYYY-MM-DD" onChange={(value) => setMeta({ ...meta, date: value })} />
+          <DocumentMetaRow label="유효기간" value={meta.validUntil} placeholder="YYYY-MM-DD" onChange={(value) => setMeta({ ...meta, validUntil: value })} />
+        </div>
       </div>
-      <div className="bg-slate-800 text-white rounded-lg px-6 py-5 text-center mb-6">
-        <p className="text-xs text-slate-400">견 적 금 액 (VAT 포함)</p>
-        <p className="mt-1 text-4xl font-bold tabular-nums text-white">{won(cost.contractPrice)}<span className="ml-1 text-lg font-normal text-white/55">원</span></p>
-        <p className="text-[11px] text-slate-400 mt-1">금 {numToKorean(cost.contractPrice)}원정</p>
+
+      <div className="mt-5 grid border border-slate-300 text-xs sm:grid-cols-2">
+        <PartyBox title="공급받는 자 · 발주처(갑)" name={meta.client} placeholder="고객명 또는 상호" onChange={(value) => setMeta({ ...meta, client: value })} />
+        <PartyBox title="공급자 · 시공사(을)" name={meta.vendor} placeholder="시공사 상호" onChange={(value) => setMeta({ ...meta, vendor: value })} supplier />
       </div>
-      <div className="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-xs">
-        <Field label="공 사 명"><input className={fld} placeholder="○○아파트 인테리어" value={meta.projectName} onChange={(e) => setMeta({ ...meta, projectName: e.target.value })} /></Field>
-        <Field label="견 적 일"><input className={fld} placeholder="2026-05-31" value={meta.date} onChange={(e) => setMeta({ ...meta, date: e.target.value })} /></Field>
-        <Field label="발주처 (갑)"><input className={fld} placeholder="고객명 / 상호" value={meta.client} onChange={(e) => setMeta({ ...meta, client: e.target.value })} /></Field>
-        <Field label="시공사 (을)"><input className={fld} value={meta.vendor} onChange={(e) => setMeta({ ...meta, vendor: e.target.value })} /></Field>
+
+      <div className="mt-5 grid gap-x-8 gap-y-3 border-y border-slate-300 py-4 text-xs sm:grid-cols-2">
+        <Field label="공 사 명">
+          <input className={fld} placeholder="○○아파트 인테리어 공사" value={meta.projectName} onChange={(e) => setMeta({ ...meta, projectName: e.target.value })} />
+        </Field>
+        <Field label="공 사 장 소">
+          <input className={fld} placeholder="현장 주소" value={meta.siteAddress} onChange={(e) => setMeta({ ...meta, siteAddress: e.target.value })} />
+        </Field>
+        <Field label="예상 공사기간">
+          <div className="flex items-center border-b border-slate-300">
+            <span className="text-xs text-slate-500">착공일 협의 후 약</span>
+            <input type="number" min={1} value={meta.expectedPeriodDays} onChange={(e) => setMeta({ ...meta, expectedPeriodDays: Number(e.target.value) || 0 })} className="w-16 bg-transparent px-2 py-1.5 text-right text-xs font-bold outline-none" />
+            <span className="text-xs text-slate-500">일</span>
+          </div>
+        </Field>
+        <Field label="견 적 범 위">
+          <p className="border-b border-slate-300 py-1.5 text-xs text-slate-700">
+            {tradeCount}개 공종 · {lineCount}개 세부항목
+          </p>
+        </Field>
       </div>
-      <div className="mt-6 border border-slate-200 rounded-lg overflow-hidden text-xs">
-        <RowKV k="직접공사비 (재료+노무)" v={cost.directMaterial + cost.directLabor} />
-        <RowKV k="제비 (간접노무+경비)" v={cost.indirectLabor + cost.expenseSubtotal} sub />
-        <RowKV k="일반관리비 + 이윤" v={cost.generalAdmin + cost.profit} sub />
+
+      <div className="my-6 border-2 border-slate-900">
+        <div className="grid items-stretch sm:grid-cols-[180px_1fr]">
+          <div className="flex items-center justify-center bg-slate-100 px-4 py-5 text-sm font-black text-slate-800">
+            견 적 금 액
+          </div>
+          <div className="border-t border-slate-900 px-5 py-4 text-right sm:border-l sm:border-t-0">
+            <p className="text-[11px] text-slate-500">
+              일금 {numToKorean(cost.contractPrice)}원정 · VAT 포함
+            </p>
+            <p className="mt-1 text-3xl font-black tabular-nums text-slate-950">
+              {won(cost.contractPrice)}
+              <span className="ml-1 text-base font-bold">원</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="overflow-hidden border border-slate-300 text-xs">
+        <RowKV k="직접재료비" v={cost.directMaterial} />
+        <RowKV k="직접노무비" v={cost.directLabor} />
+        <RowKV k="직접경비" v={cost.directExpense} />
+        <RowKV k="간접노무비·제경비" v={cost.indirectLabor + cost.indirectExpenseSubtotal} sub />
+        <RowKV k="일반관리비·이윤" v={cost.generalAdmin + cost.profit} sub />
         <RowKV k="공급가액" v={cost.supplyPrice} />
-        <RowKV k="부가가치세 (10%)" v={cost.vat} />
+        <RowKV k={`부가가치세 (${cost.margins.vat}%)`} v={cost.vat} />
         <RowKV k="도급금액" v={cost.contractPrice} strong />
       </div>
-      <p className="text-[11px] text-slate-400 mt-5 leading-relaxed">
-        · 본 견적은 {tradeCount}개 공종 / {lineCount}개 항목 · 생성 디자인의 Vision 분석 기반입니다. 현장 실측 후 물량이 조정될 수 있습니다.<br />
-        · 철거·전기·설비 금액은 현장 확인 전 기본단가 가견적이며, 현장 상태 확인 후 사업자가 수정·확정합니다.<br />
-        · 유효기간: 견적일로부터 30일. · 위 금액은 부가가치세를 포함합니다.
-      </p>
+
+      <div className="mt-5 grid gap-3 border border-slate-300 p-4 text-[11px] leading-5 text-slate-500 sm:grid-cols-[1fr_240px]">
+        <div>
+          <p className="font-bold text-slate-700">견적 조건 및 특기사항</p>
+          <p>1. 본 견적은 설계 이미지·도면과 입력 수량을 기준으로 작성했습니다.</p>
+          <p>2. 철거·전기·설비는 현장 조사 후 수량과 단가를 확정합니다.</p>
+          <p>3. 자재 변경·추가공사·현장 여건 변경은 서면 합의 후 반영합니다.</p>
+          <p>4. 총괄내역서와 세부내역서는 본 견적서의 부속서로 합니다.</p>
+        </div>
+        <div className="flex min-h-28 flex-col justify-between border border-slate-300 p-3">
+          <div>
+            <p className="text-[10px] text-slate-400">공급자 확인</p>
+            <p className="mt-1 font-bold text-slate-800">{meta.vendor || "시공사 상호"}</p>
+          </div>
+          <p className="text-right text-slate-600">대표자: __________________ (인)</p>
+        </div>
+      </div>
     </div>
   );
 }
 function Field({ label, children }: any) { return (<div><p className="text-[10px] text-slate-400 mb-0.5">{label}</p>{children}</div>); }
+function DocumentMetaRow({ label, value, placeholder, onChange }: { label: string; value: string; placeholder: string; onChange: (value: string) => void }) {
+  return (
+    <label className="grid grid-cols-[70px_1fr] border-b border-slate-200 last:border-0">
+      <span className="bg-slate-50 px-2 py-1.5 font-semibold text-slate-500">{label}</span>
+      <input value={value} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="min-w-0 bg-transparent px-2 py-1.5 text-right text-[10px] text-slate-700 outline-none" />
+    </label>
+  );
+}
+function PartyBox({ title, name, placeholder, onChange, supplier = false }: { title: string; name: string; placeholder: string; onChange: (value: string) => void; supplier?: boolean }) {
+  return (
+    <div className={`p-4 ${supplier ? "border-t border-slate-300 sm:border-l sm:border-t-0" : ""}`}>
+      <p className="text-[10px] font-bold tracking-wide text-slate-400">{title}</p>
+      <input value={name} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} className="mt-2 w-full border-b border-slate-300 bg-transparent py-1 text-sm font-bold text-slate-800 outline-none" />
+      <div className="mt-3 grid grid-cols-2 gap-4 text-[10px] text-slate-400">
+        <span>대표자: __________________</span>
+        <span>연락처: __________________</span>
+        <span className="col-span-2">주소: ____________________________________________</span>
+      </div>
+    </div>
+  );
+}
 function RowKV({ k, v, strong, sub }: { k: string; v: number; strong?: boolean; sub?: boolean }) {
   return (
     <div className={`flex justify-between px-4 py-2 border-b border-slate-100 last:border-0 ${strong ? "bg-slate-800 text-white font-bold" : sub ? "bg-slate-50/50 text-slate-500" : ""}`}>
@@ -292,6 +435,7 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
           <tbody>
             <Fixed label="직접재료비" amount={cost.directMaterial} bold />
             <Fixed label="직접노무비" amount={cost.directLabor} bold />
+            <Fixed label="직접경비" amount={cost.directExpense} bold />
             {jebi.map((j: JebiItem) => {
               const row = j.group === "INDIRECT_LABOR" ? cost.indirectLaborRow : cost.expenseRows.find((r: any) => r.key === j.key);
               if (!row) return null;
@@ -309,6 +453,11 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
                 </tr>
               );
             })}
+            <Fixed
+              label="경비 소계 (직접경비+제경비)"
+              amount={cost.expenseSubtotal}
+              strong
+            />
             <Fixed label="순공사원가 (재료+노무+경비)" amount={cost.netConstructionCost} strong />
             <Margin label="일반관리비" basis="순공사원가 × 요율" amount={cost.generalAdmin} rate={margins.generalAdmin} onRate={(v: number) => setMargins({ ...margins, generalAdmin: v })} rateCls={rateCls} />
             <Margin label="이윤" basis="(노무+경비+관리비) × 요율" amount={cost.profit} rate={margins.profit} onRate={(v: number) => setMargins({ ...margins, profit: v })} rateCls={rateCls} />
@@ -334,28 +483,39 @@ function Margin({ label, basis, amount, rate, onRate, rateCls, checkbox, onCheck
 function RollupTab({ sheet, cost }: any) {
   const directTotal = sheet.directTotal || 1;
   const indirect = cost.supplyPrice - sheet.directTotal;
-  const rows = sheet.groups.map((g: any) => { const ratio = g.sum / directTotal; const exp = Math.round(indirect * ratio); const total = g.sum + exp; return { ...g, exp, total, share: total / (cost.supplyPrice || 1) }; });
+  const rows = sheet.groups.map((g: any) => {
+    const ratio = g.sum / directTotal;
+    const indirectAllocated = Math.round(indirect * ratio);
+    const total = g.sum + indirectAllocated;
+    return {
+      ...g,
+      indirectAllocated,
+      total,
+      share: total / (cost.supplyPrice || 1),
+    };
+  });
   const maxShare = Math.max(...rows.map((r: any) => r.share), 0.01);
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
       <div className="px-4 py-3 border-b border-gray-200"><h2 className="text-sm font-bold text-gray-900">총괄내역서 — 공종별 집계표</h2><p className="text-[11px] text-gray-400 mt-0.5">직접비 + 간접비 안분 · 구성비(공급가액 기준)</p></div>
       <table className="w-full text-[11px]">
-        <thead><tr className="bg-slate-100 text-slate-600 border-b border-slate-200"><th className="px-3 py-2 text-left font-semibold">공종</th><th className="px-2 py-2 text-right font-semibold">재료비</th><th className="px-2 py-2 text-right font-semibold">노무비</th><th className="px-2 py-2 text-right font-semibold">경비(안분)</th><th className="px-2 py-2 text-right font-semibold">합계</th><th className="px-3 py-2 text-left font-semibold w-40">구성비</th></tr></thead>
+        <thead><tr className="bg-slate-100 text-slate-600 border-b border-slate-200"><th className="px-3 py-2 text-left font-semibold">공종</th><th className="px-2 py-2 text-right font-semibold">재료비</th><th className="px-2 py-2 text-right font-semibold">노무비</th><th className="px-2 py-2 text-right font-semibold">직접경비</th><th className="px-2 py-2 text-right font-semibold">간접비 안분</th><th className="px-2 py-2 text-right font-semibold">합계</th><th className="px-3 py-2 text-left font-semibold w-40">구성비</th></tr></thead>
         <tbody>
           {rows.map((r: any) => (
             <tr key={r.trade} className="border-b border-slate-50 hover:bg-black/[0.025]">
               <td className="px-3 py-1.5 text-slate-700">{String(r.order).padStart(2, "0")}. {r.trade}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.matSum)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.labSum)}</td>
-              <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{won(r.exp)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.expenseSum)}</td>
+              <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{won(r.indirectAllocated)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-900">{won(r.total)}</td>
               <td className="px-3 py-1.5"><div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-black rounded-full" style={{ width: `${(r.share / maxShare) * 100}%` }} /></div><span className="text-[10px] text-slate-400 tabular-nums w-9 text-right">{(r.share * 100).toFixed(1)}%</span></div></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-black">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-[10px] text-slate-400">공급가액</td></tr>
-          <tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (VAT 포함)</td><td colSpan={2} className="px-2 py-2.5 text-right text-base font-bold tabular-nums">{won(cost.contractPrice)}원</td></tr>
+          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directExpense)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-black">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-[10px] text-slate-400">공급가액</td></tr>
+          <tr className="bg-slate-800 text-white"><td colSpan={5} className="px-3 py-2.5 font-bold">도급금액 (VAT 포함)</td><td colSpan={2} className="px-2 py-2.5 text-right text-base font-bold tabular-nums">{won(cost.contractPrice)}원</td></tr>
         </tfoot>
       </table>
     </div>
@@ -413,13 +573,15 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
                       <th className="px-2 py-2 text-right font-semibold w-16">수량</th>
                       <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "재료환산" : "재료단가"}</th>
                       <th className="px-2 py-2 text-right font-semibold w-24">재료금액</th>
-                      <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "노무·경비환산" : "노무·경비단가"}</th>
-                      <th className="px-2 py-2 text-right font-semibold w-24">노무·경비</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "노무환산" : "노무단가"}</th>
+                      <th className="px-2 py-2 text-right font-semibold w-24">노무금액</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "경비환산" : "경비단가"}</th>
+                      <th className="px-2 py-2 text-right font-semibold w-24">경비금액</th>
                       <th className="px-2 py-2 text-right font-semibold w-28">합계</th><th className="w-8"></th>
                     </tr></thead>
                     <tbody>
                       {g.lines.map((l: Row) => (<EditRow key={l.id} l={l} updateRow={updateRow} deleteRow={deleteRow} role={role} />))}
-                      <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-black">{won(g.sum)}</td><td></td></tr>
+                      <tr className="bg-zinc-50 border-t border-zinc-200"><td colSpan={6} className="px-2 py-2 text-right font-bold text-zinc-500">소계</td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.matSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.labSum)}</td><td></td><td className="px-2 py-2 text-right tabular-nums font-bold text-zinc-600">{won(g.expenseSum)}</td><td className="px-2 py-2 text-right tabular-nums font-bold text-black">{won(g.sum)}</td><td></td></tr>
                     </tbody>
                   </table>
                 </div>
@@ -428,7 +590,15 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
           </div>
         );
       })}
-      <div className="bg-zinc-900 text-white px-4 py-3.5 flex items-center justify-between"><span className="text-sm font-bold">직접공사비 합계</span><span className="text-lg font-bold tabular-nums text-white">{won(sheet.directTotal)}원</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-zinc-900 px-4 py-3.5 text-white">
+        <span className="text-sm font-bold">직접공사비 합계</span>
+        <div className="flex flex-wrap items-center justify-end gap-x-5 gap-y-1 text-[11px] text-white/65">
+          <span>재료 {won(sheet.directMaterial)}원</span>
+          <span>노무 {won(sheet.directLabor)}원</span>
+          <span>경비 {won(sheet.directExpense)}원</span>
+          <span className="text-lg font-bold tabular-nums text-white">{won(sheet.directTotal)}원</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -506,6 +676,8 @@ function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; de
       <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.matAmount)}</td>
       <td className="px-1 py-1.5"><div className="flex items-center">{l.labWas && <span title={`보정 ${won(l.labWas)}→${won(l.labUnit)}`}><TrendingDown className="w-3 h-3 text-zinc-400 flex-shrink-0" /></span>}{editable ? <input aria-label={`${l.itemName} 노무단가`} type="number" value={l.labUnit} onChange={(e) => updateRow(l.id, { labUnit: Number(e.target.value) || 0 })} className={numCls} /> : <span className="block w-full px-1 text-right tabular-nums text-zinc-600">{won(l.labUnit)}</span>}</div></td>
       <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.labAmount)}</td>
+      <td className="px-1 py-1.5">{editable ? <input aria-label={`${l.itemName} 경비단가`} type="number" value={l.expenseUnit} onChange={(e) => updateRow(l.id, { expenseUnit: Number(e.target.value) || 0 })} className={numCls} /> : <span className="block px-1 text-right tabular-nums text-zinc-600">{won(l.expenseUnit)}</span>}</td>
+      <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700">{won(l.expenseAmount)}</td>
       <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-zinc-900">{won(l.amount)}</td>
       <td className="px-1 py-1.5 text-center">{editable && <button onClick={() => deleteRow(l.id)} className="text-zinc-300 hover:text-black" title="삭제"><Trash2 className="w-3.5 h-3.5" /></button>}</td>
     </tr>

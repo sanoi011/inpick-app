@@ -140,6 +140,7 @@ export function defaultMarginRates(): MarginRates {
 export interface CostInput {
   directMaterial: number;  // 직접재료비 합계
   directLabor: number;     // 직접노무비 합계
+  directExpense?: number;  // 직접경비 합계
   jebi: JebiItem[];
   margins: MarginRates;
   /** 제비용(간접경비) 전체 포함 여부 — 견적서 생성 시 토글 (OFF면 직접비만) */
@@ -164,12 +165,14 @@ export interface CostRow {
 export interface CostSheet {
   directMaterial: number;
   directLabor: number;
+  directExpense: number;
   indirectLabor: number;
   laborSubtotal: number;       // 노무비 소계
   materialSubtotal: number;    // 재료비 소계 (= 직접재료비, 간접재료비 미사용)
   expenseRows: CostRow[];      // 경비 상세
   indirectLaborRow: CostRow | null;
-  expenseSubtotal: number;     // 경비 소계
+  indirectExpenseSubtotal: number; // 보험료·안전관리비 등 제경비 소계
+  expenseSubtotal: number;     // 직접경비 + 제경비 소계
   netConstructionCost: number; // 순공사원가
   generalAdmin: number;        // 일반관리비
   profit: number;              // 이윤
@@ -186,7 +189,14 @@ function round(n: number): number {
 }
 
 export function computeCostSheet(input: CostInput): CostSheet {
-  const { directMaterial: M, directLabor: DL, jebi, margins, includeJebi } = input;
+  const {
+    directMaterial: M,
+    directLabor: DL,
+    directExpense: DE = 0,
+    jebi,
+    margins,
+    includeJebi,
+  } = input;
 
   const on = (it: JebiItem) => includeJebi && it.include;
 
@@ -232,7 +242,8 @@ export function computeCostSheet(input: CostInput): CostSheet {
     });
   }
 
-  const expenseSubtotal = expenseRows.reduce((s, r) => s + r.amount, 0);
+  const indirectExpenseSubtotal = expenseRows.reduce((s, r) => s + r.amount, 0);
+  const expenseSubtotal = DE + indirectExpenseSubtotal;
   const netConstructionCost = M + LSUB + expenseSubtotal;
 
   const generalAdmin = round(netConstructionCost * margins.generalAdmin / 100);
@@ -248,11 +259,13 @@ export function computeCostSheet(input: CostInput): CostSheet {
   return {
     directMaterial: M,
     directLabor: DL,
+    directExpense: DE,
     indirectLabor: IL,
     laborSubtotal: LSUB,
     materialSubtotal: M,
     expenseRows,
     indirectLaborRow,
+    indirectExpenseSubtotal,
     expenseSubtotal,
     netConstructionCost,
     generalAdmin,
@@ -273,7 +286,9 @@ export interface TradeRollupRow {
   tradeName: string;
   material: number;       // 직접재료비
   labor: number;          // 직접노무비
-  expense: number;        // 안분 경비(간접노무비+경비+일반관리비+이윤)
+  directExpense: number;  // 직접경비
+  indirectExpense: number;// 안분 간접비(간접노무비+제경비+관리비+이윤)
+  expense: number;        // 직접경비 + 안분 간접비
   subtotal: number;       // 공급가액 기준 합계
   share: number;          // 구성비 0~1 (공급가액 기준)
 }
@@ -282,26 +297,32 @@ export interface TradeInput {
   tradeCode: TradeCode;
   material: number;
   labor: number;
+  expense?: number;
 }
 
-/** 직접비(재료비+노무비) 비중으로 간접비 전체를 공종에 안분 */
+/** 직접비(재료비+노무비+직접경비) 비중으로 간접비 전체를 공종에 안분 */
 export function rollupByTrade(trades: TradeInput[], sheet: CostSheet): TradeRollupRow[] {
-  const directTotal = sheet.directMaterial + sheet.directLabor;
+  const directTotal =
+    sheet.directMaterial + sheet.directLabor + sheet.directExpense;
   // 안분 대상 = 공급가액 - 직접비 (간접노무비+경비+관리비+이윤+손해보험)
   const indirectTotal = sheet.supplyPrice - directTotal;
 
   const rows: TradeRollupRow[] = trades
-    .filter((t) => t.material + t.labor > 0)
+    .filter((t) => t.material + t.labor + (t.expense ?? 0) > 0)
     .map((t) => {
-      const direct = t.material + t.labor;
+      const directExpense = t.expense ?? 0;
+      const direct = t.material + t.labor + directExpense;
       const ratio = directTotal > 0 ? direct / directTotal : 0;
-      const expense = round(indirectTotal * ratio);
-      const subtotal = direct + expense;
+      const indirectExpense = round(indirectTotal * ratio);
+      const expense = directExpense + indirectExpense;
+      const subtotal = t.material + t.labor + expense;
       return {
         tradeCode: t.tradeCode,
         tradeName: TRADE_NAMES[t.tradeCode] || t.tradeCode,
         material: t.material,
         labor: t.labor,
+        directExpense,
+        indirectExpense,
         expense,
         subtotal,
         share: sheet.supplyPrice > 0 ? subtotal / sheet.supplyPrice : 0,
