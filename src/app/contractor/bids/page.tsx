@@ -40,6 +40,7 @@ import {
   siteConditionAnswerSummary,
   type SiteConditionAnswers,
 } from "@/lib/inpick/estimate-v2/site-condition-answers";
+import type { EstimateBidDraft } from "@/components/estimate-pro/EstimateProForm";
 
 const CostTable = dynamic(() => import("@/components/project/CostTable"), {
   loading: () => (
@@ -204,13 +205,16 @@ function ContractorBidsContent() {
   const [galleryNotice, setGalleryNotice] = useState<RfqNotice | null>(null);
   const [estimateItems, setEstimateItems] = useState<Map<string, RoomCostSection[]>>(new Map());
   const [editedEstimates, setEditedEstimates] = useState<Map<string, RoomCostSection[]>>(new Map());
+  const [estimateBidDrafts, setEstimateBidDrafts] = useState<
+    Map<string, EstimateBidDraft>
+  >(new Map());
   const [loadingItems, setLoadingItems] = useState<string | null>(null);
   const [showEstimateDetail, setShowEstimateDetail] = useState<string | null>(null);
   const [bidFormId, setBidFormId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [bidForm, setBidForm] = useState({
     bidAmount: "",
-    estimatedDays: "30",
+    estimatedDays: "",
     startAvailableDate: "",
     warrantyMonths: "12",
     highlights: "",
@@ -394,17 +398,42 @@ function ContractorBidsContent() {
     return sections.reduce((sum, section) => sum + section.subtotal, 0);
   }, [editedEstimates, estimateItems]);
 
+  const handleEstimateBidDraftChange = useCallback(
+    (estimateId: string, draft: EstimateBidDraft) => {
+      setEstimateBidDrafts((current) => {
+        const previous = current.get(estimateId);
+        if (
+          previous?.contractPrice === draft.contractPrice &&
+          previous?.schedule.totalDays === draft.schedule.totalDays &&
+          previous?.lines === draft.lines &&
+          previous?.schedule === draft.schedule
+        ) {
+          return current;
+        }
+        return new Map(current).set(estimateId, draft);
+      });
+    },
+    [],
+  );
+
   const openBidForm = (notice: RfqNotice) => {
     setBidFormId(notice.id);
     const editedTotal = customTotal(notice.id);
+    const estimateDraft = estimateBidDrafts.get(notice.id);
     setBidForm((current) => ({
       ...current,
-      bidAmount: String(editedTotal || notice.budget_won || ""),
+      bidAmount: String(
+        estimateDraft?.contractPrice ||
+          editedTotal ||
+          notice.budget_won ||
+          "",
+      ),
+      estimatedDays: String(estimateDraft?.schedule.totalDays || ""),
     }));
   };
 
   const handleSubmitBid = async (notice: RfqNotice) => {
-    if (!bidForm.bidAmount || submitting) return;
+    if (!bidForm.bidAmount || !bidForm.estimatedDays || submitting) return;
     setSubmitting(true);
     try {
       const editedSections = editedEstimates.get(notice.id);
@@ -425,6 +454,7 @@ function ContractorBidsContent() {
             grandTotal: editedSections.reduce((sum, section) => sum + section.subtotal, 0),
           }
         : undefined;
+      const estimateDraft = estimateBidDrafts.get(notice.id);
 
       const response = await authFetch("/api/bids", {
         method: "POST",
@@ -432,13 +462,23 @@ function ContractorBidsContent() {
         body: JSON.stringify({
           estimateId: notice.id,
           bidAmount: Number(bidForm.bidAmount),
-          estimatedDays: Number(bidForm.estimatedDays) || 30,
+          estimatedDays: Number(bidForm.estimatedDays),
           startAvailableDate: bidForm.startAvailableDate || null,
           message: bidForm.message.trim() || null,
           metadata: {
             highlights: bidForm.highlights.split(",").map((value) => value.trim()).filter(Boolean),
             warranty_months: Number(bidForm.warrantyMonths) || 12,
             ...(customEstimate ? { customEstimate } : {}),
+            ...(estimateDraft
+              ? {
+                  estimateDocument: {
+                    lines: estimateDraft.lines,
+                    schedule: estimateDraft.schedule,
+                    directTotal: estimateDraft.directTotal,
+                    contractPrice: estimateDraft.contractPrice,
+                  },
+                }
+              : {}),
           },
         }),
       });
@@ -452,7 +492,7 @@ function ContractorBidsContent() {
       setBidFormId(null);
       setBidForm({
         bidAmount: "",
-        estimatedDays: "30",
+        estimatedDays: "",
         startAvailableDate: "",
         warrantyMonths: "12",
         highlights: "",
@@ -638,6 +678,7 @@ function ContractorBidsContent() {
               onOpenBid={() => openBidForm(selected)}
               onCloseBid={() => setBidFormId(null)}
               onSubmitBid={() => void handleSubmitBid(selected)}
+              onEstimateBidDraftChange={handleEstimateBidDraftChange}
             />
           ) : (
             <div className="flex min-h-[360px] items-center justify-center rounded-[28px] border border-black/[0.07] bg-white text-center">
@@ -786,6 +827,7 @@ function NoticeDetail({
   onOpenBid,
   onCloseBid,
   onSubmitBid,
+  onEstimateBidDraftChange,
 }: {
   notice: RfqNotice;
   estimateSections: RoomCostSection[];
@@ -811,6 +853,10 @@ function NoticeDetail({
   onOpenBid: () => void;
   onCloseBid: () => void;
   onSubmitBid: () => void;
+  onEstimateBidDraftChange: (
+    estimateId: string,
+    draft: EstimateBidDraft,
+  ) => void;
 }) {
   const deadline = deadlineInfo(notice.rfq_data.deadlineAt);
   const publishedDate = new Date(notice.rfq_data.publishedAt || notice.created_at).toLocaleDateString("ko-KR");
@@ -917,7 +963,11 @@ function NoticeDetail({
 
         {notice.consumer_project_id && (
           <div className="mt-4">
-            <ConstructionEstimateV2Panel consumerProjectId={notice.consumer_project_id} />
+            <ConstructionEstimateV2Panel
+              consumerProjectId={notice.consumer_project_id}
+              draftId={notice.id}
+              onDraftChange={onEstimateBidDraftChange}
+            />
           </div>
         )}
       </div>

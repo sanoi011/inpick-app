@@ -5,6 +5,7 @@ import {
   assembleByRoom,
   assembleSheet,
   constructionEstimateToDetailLines,
+  type DetailLine,
 } from "../detail-model";
 import {
   computeCostSheet,
@@ -16,6 +17,8 @@ import {
 } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { computeRoomQuantityBasis } from "@/lib/inpick/estimate-v2/quantity-formulas";
 import { WOOD_FLOOR_RULE } from "@/lib/inpick/estimate-v2/work-package-rules";
+import { buildSchedule, buildScheduleFromDocumentLines } from "../schedule-model";
+import { resolveMaterialMeta } from "../material-meta";
 import type {
   RoomQuantityBasis,
   SurfacePlan,
@@ -366,4 +369,122 @@ test("욕실·주방은 타일 중복 없이 전기·설비를 별도 세부 라
   const tradeSheet = assembleSheet(detailLines);
   assert.equal(roomSheet.directExpense, tradeSheet.directExpense);
   assert.equal(roomSheet.directTotal, tradeSheet.directTotal);
+});
+
+function scheduleLine(
+  id: string,
+  trade: string,
+  itemName: string,
+  unit: string,
+  quantity: number,
+  amount = 100_000,
+): DetailLine {
+  return {
+    id,
+    trade,
+    order: 1,
+    itemCode: id,
+    itemName,
+    part: "공통",
+    spec: "-",
+    brand: "-",
+    product: "시공/설치",
+    unit,
+    quantity,
+    matUnit: 0,
+    labUnit: quantity ? amount / quantity : amount,
+    expenseUnit: 0,
+    matAmount: 0,
+    labAmount: amount,
+    expenseAmount: 0,
+    amount,
+    room: "샘플",
+    source: "테스트",
+    optional: false,
+    added: false,
+  };
+}
+
+test("도배만 시공하면 임의 30일이 아니라 실제 수량 기준 3일 공정이 된다", () => {
+  const lines = [
+    scheduleLine("demo-wallpaper", "철거공사", "기존 벽지 철거", "m²", 42),
+    scheduleLine("wallpaper-wall", "도배공사", "벽 실크벽지 시공", "m²", 42),
+    scheduleLine("wallpaper-ceiling", "도배공사", "천장 실크벽지 시공", "m²", 25.2),
+    scheduleLine("clean", "준공청소", "준공청소 및 검수", "식", 1),
+  ];
+
+  const lowCost = buildSchedule(assembleSheet(lines).groups);
+  const highCost = buildSchedule(
+    assembleSheet(lines.map((line) => ({ ...line, amount: line.amount * 20 }))).groups,
+  );
+
+  assert.equal(lowCost.totalDays, 3);
+  assert.equal(lowCost.calculationBasis, "quantity_productivity");
+  assert.equal(highCost.totalDays, lowCost.totalDays);
+  assert.deepEqual(
+    lowCost.phases.map((phase) => phase.name),
+    ["철거·폐기물", "필름·도배·도장", "준공청소·검수"],
+  );
+});
+
+test("욕실은 방수 48시간 검사·타일 3일 보양·도기 1일을 공정에 반영한다", () => {
+  const lines = [
+    scheduleLine("waterproof-floor", "방수공사", "욕실 바닥 방수", "m²", 4.2),
+    scheduleLine("waterproof-wall", "방수공사", "욕실 벽 방수", "m²", 17.5),
+    scheduleLine("tile-floor", "타일공사", "욕실 바닥 타일", "m²", 4.2),
+    scheduleLine("tile-wall", "타일공사", "욕실 벽 타일", "m²", 17.5),
+    scheduleLine("fixture", "위생도기", "양변기·세면대·수전 설치", "개", 3),
+  ];
+
+  const schedule = buildSchedule(assembleSheet(lines).groups);
+  const waterproof = schedule.phases.find((phase) => phase.key === "waterproof");
+  const tile = schedule.phases.find((phase) => phase.key === "tile");
+  const fixture = schedule.phases.find((phase) => phase.key === "fixtures");
+
+  assert.equal(waterproof?.durationDays, 3);
+  assert.equal(waterproof?.qualityHoldDays, 2);
+  assert.match(waterproof?.standardRef || "", /48시간/);
+  assert.equal(tile?.durationDays, 3);
+  assert.match(tile?.standardRef || "", /3일/);
+  assert.equal(fixture?.durationDays, 1);
+  assert.equal(schedule.totalDays, 7);
+});
+
+test("가구 기본 추천은 대형 브랜드 대신 맞춤형으로 표시한다", () => {
+  assert.equal(resolveMaterialMeta("주방 하부장 설치").brand, "맞춤형");
+  assert.equal(resolveMaterialMeta("붙박이장 제작").brand, "맞춤형");
+  assert.equal(resolveMaterialMeta("신발장 제작").brand, "맞춤형");
+});
+
+test("발행 PDF 공정표도 웹과 동일한 수량 기반 엔진을 사용한다", () => {
+  const schedule = buildScheduleFromDocumentLines([
+    {
+      id: "wallpaper",
+      tradeName: "도배/페인트",
+      itemName: "실크벽지 시공",
+      unit: "m²",
+      quantity: 85,
+      totalAmount: 1_500_000,
+      roomName: "거실",
+    },
+    {
+      id: "clean",
+      tradeName: "정리/청소",
+      itemName: "준공청소",
+      unit: "식",
+      quantity: 1,
+      totalAmount: 300_000,
+      roomName: "공통",
+    },
+  ]);
+
+  assert.equal(schedule.calculationBasis, "quantity_productivity");
+  assert.equal(schedule.totalDays, 2);
+  assert.deepEqual(
+    schedule.phases.map((phase) => [phase.name, phase.durationDays]),
+    [
+      ["필름·도배·도장", 1],
+      ["준공청소·검수", 1],
+    ],
+  );
 });

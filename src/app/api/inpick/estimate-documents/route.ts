@@ -22,6 +22,11 @@ import type {
   ProjectScopeSnapshot,
 } from "@/lib/inpick/estimate-documents/types";
 import { createClient } from "@supabase/supabase-js";
+import { createClient as createServerClient } from "@/lib/supabase/server";
+import {
+  hasEstimateBundleAccess,
+  normalizeEstimateAccessId,
+} from "@/lib/inpick/estimate-bundle-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -29,6 +34,8 @@ export const dynamic = "force-dynamic";
 
 interface BodyInput {
   projectId: string;
+  /** Step3 세부견적과 통합 문서에 공통으로 묶인 견적 버전 접근 키 */
+  accessId?: string;
   mode?: EstimateDocumentMode;
   rfqId?: string;
   bidId?: string;
@@ -72,6 +79,20 @@ export async function POST(req: NextRequest) {
   }
 
   const mode: EstimateDocumentMode = body.mode || "consumer_preview";
+
+  // 소비자 미리보기의 총액은 화면에서 무료지만 문서 발행은 통합 공개권에 포함한다.
+  if (mode === "consumer_preview") {
+    const accessId = normalizeEstimateAccessId(body.accessId);
+    const {
+      data: { user },
+    } = await createServerClient().auth.getUser();
+    if (!user) {
+      return NextResponse.json({ error: "UNAUTHENTICATED" }, { status: 401 });
+    }
+    if (!accessId || !(await hasEstimateBundleAccess(user.id, accessId))) {
+      return NextResponse.json({ error: "ESTIMATE_BUNDLE_ACCESS_REQUIRED" }, { status: 403 });
+    }
+  }
 
   // consumer_id 조회 — workflow preview 모드(consumer_projects 미생성)에서도 PDF 생성 허용
   const admin = getAdmin();

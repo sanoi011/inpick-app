@@ -709,7 +709,7 @@ export default function Step2Designer({
       case "tile_wall":
         return "wall";
       case "fixture":
-        return requirement.partCode === "main_lighting" ? "lighting" : "unknown";
+        return requirement.partCode === "main_lighting" ? "lighting" : "fixture";
       default:
         return "unknown";
     }

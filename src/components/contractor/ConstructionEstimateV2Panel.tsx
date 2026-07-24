@@ -12,8 +12,12 @@
  *  - 사용자 자재 확정 여부 (L4 견적이면 견적가 흔들기 어려움)
  *  - 카테고리/SKU별 단가 (사업자 자체 단가와 비교)
  */
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Loader2, Lock, Sparkles, TriangleAlert } from "lucide-react";
+import EstimateProForm, {
+  type EstimateBidDraft,
+} from "@/components/estimate-pro/EstimateProForm";
+import { storedConstructionEstimateLinesToDetailLines } from "@/lib/estimate-pro/detail-model";
 
 interface V2Line {
   id: string;
@@ -51,6 +55,8 @@ interface V2Estimate {
 
 interface Props {
   consumerProjectId: string;
+  draftId: string;
+  onDraftChange?: (draftId: string, draft: EstimateBidDraft) => void;
 }
 
 const SOURCE_LABEL_KO: Record<string, string> = {
@@ -71,11 +77,28 @@ const SOURCE_COLOR: Record<string, string> = {
   ai_inferred_quantity: "bg-black/[0.08] text-black",
 };
 
-export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props) {
+export default function ConstructionEstimateV2Panel({
+  consumerProjectId,
+  draftId,
+  onDraftChange,
+}: Props) {
   const [loading, setLoading] = useState(false);
   const [estimate, setEstimate] = useState<V2Estimate | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
+  const detailLines = useMemo(
+    () =>
+      estimate
+        ? storedConstructionEstimateLinesToDetailLines(
+            estimate.lines as unknown as Array<Record<string, unknown>>,
+          )
+        : [],
+    [estimate],
+  );
+  const handleDraftChange = useCallback(
+    (draft: EstimateBidDraft) => onDraftChange?.(draftId, draft),
+    [draftId, onDraftChange],
+  );
 
   const load = async () => {
     if (estimate) {
@@ -242,70 +265,22 @@ export default function ConstructionEstimateV2Panel({ consumerProjectId }: Props
             ))}
           </div>
 
-          {/* Top 10 라인 */}
-          <div className="overflow-hidden rounded-lg ring-1 ring-black/[0.07]">
-            <table className="w-full text-xs">
-              <thead className="bg-black text-white">
-                <tr>
-                  <th className="px-2 py-1.5 text-left">공종</th>
-                  <th className="px-2 py-1.5 text-left">품명</th>
-                  <th className="px-2 py-1.5 text-right">수량</th>
-                  <th className="px-2 py-1.5 text-right">단가</th>
-                  <th className="px-2 py-1.5 text-right">금액</th>
-                  <th className="px-2 py-1.5 text-left">출처</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...estimate.lines]
-                  .sort((a, b) => Number(b.total_amount) - Number(a.total_amount))
-                  .slice(0, 10)
-                  .map((l) => (
-                    <tr key={l.id} className="border-t border-black/[0.06] bg-white">
-                      <td className="px-2 py-1 text-gray-700">{l.trade_name_ko}</td>
-                      <td className="px-2 py-1 text-gray-900">
-                        {l.item_name_ko}
-                        {l.site_condition_adjustment_reason && (
-                          <span className="mt-0.5 block text-[9px] font-semibold text-amber-700">
-                            {l.site_condition_adjustment_reason}
-                            {l.site_condition_adjustment_factor
-                              ? ` · ×${Number(l.site_condition_adjustment_factor).toFixed(2)}`
-                              : ""}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-2 py-1 text-right tabular-nums">
-                        {l.quantity}
-                        {l.unit}
-                      </td>
-                      <td className="px-2 py-1 text-right tabular-nums text-gray-600">
-                        {Math.round(Number(l.material_unit_price) + Number(l.labor_unit_price) + Number(l.expense_unit_price || 0)).toLocaleString("ko-KR")}
-                      </td>
-                      <td className="px-2 py-1 text-right font-semibold tabular-nums text-black">
-                        {Math.round(Number(l.total_amount)).toLocaleString("ko-KR")}
-                      </td>
-                      <td className="px-2 py-1">
-                        <div className="flex flex-wrap gap-1">
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] ${
-                              SOURCE_COLOR[l.source] ?? "bg-black/[0.05] text-black/60"
-                            }`}
-                          >
-                            {SOURCE_LABEL_KO[l.source]?.slice(0, 6) ?? l.source.slice(0, 6)}
-                          </span>
-                          {["02", "04", "05", "15"].includes(l.trade_code) && (
-                            <span className="rounded-full bg-black px-1.5 py-0.5 text-[9px] text-white">현장확인</span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+          <div className="mb-2 rounded-xl bg-blue-50 px-3 py-2 text-[10px] leading-4 text-blue-800 ring-1 ring-blue-100">
+            세부내역서에서 수량·재료비·노무비·경비를 수정하고, 공정표에서
+            시작일차와 공사기간을 조정하세요. 수정본은 입찰서에 함께 저장됩니다.
           </div>
-          <p className="mt-2 text-[10px] text-gray-500">
-            금액 상위 10개 라인만 표시. 전체 {estimate.lines.length}개 라인. 표준 fallback 항목이 많을수록
-            사업자 견적이 받아들여질 여지가 큽니다.
-          </p>
+          <EstimateProForm
+            lines={detailLines}
+            initialRole="bidder"
+            allowRoleSwitch={false}
+            initialGroupBy="trade"
+            initialTab="detail"
+            projectName="사업자 입찰 검토 견적"
+            documentNo={`BID-DRAFT-${estimate.id.slice(0, 8).toUpperCase()}`}
+            vendorName="입찰 참여 업체"
+            visionBadge={`저장 견적 ${estimate.lines.length}개 라인 · 수정본 입찰 저장`}
+            onBidDraftChange={handleDraftChange}
+          />
         </div>
       )}
     </div>

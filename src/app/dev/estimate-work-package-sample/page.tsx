@@ -3,8 +3,10 @@ import { notFound } from "next/navigation";
 import EstimateProForm from "@/components/estimate-pro/EstimateProForm";
 import {
   assembleByRoom,
+  assembleSheet,
   constructionEstimateToDetailLines,
 } from "@/lib/estimate-pro/detail-model";
+import { buildSchedule } from "@/lib/estimate-pro/schedule-model";
 import { buildConstructionEstimate } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import type {
   RoomQuantityBasis,
@@ -202,6 +204,7 @@ export default function EstimateWorkPackageSamplePage() {
   });
   const lines = constructionEstimateToDetailLines(estimate);
   const roomSheet = assembleByRoom(lines);
+  const schedule = buildSchedule(assembleSheet(lines).groups);
   const bathroom = roomSheet.groups.find((group) => group.trade === "욕실");
   const kitchen = roomSheet.groups.find((group) => group.trade === "주방");
   const disciplineCount = estimate.lines.filter(
@@ -223,7 +226,7 @@ export default function EstimateWorkPackageSamplePage() {
             전기·설비를 실제 검수 가능한 세부 항목으로 표시합니다. 전기·설비는
             ‘주방/욕실 공사’에 숨기지 않고 별도 공종으로도 집계됩니다.
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <Metric label="검수 공간" value="거실 · 욕실 · 주방" />
             <Metric
               label="욕실 계약 표시"
@@ -237,6 +240,10 @@ export default function EstimateWorkPackageSamplePage() {
               label="전기·설비 원가 라인"
               value={`${disciplineCount}개 분리 산출`}
             />
+            <Metric
+              label="수량 기반 예정 공기"
+              value={`${schedule.totalDays}일 · 30일 고정값 없음`}
+            />
           </div>
         </header>
 
@@ -244,7 +251,7 @@ export default function EstimateWorkPackageSamplePage() {
           lines={lines}
           projectName="거실·욕실·주방 공사내역 검수 샘플"
           areaLabel={`거실 ${LIVING_ROOM.floorM2}㎡ · 욕실 ${BATHROOM.floorM2}㎡ · 주방 ${KITCHEN.floorM2}㎡`}
-          visionBadge="로컬 다실 샘플 · 전기/설비 분리 · 원가 합계 보존"
+          visionBadge={`로컬 다실 샘플 · 수량 기반 ${schedule.totalDays}일 · 사업자 공정 편집`}
           initialExpandedGroups={["욕실", "주방"]}
           initialTab="cover"
           documentNo="INPICK-DEMO-20260724-001"
@@ -253,7 +260,6 @@ export default function EstimateWorkPackageSamplePage() {
           estimateDate="2026-07-24"
           validUntil="2026-08-23"
           siteAddress="로컬 검수용 표준 현장"
-          expectedPeriodDays={30}
         />
       </div>
     </main>

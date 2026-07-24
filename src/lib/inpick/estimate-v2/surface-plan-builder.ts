@@ -65,6 +65,10 @@ function surfaceFromHint(s: MaterialHint["surfaceType"]): SurfaceType {
       return "lighting";
     case "built_in_furniture":
       return "cabinet";
+    case "fixture":
+      return "fixture";
+    case "sink":
+      return "sink";
     case "signage":
       return "signage";
     case "facade":
@@ -72,6 +76,8 @@ function surfaceFromHint(s: MaterialHint["surfaceType"]): SurfaceType {
     case "partition":
       return "partition";
     default:
+      // 분석 결과가 부위를 특정하지 못한 경우 설비로 오인하지 않는다.
+      // Step2의 실별 제품 선택은 workflow-evidence 경계에서 명시적인 부위로 보정된다.
       return "wall";
   }
 }
@@ -111,6 +117,8 @@ export interface BuildSurfacePlansInput {
     priceSource?: string;
     observationId?: string;
     confidence?: number;
+    assemblyId?: string;
+    partCode?: string;
   }>;
   /** 추가 vision evidence (analyze 결과) — 이미 design_outputs.material_hints에 병합돼 있을 수 있음 */
   materialEvidence?: unknown[];
@@ -161,7 +169,9 @@ export function buildSurfacePlansFromContext(
   // 1순위: userMaterialEdits
   for (const edit of input.userMaterialEdits ?? []) {
     const surfaceType = surfaceFromHint(edit.surfaceType);
-    const key = `${edit.roomId}::${surfaceType}`;
+    const key = `${edit.roomId}::${surfaceType}${
+      edit.partCode ? `::${edit.partCode}` : ""
+    }`;
     if (!tryClaim(key, "user_selected_material")) continue;
     const roomType = inferRoomType(edit.roomName);
     plans.push({
@@ -310,6 +320,14 @@ export function buildSurfacePlansFromContext(
     });
     for (const dp of defaultPlans) {
       const key = `${dp.roomId}::${dp.surfaceType}`;
+      if (
+        Array.from(claimed.keys()).some(
+          (claimedKey) =>
+            claimedKey === key || claimedKey.startsWith(`${key}::`),
+        )
+      ) {
+        continue;
+      }
       if (!tryClaim(key, dp.source)) continue;
       plans.push(dp);
     }

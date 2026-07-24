@@ -1,7 +1,9 @@
 // src/lib/estimate-pro/material-meta.ts
 //
 // 내역 라인 → 공사부위(실별 바닥/벽/천장 등) + 브랜드/제품(SKU) 표준 추천 맵.
-// 실제 한국 인테리어 브랜드 기준 "표준 추천" 기본값. 실제 파이프라인에선
+// 가구는 특정 대형 브랜드가 아니라 지역 제작업체가 입찰 가능한 "맞춤형"을
+// 기본으로 한다. 사용자가 실제 브랜드 제품을 고른 경우에만 해당 브랜드로 교체된다.
+// 실제 파이프라인에선
 // 사용자 선택 / AI 추천 / material_products DB로 바인딩되어 교체됨(여기선 기본 추천).
 //
 // 부위는 "각 실별 바닥/벽/천장" 수준으로 압축(요구사항).
@@ -76,12 +78,12 @@ const RULES: Rule[] = [
   { kw: ['상판'], part: '주방', brand: 'LX하우시스', product: '비아테라 엔지니어드스톤', priceBand: '재료 28~45천/m', imageHint: '화이트 스톤상판' },
   { kw: ['싱크볼'], part: '주방', brand: '백조씽크', product: 'SUS304 언더마운트 싱크볼', priceBand: '제품 12~35만' },
   { kw: ['주방 수전'], part: '주방', brand: '대림바스', product: '거위목 주방수전', priceBand: '제품 8~25만' },
-  { kw: ['키큰장', '팬트리', '냉장고장'], part: '주방', brand: '한샘', product: '키큰장/냉장고장', priceBand: '개 45~90만' },
+  { kw: ['키큰장', '팬트리', '냉장고장'], part: '주방', brand: '맞춤형', product: '키큰장/냉장고장 제작·설치', priceBand: '개 45~90만' },
   { kw: ['레인지후드', '주방 후드', '후드'], part: '주방', brand: '하츠', product: '슬림 레인지후드', priceBand: '제품 25~40만' },
   { kw: ['인덕션', '쿡탑'], part: '주방', brand: '쿠첸', product: '3구 빌트인 인덕션', priceBand: '제품 45~90만' },
-  { kw: ['싱크대', '상부장', '하부장', '주방'], part: '주방', brand: '한샘', product: '키친바흐 도어', priceBand: 'm당 60~95만', imageHint: '무광 화이트 주방' },
-  { kw: ['신발장'], part: '주방', brand: '한샘', product: '시그니처 신발장', priceBand: 'm당 38~55만' },
-  { kw: ['붙박이장', '붙박이'], part: '주방', brand: '한샘', product: '시스템 붙박이장', priceBand: 'm당 50~75만' },
+  { kw: ['싱크대', '상부장', '하부장', '주방'], part: '주방', brand: '맞춤형', product: '주방가구 제작·설치', priceBand: 'm당 60~95만', imageHint: '무광 화이트 주방' },
+  { kw: ['신발장'], part: '주방', brand: '맞춤형', product: '신발장 제작·설치', priceBand: 'm당 38~55만' },
+  { kw: ['붙박이장', '붙박이'], part: '주방', brand: '맞춤형', product: '붙박이장 제작·설치', priceBand: 'm당 50~75만' },
   { kw: ['가스레인지'], part: '주방', brand: 'SK매직', product: '가스레인지', priceBand: '제품 25~40만' },
 
   // ── 설비 ──

@@ -93,13 +93,20 @@ export async function POST(request: NextRequest) {
     const { estimateId, bidAmount, discountRate, estimatedDays, startAvailableDate, message, metadata } = body;
     const contractorId = authContractorId;
 
-    if (!estimateId || !contractorId || !bidAmount) {
+    if (!estimateId || !contractorId || !bidAmount || !estimatedDays) {
       return NextResponse.json({ error: "필수 항목이 누락되었습니다." }, { status: 400 });
     }
 
     const bidAmountNum = Number(bidAmount);
     if (!Number.isFinite(bidAmountNum) || bidAmountNum <= 0) {
       return NextResponse.json({ error: "입찰 금액은 양수여야 합니다." }, { status: 400 });
+    }
+    const estimatedDaysNum = Number(estimatedDays);
+    if (!Number.isInteger(estimatedDaysNum) || estimatedDaysNum <= 0) {
+      return NextResponse.json(
+        { error: "예상 공사기간은 1일 이상의 정수여야 합니다." },
+        { status: 400 },
+      );
     }
 
     const { data, error } = await supabase
@@ -109,7 +116,7 @@ export async function POST(request: NextRequest) {
         contractor_id: contractorId,
         bid_amount: bidAmount,
         discount_rate: discountRate || null,
-        estimated_days: estimatedDays || 30,
+        estimated_days: estimatedDaysNum,
         start_available_date: startAvailableDate || null,
         message: message || null,
         metadata: metadata || {},

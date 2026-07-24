@@ -628,7 +628,7 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       ? `${l.roomId}:${l.surfaceType}:${surfacePlanRefs.join('+')}`
       : undefined;
     return {
-      id: `ce-${i++}`,
+      id: l.id || `ce-${i++}`,
       trade,
       order: orderOf(trade),
       itemCode: l.subTradeCode || l.tradeCode || '',
@@ -666,6 +666,102 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       quantityBasis: l.quantityFormulaKo,
     };
   });
+}
+
+/**
+ * Supabase construction_estimate_lines 응답을 정식 견적 폼 라인으로 변환한다.
+ * 사업자 입찰 화면에서도 소비자 견적과 동일한 문서·수량·공정 모델을 사용하기 위한 어댑터.
+ */
+export function storedConstructionEstimateLinesToDetailLines(
+  storedLines: Array<Record<string, unknown>>,
+): DetailLine[] {
+  const lines = storedLines.map((line, index) => ({
+    id: String(line.id || `stored-${index}`),
+    sortNo: Number(line.sort_no || index),
+    tradeCode: String(line.trade_code || ""),
+    tradeNameKo: String(line.trade_name_ko || line.trade_code || "기타"),
+    subTradeCode: String(line.sub_trade_code || line.trade_code || ""),
+    subTradeNameKo: String(
+      line.sub_trade_name_ko || line.task_name_ko || "세부공종",
+    ),
+    roomId: String(line.room_id || "common"),
+    roomName: String(line.room_name || "공통"),
+    roomType: String(line.room_type || "unknown"),
+    surfaceType: line.surface_type
+      ? String(line.surface_type)
+      : undefined,
+    taskNameKo: String(line.task_name_ko || line.item_name_ko || "항목"),
+    itemNameKo: String(line.item_name_ko || line.task_name_ko || "항목"),
+    brand: line.brand ? String(line.brand) : undefined,
+    manufacturer: line.manufacturer
+      ? String(line.manufacturer)
+      : undefined,
+    supplierName: line.supplier_name
+      ? String(line.supplier_name)
+      : undefined,
+    vendorName: line.vendor_name ? String(line.vendor_name) : undefined,
+    productName: line.product_name ? String(line.product_name) : undefined,
+    modelNo: line.model_no ? String(line.model_no) : undefined,
+    sku: line.sku ? String(line.sku) : undefined,
+    spec: line.spec ? String(line.spec) : undefined,
+    productSpec: line.product_spec
+      ? String(line.product_spec)
+      : undefined,
+    materialCategoryCode: line.material_category_code
+      ? String(line.material_category_code)
+      : undefined,
+    materialPriceSource: line.material_price_source
+      ? String(line.material_price_source)
+      : undefined,
+    productMatchStatus: line.product_match_status
+      ? String(line.product_match_status)
+      : undefined,
+    fallbackReason: line.fallback_reason
+      ? String(line.fallback_reason)
+      : undefined,
+    unit: String(line.unit || "lot"),
+    quantityFormulaKo: String(line.quantity_formula_ko || "저장 견적 수량"),
+    quantity: Number(line.quantity || 0),
+    materialUnitPrice: Number(line.material_unit_price || 0),
+    laborUnitPrice: Number(line.labor_unit_price || 0),
+    expenseUnitPrice: Number(line.expense_unit_price || 0),
+    materialAmount: Number(line.material_amount || 0),
+    laborAmount: Number(line.labor_amount || 0),
+    expenseAmount: Number(line.expense_amount || 0),
+    totalAmount: Number(line.total_amount || 0),
+    included: line.included !== false,
+    source: String(line.source || "standard_fallback_material"),
+    confidence: Number(line.confidence || 0),
+    pricingBasis: line.pricing_basis
+      ? String(line.pricing_basis)
+      : undefined,
+    contractorEditable: Boolean(line.contractor_editable),
+    siteVerificationRequired: Boolean(line.site_verification_required),
+    variationNotice: line.variation_notice
+      ? String(line.variation_notice)
+      : undefined,
+    siteAdjustmentFactors: Array.isArray(line.site_adjustment_factors)
+      ? line.site_adjustment_factors.map(String)
+      : [],
+    siteConditionAdjustmentFactor:
+      line.site_condition_adjustment_factor == null
+        ? undefined
+        : Number(line.site_condition_adjustment_factor),
+    siteConditionAdjustmentReason: line.site_condition_adjustment_reason
+      ? String(line.site_condition_adjustment_reason)
+      : undefined,
+    evidenceRefs: Array.isArray(line.evidence_refs)
+      ? line.evidence_refs
+      : [],
+    assumptions: Array.isArray(line.assumptions)
+      ? line.assumptions.map(String)
+      : [],
+    warnings: Array.isArray(line.warnings) ? line.warnings.map(String) : [],
+  }));
+
+  return constructionEstimateToDetailLines({
+    lines,
+  } as unknown as ConstructionEstimate);
 }
 
 // 마스터 → DetailSheet (수량 0 항목은 옵션으로 숨김 가능)

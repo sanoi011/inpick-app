@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import {
@@ -45,8 +45,6 @@ import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/client-builder";
 // P17-1: 견적 정확도 레벨 L0~L5
 import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision-level";
-// pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
-import EstimatePdfPurchaseModal from "@/components/payments/EstimatePdfPurchaseModal";
 // community v2 (2026-05-14): 커뮤니티 견적 공유
 import EstimateShareModal from "@/components/community/EstimateShareModal";
 import MaterialShopDrawer from "@/components/workflow/MaterialShopDrawer";
@@ -58,6 +56,8 @@ import { useTokens } from "@/hooks/useTokens";
 import { CONTRACTOR_BIDDING_ENABLED } from "@/lib/features";
 import { postEstimateJson } from "@/lib/inpick/estimate-client";
 import { buildPhotoEstimateRooms } from "@/lib/inpick/photo-estimate-rooms";
+import { buildWorkflowEstimateEvidence } from "@/lib/inpick/estimate-context/workflow-evidence";
+import { ESTIMATE_BUNDLE_TOKEN_COST } from "@/types/credits";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
 function priceSourceLabel(source: string): string {
@@ -127,15 +127,7 @@ interface ConsolidatedRow {
  * 같은 설계/자재 상태로 재진입하면 재차감하지 않고, 이미지·평형·자재가 바뀐 새 견적은 다시 잠긴다.
  */
 function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2Data): string {
-  const renders = Object.entries(step2.rendersByRoom || {})
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([room, items]) => [
-      room,
-      (items || []).map((item) => [
-        item.refinedUrl || item.url || "",
-        item.refinedAt || item.timestamp || "",
-      ]),
-    ]);
+  const evidence = buildWorkflowEstimateEvidence(step2);
   const signature = JSON.stringify({
     address: step1.basicInfo.selectedAddress?.roadAddress || "",
     building: step1.basicInfo.selectedAddress?.buildingName || "",
@@ -143,9 +135,12 @@ function buildEstimateAccessId(projectId: string, step1: Step1Data, step2: Step2
     exclusiveArea: step1.basicInfo.selectedPyeong?.exclusiveArea || 0,
     expansionType: step1.basicInfo.expansionType || "",
     rooms: [...(step1.rooms || [])].sort(),
-    selectedByRoom: step2.selectedByRoom || {},
     materialSelections: step2.materialSelections || {},
-    renders,
+    selectedDesigns: evidence.selectedDesigns.map((design) => ({
+      targetId: design.targetId,
+      imageUrl: design.imageUrl,
+      prompt: design.prompt || "",
+    })),
   });
   let hash = 2166136261;
   for (let index = 0; index < signature.length; index += 1) {
@@ -327,12 +322,11 @@ type FilterCategory = "all" | "main" | "aux" | "labor";
 type SortBy = "default" | "price-desc" | "price-asc" | "name";
 
 /**
- * PDF 발행 + 다운로드 + entitlement consume.
- * 권한 체크는 호출하는 쪽에서 미리 수행.
+ * 세부견적 공개 권한으로 견적·계약 통합 PDF를 발행하고 다운로드한다.
  */
 async function downloadEstimatePdf(input: {
   projectId: string;
-  entitlementId?: string;
+  accessId: string;
   step1: Step1Data | null;
   estimates: EstimateRoom[];
   grandTotal: { main: number; aux: number; labor: number; total: number };
@@ -340,14 +334,13 @@ async function downloadEstimatePdf(input: {
   constructionEstimate: ConstructionEstimate | null;
   /** AI 디자인 이미지 — PDF 부록 첨부 (2026-07-04) */
   designImages?: Array<{ url: string; label: string }>;
-  /** 9,900원 계약견적서 패키지일 때만 공정위 공식 표준계약서 원본을 앞에 합친다. */
-  includeStandardContract?: boolean;
 }) {
   const res = await fetch("/api/inpick/estimate-documents", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       projectId: input.projectId,
+      accessId: input.accessId,
       mode: "consumer_preview",
       addressText: input.step1?.basicInfo.selectedAddress?.roadAddress,
       apartmentName: input.step1?.basicInfo.selectedAddress?.buildingName,
@@ -383,31 +376,17 @@ async function downloadEstimatePdf(input: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     package: data.package as any,
     designImages: input.designImages,
-    includeStandardContract: input.includeStandardContract,
+    includeStandardContract: true,
   });
   const url = URL.createObjectURL(pdfBlob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = input.includeStandardContract
-    ? `INPICK_계약견적서_${data.documentNo || "draft"}.pdf`
-    : `INPICK_세부견적서_${data.documentNo || "draft"}.pdf`;
+  a.download = `INPICK_계약견적_통합문서_${data.documentNo || "draft"}.pdf`;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  // 단발 entitlement이면 consume (무제한은 NOOP)
-  if (input.entitlementId) {
-    try {
-      await fetch("/api/estimate-pdf/consume", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ entitlementId: input.entitlementId }),
-      });
-    } catch (e) {
-      console.warn("[estimate] entitlement consume failed:", e);
-    }
-  }
 }
 
 // P11-FIX: useSearchParams 사용 페이지는 Suspense로 감싸야 prerender 통과 (Vercel 빌드 에러 4회 원인)
@@ -580,13 +559,15 @@ function EstimatePage() {
   >([]);
   // P7: 공종별 견적 v2 — contextId 경로에서 받음
   const [constructionEstimate, setConstructionEstimate] = useState<ConstructionEstimate | null>(null);
+  const step1Ref = useRef<Step1Data | null>(null);
+  const step2Ref = useRef<Step2Data | null>(null);
+  const sawPendingSelectedAnalysisRef = useRef(false);
+  const refreshedAfterAnalysisRef = useRef(false);
   const [viewMode, setViewMode] = useState<"trade" | "room" | "surface" | "material">("trade");
   // 2026-05-31: 기본은 새 4문서 폼. 기존 상세표는 토글로만 노출.
   const [showLegacy, setShowLegacy] = useState(false);
   // P14-4: 사용자가 제외한 v2 line ID 집합 — 토글 시 총액 재계산
   const [excludedV2Lines, setExcludedV2Lines] = useState<Set<string>>(new Set());
-  // pricing v2 (2026-05-14): PDF 다운로드 결제 게이트
-  const [pdfPurchaseOpen, setPdfPurchaseOpen] = useState(false);
   const [pdfDownloading, setPdfDownloading] = useState(false);
   const [detailsProjectId, setDetailsProjectId] = useState<string | null>(null);
   const [detailsAccessId, setDetailsAccessId] = useState<string | null>(null);
@@ -659,7 +640,7 @@ function EstimatePage() {
       }
       if (response.status === 402) {
         setDetailsAccessError(
-          `토큰이 부족합니다. 필요 10토큰 · 보유 ${data.creditsBalance ?? tokenBalance}토큰`,
+          `토큰이 부족합니다. 필요 ${ESTIMATE_BUNDLE_TOKEN_COST}토큰 · 보유 ${data.creditsBalance ?? tokenBalance}토큰`,
         );
         return;
       }
@@ -686,29 +667,10 @@ function EstimatePage() {
         : s1.workflowEntry === "photo_commercial"
           ? "commercial"
           : "apartment";
-    const finalSelectedUrls = s2.finalSelectedImageUrlsByRoom || {};
-    const selectedRoomKeys = Array.from(
-      new Set([
-        ...Object.keys(finalSelectedUrls),
-        ...Object.keys(s2.selectedByRoom || {}).filter(
-          (roomKey) => s2.selectedByRoom[roomKey] != null,
-        ),
-      ]),
+    const evidence = buildWorkflowEstimateEvidence(
+      s2,
+      (roomKey) => ROOM_NAME_MAP[roomKey] || roomKey,
     );
-    const selectedDesigns = selectedRoomKeys.flatMap((roomKey) => {
-      const renders = s2.rendersByRoom?.[roomKey] || [];
-      const selectedIndex = s2.selectedByRoom?.[roomKey];
-      const render = selectedIndex != null ? renders[selectedIndex] : undefined;
-      const imageUrl = finalSelectedUrls[roomKey] || render?.refinedUrl || render?.url;
-      if (!imageUrl) return [];
-      return [{
-        targetId: roomKey,
-        targetName: ROOM_NAME_MAP[roomKey] || roomKey,
-        imageUrl,
-        sourceImageUrl: render?.url,
-        prompt: render?.revisedPrompt || render?.prompt,
-      }];
-    });
     try {
       const data = await postEstimateJson<{ contextId?: string }>(
         "/api/inpick/estimate-context/finalize",
@@ -716,8 +678,10 @@ function EstimatePage() {
           projectId,
           projectMode,
           step1Snapshot: s1,
-          selectionMode: selectedDesigns.length > 0 ? "final_images_only" : undefined,
-          selectedDesigns,
+          selectionMode:
+            evidence.selectedDesigns.length > 0 ? "final_images_only" : undefined,
+          selectedDesigns: evidence.selectedDesigns,
+          userMaterialEdits: evidence.userMaterialEdits,
         },
       );
       return data.contextId || null;
@@ -811,12 +775,25 @@ function EstimatePage() {
     const tick = async () => {
       const outputs = await fetchDesignOutputs(projectId);
       if (stopped) return;
-      if (outputs.length === 0) {
+      const currentStep2 = step2Ref.current;
+      const selectedUrls = new Set(
+        currentStep2
+          ? buildWorkflowEstimateEvidence(
+              currentStep2,
+              (roomKey) => ROOM_NAME_MAP[roomKey] || roomKey,
+            ).selectedImageUrls
+          : [],
+      );
+      const relevantOutputs =
+        selectedUrls.size > 0
+          ? outputs.filter((output) => selectedUrls.has(output.imageUrl))
+          : outputs;
+      if (relevantOutputs.length === 0) {
         setAnalysisStatus(null);
         return;
       }
-      const counts = { pending: 0, done: 0, failed: 0, total: outputs.length };
-      for (const o of outputs) {
+      const counts = { pending: 0, done: 0, failed: 0, total: relevantOutputs.length };
+      for (const o of relevantOutputs) {
         if (o.status === "analysis_pending" || o.status === "generated") counts.pending++;
         else if (o.status === "analysis_done") counts.done++;
         else if (o.status === "analysis_failed") counts.failed++;
@@ -827,9 +804,13 @@ function EstimatePage() {
         void fetch("/api/inpick/design-outputs/reanalyze", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ projectId }),
+          body: JSON.stringify({
+            projectId,
+            imageUrls: Array.from(selectedUrls),
+          }),
         }).catch(() => {});
       }
+      if (counts.pending > 0) sawPendingSelectedAnalysisRef.current = true;
       ticks++;
       // 일정 시간 내 정밀 분석이 끝나지 않으면 남은 항목을 표준값으로 확정(폴링 종료).
       // 견적은 이미 디자인 기반으로 산출되어 있으므로 '진행 중'이 영원히 멈추는 것을 방지.
@@ -840,7 +821,7 @@ function EstimatePage() {
       setAnalysisStatus(counts);
       // P5: 갤러리 보강 — design_outputs DB의 이미지도 함께 표시
       setDesignOutputsForGallery(
-        outputs.map((o) => ({
+        relevantOutputs.map((o) => ({
           id: o.id,
           imageUrl: o.imageUrl,
           targetName: o.targetName,
@@ -852,6 +833,21 @@ function EstimatePage() {
         counts.pending > 0 || (reanalyzeRequested && counts.failed > 0 && ticks < MAX_ANALYSIS_TICKS);
       if (stillWorking && !stopped) {
         timer = setTimeout(() => void tick(), 4000);
+      } else if (
+        sawPendingSelectedAnalysisRef.current &&
+        !refreshedAfterAnalysisRef.current &&
+        step1Ref.current &&
+        step2Ref.current
+      ) {
+        refreshedAfterAnalysisRef.current = true;
+        const nextContextId = await finalizeEstimateContext(
+          step1Ref.current,
+          step2Ref.current,
+        );
+        if (!stopped && nextContextId) {
+          setResolvedContextId(nextContextId);
+          await runEstimate(step1Ref.current, step2Ref.current, nextContextId);
+        }
       }
     };
     void tick();
@@ -920,6 +916,8 @@ function EstimatePage() {
       setDetailsAccessId(buildEstimateAccessId(activeProjectId, finalS1, finalS2));
       setStep1(finalS1);
       setStep2(finalS2);
+      step1Ref.current = finalS1;
+      step2Ref.current = finalS2;
       // sessionStorage 동기화 (다음 진입 시 빠르게)
       try {
         sessionStorage.setItem("workflow_step1", JSON.stringify(finalS1));
@@ -2638,11 +2636,11 @@ function EstimatePage() {
                     <div className="flex items-center gap-2">
                       <FileText className="h-3.5 w-3.5 text-black/55" />
                       <p className="text-[0.85rem] font-semibold tracking-tight text-black">
-                        건축공사 견적서
+                        계약·견적 통합 문서
                       </p>
                     </div>
                     <p className="mt-2 text-[0.78rem] leading-relaxed text-black/60">
-                      공개한 세부견적은 PDF로 내려받을 수 있습니다. 계약 단계에서는 공정위 공식 표준계약서와 전체 견적 부속서류를 한 세트로 발급합니다.
+                      세부견적을 한 번 공개하면 현재 견적 버전의 견적서·공정표·계약 확인서와 공정위 표준계약서를 계속 내려받을 수 있습니다.
                     </p>
                     <button
                       type="button"
@@ -2651,8 +2649,12 @@ function EstimatePage() {
                         const projectId = detailsProjectId || getOrCreateWorkflowProjectId() || "preview";
                         try {
                           setPdfDownloading(true);
+                          if (!detailsAccessId) {
+                            throw new Error("문서 접근 권한 식별자를 확인하지 못했습니다.");
+                          }
                           await downloadEstimatePdf({
                             projectId,
+                            accessId: detailsAccessId,
                             step1,
                             estimates,
                             grandTotal,
@@ -2662,7 +2664,6 @@ function EstimatePage() {
                               url: output.imageUrl,
                               label: output.targetName,
                             })),
-                            includeStandardContract: false,
                           });
                         } catch (downloadError) {
                           alert(
@@ -2682,72 +2683,10 @@ function EstimatePage() {
                       ) : (
                         <Download className="h-3.5 w-3.5" />
                       )}
-                      세부견적 PDF 다운로드
-                    </button>
-                    <button
-                      type="button"
-                      disabled={pdfDownloading}
-                      onClick={async () => {
-                        // pricing v2: 다운로드 직전 권한 체크
-                        try {
-                          setPdfDownloading(true);
-                          const queryProjectId =
-                            typeof window !== "undefined"
-                              ? new URLSearchParams(window.location.search).get("projectId")
-                              : null;
-                          const projectId =
-                            queryProjectId ||
-                            getOrCreateWorkflowProjectId() ||
-                            "preview";
-                          // 권한 체크
-                          const accessRes = await fetch(
-                            `/api/estimate-pdf/check-access?consumerProjectId=${encodeURIComponent(projectId)}`,
-                          );
-                          if (accessRes.status === 401) {
-                            alert("PDF 다운로드는 로그인 후 가능합니다.");
-                            return;
-                          }
-                          const access = (await accessRes.json()) as {
-                            granted: boolean;
-                            entitlementId?: string;
-                            reason?: string;
-                          };
-                          if (!access.granted) {
-                            setPdfPurchaseOpen(true);
-                            return;
-                          }
-                          await downloadEstimatePdf({
-                            projectId,
-                            entitlementId: access.entitlementId,
-                            step1,
-                            estimates,
-                            grandTotal,
-                            matchMetaByRoom,
-                            constructionEstimate,
-                            designImages: designOutputsForGallery.map((o) => ({
-                              url: o.imageUrl,
-                              label: o.targetName,
-                            })),
-                            includeStandardContract: true,
-                          });
-                        } catch (e) {
-                          console.error("[estimate] PDF download failed:", e);
-                          alert("PDF 생성 실패: " + (e instanceof Error ? e.message : String(e)));
-                        } finally {
-                          setPdfDownloading(false);
-                        }
-                      }}
-                      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-xl border border-black/10 bg-white px-4 py-2.5 text-sm font-bold text-black transition hover:bg-zinc-50 disabled:opacity-50"
-                    >
-                      {pdfDownloading ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Download className="h-3.5 w-3.5" />
-                      )}
-                      계약견적서 패키지 (9,900원)
+                      계약·견적 전체 PDF 다운로드
                     </button>
                     <p className="mt-2 text-center text-[0.65rem] text-black/50">
-                      공정위 표준계약서 갑·을지 + 견적 갑지·총괄표·세부내역·이미지·특기사항·서명란
+                      추가 결제 없음 · 전체 펼침 세부내역 · 수량 기반 공정표 · 계약 확인·서명란
                     </p>
                     <button
                       type="button"
@@ -2920,7 +2859,7 @@ function EstimatePage() {
                     <p className="mt-2 text-sm leading-relaxed text-black/52">
                       총 견적금액은 무료로 확인할 수 있습니다.
                       <br />
-                      공종별·자재별 세부내역과 PDF는 10토큰으로 열립니다.
+                      공종별·자재별 전체내역과 모든 계약·견적 PDF는 한 번에 {ESTIMATE_BUNDLE_TOKEN_COST}토큰으로 열립니다.
                     </p>
                     <button
                       type="button"
@@ -2933,7 +2872,7 @@ function EstimatePage() {
                       ) : (
                         <Lock className="h-4 w-4" />
                       )}
-                      10토큰으로 세부견적 보기
+                      {ESTIMATE_BUNDLE_TOKEN_COST}토큰으로 전체 열기
                     </button>
                     <p className="mt-3 text-xs text-black/40">현재 보유 {tokenBalance}토큰</p>
                     {detailsAccessError && (
@@ -2968,46 +2907,6 @@ function EstimatePage() {
         onClose={() => setShareModalOpen(false)}
       />
       <MaterialShopDrawer materialName={shopMaterial} onClose={() => setShopMaterial(null)} />
-      <EstimatePdfPurchaseModal
-        open={pdfPurchaseOpen}
-        consumerProjectId={
-          typeof window !== "undefined"
-            ? new URLSearchParams(window.location.search).get("projectId") ||
-              getOrCreateWorkflowProjectId() ||
-              null
-            : null
-        }
-        onClose={() => setPdfPurchaseOpen(false)}
-        onPaid={async ({ entitlementId }) => {
-          setPdfPurchaseOpen(false);
-          // 결제 완료 → 즉시 다운로드
-          const projectId =
-            (typeof window !== "undefined"
-              ? new URLSearchParams(window.location.search).get("projectId")
-              : null) ||
-            getOrCreateWorkflowProjectId() ||
-            "preview";
-          setPdfDownloading(true);
-          try {
-            await downloadEstimatePdf({
-              projectId,
-              entitlementId,
-              step1,
-              estimates,
-              grandTotal,
-              matchMetaByRoom,
-              constructionEstimate,
-              designImages: designOutputsForGallery.map((o) => ({
-                url: o.imageUrl,
-                label: o.targetName,
-              })),
-              includeStandardContract: true,
-            });
-          } finally {
-            setPdfDownloading(false);
-          }
-        }}
-      />
     </LenisProvider>
   );
 }

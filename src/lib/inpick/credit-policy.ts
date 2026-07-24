@@ -11,6 +11,7 @@
  */
 import { createClient as createServerClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ESTIMATE_BUNDLE_TOKEN_COST } from "@/types/credits";
 
 /**
  * 작업별 토큰 비용 매트릭스.
@@ -22,7 +23,7 @@ export const CREDIT_COSTS = {
   "partial-ai-room": 5, // 부분 AI 인테리어: 거실·방·주방·욕실 1실 렌더
   "render-room-high": 2, // 고화질 재생성
   "refine-render": 2, // 정밀 영역 선택 후 GPT Image 2 자재 재렌더
-  "unlock-estimate-details": 10, // Step3 세부 견적 1회 공개
+  "unlock-estimate-details": ESTIMATE_BUNDLE_TOKEN_COST, // Step3 세부견적 + 전체 문서 영구 공개
   "normalize-floorplan": 1, // 캐시 miss 시 (정형화)
   "extract-material": 0, // 자동 분석 무료
   "design-chat": 0, // 채팅 무료 (rate limit으로 보호)

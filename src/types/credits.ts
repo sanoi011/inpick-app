@@ -42,6 +42,10 @@ export const CREDITS_PER_GENERATION = 1;
 export const FREE_GENERATION_LIMIT = 0; // 회원가입 +10 보너스로 대체
 export const TOKEN_UNIT_PRICE_KRW = 500;
 
+// Step3 세부견적 + 견적서/공정표/계약서 통합 다운로드 영구 공개권.
+// 토큰 1개 500원 기준 약 1만원 상당이며, 같은 견적 버전은 재차감하지 않는다.
+export const ESTIMATE_BUNDLE_TOKEN_COST = 20;
+
 // PDF 견적서 단발 다운로드 가격 (부가세 포함)
 export const ESTIMATE_PDF_PRICE_KRW = 9900;
 export const ESTIMATE_PDF_PRODUCT_CODE = "estimate_pdf_single";

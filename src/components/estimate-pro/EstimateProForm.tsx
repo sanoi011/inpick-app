@@ -8,14 +8,18 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ChevronDown, ChevronRight, TrendingDown, ImageIcon, Trash2,
   FileText, Receipt, CalendarRange, FileSignature, Layers,
-  TriangleAlert, Pencil,
+  TriangleAlert, Pencil, RotateCcw,
 } from "lucide-react";
 import { assembleSheet, assembleByRoom, type DetailLine } from "@/lib/estimate-pro/detail-model";
 import {
   computeCostSheet, defaultJebiItems, defaultMarginRates,
   type JebiItem, type MarginRates,
 } from "@/lib/estimate-pro/cost-model";
-import { buildSchedule } from "@/lib/estimate-pro/schedule-model";
+import {
+  buildSchedule,
+  type PhaseBar,
+  type ScheduleResult,
+} from "@/lib/estimate-pro/schedule-model";
 import { SITE_CONDITION_NOTICES } from "@/lib/inpick/estimate-v2/site-condition-pricing";
 
 const won = (n: number) => Math.round(n || 0).toLocaleString("ko-KR");
@@ -38,12 +42,64 @@ function recalc(r: Row): Row {
   };
 }
 
+function applyScheduleOverrides(
+  base: ScheduleResult,
+  overrides: Record<string, EstimateScheduleOverride>,
+): ScheduleResult {
+  let cursor = 0;
+  const phases = base.phases.map((phase) => {
+    const override = overrides[phase.key] || {};
+    const startDay =
+      override.startDay == null
+        ? cursor
+        : Math.max(0, Math.round(override.startDay));
+    const durationDays =
+      override.durationDays == null
+        ? phase.durationDays
+        : Math.max(1, Math.round(override.durationDays));
+    cursor = Math.max(cursor, startDay + durationDays);
+    return {
+      ...phase,
+      startDay,
+      durationDays,
+      qualityHoldDays:
+        durationDays === phase.durationDays ? phase.qualityHoldDays : 0,
+      basis:
+        durationDays === phase.durationDays &&
+        startDay === phase.startDay
+          ? phase.basis
+          : `${phase.basis} · 사업자 조정`,
+    };
+  });
+  return {
+    ...base,
+    phases,
+    totalDays: phases.reduce(
+      (maximum, phase) =>
+        Math.max(maximum, phase.startDay + phase.durationDays),
+      0,
+    ),
+  };
+}
+
 export type EstimateProTab =
   | "cover"
   | "summary"
   | "rollup"
   | "detail"
   | "schedule";
+
+export interface EstimateScheduleOverride {
+  startDay?: number;
+  durationDays?: number;
+}
+
+export interface EstimateBidDraft {
+  lines: DetailLine[];
+  schedule: ScheduleResult;
+  directTotal: number;
+  contractPrice: number;
+}
 
 export interface EstimateProFormProps {
   lines: DetailLine[];
@@ -63,6 +119,12 @@ export interface EstimateProFormProps {
   siteAddress?: string;
   validUntil?: string;
   expectedPeriodDays?: number;
+  /** 사업자 입찰 화면은 bidder로 고정하고 역할 전환을 숨긴다. */
+  initialRole?: "owner" | "bidder";
+  allowRoleSwitch?: boolean;
+  initialGroupBy?: "room" | "trade";
+  /** 입찰 제출 metadata에 수정 내역·공정표를 보존하기 위한 draft 콜백 */
+  onBidDraftChange?: (draft: EstimateBidDraft) => void;
 }
 
 export default function EstimateProForm({
@@ -79,13 +141,19 @@ export default function EstimateProForm({
   estimateDate = "",
   siteAddress = "",
   validUntil = "",
-  expectedPeriodDays = 30,
+  expectedPeriodDays = 0,
+  initialRole = "owner",
+  allowRoleSwitch = true,
+  initialGroupBy = "room",
+  onBidDraftChange,
 }: EstimateProFormProps) {
-  const [role, setRole] = useState<"owner" | "bidder">("owner");
+  const [role, setRole] = useState<"owner" | "bidder">(initialRole);
   const [tab, setTab] = useState<EstimateProTab>(initialTab);
   // 민간 소규모 인테리어 견적의 기본값. 공공공사 제비율은 사업자가 필요할 때 켠다.
   const [includeJebi, setIncludeJebi] = useState(false);
-  const [targetDays, setTargetDays] = useState(30);
+  const [scheduleOverrides, setScheduleOverrides] = useState<
+    Record<string, EstimateScheduleOverride>
+  >({});
   // 세부내역서 기본 전체 접힘 — 대분류·소계만 먼저 보이게 (모바일 시인성)
   const [expanded, setExpanded] = useState<Set<string>>(
     () => new Set(initialExpandedGroups),
@@ -104,7 +172,7 @@ export default function EstimateProForm({
   const [rows, setRows] = useState<Row[]>(lines);
   const [jebi, setJebi] = useState<JebiItem[]>(() => defaultJebiItems());
   const [margins, setMargins] = useState<MarginRates>(() => defaultMarginRates());
-  const [groupBy, setGroupBy] = useState<"room" | "trade">("room"); // 세부내역서: 기본 실별×부위별
+  const [groupBy, setGroupBy] = useState<"room" | "trade">(initialGroupBy);
 
   // 견적(lines) 갱신 시 편집행 동기화
   useEffect(() => { setRows(lines); }, [lines]);
@@ -132,7 +200,11 @@ export default function EstimateProForm({
       includeJebi,
     ]
   );
-  const schedule = useMemo(() => buildSchedule(sheet.groups, targetDays), [sheet.groups, targetDays]);
+  const baseSchedule = useMemo(() => buildSchedule(sheet.groups), [sheet.groups]);
+  const schedule = useMemo(
+    () => applyScheduleOverrides(baseSchedule, scheduleOverrides),
+    [baseSchedule, scheduleOverrides],
+  );
 
   const updateRow = (id: string, patch: Partial<Row>) =>
     setRows((rs) => rs.map((r) => (r.id === id ? recalc({ ...r, ...patch }) : r)));
@@ -146,6 +218,39 @@ export default function EstimateProForm({
       else n.add(t);
       return n;
     });
+  const updateSchedulePhase = (
+    key: string,
+    patch: EstimateScheduleOverride,
+  ) =>
+    setScheduleOverrides((current) => ({
+      ...current,
+      [key]: { ...current[key], ...patch },
+    }));
+
+  useEffect(() => {
+    if (!schedule.totalDays) return;
+    setMeta((current) =>
+      current.expectedPeriodDays === schedule.totalDays
+        ? current
+        : { ...current, expectedPeriodDays: schedule.totalDays },
+    );
+  }, [schedule.totalDays]);
+
+  useEffect(() => {
+    if (!onBidDraftChange) return;
+    onBidDraftChange({
+      lines: rows,
+      schedule,
+      directTotal: sheet.directTotal,
+      contractPrice: cost.contractPrice,
+    });
+  }, [
+    cost.contractPrice,
+    onBidDraftChange,
+    rows,
+    schedule,
+    sheet.directTotal,
+  ]);
 
   // 공종별 선행공정 (공정표 순서 기반 — 견적에 있는 공종만)
   const precedingByTrade = useMemo(() => {
@@ -166,10 +271,17 @@ export default function EstimateProForm({
           {visionBadge && (
             <span className="rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] text-black/65">{visionBadge}</span>
           )}
-          <div className="ml-auto flex items-center bg-gray-100 rounded-lg p-0.5">
-            <Seg active={role === "owner"} onClick={() => setRole("owner")}>고객 보기</Seg>
-            <Seg active={role === "bidder"} onClick={() => setRole("bidder")} icon={<Pencil className="w-3.5 h-3.5" />}>사업자 편집</Seg>
-          </div>
+          {allowRoleSwitch ? (
+            <div className="ml-auto flex items-center bg-gray-100 rounded-lg p-0.5">
+              <Seg active={role === "owner"} onClick={() => setRole("owner")}>고객 보기</Seg>
+              <Seg active={role === "bidder"} onClick={() => setRole("bidder")} icon={<Pencil className="w-3.5 h-3.5" />}>사업자 편집</Seg>
+            </div>
+          ) : (
+            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700 ring-1 ring-blue-100">
+              <Pencil className="h-3 w-3" />
+              입찰용 편집
+            </span>
+          )}
         </div>
         <div className="px-4 flex gap-1 overflow-x-auto">
           <Tab active={tab === "cover"} onClick={() => setTab("cover")} icon={<FileSignature className="w-3.5 h-3.5" />}>1. 갑지</Tab>
@@ -190,7 +302,15 @@ export default function EstimateProForm({
             <DetailTab sheet={detailSheet} groupBy={groupBy} setGroupBy={setGroupBy} expanded={expanded} toggleGroup={toggleGroup} updateRow={updateRow} deleteRow={deleteRow} precedingByTrade={precedingByTrade} role={role} />
           </>
         )}
-        {tab === "schedule" && <ScheduleTab schedule={schedule} targetDays={targetDays} setTargetDays={setTargetDays} />}
+        {tab === "schedule" && (
+          <ScheduleTab
+            schedule={schedule}
+            role={role}
+            edited={Object.keys(scheduleOverrides).length > 0}
+            updateSchedulePhase={updateSchedulePhase}
+            resetSchedule={() => setScheduleOverrides({})}
+          />
+        )}
       </div>
     </div>
   );
@@ -307,10 +427,12 @@ function CoverTab({ meta, setMeta, cost, category, areaLabel, lineCount, tradeCo
           <input className={fld} placeholder="현장 주소" value={meta.siteAddress} onChange={(e) => setMeta({ ...meta, siteAddress: e.target.value })} />
         </Field>
         <Field label="예상 공사기간">
-          <div className="flex items-center border-b border-slate-300">
+          <div className="flex items-center justify-between border-b border-slate-300 py-1.5">
             <span className="text-xs text-slate-500">착공일 협의 후 약</span>
-            <input type="number" min={1} value={meta.expectedPeriodDays} onChange={(e) => setMeta({ ...meta, expectedPeriodDays: Number(e.target.value) || 0 })} className="w-16 bg-transparent px-2 py-1.5 text-right text-xs font-bold outline-none" />
-            <span className="text-xs text-slate-500">일</span>
+            <span className="text-xs font-bold text-slate-800">
+              {meta.expectedPeriodDays || 0}일
+            </span>
+            <span className="text-[9px] text-slate-400">공정표 자동 반영</span>
           </div>
         </Field>
         <Field label="견 적 범 위">
@@ -685,29 +807,227 @@ function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; de
 }
 
 /* 공정표 */
-function ScheduleTab({ schedule, targetDays, setTargetDays }: any) {
+function ScheduleTab({
+  schedule,
+  role,
+  edited,
+  updateSchedulePhase,
+  resetSchedule,
+}: {
+  schedule: ScheduleResult;
+  role: "owner" | "bidder";
+  edited: boolean;
+  updateSchedulePhase: (
+    key: string,
+    patch: EstimateScheduleOverride,
+  ) => void;
+  resetSchedule: () => void;
+}) {
   const total = schedule.totalDays || 1;
-  const ticks = Array.from({ length: Math.ceil(total / 5) + 1 }, (_, i) => i * 5);
+  const tickStep = total <= 10 ? 1 : total <= 30 ? 5 : 10;
+  const ticks = Array.from(
+    { length: Math.ceil(total / tickStep) + 1 },
+    (_, i) => i * tickStep,
+  ).filter((day) => day <= total);
+  if (ticks[ticks.length - 1] !== total) ticks.push(total);
+  const bidder = role === "bidder";
+
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-4">
-        <div><h2 className="text-sm font-bold text-gray-900">공정표 — 견적 기반 막대그래프</h2><p className="text-[11px] text-gray-400 mt-0.5">공종별 금액 비중으로 공기 자동 배분 · 총 {schedule.totalDays}일</p></div>
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">목표 공사일<input type="number" value={targetDays} min={10} max={120} onChange={(e) => setTargetDays(Math.max(5, Number(e.target.value) || 30))} className="w-16 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black" /><span className="text-gray-400">일</span></label>
-      </div>
-      <div className="flex items-center mb-1 pl-44"><div className="flex-1 relative h-4">{ticks.map((d) => (<span key={d} className="absolute text-[9px] text-slate-400 -translate-x-1/2" style={{ left: `${(d / total) * 100}%` }}>{d}일</span>))}</div></div>
-      <div className="space-y-1.5">
-        {schedule.phases.map((p: any) => (
-          <div key={p.key} className="flex items-center">
-            <div className="w-44 flex-shrink-0 pr-2 text-[11px] text-slate-600 font-medium truncate" title={p.trades.join(", ")}>{p.name}</div>
-            <div className="flex-1 relative h-6 bg-slate-50 rounded">
-              {ticks.map((d) => (<span key={d} className="absolute top-0 bottom-0 border-l border-slate-100" style={{ left: `${(d / total) * 100}%` }} />))}
-              <div className="absolute top-0.5 bottom-0.5 rounded flex items-center px-1.5 text-[9px] text-white font-medium overflow-hidden whitespace-nowrap" style={{ left: `${(p.startDay / total) * 100}%`, width: `${(p.durationDays / total) * 100}%`, backgroundColor: "#111111" }} title={`${p.name} · ${p.durationDays}일 · ${won(p.cost)}원`}>{p.durationDays}일</div>
-            </div>
-            <div className="w-24 flex-shrink-0 text-right text-[10px] text-slate-500 tabular-nums">{won(p.cost)}</div>
+    <div className="rounded-xl border border-blue-100 bg-white p-4 shadow-[0_14px_45px_rgba(37,99,235,0.06)]">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <h2 className="text-sm font-bold text-gray-900">
+              공정표 — 견적 수량 기반 예정 공기
+            </h2>
+            <span className="rounded-full bg-gradient-to-r from-blue-600 to-sky-400 px-2.5 py-1 text-[9px] font-bold text-white shadow-sm shadow-blue-200">
+              총 {schedule.totalDays}일
+            </span>
+            {edited && (
+              <span className="rounded-full bg-blue-50 px-2 py-1 text-[9px] font-bold text-blue-700 ring-1 ring-blue-100">
+                사업자 조정됨
+              </span>
+            )}
           </div>
-        ))}
+          <p className="mt-1 text-[11px] leading-4 text-gray-400">
+            견적 수량 ÷ 표준 일당 시공량 + 방수·타일 검사 및 양생기간
+          </p>
+        </div>
+        {bidder && (
+          <button
+            type="button"
+            onClick={resetSchedule}
+            disabled={!edited}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 px-3 py-1.5 text-[10px] font-bold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-35"
+          >
+            <RotateCcw className="h-3 w-3" />
+            자동 산정으로 초기화
+          </button>
+        )}
       </div>
-      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs"><span className="text-slate-400">총 {schedule.phases.length}개 공정 · 순차 시공 기준</span><span className="font-bold text-slate-700">총 공사비 {won(schedule.totalCost)}원</span></div>
+
+      {schedule.phases.length > 0 ? (
+        <>
+          <div
+            className={`mb-1 flex items-center ${
+              bidder ? "pr-[154px]" : "pr-[72px]"
+            }`}
+          >
+            <div className="w-48 shrink-0" />
+            <div className="relative h-4 flex-1">
+              {ticks.map((day) => (
+                <span
+                  key={day}
+                  className="absolute -translate-x-1/2 text-[9px] text-blue-400"
+                  style={{ left: `${(day / total) * 100}%` }}
+                >
+                  {day}일
+                </span>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {schedule.phases.map((phase) => (
+              <ScheduleRow
+                key={phase.key}
+                phase={phase}
+                total={total}
+                ticks={ticks}
+                bidder={bidder}
+                updateSchedulePhase={updateSchedulePhase}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <div className="rounded-xl border border-dashed border-blue-100 py-10 text-center text-xs text-slate-400">
+          견적 공종을 추가하면 수량 기반 공정표가 생성됩니다.
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-blue-50 pt-4 text-xs">
+        <span className="text-slate-400">
+          총 {schedule.phases.length}개 공정 · 기본 순차 시공 · 계약 전 현장
+          조건에 따라 조정
+        </span>
+        <span className="font-bold text-slate-700">
+          직접공사비 {won(schedule.totalCost)}원
+        </span>
+      </div>
+      <p className="mt-2 text-[9px] leading-4 text-slate-400">
+        표준 공기는 예비값입니다. 실제 착공일, 작업 가능 시간, 투입 인원,
+        병렬 시공, 자재 제작·납기와 공동주택 관리규약은 사업자 입찰 공정표에서
+        확정합니다.
+      </p>
+    </div>
+  );
+}
+
+function ScheduleRow({
+  phase,
+  total,
+  ticks,
+  bidder,
+  updateSchedulePhase,
+}: {
+  phase: PhaseBar;
+  total: number;
+  ticks: number[];
+  bidder: boolean;
+  updateSchedulePhase: (
+    key: string,
+    patch: EstimateScheduleOverride,
+  ) => void;
+}) {
+  const startDayLabel = phase.startDay + 1;
+  const endDayLabel = phase.startDay + phase.durationDays;
+  return (
+    <div className="group flex items-center gap-2">
+      <div className="w-48 shrink-0 pr-2">
+        <p
+          className="truncate text-[11px] font-bold text-slate-700"
+          title={phase.trades.join(", ")}
+        >
+          {phase.name}
+        </p>
+        <p
+          className="mt-0.5 truncate text-[9px] text-slate-400"
+          title={`${phase.basis} · ${phase.standardRef}`}
+        >
+          {phase.basis}
+        </p>
+      </div>
+      <div className="relative h-9 min-w-[180px] flex-1 overflow-hidden rounded-lg bg-blue-50/60 ring-1 ring-inset ring-blue-100/50">
+        {ticks.map((day) => (
+          <span
+            key={day}
+            className="absolute inset-y-0 border-l border-blue-100/70"
+            style={{ left: `${(day / total) * 100}%` }}
+          />
+        ))}
+        <div
+          className="absolute inset-y-1 flex min-w-[24px] items-center overflow-hidden whitespace-nowrap rounded-md px-2 text-[9px] font-bold text-white shadow-sm shadow-blue-200/70 transition-[filter] group-hover:brightness-105"
+          style={{
+            left: `${(phase.startDay / total) * 100}%`,
+            width: `${(phase.durationDays / total) * 100}%`,
+            backgroundImage: phase.gradient,
+          }}
+          title={`${phase.name} · ${startDayLabel}~${endDayLabel}일차 · ${phase.standardRef}`}
+        >
+          {phase.durationDays}일
+        </div>
+      </div>
+      {bidder ? (
+        <div className="grid w-[146px] shrink-0 grid-cols-2 gap-1.5">
+          <label className="text-[9px] text-slate-400">
+            시작
+            <span className="mt-0.5 flex items-center rounded-md border border-blue-100 bg-white px-1.5">
+              <input
+                aria-label={`${phase.name} 시작일`}
+                type="number"
+                min={1}
+                value={startDayLabel}
+                onChange={(event) =>
+                  updateSchedulePhase(phase.key, {
+                    startDay: Math.max(
+                      0,
+                      (Number(event.target.value) || 1) - 1,
+                    ),
+                  })
+                }
+                className="w-full bg-transparent py-1 text-right text-[10px] font-bold text-blue-800 outline-none"
+              />
+              <span>일</span>
+            </span>
+          </label>
+          <label className="text-[9px] text-slate-400">
+            기간
+            <span className="mt-0.5 flex items-center rounded-md border border-blue-100 bg-white px-1.5">
+              <input
+                aria-label={`${phase.name} 공사기간`}
+                type="number"
+                min={1}
+                value={phase.durationDays}
+                onChange={(event) =>
+                  updateSchedulePhase(phase.key, {
+                    durationDays: Math.max(
+                      1,
+                      Number(event.target.value) || 1,
+                    ),
+                  })
+                }
+                className="w-full bg-transparent py-1 text-right text-[10px] font-bold text-blue-800 outline-none"
+              />
+              <span>일</span>
+            </span>
+          </label>
+        </div>
+      ) : (
+        <div className="w-16 shrink-0 text-right text-[10px] font-semibold tabular-nums text-blue-700">
+          {startDayLabel}~{endDayLabel}일
+        </div>
+      )}
     </div>
   );
 }

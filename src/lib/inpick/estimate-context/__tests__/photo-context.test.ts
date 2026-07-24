@@ -101,7 +101,7 @@ test("requested photo rooms survive missing or failed design analysis as room-sc
   assert.equal(result.quantityBasisByRoom.kitchen.roomName, "주방");
 });
 
-test("final-images-only keeps evidence and user edits relevant to selected rooms and source images", () => {
+test("final-images-only keeps evidence and user edits relevant to the exact selected image", () => {
   const selections = [
     {
       targetId: "kitchen",
@@ -119,7 +119,7 @@ test("final-images-only keeps evidence and user edits relevant to selected rooms
 
   assert.deepEqual(
     Array.from(collectFinalSelectionImageUrls(selectedOutputs, selections)).sort(),
-    ["https://img/kitchen-final.png", "https://img/kitchen-source.png"],
+    ["https://img/kitchen-final.png"],
   );
   assert.deepEqual(
     filterRecordsForSelectedRooms(
@@ -189,4 +189,82 @@ test("server construction estimate consumes Step1 kitchen overrides", () => {
   assert.equal(tall?.quantity, 2);
   assert.equal(tall?.itemNameKo, "냉장고장 · 김치냉장고장");
   assert.ok(tall?.assumptions.some((assumption) => assumption.includes("사용자 요구 주방장 구성")));
+});
+
+test("unknown vision surfaces stay walls while explicit bathroom fixtures remain separate", () => {
+  const result = buildSurfacePlansFromContext({
+    projectId: "photo-project",
+    projectMode: "photo_only",
+    designOutputs: [
+      {
+        id: "bath-output",
+        projectId: "photo-project",
+        userId: "user-1",
+        projectMode: "photo_only",
+        targetType: "room",
+        targetId: "bath",
+        targetName: "욕실",
+        renderKind: "room_render",
+        imageUrl: "https://img/bath.png",
+        materialHints: [
+          {
+            surfaceType: "unknown",
+            materialCategory: "unclassified_finish",
+            materialNameKo: "분류 미확정 마감",
+            confidence: 0.5,
+            source: "vision_analysis",
+          },
+        ],
+        status: "analysis_done",
+        createdAt: "2026-07-24T00:00:00.000Z",
+        updatedAt: "2026-07-24T00:00:00.000Z",
+      },
+    ],
+    userMaterialEdits: [
+      {
+        id: "bath::toilet",
+        roomId: "bath",
+        roomName: "욕실",
+        surfaceType: "fixture",
+        materialCategory: "room-product.toilet",
+        materialProductId: "toilet-1",
+        materialNameKo: "선택 양변기",
+        partCode: "toilet",
+      },
+      {
+        id: "bath::basin",
+        roomId: "bath",
+        roomName: "욕실",
+        surfaceType: "fixture",
+        materialCategory: "room-product.basin",
+        materialProductId: "basin-1",
+        materialNameKo: "선택 세면대",
+        partCode: "basin",
+      },
+    ],
+  });
+
+  assert.equal(
+    result.surfacePlans.filter(
+      (plan) => plan.roomId === "bath" && plan.surfaceType === "fixture",
+    ).length,
+    2,
+  );
+  assert.ok(
+    result.surfacePlans.some(
+      (plan) =>
+        plan.roomId === "bath" &&
+        plan.surfaceType === "wall" &&
+        plan.materialCategory === "unclassified_finish",
+    ),
+  );
+  assert.equal(
+    result.surfacePlans.filter(
+      (plan) =>
+        plan.roomId === "bath" &&
+        plan.surfaceType === "fixture" &&
+        plan.source === "standard_fallback_material",
+    ).length,
+    0,
+  );
 });
