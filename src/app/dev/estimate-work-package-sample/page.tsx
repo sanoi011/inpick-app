@@ -11,7 +11,7 @@ import type {
   SurfacePlan,
 } from "@/lib/inpick/estimate-v2/types";
 
-const ROOM: RoomQuantityBasis = {
+const LIVING_ROOM: RoomQuantityBasis = {
   roomId: "living-sample",
   roomName: "거실",
   roomType: "living_room",
@@ -26,20 +26,57 @@ const ROOM: RoomQuantityBasis = {
   assumptions: ["거실 순바닥 25.2m², 벽 42m², 천장 25.2m² 로컬 검수 기준"],
 };
 
+const BATHROOM: RoomQuantityBasis = {
+  roomId: "bathroom-sample",
+  roomName: "욕실",
+  roomType: "bathroom",
+  floorM2: 4.2,
+  ceilingM2: 4.2,
+  wallM2: 17.5,
+  perimeterM: 8.6,
+  doorCount: 1,
+  windowCount: 0,
+  fixtureCount: 1,
+  widthM: 2,
+  depthM: 2.1,
+  heightM: 2.3,
+  basisSource: "manual_input",
+  assumptions: ["욕실 바닥 4.2m², 벽 타일 17.5m², 위생기구 1세트 기준"],
+};
+
+const KITCHEN: RoomQuantityBasis = {
+  roomId: "kitchen-sample",
+  roomName: "주방",
+  roomType: "kitchen",
+  floorM2: 8.5,
+  ceilingM2: 8.5,
+  wallM2: 14.5,
+  perimeterM: 12,
+  doorCount: 0,
+  windowCount: 1,
+  fixtureCount: 1,
+  widthM: 3.6,
+  depthM: 2.4,
+  heightM: 2.3,
+  basisSource: "manual_input",
+  assumptions: ["주방 바닥 8.5m², 조리대 3.6m 일자형 기준"],
+};
+
 function plan(
   id: string,
-  surfaceType: "floor" | "wall" | "ceiling",
+  room: RoomQuantityBasis,
+  surfaceType: SurfacePlan["surfaceType"],
   materialCategory: string,
   materialNameKo: string,
-  selectedMaterialUnitPrice: number,
+  selectedMaterialUnitPrice?: number,
 ): SurfacePlan {
   return {
     id,
     projectId: "local-estimate-work-package-sample",
     projectMode: "apartment",
-    roomId: ROOM.roomId,
-    roomName: ROOM.roomName,
-    roomType: ROOM.roomType,
+    roomId: room.roomId,
+    roomName: room.roomName,
+    roomType: room.roomType,
     surfaceType,
     action: "demolish_and_new",
     materialCategory,
@@ -60,20 +97,116 @@ export default function EstimateWorkPackageSamplePage() {
     projectId: "local-estimate-work-package-sample",
     projectMode: "apartment",
     surfacePlans: [
-      plan("sample-floor", "floor", "engineered_floor", "강마루", 65_000),
-      plan("sample-wall", "wall", "silk_wallpaper", "실크벽지", 8_500),
-      plan("sample-ceiling", "ceiling", "silk_wallpaper", "실크벽지", 8_500),
+      plan(
+        "living-floor",
+        LIVING_ROOM,
+        "floor",
+        "engineered_floor",
+        "강마루",
+        65_000,
+      ),
+      plan(
+        "living-wall",
+        LIVING_ROOM,
+        "wall",
+        "silk_wallpaper",
+        "실크벽지",
+        8_500,
+      ),
+      plan(
+        "living-ceiling",
+        LIVING_ROOM,
+        "ceiling",
+        "silk_wallpaper",
+        "실크벽지",
+        8_500,
+      ),
+      plan(
+        "bath-floor",
+        BATHROOM,
+        "floor",
+        "porcelain_tile",
+        "욕실 바닥 포세린 타일",
+        42_000,
+      ),
+      plan(
+        "bath-wall",
+        BATHROOM,
+        "wall",
+        "wall_tile",
+        "욕실 벽 포세린 타일",
+        39_000,
+      ),
+      plan(
+        "bath-fixture",
+        BATHROOM,
+        "fixture",
+        "bathroom_full",
+        "욕실 위생기구 패키지",
+      ),
+      plan(
+        "kitchen-floor",
+        KITCHEN,
+        "floor",
+        "engineered_floor",
+        "강마루",
+        65_000,
+      ),
+      plan(
+        "kitchen-wall",
+        KITCHEN,
+        "wall",
+        "silk_wallpaper",
+        "실크벽지",
+        8_500,
+      ),
+      plan(
+        "kitchen-ceiling",
+        KITCHEN,
+        "ceiling",
+        "silk_wallpaper",
+        "실크벽지",
+        8_500,
+      ),
+      plan(
+        "kitchen-package",
+        KITCHEN,
+        "sink",
+        "kitchen_standard",
+        "일자형 주방가구 패키지",
+      ),
     ],
-    quantityBasisByRoom: { [ROOM.roomId]: ROOM },
+    quantityBasisByRoom: {
+      [LIVING_ROOM.roomId]: LIVING_ROOM,
+      [BATHROOM.roomId]: BATHROOM,
+      [KITCHEN.roomId]: KITCHEN,
+    },
+    kitchenPlanOverrides: {
+      [KITCHEN.roomId]: {
+        counterLengthM: 3.6,
+        lowerCabinetLengthM: 3.6,
+        upperCabinetLengthM: 2.8,
+        tallCabinetEa: 1,
+        tallCabinetLabels: ["냉장고장"],
+        worktopLengthM: 3.6,
+        sinkEa: 1,
+        faucetEa: 1,
+        hoodEa: 1,
+        cooktopEa: 1,
+        backsplashM2: 2.2,
+        electricalAdditionsEa: 3,
+        plumbingRelocation: "none",
+        layoutType: "linear",
+      },
+    },
   });
   const lines = constructionEstimateToDetailLines(estimate);
-  const living = assembleByRoom(lines).groups.find((group) => group.trade === "거실");
-  const packageCount = living?.lines.filter((line) => line.isWorkPackage).length || 0;
-  const contractLineCount = living?.lines.length || 0;
-  const atomicCount = living?.lines.reduce(
-    (sum, line) => sum + (line.workBreakdown?.length || 1),
-    0,
-  ) || 0;
+  const roomSheet = assembleByRoom(lines);
+  const bathroom = roomSheet.groups.find((group) => group.trade === "욕실");
+  const kitchen = roomSheet.groups.find((group) => group.trade === "주방");
+  const disciplineCount = estimate.lines.filter(
+    (line) => line.tradeCode === "04" || line.tradeCode === "05",
+  ).length;
 
   return (
     <main className="min-h-screen bg-[#f4f4f2] px-4 py-10 text-zinc-900">
@@ -86,25 +219,33 @@ export default function EstimateWorkPackageSamplePage() {
             실별 공사 패키지 견적 샘플
           </h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-zinc-500">
-            거실 바닥·벽·천장은 각각 한 줄로 표시하고, 철거·바탕·부자재·마감·폐기물은
-            각 행의 ‘세부 산출근거’와 공종별 탭에 보존합니다.
+            거실은 면 단위로 간결하게, 욕실·주방은 타일·방수·위생기구·가구와
+            전기·설비를 실제 검수 가능한 세부 항목으로 표시합니다. 전기·설비는
+            ‘주방/욕실 공사’에 숨기지 않고 별도 공종으로도 집계됩니다.
           </p>
-          <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <Metric label="기존 거실 표시" value={`${atomicCount}개 원가 라인`} />
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <Metric label="검수 공간" value="거실 · 욕실 · 주방" />
             <Metric
-              label="개선된 거실 표시"
-              value={`${contractLineCount}개 계약 항목 · 마감 ${packageCount}개`}
+              label="욕실 계약 표시"
+              value={`${bathroom?.lines.length || 0}개 항목`}
             />
-            <Metric label="대표 바닥 수량" value={`${ROOM.floorM2}m² 순면적`} />
+            <Metric
+              label="주방 계약 표시"
+              value={`${kitchen?.lines.length || 0}개 항목`}
+            />
+            <Metric
+              label="전기·설비 원가 라인"
+              value={`${disciplineCount}개 분리 산출`}
+            />
           </div>
         </header>
 
         <EstimateProForm
           lines={lines}
-          projectName="거실 마감공사 검수 샘플"
-          areaLabel={`거실 ${ROOM.floorM2}㎡`}
-          visionBadge="로컬 표준 샘플 · 원가 합계 보존"
-          initialExpandedGroups={["거실"]}
+          projectName="거실·욕실·주방 공사내역 검수 샘플"
+          areaLabel={`거실 ${LIVING_ROOM.floorM2}㎡ · 욕실 ${BATHROOM.floorM2}㎡ · 주방 ${KITCHEN.floorM2}㎡`}
+          visionBadge="로컬 다실 샘플 · 전기/설비 분리 · 원가 합계 보존"
+          initialExpandedGroups={["욕실", "주방"]}
         />
       </div>
     </main>

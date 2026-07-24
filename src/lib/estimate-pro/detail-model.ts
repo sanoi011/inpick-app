@@ -515,6 +515,25 @@ function isSupportingWorkTask(taskName: string): boolean {
   ].some((keyword) => taskName.includes(keyword));
 }
 
+function materialLookupNameForDiscipline(
+  taskName: string,
+  tradeCode?: string,
+): string {
+  if (tradeCode === '05') {
+    return taskName.replace(
+      /(주방|욕실|싱크대|싱크볼|양변기|세면대|샤워|식기세척기)/g,
+      '',
+    );
+  }
+  if (tradeCode === '04') {
+    return taskName.replace(
+      /(주방|욕실|상부장|인덕션|식기세척기|오븐|환풍기)/g,
+      '',
+    );
+  }
+  return taskName;
+}
+
 export function constructionEstimateToDetailLines(est: ConstructionEstimate): DetailLine[] {
   const lines = (est.lines || []).filter((l) => l.included !== false);
   let i = 0;
@@ -523,14 +542,30 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
     // taskName은 원가 라인의 실제 작업(철거/바탕/마감)을 나타낸다.
     // 구 버전 resolver가 itemNameKo를 최종 마감재명으로 덮어쓴 견적도 여기서 복구한다.
     const itemName = l.taskNameKo || l.itemNameKo || l.subTradeNameKo || '항목';
-    const meta = resolveMaterialMeta(itemName);
+    const materialLookupName = materialLookupNameForDiscipline(itemName, l.tradeCode);
+    const resolvedMeta = resolveMaterialMeta(materialLookupName);
+    const meta =
+      resolvedMeta.brand === '-' && resolvedMeta.product === materialLookupName
+        ? { ...resolvedMeta, product: itemName }
+        : resolvedMeta;
     const semanticPart = resolvePart(itemName);
+    const disciplinePart: PartCode | undefined =
+      l.tradeCode === '04'
+        ? '전기'
+        : l.tradeCode === '05'
+          ? '설비'
+          : undefined;
+    const preferSemanticPart =
+      semanticPart !== '공통' &&
+      !(l.surfaceType === 'ceiling' && semanticPart === '벽');
     const part: PartCode =
-      // LH 실내재료마감표의 AF(바닥)와 AB(걸레받이)처럼 걸레받이는
-      // 바닥 SurfacePlan에서 생성됐더라도 별도 계약 항목으로 표시한다.
-      semanticPart === '걸레받이/몰딩'
+      // 전기·설비는 주방/욕실 SurfacePlan에서 파생돼도 독립 공종으로 표시한다.
+      disciplinePart ||
+      // fixture/sink 계획 안의 천장·욕실·주방 작업과 LH의 AB(걸레받이)는
+      // 실제 작업 부위를 우선한다. 단, 천장 벽지는 "벽"으로 오인하지 않는다.
+      (preferSemanticPart
         ? semanticPart
-        : (l.surfaceType && SURFACE_PART[l.surfaceType]) || semanticPart || meta.part;
+        : (l.surfaceType && SURFACE_PART[l.surfaceType]) || semanticPart || meta.part);
     const supportingWork = isSupportingWorkTask(l.taskNameKo || itemName);
     // 구 견적의 하위 공정에 잘못 복제된 최종 마감재 상품 메타도 제거한다.
     const brand = supportingWork

@@ -143,10 +143,13 @@ export async function buildConstructionEstimateWithProductResolution(
         // 모든 품명이 "강마루/실크벽지"로 덮이고 원가 단가까지 오염될 수 있다.
         if (hasMaterialIntent(template)) {
           try {
+            const useSelectedSurfaceProduct = shouldUseSelectedMaterialForTemplate(
+              template,
+              surfacePlan,
+            );
             const product = await resolveMaterialProductForLine({
               surfacePlan,
-              useSelectedSurfaceProduct:
-                template.costModel.materialUnitPriceKey === "selected_material_unit_price",
+              useSelectedSurfaceProduct,
               workOutput: {
                 taskNameKo: template.taskNameKo,
                 defaultItemNameKo: template.defaultItemNameKo,
@@ -154,7 +157,10 @@ export async function buildConstructionEstimateWithProductResolution(
                 tradeCode: template.tradeCode,
                 subTradeCode: template.subTradeCode,
                 // P15-3: template의 카테고리 코드 전달 → resolver가 우선 사용
-                materialCategoryCode: template.materialCategoryCode,
+                materialCategoryCode: materialCategoryCodeForTemplate(
+                  template,
+                  surfacePlan,
+                ),
                 requiredProductMatch: template.requiredProductMatch,
                 highValue: template.highValue,
               },
@@ -164,8 +170,12 @@ export async function buildConstructionEstimateWithProductResolution(
             const price = await resolveMaterialPriceForLine({
               product,
               unit: template.unit,
-              overridePriceWon: surfacePlan.selectedMaterialUnitPrice,
-              overridePriceSource: surfacePlan.selectedMaterialPriceSource,
+              overridePriceWon: useSelectedSurfaceProduct
+                ? surfacePlan.selectedMaterialUnitPrice
+                : undefined,
+              overridePriceSource: useSelectedSurfaceProduct
+                ? surfacePlan.selectedMaterialPriceSource
+                : undefined,
               fallbackDefaultPriceWon: template.costModel.defaultMaterialUnitPrice,
             });
             applyResolvedProductPriceToLine(line, product, price);
@@ -214,6 +224,58 @@ export function hasMaterialIntent(template: WorkPackageLineTemplate): boolean {
     template.requiredProductMatch ||
     template.costModel.materialUnitPriceKey === "selected_material_unit_price"
   );
+}
+
+/**
+ * 한 SurfacePlan이 여러 완제품으로 전개되는 욕실·주방 패키지에서는 선택 단가를
+ * 모든 부품에 복제하지 않는다. 범용 "싱크대" 선택은 하부장 대표 단가에만 쓰고,
+ * 부품 카테고리를 직접 선택한 경우에만 해당 부품에 적용한다.
+ */
+export function shouldUseSelectedMaterialForTemplate(
+  template: WorkPackageLineTemplate,
+  plan: SurfacePlan,
+): boolean {
+  if (
+    template.costModel.materialUnitPriceKey !== "selected_material_unit_price"
+  ) {
+    return false;
+  }
+  if (plan.roomType !== "kitchen") return true;
+
+  const selectedCategory = plan.materialCategory.trim().toLowerCase();
+  const broadKitchenSelection = [
+    "kitchen_standard",
+    "kitchen_cabinet",
+    "sink_cabinet",
+    "arch_kitchen",
+    "주방",
+    "싱크대",
+  ].some((alias) => selectedCategory.includes(alias));
+
+  if (broadKitchenSelection) return template.subTradeCode === "12-11";
+  if (!template.materialCategoryCode) return false;
+
+  const templateCategory = template.materialCategoryCode.toLowerCase();
+  return (
+    selectedCategory === templateCategory ||
+    selectedCategory.includes(templateCategory) ||
+    templateCategory.includes(selectedCategory)
+  );
+}
+
+/** 욕실 벽 타일은 바닥 타일과 다른 상품 카테고리로 조회한다. */
+function materialCategoryCodeForTemplate(
+  template: WorkPackageLineTemplate,
+  plan: SurfacePlan,
+): string | undefined {
+  if (
+    plan.roomType === "bathroom" &&
+    plan.surfaceType === "wall" &&
+    template.materialCategoryCode === "MAT-FLR-PORCELAIN"
+  ) {
+    return "MAT-WAL-TILE";
+  }
+  return template.materialCategoryCode;
 }
 
 /** Resolver 결과를 line에 채움 */
@@ -470,8 +532,7 @@ function createEstimateLine(
     template.siteAdjustmentFactors ?? siteMeta?.siteAdjustmentFactors ?? [];
   const siteVerificationRequired =
     template.siteVerificationRequired ?? siteMeta?.siteVerificationRequired ?? false;
-  const isSelectedProductLine =
-    template.costModel.materialUnitPriceKey === "selected_material_unit_price";
+  const isSelectedProductLine = shouldUseSelectedMaterialForTemplate(template, plan);
 
   return {
     id: randomId(),
@@ -564,7 +625,7 @@ function resolveUnitPrices(
   // 자재 단가: surfacePlan에 선택 자재 단가가 있으면 우선
   let materialUnitPrice = template.costModel.defaultMaterialUnitPrice ?? 0;
   if (
-    template.costModel.materialUnitPriceKey === "selected_material_unit_price" &&
+    shouldUseSelectedMaterialForTemplate(template, plan) &&
     plan.selectedMaterialUnitPrice &&
     plan.selectedMaterialUnitPrice > 0
   ) {

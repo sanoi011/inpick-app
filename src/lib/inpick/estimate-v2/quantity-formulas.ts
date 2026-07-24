@@ -16,7 +16,9 @@ function getWallExposureFactor(roomType: RoomType): number {
     case "kitchen":
       return 0.55; // 싱크대·타일 영역 차감
     case "bathroom":
-      return 0.0; // 욕실은 도배 X (별도 타일 공정)
+      // 물리 벽면적은 타일·방수 수량에도 사용한다. 욕실 도배를 제외하는 책임은
+      // SurfacePlan/WorkPackageRule에 두고 수량 기반 자체를 0으로 만들지 않는다.
+      return 1.0;
     case "dress_room":
       return 0.7; // 붙박이장 가려진 부분 차감
     case "utility":
