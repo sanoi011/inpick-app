@@ -636,6 +636,7 @@ export default function WorkflowPage() {
                 <Step2Designer
                   rooms={step1.rooms}
                   basicInfo={step1.basicInfo}
+                  buildingType={step1.buildingType}
                   normalizedFloorplan={step1.normalizedFloorplan}
                   roomFurnishings={step1.roomFurnishings}
                   workflowEntry={step1.workflowEntry}

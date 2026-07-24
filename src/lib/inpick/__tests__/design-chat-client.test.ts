@@ -44,3 +44,32 @@ test("prompt extraction maps a text 413 response without JSON parse leakage", as
     },
   );
 });
+
+test("prompt extraction sends sanitized Step 1 context with the conversation", async () => {
+  let payload: Record<string, unknown> | null = null;
+  const fetchMock: typeof fetch = async (_input, init) => {
+    payload = JSON.parse(String(init?.body)) as Record<string, unknown>;
+    return Response.json({ image_prompt: "Photorealistic Korean apartment interior" });
+  };
+
+  await extractDesignPrompt(
+    [{ role: "user", content: "블랙 포인트 주방으로 꾸며줘" }],
+    {
+      projectMode: "apartment",
+      workflowEntry: "apartment_drawing",
+      buildingType: "apartment",
+      address: "대전광역시 중구 대전천서로 709",
+      exclusiveAreaM2: 59.98,
+      expansionType: "extended",
+      selectedRooms: ["주방"],
+    },
+    fetchMock,
+  );
+
+  const context = payload?.context as Record<string, unknown> | undefined;
+  assert.ok(context);
+  assert.equal(context.buildingType, "apartment");
+  assert.equal(context.exclusiveAreaM2, 59.98);
+  assert.equal(context.expansionType, "extended");
+  assert.deepEqual(context.selectedRooms, ["주방"]);
+});

@@ -1,3 +1,8 @@
+import {
+  sanitizeDesignChatContext,
+  type DesignChatContext,
+} from "./design-chat-context";
+
 export interface DesignChatMessageLike {
   role: "user" | "assistant";
   content: string;
@@ -46,12 +51,21 @@ function invalidResponseError(response: Response, bodyText: string): Error {
 
 export async function extractDesignPrompt(
   messages: DesignChatMessageLike[],
-  fetchImpl: typeof fetch = fetch,
+  contextOrFetch?: DesignChatContext | typeof fetch,
+  fetchOverride: typeof fetch = fetch,
 ): Promise<ExtractDesignPromptResult> {
+  const fetchImpl = typeof contextOrFetch === "function" ? contextOrFetch : fetchOverride;
+  const context =
+    typeof contextOrFetch === "function"
+      ? undefined
+      : sanitizeDesignChatContext(contextOrFetch);
   const response = await fetchImpl("/api/inpick/design-chat/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages: textOnlyMessages(messages) }),
+    body: JSON.stringify({
+      messages: textOnlyMessages(messages),
+      ...(context ? { context } : {}),
+    }),
   });
   const bodyText = await response.text();
 

@@ -32,6 +32,10 @@ import type { NormalizedFloorplan } from "./Step1Cards";
 import { renderRoomViaClient, type RenderRoomBody } from "@/lib/inpick/render-room-client";
 import { extractDesignPrompt } from "@/lib/inpick/design-chat-client";
 import {
+  buildInitialDesignChatMessage,
+  type DesignChatContext,
+} from "@/lib/inpick/design-chat-context";
+import {
   classifyPyeong,
   estimateRoomDimsFromPyeong,
   type RoomDim,
@@ -351,6 +355,7 @@ function isRenderAccessible(
 interface Props {
   rooms: string[];
   basicInfo: BasicInfoData;
+  buildingType?: "apartment" | "house" | "store" | "etc" | null;
   normalizedFloorplan?: NormalizedFloorplan;
   roomFurnishings?: Record<string, string[]>;
   /** 워크플로 진입 모드 — Step2 탭 분기 결정 */
@@ -368,6 +373,7 @@ interface Props {
 export default function Step2Designer({
   rooms,
   basicInfo,
+  buildingType,
   normalizedFloorplan,
   roomFurnishings,
   workflowEntry,
@@ -448,6 +454,63 @@ export default function Step2Designer({
     );
     return generatedRoom?.v ?? availableTabs[0]?.v ?? "living";
   });
+  const designChatContext = useMemo<DesignChatContext>(
+    () => {
+      const activeRoomLabel =
+        activeRoom === "all"
+          ? undefined
+          : availableTabs.find((tab) => tab.v === activeRoom)?.label;
+      const floorplanRooms =
+        normalizedFloorplan?.rooms?.length
+          ? normalizedFloorplan.rooms
+          : basicInfo.normalizedRooms;
+
+      return {
+        projectMode: currentProjectMode,
+        workflowEntry,
+        buildingType,
+        residentialType: photoSpaceType,
+        commercialBusiness,
+        address:
+          basicInfo.selectedAddress?.roadAddress ||
+          basicInfo.selectedAddress?.jibunAddress,
+        complexName:
+          basicInfo.selectedComplex?.complexName ||
+          basicInfo.selectedAddress?.buildingName,
+        pyeongName: basicInfo.selectedPyeong?.pyeongName,
+        exclusiveAreaM2: basicInfo.selectedPyeong?.exclusiveArea,
+        roomCount: basicInfo.selectedPyeong?.roomCnt,
+        expansionType: basicInfo.expansionType,
+        budgetManwon: basicInfo.budget,
+        selectedRooms: selectedRoomKeys
+          .map((roomKey) => availableTabs.find((tab) => tab.v === roomKey)?.label)
+          .filter((label): label is string => Boolean(label)),
+        activeRoom: activeRoomLabel,
+        floorplanPyeong:
+          normalizedFloorplan?.pyeong || basicInfo.normalizedPyeong,
+        floorplanRooms: floorplanRooms?.map((room) => ({
+          name: room.name,
+          widthMm: room.widthMm,
+          depthMm: room.depthMm,
+          heightMm: room.heightMm,
+        })),
+        floorplanNotes:
+          normalizedFloorplan?.notes || basicInfo.normalizedNotes,
+      };
+    },
+    [
+      activeRoom,
+      availableTabs,
+      basicInfo,
+      buildingType,
+      commercialBusiness,
+      currentProjectMode,
+      normalizedFloorplan,
+      photoSpaceType,
+      selectedRoomKeys,
+      workflowEntry,
+    ],
+  );
   const [generating, setGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [estimateTransitioning, setEstimateTransitioning] = useState(false);
@@ -484,7 +547,16 @@ export default function Step2Designer({
   // "이 컨셉으로 디자인 생성하기" 버튼을 눌러야 이미지 생성. 즉시생성은 토글로 옵션.
   // 상담과 이미지 수정은 하나의 공용 프롬프트가 문맥에 따라 자동 분기한다.
   const chatMode = true;
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(value.chatMessages ?? []);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() =>
+    value.chatMessages?.length
+      ? value.chatMessages
+      : [
+          {
+            role: "assistant",
+            content: buildInitialDesignChatMessage(designChatContext),
+          },
+        ],
+  );
   const photoSourcesByRoom = useMemo(
     () =>
       mapPhotoSourcesToRooms({
@@ -518,21 +590,6 @@ export default function Step2Designer({
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatMessages, chatMode]);
-
-  // chatMode가 default true(value.chatMode 미설정 시)로 시작될 때도 동일하게 인사
-  // — 마운트 직후 1회 (chatMessages 비어있으면)
-  useEffect(() => {
-    if (chatMode && chatMessages.length === 0) {
-      setChatMessages([
-        {
-          role: "assistant",
-          content:
-            "안녕하세요! InPick 인테리어 상담 AI입니다 😊\n어떤 공간을 어떻게 꾸미고 싶으신가요? 자유롭게 말씀해 주세요.",
-        },
-      ]);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   // 구형 자재 편집 화면을 다시 공개할 때만 SAM을 준비한다.
   useEffect(() => {
@@ -1192,6 +1249,7 @@ export default function Step2Designer({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          context: designChatContext,
           messages: next.map((m) => ({
             role: m.role,
             content: m.content,
@@ -1418,7 +1476,7 @@ export default function Step2Designer({
     try {
       // 이미지 attachment의 base64/data URL은 prompt 추출에 필요하지 않다.
       // text-only로 제한해 Vercel 413 plain-text 응답과 JSON parse crash를 방지한다.
-      const data = await extractDesignPrompt(chatMessages);
+      const data = await extractDesignPrompt(chatMessages, designChatContext);
       // 모드 분기 — workflowEntry 명시적으로만 결정 (MD §3 silent fallback 금지)
       // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasSpatialBasis =

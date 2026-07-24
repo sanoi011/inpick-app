@@ -8,6 +8,12 @@
  * 출력: { room_type, area_sqm, style, tone, image_prompt }
  */
 import { NextRequest, NextResponse } from "next/server";
+import {
+  buildDesignChatSystemContext,
+  buildImagePromptContextSuffix,
+  sanitizeDesignChatContext,
+  type DesignChatContext,
+} from "@/lib/inpick/design-chat-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,7 +38,8 @@ JSON 스키마:
 }
 
 image_prompt 작성 규칙 (반드시 영문):
-- 첫 단어: "Photorealistic Korean apartment interior"
+- Step 1 공간 유형이 아파트면 "Photorealistic Korean apartment interior", 주택이면 "Photorealistic Korean house interior", 상업 공간이면 "Photorealistic Korean commercial interior"로 시작
+- Step 1 공간 유형이 없을 때만 "Photorealistic Korean apartment interior"를 기본값으로 사용
 - 공간/스타일/톤/특별요구사항 포함
 - "wide angle, eye level, natural daylight" 추가
 - "clear visible floor, walls, ceiling" 추가 (segmentation 정확도)
@@ -49,7 +56,10 @@ interface ChatMessage {
  * 사용자 채팅 텍스트 → 영문 image prompt (Claude 호출 실패 시 fallback).
  * 한국어 키워드를 영문 인테리어 키워드로 mapping.
  */
-function buildFallbackPrompt(userText: string): string {
+function buildFallbackPrompt(
+  userText: string,
+  context?: DesignChatContext,
+): string {
   const t = userText.toLowerCase();
   const styles: string[] = [];
   if (t.includes("모던") || t.includes("modern")) styles.push("modern minimal");
@@ -72,13 +82,22 @@ function buildFallbackPrompt(userText: string): string {
   if (t.includes("조명") || t.includes("lighting")) extras.push("layered warm lighting");
   if (t.includes("창") || t.includes("window")) extras.push("large window with natural light");
 
+  const prefix =
+    context?.projectMode === "commercial"
+      ? "Photorealistic Korean commercial interior"
+      : context?.buildingType === "house" || context?.residentialType === "house"
+        ? "Photorealistic Korean house interior"
+        : "Photorealistic Korean apartment interior";
+  const contextSuffix = buildImagePromptContextSuffix(context);
+
   return [
-    "Photorealistic Korean apartment interior",
+    prefix,
     styles.join(", "),
     tones.join(", "),
     extras.join(", "),
     "wide angle, eye level, natural daylight",
     "clear visible floor, walls, ceiling",
+    contextSuffix,
   ]
     .filter((s) => s && s.trim())
     .join(", ");
@@ -94,10 +113,15 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const { messages } = (await req.json()) as { messages?: ChatMessage[] };
+    const { messages, context: rawContext } = (await req.json()) as {
+      messages?: ChatMessage[];
+      context?: unknown;
+    };
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return NextResponse.json({ error: "messages 필수" }, { status: 400 });
     }
+
+    const context = sanitizeDesignChatContext(rawContext);
 
     // Anthropic은 messages가 user로 시작해야 함.
     // chatMessages 첫 항목이 assistant(정적 인사)면 제거.
@@ -132,6 +156,7 @@ export async function POST(req: NextRequest) {
     });
 
     // 가이드 v2 §5-3 — EXTRACTION_INSTRUCTION을 system으로 이동 + cache_control.
+    const step1Context = buildDesignChatSystemContext(context);
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -150,6 +175,16 @@ export async function POST(req: NextRequest) {
             text: EXTRACTION_INSTRUCTION,
             cache_control: { type: "ephemeral" },
           },
+          ...(step1Context
+            ? [
+                {
+                  type: "text",
+                  text:
+                    `${step1Context}\n` +
+                    "이미지 프롬프트에는 주소를 제외하고, 확인된 공간 유형·전체 전용면적·확장 여부·도면 구조를 반영하라.",
+                },
+              ]
+            : []),
         ],
         messages: normalized,
       }),
@@ -204,7 +239,7 @@ export async function POST(req: NextRequest) {
         .filter((m) => m.role === "user")
         .map((m) => m.content)
         .join(" ");
-      const fallbackPrompt = buildFallbackPrompt(userTexts);
+      const fallbackPrompt = buildFallbackPrompt(userTexts, context);
       console.warn(
         `[design-chat/extract] JSON 파싱 실패 — fallback prompt 생성 (raw 일부: ${text.slice(0, 200)})`,
       );
@@ -218,12 +253,18 @@ export async function POST(req: NextRequest) {
       });
     }
 
+    const contextSuffix = buildImagePromptContextSuffix(context);
+    const imagePrompt =
+      contextSuffix && !parsed.image_prompt.includes(contextSuffix)
+        ? `${parsed.image_prompt.trim()} ${contextSuffix}`
+        : parsed.image_prompt;
+
     return NextResponse.json({
       room_type: parsed.room_type || "living_room",
       area_sqm: typeof parsed.area_sqm === "number" ? parsed.area_sqm : 25,
       style: parsed.style || "modern",
       tone: parsed.tone || "warm wood",
-      image_prompt: parsed.image_prompt,
+      image_prompt: imagePrompt,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

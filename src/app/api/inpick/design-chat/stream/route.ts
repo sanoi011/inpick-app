@@ -10,6 +10,7 @@
  * 출력: SSE 'data: <chunk>\n\n' ... 'data: [DONE]\n\n'
  */
 import { NextRequest } from "next/server";
+import { buildDesignChatSystemContext } from "@/lib/inpick/design-chat-context";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -112,7 +113,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { messages } = (await request.json()) as { messages?: ChatMessage[] };
+    const { messages, context } = (await request.json()) as {
+      messages?: ChatMessage[];
+      context?: unknown;
+    };
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(
         JSON.stringify({ error: "messages 필수" }),
@@ -123,6 +127,7 @@ export async function POST(request: NextRequest) {
     // 가이드 v2 §5-3 — prompt caching (ephemeral 5분 TTL).
     // 시스템 프롬프트 (~600 tokens)를 캐싱 → 동일 사용자 5분 내 재호출 시 입력 90% 할인.
     // GA 이후 anthropic-version만으로 동작하지만, 안전하게 베타 헤더도 함께 전송.
+    const step1Context = buildDesignChatSystemContext(context);
     const upstream = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -140,6 +145,14 @@ export async function POST(request: NextRequest) {
             text: SYSTEM_PROMPT,
             cache_control: { type: "ephemeral" },
           },
+          ...(step1Context
+            ? [
+                {
+                  type: "text",
+                  text: step1Context,
+                },
+              ]
+            : []),
         ],
         stream: true,
         messages: messages.map((m) => ({ role: m.role, content: buildAnthropicContent(m) })),
