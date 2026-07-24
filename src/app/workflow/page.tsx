@@ -34,6 +34,8 @@ import {
   shouldAdoptLatestWorkflowProject,
   startFreshWorkflowSession,
   lightenWorkflowStep2,
+  parseWorkflowResetEvent,
+  WORKFLOW_RESET_EVENT_KEY,
 } from "@/lib/inpick/estimate-context/client";
 import { mergeRestoredDesigns } from "@/lib/inpick/workflow/restore-designs";
 
@@ -109,10 +111,13 @@ export default function WorkflowPage() {
   const [workflowReady, setWorkflowReady] = useState(false);
   const hydratedRef = useRef(false);
   const autoSaveMountedRef = useRef(false);
+  const skipNextAutoSaveRef = useRef(false);
+  const projectIdRef = useRef("");
+  const dbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const startQuickPhotoFlow = () => {
     if (!quickMode) return;
-    startFreshWorkflowSession();
+    projectIdRef.current = startFreshWorkflowSession();
     const pyeong = Math.max(5, Math.min(500, Math.round(quickPyeong || 24)));
     const exclusiveArea = Math.round(pyeong * 3.3058 * 10) / 10;
 
@@ -165,6 +170,7 @@ export default function WorkflowPage() {
         ? startFreshWorkflowSession()
         : getOrCreateWorkflowProjectId();
       let projectId = requestedProjectId || previousProjectId;
+      projectIdRef.current = projectId;
 
       // 프로젝트 id를 교체하기 전에 프로젝트별 캐시를 읽어야
       // 이전 프로젝트의 글로벌 키를 잘못 채택하지 않는다.
@@ -172,6 +178,7 @@ export default function WorkflowPage() {
       if (requestedProjectId && requestedProjectId !== previousProjectId) {
         clearActiveWorkflowSessionSnapshot();
         setWorkflowProjectId(requestedProjectId);
+        projectIdRef.current = requestedProjectId;
       }
 
       let s1 = cached?.step1
@@ -230,6 +237,8 @@ export default function WorkflowPage() {
             (Boolean(cached) || Boolean(requestedProjectId))
           ) {
             projectId = startFreshWorkflowSession();
+            projectIdRef.current = projectId;
+            skipNextAutoSaveRef.current = true;
             s1 = null;
             s2 = null;
             lastStep = 1;
@@ -258,6 +267,7 @@ export default function WorkflowPage() {
             if (latest?.id && latest.id !== projectId) {
               projectId = latest.id;
               setWorkflowProjectId(projectId);
+              projectIdRef.current = projectId;
               openedFromCompleteCache = false;
               dbRow = await fetchWorkflowState(projectId);
               outputsPromise = fetchDesignOutputs(projectId);
@@ -309,6 +319,36 @@ export default function WorkflowPage() {
     };
   }, []);
 
+  // 마이페이지가 다른 탭에서 프로젝트를 삭제해도 열린 Step2가 늦은 자동저장으로
+  // 삭제된 디자인을 되살리지 않게 즉시 새 세션으로 전환한다.
+  useEffect(() => {
+    const handleWorkflowReset = (event: StorageEvent) => {
+      if (event.key !== WORKFLOW_RESET_EVENT_KEY) return;
+      const reset = parseWorkflowResetEvent(event.newValue);
+      if (!reset) return;
+      const currentProjectId = projectIdRef.current;
+      if (
+        !reset.resetAll &&
+        (!currentProjectId || !reset.deletedProjectIds.includes(currentProjectId))
+      ) {
+        return;
+      }
+      if (dbSaveTimer.current) {
+        clearTimeout(dbSaveTimer.current);
+        dbSaveTimer.current = null;
+      }
+      skipNextAutoSaveRef.current = true;
+      projectIdRef.current = startFreshWorkflowSession();
+      setStep1(createInitialStep1());
+      setStep2(createInitialStep2());
+      setStep(1);
+      setNormalizeError(null);
+      setWorkflowReady(true);
+    };
+    window.addEventListener("storage", handleWorkflowReset);
+    return () => window.removeEventListener("storage", handleWorkflowReset);
+  }, []);
+
   // 디자인 단계에 있는 동안 다음 화면의 JS를 미리 받아 첫 전환을 빠르게 만든다.
   useEffect(() => {
     if (step === 2) router.prefetch("/workflow/estimate");
@@ -330,7 +370,6 @@ export default function WorkflowPage() {
   }, [step, workflowReady]);
 
   // 변경 시 자동 저장 — sessionStorage 즉시 + DB 디바운스 (P8)
-  const dbSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     // 복원 effect가 마운트 첫 passive-effect에서 state를 교체하는 동안
     // 초기 기본값이 프로젝트 캐시/DB를 덮어쓰지 못하게 첫 자동 저장은 건너뛴다.
@@ -338,9 +377,14 @@ export default function WorkflowPage() {
       autoSaveMountedRef.current = true;
       return;
     }
+    if (skipNextAutoSaveRef.current) {
+      skipNextAutoSaveRef.current = false;
+      return;
+    }
     if (!hydratedRef.current) return;
     const lightStep2 = lightenWorkflowStep2(step2);
-    const projectId = getOrCreateWorkflowProjectId();
+    const projectId = projectIdRef.current || getOrCreateWorkflowProjectId();
+    projectIdRef.current = projectId;
     if (projectId) {
       saveWorkflowSessionSnapshot({
         projectId,
@@ -441,7 +485,8 @@ export default function WorkflowPage() {
     // sessionStorage 저장 실패(Quota/프라이빗 모드)가 네비게이션을 막지 않도록 보호.
     // (step2에 base64 렌더 이미지가 많으면 QuotaExceeded로 throw → 견적요청 클릭이 먹통이 되던 버그)
     if (typeof window !== "undefined") {
-      const projectId = getOrCreateWorkflowProjectId();
+      const projectId = projectIdRef.current || getOrCreateWorkflowProjectId();
+      projectIdRef.current = projectId;
       if (projectId) {
         saveWorkflowSessionSnapshot({
           projectId,
@@ -601,7 +646,7 @@ export default function WorkflowPage() {
                         promptByRoom: {},
                       });
                       setStep(1);
-                      startFreshWorkflowSession();
+                      projectIdRef.current = startFreshWorkflowSession();
                       setNormalizeError(null);
                     }}
                   />

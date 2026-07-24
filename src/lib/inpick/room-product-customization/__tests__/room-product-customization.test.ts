@@ -81,6 +81,49 @@ test("실제 SKU 선택만 Prompt MD와 견적 매핑에 들어간다", () => {
   assert.deepEqual(listTargetSurfaces(customization), ["floor"]);
 });
 
+test("현재 source render에서 확정한 경계만 단일 부위 image-2 프롬프트에 들어간다", () => {
+  const customization: RoomProductCustomization = {
+    roomId: "living",
+    roomName: "거실",
+    roomKind: "living",
+    assemblyId: "room-products-living-render-a",
+    sourceRenderKey: "render-a",
+    regions: {
+      floor_finish: {
+        sourceRenderKey: "render-a",
+        polygon: [[0, 700], [1024, 700], [1024, 1024], [0, 1024]],
+        imageSize: [1024, 1024],
+        maskUrl: "https://example.supabase.co/storage/v1/object/public/renders/mask.png",
+        confidence: 0.94,
+        areaPixels: 331_776,
+        targetSurface: "floor",
+      },
+    },
+    selections: {
+      floor_finish: { partCode: "floor_finish", product: verifiedProduct },
+    },
+  };
+
+  const markdown = buildRoomProductPromptMarkdown(customization, "floor_finish");
+  assert.match(markdown, /attached SAM mask for floor/);
+  assert.match(markdown, /boundary source render: render-a/);
+  assert.match(markdown, /pixels outside the attached boundary as immutable/i);
+
+  const stale = {
+    ...customization,
+    regions: {
+      floor_finish: {
+        ...customization.regions!.floor_finish!,
+        sourceRenderKey: "render-before-a",
+      },
+    },
+  };
+  assert.throws(
+    () => buildRoomProductPromptMarkdown(stale, "floor_finish"),
+    /ROOM_PRODUCT_REGION_REQUIRED/,
+  );
+});
+
 test("SKU나 검증 시점이 없는 상품은 exact product 재생성에 사용할 수 없다", () => {
   const customization: RoomProductCustomization = {
     roomId: "bath",
@@ -148,6 +191,16 @@ test("선택 SKU로 image edit한 새 시안은 같은 선택을 새 source rend
     roomKind: "bathroom",
     assemblyId: "room-products-bath-render-a",
     sourceRenderKey: "render-a",
+    regions: {
+      toilet: {
+        sourceRenderKey: "render-a",
+        polygon: [[100, 100], [200, 100], [200, 300], [100, 300]],
+        imageSize: [1024, 1024],
+        confidence: 0.91,
+        areaPixels: 20_000,
+        targetSurface: "fixture",
+      },
+    },
     selections: {
       toilet: { partCode: "toilet", product: verifiedProduct },
     },
@@ -157,4 +210,5 @@ test("선택 SKU로 image edit한 새 시안은 같은 선택을 새 source rend
   assert.equal(carried.sourceRenderKey, "render-b");
   assert.equal(carried.assemblyId, original.assemblyId);
   assert.equal(carried.selections.toilet?.product.sku, "REAL-SKU-600-WH");
+  assert.equal(carried.regions?.toilet?.sourceRenderKey, "render-b");
 });

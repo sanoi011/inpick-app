@@ -611,7 +611,12 @@ function SamCategoryMaterialModal({
   onSelect: (category: InteriorCategory, material: CatalogMaterial) => void;
   initialCategory: SamSurfaceTarget;
 }) {
-  const category: InteriorCategory = initialCategory;
+  const category: InteriorCategory =
+    initialCategory === "counter" || initialCategory === "tile_wall"
+      ? "wall"
+      : initialCategory === "fixture"
+        ? "unknown"
+        : initialCategory;
   const [materials, setMaterials] = useState<CatalogMaterial[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedSku, setSelectedSku] = useState<string | null>(null);

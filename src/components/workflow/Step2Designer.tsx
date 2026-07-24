@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import {
@@ -46,6 +46,7 @@ import type { SegmentationData } from "@/types/segmentation";
 // P1: 이미지 생성 결과를 견적 evidence로 DB 저장 — workflow blocking 제거 핵심
 import {
   getOrCreateWorkflowProjectId,
+  isActiveWorkflowProjectId,
   saveDesignOutputAfterRender,
   lightenWorkflowStep2,
 } from "@/lib/inpick/estimate-context/client";
@@ -62,18 +63,24 @@ import {
   buildKitchenAssemblyRenderPrompt,
   type KitchenAssembly,
 } from "@/lib/inpick/kitchen-assembly";
-import RoomProductImageSelector from "./RoomProductImageSelector";
+import RoomProductImageSelector, {
+  type RoomProductRegenerationRequest,
+} from "./RoomProductImageSelector";
 import {
   bindRoomProductCustomizationToSource,
   buildRoomProductEstimateMapping,
   buildRoomProductPromptMarkdown,
   carryRoomProductCustomizationToSource,
   inferRoomProductKind,
-  listTargetSurfaces,
   type RoomCatalogProduct,
   type RoomProductCustomization,
   type RoomProductPartCode,
 } from "@/lib/inpick/room-product-customization";
+import {
+  requestLockedDesignView,
+  shouldRefreshLockedDesignView,
+  type LockedDesignView,
+} from "@/lib/inpick/locked-design/client-access";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
@@ -340,6 +347,30 @@ function renderUnlockKey(render: RenderItem, index: number): string {
   return render.timestamp || `render-${index}`;
 }
 
+async function buildRoomProductAlphaMask(
+  request: RoomProductRegenerationRequest,
+): Promise<string> {
+  const [width, height] = request.region.imageSize;
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const context = canvas.getContext("2d");
+  if (!context) throw new Error("선택 경계 마스크를 만들 수 없습니다.");
+
+  context.fillStyle = "rgba(255, 255, 255, 1)";
+  context.fillRect(0, 0, width, height);
+  context.globalCompositeOperation = "destination-out";
+  context.beginPath();
+  request.region.polygon.forEach(([x, y], index) => {
+    if (index === 0) context.moveTo(x, y);
+    else context.lineTo(x, y);
+  });
+  context.closePath();
+  context.fill();
+  context.globalCompositeOperation = "source-over";
+  return canvas.toDataURL("image/png");
+}
+
 function isRenderAccessible(
   roomKey: string,
   roomLabel: string | undefined,
@@ -514,6 +545,55 @@ export default function Step2Designer({
   const chatFileInputRef = useRef<HTMLInputElement>(null);
   const materialFileInputRef = useRef<HTMLInputElement>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const latestValueRef = useRef(value);
+  const lockedViewRequestsRef = useRef(
+    new Map<string, Promise<LockedDesignView>>(),
+  );
+  latestValueRef.current = value;
+
+  const refreshLockedRender = useCallback(
+    async (
+      roomKey: string,
+      renderIndex: number,
+      render: RenderItem,
+    ): Promise<string> => {
+      if (!render.lockedAssetId) return render.refinedUrl || render.url;
+      const assetId = render.lockedAssetId;
+      let request = lockedViewRequestsRef.current.get(assetId);
+      if (!request) {
+        request = requestLockedDesignView(assetId);
+        lockedViewRequestsRef.current.set(assetId, request);
+      }
+      try {
+        const view = await request;
+        const latest = latestValueRef.current;
+        const roomRenders = [...(latest.rendersByRoom[roomKey] || [])];
+        const current = roomRenders[renderIndex];
+        if (current?.lockedAssetId === assetId) {
+          roomRenders[renderIndex] = {
+            ...current,
+            url: view.url,
+            accessState: "unlocked",
+            entitlementGranted: true,
+            viewExpiresAt: view.expiresAt,
+          };
+          const nextValue: Step2Data = {
+            ...latest,
+            rendersByRoom: {
+              ...latest.rendersByRoom,
+              [roomKey]: roomRenders,
+            },
+          };
+          latestValueRef.current = nextValue;
+          onChange(nextValue);
+        }
+        return view.url;
+      } finally {
+        lockedViewRequestsRef.current.delete(assetId);
+      }
+    },
+    [onChange],
+  );
 
   // 부모(value)와 sync — 페이지 이탈 후 복원용. 단, 매 chunk마다 X (debounce).
   useEffect(() => {
@@ -800,6 +880,52 @@ export default function Step2Designer({
         selectedIdx,
         value.unlockedRenderKeys,
       ));
+  useEffect(() => {
+    if (
+      !activeRenderUnlocked ||
+      selectedIdx == null ||
+      !activeRender?.lockedAssetId
+    ) {
+      return;
+    }
+    const refresh = () => {
+      void refreshLockedRender(activeRoom, selectedIdx, activeRender).catch(
+        (error) => {
+          setErrorMsg(
+            error instanceof Error
+              ? error.message
+              : "결제한 이미지의 열람 주소를 갱신하지 못했습니다.",
+          );
+        },
+      );
+    };
+    if (shouldRefreshLockedDesignView(activeRender.viewExpiresAt)) {
+      refresh();
+      return;
+    }
+    const refreshAt =
+      Date.parse(activeRender.viewExpiresAt || "") - Date.now() - 60_000;
+    const timer = window.setTimeout(refresh, Math.max(1_000, refreshAt));
+    return () => window.clearTimeout(timer);
+  }, [
+    activeRender,
+    activeRenderUnlocked,
+    activeRoom,
+    refreshLockedRender,
+    selectedIdx,
+  ]);
+  const recoverActiveRenderImage = () => {
+    if (selectedIdx == null || !activeRender?.lockedAssetId) return;
+    void refreshLockedRender(activeRoom, selectedIdx, activeRender).catch(
+      (error) => {
+        setErrorMsg(
+          error instanceof Error
+            ? error.message
+            : "결제한 이미지의 열람 주소를 갱신하지 못했습니다.",
+        );
+      },
+    );
+  };
   const hasGenerated = renders.length > 0;
   const allRoomsDecided = realRoomTabs.every((t) => (value.rendersByRoom[t.v] || []).length > 0);
   const firstGeneratedRoom = availableTabs.find(
@@ -837,8 +963,14 @@ export default function Step2Designer({
     const draft: Record<string, number> = {};
     for (const room of finalSelectionRooms) {
       const selected = value.selectedByRoom[room.key];
+      const selectedStillAvailable = room.renders.some(
+        (render, index) => (render.selectionIndex ?? index) === selected,
+      );
       draft[room.key] =
-        selected != null && room.renders[selected] ? selected : Math.max(0, room.renders.length - 1);
+        selected != null && selectedStillAvailable
+          ? selected
+          : room.renders[room.renders.length - 1]?.selectionIndex ??
+            Math.max(0, room.renders.length - 1);
     }
     setFinalSelectionDraft(draft);
     setEstimateTransitionError(null);
@@ -850,13 +982,19 @@ export default function Step2Designer({
     const finalSelectedImageUrlsByRoom: Record<string, string> = {};
     for (const room of finalSelectionRooms) {
       const selectedIndex = confirmedDraft[room.key];
-      const render = room.renders[selectedIndex];
+      const render =
+        room.renders.find(
+          (candidate, index) =>
+            (candidate.selectionIndex ?? index) === selectedIndex,
+        ) ?? room.renders[selectedIndex];
       if (!render) {
         setEstimateTransitionError(`${room.label}의 최종 이미지를 1장 선택해주세요.`);
         return;
       }
       selectedByRoom[room.key] = selectedIndex;
-      finalSelectedImageUrlsByRoom[room.key] = render.refinedUrl || render.url;
+      finalSelectedImageUrlsByRoom[room.key] = render.lockedAssetId
+        ? await refreshLockedRender(room.key, selectedIndex, render)
+        : render.refinedUrl || render.url;
     }
     const finalValue: Step2Data = {
       ...value,
@@ -1139,6 +1277,168 @@ export default function Step2Designer({
     setPendingAttachments((prev) => prev.filter((_, i) => i !== idx));
   };
 
+  const handleRoomProductBoundaryEdit = async (
+    request: RoomProductRegenerationRequest,
+    roomKey: string,
+    roomLabel: string,
+  ) => {
+    if (generating || chatStreaming) {
+      throw new Error("다른 이미지 작업이 끝난 뒤 다시 시도해 주세요.");
+    }
+    if (tokenBalance < 2) {
+      setInsufficientOpen(true);
+      throw new Error("선택 경계 재생성에는 2토큰이 필요합니다.");
+    }
+
+    const workflowProjectId = getOrCreateWorkflowProjectId();
+    const startValue = latestValueRef.current;
+    const startRenders = startValue.rendersByRoom[roomKey] || [];
+    const sourceIndex =
+      startValue.selectedByRoom[roomKey] ??
+      (startRenders.length > 0 ? startRenders.length - 1 : null);
+    const sourceRender = sourceIndex != null ? startRenders[sourceIndex] : null;
+    if (!sourceRender || sourceIndex == null) {
+      throw new Error("제품을 적용할 원본 시안을 찾지 못했습니다.");
+    }
+    const sourceRenderKey = renderUnlockKey(sourceRender, sourceIndex);
+    if (
+      !startValue.roomProductCustomizations?.[roomKey] ||
+      request.region.sourceRenderKey !== sourceRenderKey
+    ) {
+      throw new Error(
+        "선택 경계가 현재 시안과 다릅니다. 현재 이미지에서 경계를 다시 선택해 주세요.",
+      );
+    }
+
+    setGenerating(true);
+    setErrorMsg(null);
+    try {
+      let sourceUrl = sourceRender.refinedUrl || sourceRender.url;
+      if (!sourceRender.refinedUrl && sourceRender.lockedAssetId) {
+        sourceUrl = await refreshLockedRender(roomKey, sourceIndex, sourceRender);
+      }
+      const maskBase64 = request.region.maskUrl
+        ? "server-will-use-selection-mask"
+        : await buildRoomProductAlphaMask(request);
+      const response = await fetch("/api/inpick/refine-render", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalImageUrl: sourceUrl,
+          maskBase64,
+          selectionMaskUrl: request.region.maskUrl,
+          prompt: request.promptMarkdown,
+          roomName: roomLabel,
+          styleHint: sourceRender.prompt,
+          regionCategoryEn: request.targetSurface,
+          materialName: request.product.displayName,
+          materialProductId: request.product.materialProductId,
+          quality: "medium",
+        }),
+      });
+      const data = (await response.json()) as {
+        imageUrl?: string;
+        costUsd?: number;
+        model?: string;
+        error?: string;
+        hint?: string;
+      };
+      if (!response.ok || !data.imageUrl) {
+        throw new Error(data.hint || data.error || "선택 경계 이미지 생성에 실패했습니다.");
+      }
+
+      void saveDesignOutputAfterRender({
+        projectId: workflowProjectId,
+        projectMode: currentProjectMode,
+        targetType: currentProjectMode === "commercial" ? "zone" : "surface",
+        targetId: roomKey,
+        targetName: roomLabel,
+        renderKind: "surface_render",
+        imageUrl: data.imageUrl,
+        prompt: request.promptMarkdown,
+      });
+
+      if (!isActiveWorkflowProjectId(workflowProjectId)) {
+        throw new Error(
+          "생성 중 새 프로젝트가 시작되어 결과를 이전 프로젝트와 분리했습니다.",
+        );
+      }
+
+      const latest = latestValueRef.current;
+      const latestRenders = [...(latest.rendersByRoom[roomKey] || [])];
+      const persistedSourceIndex = latestRenders.findIndex(
+        (render, index) => renderUnlockKey(render, index) === sourceRenderKey,
+      );
+      if (persistedSourceIndex < 0) {
+        throw new Error(
+          "원본 시안이 변경되어 생성 결과를 현재 작업에 섞지 않았습니다.",
+        );
+      }
+      const latestSelectedIndex =
+        latest.selectedByRoom[roomKey] ??
+        (latestRenders.length > 0 ? latestRenders.length - 1 : null);
+      const latestSelectedRender =
+        latestSelectedIndex != null ? latestRenders[latestSelectedIndex] : null;
+      const sourceStillSelected =
+        latestSelectedRender != null &&
+        latestSelectedIndex != null &&
+        renderUnlockKey(latestSelectedRender, latestSelectedIndex) === sourceRenderKey;
+
+      const editedRender: RenderItem = {
+        url: data.imageUrl,
+        prompt: request.promptMarkdown,
+        revisedPrompt: request.promptMarkdown,
+        costUsd: data.costUsd ?? 0.04,
+        timestamp: new Date().toISOString(),
+        metadata: sourceRender.metadata,
+      };
+      latestRenders.push(editedRender);
+      const nextIndex = latestRenders.length - 1;
+      const editedRenderKey = renderUnlockKey(editedRender, nextIndex);
+      const currentCustomization = latest.roomProductCustomizations?.[roomKey];
+      const carriedCustomization =
+        sourceStillSelected &&
+        currentCustomization?.sourceRenderKey === sourceRenderKey
+          ? carryRoomProductCustomizationToSource(
+              currentCustomization,
+              editedRenderKey,
+            )
+          : undefined;
+      const nextValue: Step2Data = {
+        ...latest,
+        rendersByRoom: {
+          ...latest.rendersByRoom,
+          [roomKey]: latestRenders,
+        },
+        selectedByRoom: sourceStillSelected
+          ? { ...latest.selectedByRoom, [roomKey]: nextIndex }
+          : latest.selectedByRoom,
+        roomProductCustomizations: {
+          ...(latest.roomProductCustomizations || {}),
+          ...(carriedCustomization
+            ? { [roomKey]: carriedCustomization }
+            : {}),
+        },
+        generations: {
+          ...latest.generations,
+          [roomKey]: (latest.generations[roomKey] ?? 0) + 1,
+        },
+        unlockedRenderKeys: {
+          ...(latest.unlockedRenderKeys || {}),
+          [roomKey]: [
+            ...(latest.unlockedRenderKeys?.[roomKey] || []),
+            editedRenderKey,
+          ],
+        },
+      };
+      latestValueRef.current = nextValue;
+      onChange(nextValue);
+    } finally {
+      setGenerating(false);
+      await onTokensChanged?.();
+    }
+  };
+
   const handlePromptImageEdit = async (
     editPrompt: string,
     roomKey: string,
@@ -1155,6 +1455,7 @@ export default function Step2Designer({
       setInsufficientOpen(true);
       return;
     }
+    const workflowProjectId = getOrCreateWorkflowProjectId();
 
     const userMessage: ChatMessage = { role: "user", content: editPrompt };
     const workingMessage: ChatMessage = {
@@ -1170,7 +1471,20 @@ export default function Step2Designer({
     setChatStreaming(true);
 
     try {
-      const sourceUrl = sourceRender.refinedUrl || sourceRender.url;
+      let sourceUrl = sourceRender.refinedUrl || sourceRender.url;
+      if (
+        !sourceRender.refinedUrl &&
+        sourceRender.lockedAssetId &&
+        roomSelectedIndex != null
+      ) {
+        // private 실 이미지는 짧은 signed URL을 사용한다. 제품 재시안 생성 직전에
+        // grant를 재사용해 새 URL을 발급받아 만료된 원본으로 edits API가 실패하지 않게 한다.
+        sourceUrl = await refreshLockedRender(
+          roomKey,
+          roomSelectedIndex,
+          sourceRender,
+        );
+      }
       const response = await fetch("/api/inpick/render-space-edit", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1181,7 +1495,7 @@ export default function Step2Designer({
           targetSurfaces: targetSurfaces.length > 0 ? targetSurfaces : undefined,
           analyzeSurfaces: false,
           quality: "low",
-          projectId: getOrCreateWorkflowProjectId(),
+          projectId: workflowProjectId,
           targetId: roomKey,
           targetNameKo: roomLabel,
           spaceType: roomLabel,
@@ -1245,6 +1559,7 @@ export default function Step2Designer({
       setChatMessages(nextMessages);
       onChange(nextValue);
       void saveDesignOutputAfterRender({
+        projectId: workflowProjectId,
         projectMode: currentProjectMode,
         targetType: currentProjectMode === "commercial" ? "zone" : "room",
         targetId: roomKey,
@@ -1505,6 +1820,7 @@ export default function Step2Designer({
           next.generations[targetKey] = (next.generations[targetKey] ?? 0) + 1;
           if (!data.asset && data.imageUrl) {
             void saveDesignOutputAfterRender({
+              projectId,
               projectMode: currentProjectMode,
               targetType: currentProjectMode === "commercial" ? "zone" : "room",
               targetId: targetKey,
@@ -1596,6 +1912,7 @@ export default function Step2Designer({
       setInsufficientOpen(true);
       return;
     }
+    const workflowProjectId = getOrCreateWorkflowProjectId();
 
     setGenerating(true);
     try {
@@ -1664,6 +1981,7 @@ export default function Step2Designer({
       };
       // P1: 견적 evidence 저장 (실패해도 워크플로 막지 않음)
       void saveDesignOutputAfterRender({
+        projectId: workflowProjectId,
         projectMode: currentProjectMode,
         targetType: currentProjectMode === "commercial" ? "zone" : "room",
         targetId: activeRoom,
@@ -1731,6 +2049,7 @@ export default function Step2Designer({
     setErrorMsg(null);
     setGenerating(true);
     setBulkProgress({ current: 0, total: emptyTabs.length, roomLabel: "" });
+    const workflowProjectId = getOrCreateWorkflowProjectId();
     try {
       // 가이드 Q3 — 직렬 호출 (Promise.allSettled 동시 호출 → rate limit 위험 → 직렬화)
       // 가이드 Q2 — 일괄은 quality "low" (1차 미리보기 — 빠름 + 저비용)
@@ -1778,7 +2097,7 @@ export default function Step2Designer({
             lockedDelivery: tabIsLiving
               ? undefined
               : {
-                  projectId: getOrCreateWorkflowProjectId(),
+                  projectId: workflowProjectId,
                   projectMode: "apartment",
                   targetType: "room",
                   targetId: tab.v,
@@ -1819,6 +2138,7 @@ export default function Step2Designer({
             });
             // 잠긴 결과는 private 등록 과정에서 design_output도 함께 생성된다.
             if (!result.lockedAsset) void saveDesignOutputAfterRender({
+              projectId: workflowProjectId,
               projectMode: currentProjectMode,
               targetType: currentProjectMode === "commercial" ? "zone" : "room",
               targetId: tab.v,
@@ -2852,6 +3172,7 @@ export default function Step2Designer({
                     src={activeRender.refinedUrl || activeRender.url}
                     alt="previous"
                     className="absolute inset-0 w-full h-full object-cover opacity-20 blur-sm scale-110"
+                    onError={recoverActiveRenderImage}
                   />
                 )}
                 {/* shimmer 오버레이 */}
@@ -2953,6 +3274,7 @@ export default function Step2Designer({
                   src={activeRender.refinedUrl || activeRender.url}
                   alt="design"
                   className="absolute inset-0 w-full h-full object-cover"
+                  onError={recoverActiveRenderImage}
                 />
                 {activeRender.refinedUrl && (
                   <div className="absolute top-3 left-3 rounded-full bg-black px-2.5 py-1 text-[0.7rem] font-bold text-white shadow">
@@ -3058,6 +3380,7 @@ export default function Step2Designer({
                 src={activeRender.refinedUrl || activeRender.url}
                 alt="mini"
                 className="absolute inset-0 w-full h-full object-cover"
+                onError={recoverActiveRenderImage}
               />
               <div className="absolute top-1 right-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-white/90 text-black">
                 <Maximize2 className="h-2.5 w-2.5" />
@@ -3149,14 +3472,12 @@ export default function Step2Designer({
             onChange={updateRoomProductCustomization}
             searchCatalog={searchRoomProductCatalog}
             disabled={generating}
-            onRegenerate={async () => {
-              const promptMarkdown = buildRoomProductPromptMarkdown(activeRoomProductCustomization);
-              if (!promptMarkdown) throw new Error("재생성할 실제 SKU를 먼저 선택해주세요.");
-              await handlePromptImageEdit(
-                promptMarkdown,
+            onImageError={recoverActiveRenderImage}
+            onRegenerate={async (request) => {
+              await handleRoomProductBoundaryEdit(
+                request,
                 activeRoom,
                 activeRoomName,
-                listTargetSurfaces(activeRoomProductCustomization),
               );
             }}
           />
@@ -3273,6 +3594,18 @@ export default function Step2Designer({
             setFinalSelectionDraft((current) => ({ ...current, [roomKey]: renderIndex }))
           }
           onClose={() => setFinalSelectionOpen(false)}
+          onImageError={(roomKey, renderIndex, render) => {
+            if (!render.lockedAssetId) return;
+            void refreshLockedRender(roomKey, renderIndex, render).catch(
+              (error) => {
+                setEstimateTransitionError(
+                  error instanceof Error
+                    ? error.message
+                    : "결제한 이미지의 열람 주소를 갱신하지 못했습니다.",
+                );
+              },
+            );
+          }}
           onConfirm={(confirmedDraft) => void confirmFinalSelection(confirmedDraft)}
         />
       )}
@@ -3320,16 +3653,27 @@ function FinalDesignSelectionModal({
   selectedByRoom,
   onSelect,
   onClose,
+  onImageError,
   onConfirm,
 }: {
   rooms: Array<{ key: string; label: string; renders: RenderItem[] }>;
   selectedByRoom: Record<string, number>;
   onSelect: (roomKey: string, renderIndex: number) => void;
   onClose: () => void;
+  onImageError: (
+    roomKey: string,
+    renderIndex: number,
+    render: RenderItem,
+  ) => void;
   onConfirm: (selectedByRoom: Record<string, number>) => void;
 }) {
   if (typeof document === "undefined") return null;
-  const ready = rooms.every((room) => room.renders[selectedByRoom[room.key]]);
+  const ready = rooms.every((room) =>
+    room.renders.some(
+      (render, index) =>
+        (render.selectionIndex ?? index) === selectedByRoom[room.key],
+    ),
+  );
 
   return createPortal(
     <>
@@ -3394,6 +3738,13 @@ function FinalDesignSelectionModal({
                         src={render.refinedUrl || render.url}
                         alt={`${room.label} 시안 ${renderIndex + 1}`}
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                        onError={() =>
+                          onImageError(
+                            room.key,
+                            render.selectionIndex ?? renderIndex,
+                            render,
+                          )
+                        }
                       />
                       <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[0.65rem] font-semibold text-white backdrop-blur-sm">
                         시안 {renderIndex + 1}

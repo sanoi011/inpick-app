@@ -11,7 +11,10 @@ import { toast } from "@/components/ui/Toast";
 import { SkeletonProjectCard } from "@/components/ui/Skeleton";
 import { ProjectProgress } from "@/components/ui/ProjectProgress";
 import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
-import { clearDeletedWorkflowProjects } from "@/lib/inpick/estimate-context/client";
+import {
+  clearAllWorkflowProjects,
+  clearDeletedWorkflowProjects,
+} from "@/lib/inpick/estimate-context/client";
 import {
   CONSUMER_PROJECT_STATUS_LABELS,
   CONSUMER_PROJECT_STATUS_COLORS,
@@ -106,7 +109,11 @@ export default function MyPageProjects() {
       }
       // localStorage 삭제
       localStorage.removeItem(`inpick_project_${id}`);
-      clearDeletedWorkflowProjects([id]);
+      if (projects.every((project) => project.id === id)) {
+        clearAllWorkflowProjects();
+      } else {
+        clearDeletedWorkflowProjects([id]);
+      }
       setProjects((prev) => prev.filter((p) => p.id !== id));
       toast({ type: "success", title: "삭제 완료", message: "프로젝트가 삭제되었습니다" });
     } catch {
@@ -159,7 +166,15 @@ export default function MyPageProjects() {
       for (const id of locallyDeletableIds) {
         try { localStorage.removeItem(`inpick_project_${id}`); } catch { /* ignore */ }
       }
-      clearDeletedWorkflowProjects(locallyDeletableIds);
+      const deletedIdSet = new Set(locallyDeletableIds);
+      if (
+        locallyDeletableIds.length > 0 &&
+        projects.every((project) => deletedIdSet.has(project.id))
+      ) {
+        clearAllWorkflowProjects();
+      } else {
+        clearDeletedWorkflowProjects(locallyDeletableIds);
+      }
       setProjects((prev) => prev.filter((p) => !locallyDeletableIds.includes(p.id)));
       if (locallyDeletableIds.length > 0) {
         toast({

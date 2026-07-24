@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 
 import {
+  clearAllWorkflowProjects,
   clearDeletedWorkflowProjects,
   fetchWorkflowState,
   isActiveWorkflowProjectId,
@@ -13,6 +14,8 @@ import {
   saveWorkflowState,
   shouldAdoptLatestWorkflowProject,
   startFreshWorkflowSession,
+  parseWorkflowResetEvent,
+  WORKFLOW_RESET_EVENT_KEY,
 } from "../client";
 
 class MemoryStorage implements Storage {
@@ -207,6 +210,48 @@ test("deleting another project preserves the active workflow", () => {
   assert.equal(local.getItem("workflow_project_id"), "project-active");
   assert.equal(session.getItem("workflow_snapshot:project-old"), null);
   assert.notEqual(session.getItem("workflow_step2"), null);
+});
+
+test("deleting the final account project clears orphan Step2 snapshots regardless of active id", () => {
+  local.setItem("workflow_project_id", "orphan-active-project");
+  session.setItem("workflow_step1", JSON.stringify({ name: "old" }));
+  session.setItem(
+    "workflow_step2",
+    JSON.stringify({ rendersByRoom: { kitchen: [{ url: "expired-image" }] } }),
+  );
+  session.setItem(
+    "workflow_snapshot:deleted-listed-project",
+    JSON.stringify({ projectId: "deleted-listed-project" }),
+  );
+  session.setItem(
+    "workflow_snapshot:orphan-active-project",
+    JSON.stringify({ projectId: "orphan-active-project" }),
+  );
+
+  const nextProjectId = clearAllWorkflowProjects("brand-new-project");
+
+  assert.equal(nextProjectId, "brand-new-project");
+  assert.equal(local.getItem("workflow_project_id"), "brand-new-project");
+  assert.equal(session.getItem("workflow_step1"), null);
+  assert.equal(session.getItem("workflow_step2"), null);
+  assert.equal(session.getItem("workflow_snapshot:deleted-listed-project"), null);
+  assert.equal(session.getItem("workflow_snapshot:orphan-active-project"), null);
+  assert.deepEqual(
+    parseWorkflowResetEvent(local.getItem(WORKFLOW_RESET_EVENT_KEY)),
+    {
+      deletedProjectIds: [
+        "orphan-active-project",
+        "deleted-listed-project",
+      ],
+      resetAll: true,
+      emittedAt: parseWorkflowResetEvent(
+        local.getItem(WORKFLOW_RESET_EVENT_KEY),
+      )?.emittedAt,
+      nonce: parseWorkflowResetEvent(
+        local.getItem(WORKFLOW_RESET_EVENT_KEY),
+      )?.nonce,
+    },
+  );
 });
 
 test("locked room snapshots never persist original or refined image URLs", () => {

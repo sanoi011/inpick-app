@@ -1,5 +1,6 @@
 import type { SurfaceType } from "../editable-render/types";
 import { materialProductCategoryCodes } from "../material-product-category-codes";
+import type { SamSurfaceTarget } from "../sam-surface-prompts";
 
 export type RoomProductKind =
   | "living"
@@ -66,13 +67,26 @@ export interface RoomProductSelection {
   quantity?: number;
 }
 
+export interface RoomProductRegionSelection {
+  /** 경계가 추출된 생성 이미지. 다른 시안의 마스크가 섞이지 않게 하는 식별자 */
+  sourceRenderKey: string;
+  /** SAM native pixel polygon */
+  polygon: number[][];
+  imageSize: [number, number];
+  maskUrl?: string;
+  confidence: number;
+  areaPixels: number;
+  targetSurface: SamSurfaceTarget;
+}
+
 export interface RoomProductCustomization {
   roomId: string;
   roomName: string;
   roomKind: RoomProductKind;
   assemblyId: string;
-  /** 선택과 화살표가 어느 생성 이미지 시안에 결합됐는지 식별한다. */
+  /** 선택과 경계 마스크가 어느 생성 이미지 시안에 결합됐는지 식별한다. */
   sourceRenderKey?: string;
+  regions?: Partial<Record<RoomProductPartCode, RoomProductRegionSelection>>;
   selections: Partial<Record<RoomProductPartCode, RoomProductSelection>>;
 }
 
@@ -103,6 +117,7 @@ export function bindRoomProductCustomizationToSource(
     ...customization,
     sourceRenderKey,
     assemblyId: `room-products-${customization.roomId}-${renderKeySuffix(sourceRenderKey)}`,
+    regions: {},
     selections: {},
   };
 }
@@ -113,7 +128,16 @@ export function carryRoomProductCustomizationToSource(
   sourceRenderKey: string,
 ): RoomProductCustomization {
   if (!sourceRenderKey || customization.sourceRenderKey === sourceRenderKey) return customization;
-  return { ...customization, sourceRenderKey };
+  return {
+    ...customization,
+    sourceRenderKey,
+    regions: Object.fromEntries(
+      Object.entries(customization.regions || {}).map(([partCode, region]) => [
+        partCode,
+        region ? { ...region, sourceRenderKey } : region,
+      ]),
+    ),
+  };
 }
 
 export interface RoomProductPartDefinition {
@@ -124,7 +148,7 @@ export interface RoomProductPartDefinition {
   categoryCodes: readonly string[];
   estimateUnit: "m" | "m²" | "ea" | "set";
   defaultQuantity: number;
-  /** normalized image coordinate: target = arrow head, label = callout origin */
+  /** legacy 좌표. UI는 고정 화살표 대신 사용자가 확정한 SAM 경계를 사용한다. */
   target: { x: number; y: number };
   label: { x: number; y: number };
 }
@@ -241,26 +265,52 @@ function assertVerifiedSku(product: RoomCatalogProduct): asserts product is Room
   }
 }
 
-export function buildRoomProductPromptMarkdown(customization: RoomProductCustomization): string {
+export function buildRoomProductPromptMarkdown(
+  customization: RoomProductCustomization,
+  onlyPartCode?: RoomProductPartCode,
+): string {
   const selected = getRoomProductParts(customization.roomKind).flatMap((definition) => {
+    if (onlyPartCode && definition.partCode !== onlyPartCode) return [];
     const selection = customization.selections[definition.partCode];
     if (!selection) return [];
     if (selection.partCode !== definition.partCode) throw new Error("ROOM_PRODUCT_PART_MISMATCH");
     assertVerifiedSku(selection.product);
-    return [{ definition, selection }];
+    const region = customization.regions?.[definition.partCode];
+    if (
+      onlyPartCode &&
+      (!region ||
+        !customization.sourceRenderKey ||
+        region.sourceRenderKey !== customization.sourceRenderKey)
+    ) {
+      throw new Error("ROOM_PRODUCT_REGION_REQUIRED");
+    }
+    return [{ definition, selection, region }];
   });
   if (selected.length === 0) return "";
 
-  const lines = selected.flatMap(({ definition, selection }) => [
-    `### ${definition.labelKo} (${definition.partCode})`,
-    `- materialProductId: ${selection.product.materialProductId}`,
-    `- product: ${selection.product.displayName}`,
-    `- brand: ${selection.product.brand || "not provided"}`,
-    `- SKU: ${selection.product.sku}`,
-    `- specification: ${selection.product.spec || "not provided"}`,
-    `- verified source: ${selection.product.provenance.reference}`,
-    `- verified at: ${selection.product.provenance.verifiedAt}`,
-  ]);
+  const lines = selected.flatMap(({ definition, selection, region }) => {
+    const coverage = region
+      ? ((region.areaPixels / Math.max(1, region.imageSize[0] * region.imageSize[1])) * 100).toFixed(2)
+      : null;
+    return [
+      `### ${definition.labelKo} (${definition.partCode})`,
+      `- materialProductId: ${selection.product.materialProductId}`,
+      `- product: ${selection.product.displayName}`,
+      `- brand: ${selection.product.brand || "not provided"}`,
+      `- SKU: ${selection.product.sku}`,
+      `- specification: ${selection.product.spec || "not provided"}`,
+      `- verified source: ${selection.product.provenance.reference}`,
+      `- verified at: ${selection.product.provenance.verifiedAt}`,
+      ...(onlyPartCode && region
+        ? [
+            `- edit boundary: attached SAM mask for ${region.targetSurface}`,
+            `- boundary confidence: ${region.confidence.toFixed(4)}`,
+            `- boundary coverage: ${coverage}% of source image`,
+            `- boundary source render: ${region.sourceRenderKey}`,
+          ]
+        : []),
+    ];
+  });
 
   return [
     "# InPick Product Restyle",
@@ -275,7 +325,12 @@ export function buildRoomProductPromptMarkdown(customization: RoomProductCustomi
     "",
     "## Image edit instructions",
     "- Preserve the current room geometry, perspective, camera position, openings, ceiling height, and unselected objects.",
-    "- Restyle only the selected parts using the listed product facts; never invent or substitute a SKU.",
+    onlyPartCode
+      ? "- Restyle only the pixels inside the attached SAM boundary using the listed product facts; never invent or substitute a SKU."
+      : "- Restyle only the named parts using the listed product facts; never invent or substitute a SKU.",
+    onlyPartCode
+      ? "- Treat pixels outside the attached boundary as immutable source pixels."
+      : "- Preserve every unselected surface and object.",
     "- Match the listed product's documented material, color, finish, proportions, and visible details as closely as the source facts allow.",
     "- Keep every listed part as an independent selection and do not merge products.",
     "- Produce a clean photorealistic interior image without arrows, labels, text, watermarks, or logos.",

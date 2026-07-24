@@ -29,6 +29,31 @@ export const SAM_SURFACE_TARGETS = {
     concept:
       "curtain or blind fabric only, excluding window, wall, curtain rail and surrounding furniture",
   },
+  tile_wall: {
+    labelKo: "벽 타일",
+    concept:
+      "visible wall tile finish only, excluding floor tile, sanitary fixtures, mirrors, doors and ceiling",
+  },
+  cabinet: {
+    labelKo: "수납장",
+    concept:
+      "the clicked cabinet body and door fronts only, excluding wall, countertop, appliances and adjacent cabinets",
+  },
+  counter: {
+    labelKo: "상판",
+    concept:
+      "the visible countertop slab only, excluding backsplash, sink, faucet, cabinet fronts and appliances",
+  },
+  fixture: {
+    labelKo: "설비·기기",
+    concept:
+      "the clicked sanitary fixture, faucet, appliance or hardware object only, excluding adjacent finishes and furniture",
+  },
+  lighting: {
+    labelKo: "조명",
+    concept:
+      "the clicked lighting fixture only, excluding ceiling, surrounding trim and reflected light",
+  },
 } as const;
 
 export type SamSurfaceTarget = keyof typeof SAM_SURFACE_TARGETS;

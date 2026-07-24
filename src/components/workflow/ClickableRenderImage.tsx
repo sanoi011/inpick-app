@@ -32,6 +32,14 @@ interface Props {
   initialMode?: "view" | "select";
   /** 추가 안내 텍스트 */
   hint?: string;
+  /** 바깥 UI에서 이미 부위를 정한 SKU 선택 흐름 */
+  fixedTargetSurface?: SamSurfaceTarget;
+  /** 현재 source render에 저장된 경계 */
+  initialSelection?: SamPolygonResult | null;
+  confirmLabel?: string;
+  onImageError?: () => void;
+  imageAlt?: string;
+  targetOptions?: readonly SamSurfaceTarget[];
 }
 
 type Mode = "view" | "select";
@@ -40,6 +48,15 @@ interface RefinePoints {
   positive: SamPoint[];
   negative: SamPoint[];
 }
+
+const DEFAULT_TARGET_OPTIONS: readonly SamSurfaceTarget[] = [
+  "floor",
+  "wall",
+  "ceiling",
+  "window",
+  "door",
+  "curtain",
+];
 
 /**
  * SAM 마스크는 흑백 PNG라 alpha 채널이 이미지 전체에 존재한다.
@@ -123,10 +140,18 @@ export default function ClickableRenderImage({
   onConfirm,
   initialMode = "view",
   hint,
+  fixedTargetSurface,
+  initialSelection = null,
+  confirmLabel = "선택 경계 확인 · 자재 고르기",
+  onImageError,
+  imageAlt = "design",
+  targetOptions = DEFAULT_TARGET_OPTIONS,
 }: Props) {
   const [mode, setMode] = useState<Mode>(initialMode);
-  const [targetSurface, setTargetSurface] = useState<SamSurfaceTarget>("floor");
-  const [selected, setSelected] = useState<SamPolygonResult | null>(null);
+  const [targetSurface, setTargetSurface] = useState<SamSurfaceTarget>(
+    fixedTargetSurface || "floor",
+  );
+  const [selected, setSelected] = useState<SamPolygonResult | null>(initialSelection);
   const [candidateOptions, setCandidateOptions] = useState<SamPolygonResult[]>([]);
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [recommendedCandidateIndex, setRecommendedCandidateIndex] = useState(0);
@@ -248,33 +273,40 @@ export default function ClickableRenderImage({
     <div className="space-y-3">
       {/* 모드 토글 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="inline-flex items-center gap-0.5 rounded-full border border-black/10 bg-white p-0.5 text-[0.7rem] font-bold">
-          <button
-            type="button"
-            onClick={() => {
-              setMode("view");
-              handleReset();
-            }}
-            className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
-              mode === "view"
-                ? "bg-black text-white"
-                : "text-black/60 hover:text-black"
-            }`}
-          >
-            <Eye className="h-3 w-3" /> 보기
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("select")}
-            className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
-              mode === "select"
-                ? "bg-black text-white"
-                : "text-black/60 hover:text-black"
-            }`}
-          >
-            <Crosshair className="h-3 w-3" /> 부위 선택
-          </button>
-        </div>
+        {!fixedTargetSurface ? (
+          <div className="inline-flex items-center gap-0.5 rounded-full border border-black/10 bg-white p-0.5 text-[0.7rem] font-bold">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("view");
+                handleReset();
+              }}
+              className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
+                mode === "view"
+                  ? "bg-black text-white"
+                  : "text-black/60 hover:text-black"
+              }`}
+            >
+              <Eye className="h-3 w-3" /> 보기
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("select")}
+              className={`px-3 py-1.5 rounded-full inline-flex items-center gap-1 transition-colors ${
+                mode === "select"
+                  ? "bg-black text-white"
+                  : "text-black/60 hover:text-black"
+              }`}
+            >
+              <Crosshair className="h-3 w-3" /> 부위 선택
+            </button>
+          </div>
+        ) : (
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-black px-3 py-1.5 text-[0.7rem] font-bold text-white">
+            <Crosshair className="h-3 w-3" />
+            {SAM_SURFACE_TARGETS[fixedTargetSurface].labelKo} 경계 선택
+          </span>
+        )}
 
         {/* refine 모드 +/- 토글 (selected 있을 때만) */}
         {mode === "select" && selected && (
@@ -307,7 +339,7 @@ export default function ClickableRenderImage({
         )}
       </div>
 
-      {mode === "select" && (
+      {mode === "select" && !fixedTargetSurface && (
         <div className="rounded-2xl border border-black/[0.08] bg-[#f7f7f5] p-3">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -321,9 +353,7 @@ export default function ClickableRenderImage({
             </span>
           </div>
           <div className="mt-3 grid grid-cols-3 gap-1.5 sm:grid-cols-6">
-            {(Object.entries(SAM_SURFACE_TARGETS) as Array<
-              [SamSurfaceTarget, (typeof SAM_SURFACE_TARGETS)[SamSurfaceTarget]]
-            >).map(([value, config]) => (
+            {targetOptions.map((value) => (
               <button
                 key={value}
                 type="button"
@@ -338,7 +368,7 @@ export default function ClickableRenderImage({
                     : "border-black/10 bg-white text-black/65 hover:border-black/30"
                 }`}
               >
-                {config.labelKo}
+                {SAM_SURFACE_TARGETS[value].labelKo}
               </button>
             ))}
           </div>
@@ -358,8 +388,9 @@ export default function ClickableRenderImage({
         <img
           ref={imgRef}
           src={imageUrl}
-          alt="design"
+          alt={imageAlt}
           onLoad={handleImageLoad}
+          onError={onImageError}
           onClick={handleImageClick}
           draggable={false}
           className="block w-full select-none"
@@ -529,7 +560,7 @@ export default function ClickableRenderImage({
               onClick={handleConfirm}
               className="flex-[2] inline-flex items-center justify-center gap-1.5 rounded-full bg-black px-4 py-2.5 text-sm font-bold text-white shadow-cta hover:bg-black"
             >
-              선택 경계 확인 · 자재 고르기
+              {confirmLabel}
               <ChevronRight className="h-3.5 w-3.5" />
             </button>
           )}

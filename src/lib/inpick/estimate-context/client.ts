@@ -19,6 +19,14 @@ import type { SanitizedLockedAsset } from "@/lib/inpick/locked-design/contracts"
 const PROJECT_ID_KEY = "workflow_project_id";
 const WORKFLOW_SNAPSHOT_PREFIX = "workflow_snapshot:";
 const WORKFLOW_STATE_CACHE_TTL_MS = 15_000;
+export const WORKFLOW_RESET_EVENT_KEY = "workflow_reset_event";
+
+export interface WorkflowResetEvent {
+  deletedProjectIds: string[];
+  resetAll: boolean;
+  emittedAt: string;
+  nonce: string;
+}
 
 export interface WorkflowSessionSnapshot {
   projectId: string;
@@ -289,6 +297,49 @@ export function clearWorkflowProjectId() {
   }
 }
 
+function emitWorkflowResetEvent(input: {
+  deletedProjectIds: readonly string[];
+  resetAll: boolean;
+}) {
+  if (typeof window === "undefined") return;
+  try {
+    const event: WorkflowResetEvent = {
+      deletedProjectIds: Array.from(
+        new Set(input.deletedProjectIds.map((id) => id.trim()).filter(Boolean)),
+      ),
+      resetAll: input.resetAll,
+      emittedAt: new Date().toISOString(),
+      nonce:
+        typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    };
+    localStorage.setItem(WORKFLOW_RESET_EVENT_KEY, JSON.stringify(event));
+  } catch {
+    /* private mode */
+  }
+}
+
+export function parseWorkflowResetEvent(value: string | null): WorkflowResetEvent | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value) as Partial<WorkflowResetEvent>;
+    if (!Array.isArray(parsed.deletedProjectIds) || typeof parsed.resetAll !== "boolean") {
+      return null;
+    }
+    return {
+      deletedProjectIds: parsed.deletedProjectIds.filter(
+        (id): id is string => typeof id === "string" && id.length > 0,
+      ),
+      resetAll: parsed.resetAll,
+      emittedAt: typeof parsed.emittedAt === "string" ? parsed.emittedAt : "",
+      nonce: typeof parsed.nonce === "string" ? parsed.nonce : "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 명시적인 "새 프로젝트" 시작 경계.
  *
@@ -356,16 +407,75 @@ export function clearDeletedWorkflowProjects(
   }
 
   if (!activeProjectId || !ids.has(activeProjectId)) {
+    emitWorkflowResetEvent({
+      deletedProjectIds: Array.from(ids),
+      resetAll: false,
+    });
     return { activeProjectDeleted: false };
   }
 
+  const nextProjectId = startFreshWorkflowSession(forcedNextProjectId);
+  emitWorkflowResetEvent({
+    deletedProjectIds: Array.from(ids),
+    resetAll: false,
+  });
   return {
     activeProjectDeleted: true,
-    nextProjectId: startFreshWorkflowSession(forcedNextProjectId),
+    nextProjectId,
   };
 }
 
+/**
+ * 계정의 마지막 프로젝트까지 삭제했을 때 호출한다.
+ * 현재 active id와 무관하게 이 탭의 모든 프로젝트별 스냅샷·후속 견적 임시값·
+ * 메모리 요청 캐시를 지우고, 다른 탭에도 강제 초기화 이벤트를 전달한다.
+ */
+export function clearAllWorkflowProjects(forcedNextProjectId?: string): string {
+  if (typeof window === "undefined") return forcedNextProjectId || "";
+  const deletedProjectIds = new Set<string>();
+  try {
+    const activeProjectId =
+      localStorage.getItem(PROJECT_ID_KEY) || sessionStorage.getItem(PROJECT_ID_KEY) || "";
+    if (activeProjectId) deletedProjectIds.add(activeProjectId);
+
+    const scopedKeys: string[] = [];
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const key = sessionStorage.key(index);
+      if (key?.startsWith(WORKFLOW_SNAPSHOT_PREFIX)) scopedKeys.push(key);
+    }
+    for (const key of scopedKeys) {
+      const projectId = key.slice(WORKFLOW_SNAPSHOT_PREFIX.length);
+      if (projectId) deletedProjectIds.add(projectId);
+      sessionStorage.removeItem(key);
+    }
+
+    clearActiveWorkflowSessionSnapshot();
+    sessionStorage.removeItem("workflow_rfq_decision_packet");
+    sessionStorage.removeItem("bidding_post");
+    localStorage.removeItem(PROJECT_ID_KEY);
+    sessionStorage.removeItem(PROJECT_ID_KEY);
+    workflowStateCache.clear();
+    workflowStateRequests.clear();
+
+    const nextProjectId =
+      forcedNextProjectId ||
+      (typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : fallbackUuid());
+    localStorage.setItem(PROJECT_ID_KEY, nextProjectId);
+    emitWorkflowResetEvent({
+      deletedProjectIds: Array.from(deletedProjectIds),
+      resetAll: true,
+    });
+    return nextProjectId;
+  } catch {
+    return forcedNextProjectId || fallbackUuid();
+  }
+}
+
 export interface SaveDesignOutputInput {
+  /** 이미지 생성 시작 시점의 프로젝트. 삭제/새 프로젝트 전환 중 결과가 섞이지 않게 고정한다. */
+  projectId?: string;
   projectMode: ProjectMode;
   targetType: DesignTargetType;
   targetId: string;
@@ -385,12 +495,13 @@ export async function saveDesignOutputAfterRender(
   input: SaveDesignOutputInput,
 ): Promise<DesignOutput | null> {
   try {
-    const projectId = getOrCreateWorkflowProjectId();
+    const { projectId: requestedProjectId, ...payload } = input;
+    const projectId = requestedProjectId || getOrCreateWorkflowProjectId();
     if (!projectId) return null;
     const res = await fetch("/api/inpick/design-outputs", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ projectId, ...input }),
+      body: JSON.stringify({ projectId, ...payload }),
     });
     if (!res.ok) {
       // 401(미인증) 포함 — 사용자가 로그인 안 했어도 워크플로는 그대로 진행

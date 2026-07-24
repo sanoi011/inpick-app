@@ -30,6 +30,7 @@ import {
 } from "@/lib/inpick/refine-cache";
 import { trackServerEventAsync } from "@/lib/analytics/track";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import type { SurfaceType } from "@/lib/inpick/editable-render/types";
 import sharp from "sharp";
 
 export const runtime = "nodejs";
@@ -71,7 +72,7 @@ interface Body {
   roomName?: string;
   styleHint?: string;          // 전체 스타일 일관성 유지용
   /** 가이드 §2-2 build_replacement_prompt — 카테고리 라벨 (floor/wall/...) */
-  regionCategoryEn?: "floor" | "wall" | "ceiling" | "window" | "door" | "curtain";
+  regionCategoryEn?: SurfaceType | "curtain";
   materialName?: string;       // 표시용 (예: "강마루 화이트오크")
   materialColor?: string;
   materialTexture?: string;

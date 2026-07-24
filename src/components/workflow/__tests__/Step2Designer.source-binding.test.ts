@@ -18,3 +18,10 @@ test("SKU image edit로 만든 파생 시안에는 선택을 새 render identity
   assert.match(source, /roomProductCustomizations:\s*\{/);
   assert.match(source, /renderUnlockKey\(editedRender, nextIndex\)/);
 });
+
+test("SKU 재생성은 SAM 경계 마스크와 고정 project identity를 사용한다", () => {
+  assert.match(source, /selectionMaskUrl:\s*request\.region\.maskUrl/);
+  assert.ok(source.includes('fetch("/api/inpick/refine-render"'));
+  assert.match(source, /isActiveWorkflowProjectId\(workflowProjectId\)/);
+  assert.match(source, /request\.region\.sourceRenderKey !== sourceRenderKey/);
+});
