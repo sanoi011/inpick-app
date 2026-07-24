@@ -138,8 +138,10 @@ export async function buildConstructionEstimateWithProductResolution(
             }
           }
         }
-        // P12: 재료비 있는 line만 resolver 실행 (노무비/경비만 있는 라인은 skip)
-        if (line.materialUnitPrice > 0 || hasMaterialIntent(template)) {
+        // 완성 마감재 라인만 상품 resolver를 실행한다.
+        // 바탕처리·부자재·철거 라인에 같은 SurfacePlan 마감재를 매칭하면
+        // 모든 품명이 "강마루/실크벽지"로 덮이고 원가 단가까지 오염될 수 있다.
+        if (hasMaterialIntent(template)) {
           try {
             const product = await resolveMaterialProductForLine({
               surfacePlan,
@@ -206,9 +208,12 @@ export async function buildConstructionEstimateWithProductResolution(
 }
 
 /** WorkPackageLineTemplate이 자재가 있는 작업인지 (단가 0이라도 자재 의도 있으면 resolver 호출) */
-function hasMaterialIntent(template: WorkPackageLineTemplate): boolean {
-  // 가구·싱크공사(12), 욕실공사(13), 주방공사(14), 바닥재공사(10), 도배공사(09), 타일공사(07), 도장공사(08), 창호(11) 등
-  return ["07", "08", "09", "10", "11", "12", "13", "14"].includes(template.tradeCode);
+export function hasMaterialIntent(template: WorkPackageLineTemplate): boolean {
+  return Boolean(
+    template.materialCategoryCode ||
+    template.requiredProductMatch ||
+    template.costModel.materialUnitPriceKey === "selected_material_unit_price"
+  );
 }
 
 /** Resolver 결과를 line에 채움 */

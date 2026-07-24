@@ -38,15 +38,26 @@ export interface EstimateProFormProps {
   areaLabel?: string;          // 예: "전용 97.36㎡"
   /** 분석 안내(일부 표준값) 등 상단 배지 */
   visionBadge?: string;
+  /** 로컬 샘플·검수 화면에서 처음부터 열어둘 실/공종 */
+  initialExpandedGroups?: string[];
 }
 
-export default function EstimateProForm({ lines, category = "residential", projectName, areaLabel, visionBadge }: EstimateProFormProps) {
+export default function EstimateProForm({
+  lines,
+  category = "residential",
+  projectName,
+  areaLabel,
+  visionBadge,
+  initialExpandedGroups = [],
+}: EstimateProFormProps) {
   const [role, setRole] = useState<"owner" | "bidder">("owner");
   const [tab, setTab] = useState<"cover" | "summary" | "rollup" | "detail" | "schedule">("detail");
   const [includeJebi, setIncludeJebi] = useState(true);
   const [targetDays, setTargetDays] = useState(30);
   // 세부내역서 기본 전체 접힘 — 대분류·소계만 먼저 보이게 (모바일 시인성)
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(
+    () => new Set(initialExpandedGroups),
+  );
   const [meta, setMeta] = useState({ projectName: projectName || "", client: "", vendor: "INPICK 제휴 시공사", date: "" });
 
   const [rows, setRows] = useState<Row[]>(lines);
@@ -363,7 +374,11 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
             <button onClick={() => setGroupBy("trade")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
           </div>
           <span className="text-[11px] text-gray-400 hidden sm:inline">
-            {role === "bidder" ? "수량과 단가를 현장 확인값으로 수정할 수 있습니다" : "사업자 편집에서 현장 확인값을 조정할 수 있습니다"}
+            {groupBy === "room"
+              ? "같은 부위의 철거·바탕·마감·부대공정을 1개 공사로 합산했습니다"
+              : role === "bidder"
+                ? "수량과 단가를 현장 확인값으로 수정할 수 있습니다"
+                : "사업자 편집에서 현장 확인값을 조정할 수 있습니다"}
           </span>
         </div>
       </div>
@@ -396,10 +411,10 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
                       <th className="px-2 py-2 text-left font-semibold min-w-[110px]">규격</th>
                       <th className="px-2 py-2 text-center font-semibold w-9">단위</th>
                       <th className="px-2 py-2 text-right font-semibold w-16">수량</th>
-                      <th className="px-2 py-2 text-right font-semibold w-20">재료단가</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "재료환산" : "재료단가"}</th>
                       <th className="px-2 py-2 text-right font-semibold w-24">재료금액</th>
-                      <th className="px-2 py-2 text-right font-semibold w-20">노무단가</th>
-                      <th className="px-2 py-2 text-right font-semibold w-24">노무금액</th>
+                      <th className="px-2 py-2 text-right font-semibold w-20">{groupBy === "room" ? "노무·경비환산" : "노무·경비단가"}</th>
+                      <th className="px-2 py-2 text-right font-semibold w-24">노무·경비</th>
                       <th className="px-2 py-2 text-right font-semibold w-28">합계</th><th className="w-8"></th>
                     </tr></thead>
                     <tbody>
@@ -419,7 +434,7 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
 }
 function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; deleteRow: any; role: "owner" | "bidder" }) {
   const hasMat = l.brand !== "-";
-  const editable = role === "bidder";
+  const editable = role === "bidder" && !l.isWorkPackage;
   const numCls = "w-full text-right text-xs bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent hover:border-zinc-200 focus:border-zinc-400 rounded px-1 py-1 focus:outline-none tabular-nums";
   return (
     <tr className="border-b border-zinc-50 hover:bg-zinc-50/60">
@@ -456,6 +471,32 @@ function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; de
               {l.imageHint && <p className="text-[11px] text-zinc-500 mt-0.5">이미지 구현 · {l.imageHint}</p>}
             </div>
           </div>
+        )}
+        {l.isWorkPackage && l.workBreakdown && (
+          <details className="mt-1.5 max-w-xl text-[10px] text-zinc-500">
+            <summary className="cursor-pointer select-none font-semibold text-zinc-600">
+              세부 산출근거 {l.workBreakdown.length}개 보기
+            </summary>
+            <div className="mt-1.5 space-y-1 rounded-lg border border-zinc-200 bg-zinc-50 p-2.5">
+              {l.workBreakdown.map((item, index) => (
+                <div key={item.id} className="grid gap-1 border-b border-zinc-200/70 pb-1 last:border-0 last:pb-0 sm:grid-cols-[1fr_auto]">
+                  <div>
+                    <span className="font-semibold text-zinc-700">{index + 1}. {item.taskName}</span>
+                    <span className="ml-1 text-zinc-400">· {item.quantity}{item.unit} · {item.quantityBasis}</span>
+                  </div>
+                  <span className="tabular-nums text-zinc-600">
+                    재료 {won(item.matAmount)} · 노무 {won(item.laborAmount)} · 경비 {won(item.expenseAmount)} · 합계 {won(item.amount)}
+                  </span>
+                </div>
+              ))}
+              {role === "bidder" && (
+                <p className="pt-1 font-semibold text-zinc-600">수량·단가는 공종별 탭의 원가 라인에서 수정합니다.</p>
+              )}
+            </div>
+          </details>
+        )}
+        {l.isWorkPackage && l.quantityBasis && (
+          <p className="mt-1 text-[10px] text-zinc-400">대표수량 · {l.quantityBasis}</p>
         )}
       </td>
       <td className="px-2 py-1.5 text-zinc-500">{l.spec}</td>
