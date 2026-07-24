@@ -316,7 +316,7 @@ function drawCostSummaryPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
     }
     doc.setFontSize(9);
     doc.text(r.label, colX[0], y + 4);
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     doc.text(r.note || "-", colX[1], y + 4);
     doc.setFontSize(9);
     doc.text(fmtWon(r.amount), colX[2], y + 4, { align: "right" });
@@ -326,7 +326,7 @@ function drawCostSummaryPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   // 하단 안내
   y += 5;
   doc.setFont("NanumGothic", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   doc.setTextColor(100, 100, 100);
   doc.text("금액 단위: 원 / 단가 기준: material_price_lookup + 카탈로그 + KPA 표준", PAGE.marginX, y);
   doc.setTextColor(0, 0, 0);
@@ -356,7 +356,7 @@ function drawTradeSummaryPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   doc.setFillColor(240, 240, 245);
   doc.rect(PAGE.marginX, y - 2, cols[cols.length - 1].x + cols[cols.length - 1].w - PAGE.marginX, 7, "F");
   doc.setFont("NanumGothic", "bold");
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   for (const c of cols) {
     const align = c.right ? "right" : "left";
     const tx = c.right ? c.x + c.w - 1 : c.x + 1;
@@ -365,7 +365,7 @@ function drawTradeSummaryPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
   y += 7;
 
   doc.setFont("NanumGothic", "normal");
-  doc.setFontSize(7);
+  doc.setFontSize(8);
   for (const t of pkg.tradeSummaries) {
     doc.text(t.tradeCode, cols[0].x + 1, y + 4);
     doc.text(truncate(t.tradeName, 16), cols[1].x + 1, y + 4);
@@ -440,18 +440,18 @@ function drawTradeDetailPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
 
     // 컬럼 헤더
     doc.setFont("NanumGothic", "bold");
-    doc.setFontSize(6.5);
+    doc.setFontSize(7.5);
     doc.setFillColor(245, 245, 250);
-    doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 5, "F");
+    doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 6, "F");
     for (const c of cols) {
       const tx = c.align === "right" ? c.x + c.w - 1 : c.x + 1;
       doc.text(c.label, tx, y + 2, { align: c.align || "left" });
     }
-    y += 5;
+    y += 6;
 
     // 행
     doc.setFont("NanumGothic", "normal");
-    doc.setFontSize(6.5);
+    doc.setFontSize(7.5);
     for (const l of lines) {
       if (y > PAGE.height - 12) {
         doc.addPage("a4", "landscape");
@@ -472,11 +472,11 @@ function drawTradeDetailPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
       doc.setFont("NanumGothic", "normal");
       // 브랜드/SKU
       const brand = l.brand ? `${l.brand} / ${l.sku || "SKU없음"}` : "표준";
-      doc.setFontSize(5.5);
-      doc.text(truncate(brand, 18), cols[11].x + 1, y + 3);
       doc.setFontSize(6.5);
+      doc.text(truncate(brand, 18), cols[11].x + 1, y + 3);
+      doc.setFontSize(7.5);
       no++;
-      y += 5;
+      y += 6;
     }
     y += 3;
   }
@@ -565,21 +565,21 @@ function drawMaterialSummaryPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
   // 컬럼 헤더
   const drawHeader = () => {
     doc.setFont("NanumGothic", "bold");
-    doc.setFontSize(6.5);
+    doc.setFontSize(7.5);
     doc.setFillColor(24, 56, 95);
     doc.setTextColor(255, 255, 255);
-    doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 5.5, "F");
+    doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 6, "F");
     for (const c of cols) {
       const tx = c.align === "right" ? c.x + c.w - 1 : c.x + 1;
       doc.text(c.label, tx, y + 2, { align: c.align || "left" });
     }
     doc.setTextColor(0, 0, 0);
-    y += 5.5;
+    y += 6;
   };
   drawHeader();
 
   doc.setFont("NanumGothic", "normal");
-  doc.setFontSize(6.5);
+  doc.setFontSize(7.5);
   let no = 1;
   for (const r of rows) {
     if (y > PAGE.height - 12) {
@@ -587,7 +587,7 @@ function drawMaterialSummaryPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
       y = 20;
       drawHeader();
       doc.setFont("NanumGothic", "normal");
-      doc.setFontSize(6.5);
+      doc.setFontSize(7.5);
     }
     // 컬럼 값
     doc.text(String(no), cols[0].x + cols[0].w - 1, y + 3, { align: "right" });
@@ -615,7 +615,7 @@ function drawMaterialSummaryPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
     doc.setTextColor(0, 0, 0);
     doc.text(r.appliedAt ? fmtDate(r.appliedAt) : "-", cols[12].x + 1, y + 3);
     no++;
-    y += 5;
+    y += 6;
   }
 
   // 하단: 통계

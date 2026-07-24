@@ -62,17 +62,11 @@ import {
   buildKitchenAssemblyRenderPrompt,
   type KitchenAssembly,
 } from "@/lib/inpick/kitchen-assembly";
-import RoomProductImageSelector from "./RoomProductImageSelector";
 import {
   bindRoomProductCustomizationToSource,
-  buildRoomProductEstimateMapping,
   buildRoomProductPromptMarkdown,
   carryRoomProductCustomizationToSource,
-  inferRoomProductKind,
-  listTargetSurfaces,
-  type RoomCatalogProduct,
   type RoomProductCustomization,
-  type RoomProductPartCode,
 } from "@/lib/inpick/room-product-customization";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
@@ -201,6 +195,7 @@ const GLOBAL_PROMPT_KEY = "__global__";
  * 2026-07-14 정밀 선택 UX + GPT Image 2 영역 편집 파이프라인으로 재공개.
  */
 const PARTIAL_MATERIAL_VIEW_ENABLED = false;
+const ROOM_PRODUCT_CUSTOMIZATION_ENABLED = false;
 
 /**
  * 내부 생성용 기술 프롬프트 감지 — 채팅 말풍선에 그대로 노출하지 않는다.
@@ -661,134 +656,16 @@ export default function Step2Designer({
   const activeTab = availableTabs.find((tab) => tab.v === activeRoom);
   const promptWithKitchenSelections = (prompt: string, roomKey: string) => {
     const assembly = value.kitchenAssemblies?.[roomKey];
-    const kitchenPrompt = assembly ? buildKitchenAssemblyRenderPrompt(assembly) : "";
+    const kitchenPrompt =
+      ROOM_PRODUCT_CUSTOMIZATION_ENABLED && assembly
+        ? buildKitchenAssemblyRenderPrompt(assembly)
+        : "";
     const roomCustomization = value.roomProductCustomizations?.[roomKey];
-    const productPrompt = roomCustomization
+    const productPrompt = ROOM_PRODUCT_CUSTOMIZATION_ENABLED && roomCustomization
       ? buildRoomProductPromptMarkdown(roomCustomization)
       : "";
     return [prompt, kitchenPrompt, productPrompt].filter(Boolean).join("\n\n");
   };
-  const activeRoomName = activeTab?.label || activeRoom;
-  const activeRoomProductKind = inferRoomProductKind(`${activeRoom} ${activeRoomName}`);
-  const storedRoomProductCustomization: RoomProductCustomization =
-    value.roomProductCustomizations?.[activeRoom] || {
-      roomId: activeRoom,
-      roomName: activeRoomName,
-      roomKind: activeRoomProductKind,
-      assemblyId: `room-products-${activeRoom}`,
-      sourceRenderKey: activeRenderKey || undefined,
-      selections: {},
-    };
-  const activeRoomProductCustomization: RoomProductCustomization = activeRenderKey
-    ? bindRoomProductCustomizationToSource(storedRoomProductCustomization, activeRenderKey)
-    : storedRoomProductCustomization;
-  const searchRoomProductCatalog = async (
-    partCode: RoomProductPartCode,
-    query: string,
-  ): Promise<readonly RoomCatalogProduct[]> => {
-    const response = await fetch(
-      `/api/inpick/room-product-catalog?roomKind=${encodeURIComponent(activeRoomProductCustomization.roomKind)}&partCode=${encodeURIComponent(partCode)}&q=${encodeURIComponent(query)}`,
-    );
-    const data = (await response.json()) as { products?: RoomCatalogProduct[]; error?: string };
-    if (!response.ok) throw new Error(data.error || "CATALOG_QUERY_FAILED");
-    return data.products || [];
-  };
-  const mapRoomProductSurface = (
-    requirement: ReturnType<typeof buildRoomProductEstimateMapping>["requirements"][number],
-  ): MaterialHint["surfaceType"] => {
-    switch (requirement.targetSurface) {
-      case "floor":
-      case "wall":
-      case "ceiling":
-      case "window":
-      case "door":
-      case "counter":
-        return requirement.targetSurface;
-      case "cabinet":
-        return "built_in_furniture";
-      case "tile_wall":
-        return "wall";
-      case "fixture":
-        return requirement.partCode === "main_lighting" ? "lighting" : "unknown";
-      default:
-        return "unknown";
-    }
-  };
-  const updateRoomProductCustomization = (customization: RoomProductCustomization) => {
-    const mapping = buildRoomProductEstimateMapping(customization);
-    const roomProductPrefix = `${customization.roomId}::room-products-`;
-    const materialSelections = Object.fromEntries(
-      Object.entries(value.materialSelections || {}).filter(([key]) => !key.startsWith(roomProductPrefix)),
-    ) as Record<string, SelectedEstimateMaterial>;
-    for (const requirement of mapping.requirements) {
-      materialSelections[requirement.selectionKey] = {
-        roomId: requirement.roomId,
-        roomName: requirement.roomName,
-        surfaceType: mapRoomProductSurface(requirement),
-        materialCategory: `room-product.${requirement.partCode}`,
-        materialProductId: requirement.materialProductId,
-        materialNameKo: requirement.materialNameKo,
-        brand: requirement.brand,
-        sku: requirement.sku,
-        spec: requirement.spec,
-        unit: requirement.unit,
-        unitPrice: requirement.unitPrice,
-        priceSource: requirement.provenance.reference,
-        confidence: 1,
-        assemblyId: requirement.assemblyId,
-        partCode: requirement.partCode,
-        provenance: requirement.provenance,
-      };
-    }
-    onChange({
-      ...value,
-      roomProductCustomizations: {
-        ...(value.roomProductCustomizations || {}),
-        [customization.roomId]: customization,
-      },
-      materialSelections,
-    });
-  };
-
-  useEffect(() => {
-    const existing = value.roomProductCustomizations?.[activeRoom];
-    if (!activeRenderKey || !existing || existing.sourceRenderKey === activeRenderKey) return;
-
-    const rebound = bindRoomProductCustomizationToSource(existing, activeRenderKey);
-    const mapping = buildRoomProductEstimateMapping(rebound);
-    const roomProductPrefix = `${rebound.roomId}::room-products-`;
-    const materialSelections = Object.fromEntries(
-      Object.entries(value.materialSelections || {}).filter(([key]) => !key.startsWith(roomProductPrefix)),
-    ) as Record<string, SelectedEstimateMaterial>;
-    for (const requirement of mapping.requirements) {
-      materialSelections[requirement.selectionKey] = {
-        roomId: requirement.roomId,
-        roomName: requirement.roomName,
-        surfaceType: mapRoomProductSurface(requirement),
-        materialCategory: `room-product.${requirement.partCode}`,
-        materialProductId: requirement.materialProductId,
-        materialNameKo: requirement.materialNameKo,
-        brand: requirement.brand,
-        sku: requirement.sku,
-        spec: requirement.spec,
-        unit: requirement.unit,
-        unitPrice: requirement.unitPrice,
-        priceSource: requirement.provenance.reference,
-        confidence: 1,
-        assemblyId: requirement.assemblyId,
-        partCode: requirement.partCode,
-        provenance: requirement.provenance,
-      };
-    }
-    onChange({
-      ...value,
-      roomProductCustomizations: {
-        ...(value.roomProductCustomizations || {}),
-        [activeRoom]: rebound,
-      },
-      materialSelections,
-    });
-  }, [activeRenderKey, activeRoom, onChange, value]);
   const activeRoomIsLiving = isLivingRoom(activeRoom, activeTab?.label);
   const activeRenderUnlocked =
     activeRoomIsLiving ||
@@ -3140,28 +3017,6 @@ export default function Step2Designer({
           )
         )}
       </section>
-
-      {activeRoom !== "all" && activeRender && activeRenderUnlocked && (
-        <div className="lg:col-span-2">
-          <RoomProductImageSelector
-            imageUrl={activeRender.refinedUrl || activeRender.url}
-            value={activeRoomProductCustomization}
-            onChange={updateRoomProductCustomization}
-            searchCatalog={searchRoomProductCatalog}
-            disabled={generating}
-            onRegenerate={async () => {
-              const promptMarkdown = buildRoomProductPromptMarkdown(activeRoomProductCustomization);
-              if (!promptMarkdown) throw new Error("재생성할 실제 SKU를 먼저 선택해주세요.");
-              await handlePromptImageEdit(
-                promptMarkdown,
-                activeRoom,
-                activeRoomName,
-                listTargetSurfaces(activeRoomProductCustomization),
-              );
-            }}
-          />
-        </div>
-      )}
 
       {/* Phase 7 — Vision Material Picker 모달 */}
       {PARTIAL_MATERIAL_VIEW_ENABLED && <VisionMaterialPicker

@@ -456,7 +456,7 @@ export default function Home() {
 
       <section className="border-t border-black/[0.07] bg-white px-5 py-24 text-center sm:px-8 sm:py-32">
         <ImagePlus className="mx-auto h-7 w-7" strokeWidth={1.5} />
-        <h2 className="mx-auto mt-7 max-w-3xl text-[36px] font-medium leading-[1.08] tracking-[-0.06em] sm:text-[58px]">
+        <h2 className="mx-auto mt-7 w-full whitespace-nowrap text-[clamp(13px,4.3vw,58px)] font-medium leading-[1.08] tracking-[-0.06em]">
           오늘, 내 공간을 새롭게 만들어보세요.
         </h2>
         <Link href={designHref} className="mt-8 inline-flex items-center gap-2 rounded-full bg-black px-6 py-3.5 text-sm font-semibold text-white transition hover:bg-black/75">

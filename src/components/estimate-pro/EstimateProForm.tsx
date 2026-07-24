@@ -162,7 +162,7 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-bold text-zinc-900">현장 확인 공종</h2>
-              <p className="mt-0.5 text-[11px] leading-4 text-zinc-500">
+              <p className="mt-0.5 text-[13px] leading-5 text-zinc-500">
                 이미지·도면으로 확인하기 어려운 공종은 기본단가 가견적으로 먼저 반영했습니다.
               </p>
             </div>
@@ -175,11 +175,11 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
             {groups.map((group) => (
               <div key={group.key} className="rounded-lg bg-zinc-50 px-3 py-2.5 ring-1 ring-zinc-200/70">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-[11px] font-bold text-zinc-600">{group.label}</span>
-                  <span className="text-[10px] text-zinc-400">{group.rows.length}건</span>
+                  <span className="text-[13px] font-bold text-zinc-600">{group.label}</span>
+                  <span className="text-xs text-zinc-400">{group.rows.length}건</span>
                 </div>
                 <p className="mt-1 text-sm font-black tabular-nums text-zinc-900">{won(group.amount)}원</p>
-                <p className="mt-1 line-clamp-2 text-[9px] leading-3.5 text-zinc-400" title={group.notice}>
+                <p className="mt-1 line-clamp-2 text-xs leading-4 text-zinc-400" title={group.notice}>
                   {group.notice}
                 </p>
               </div>
@@ -187,7 +187,7 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
           </div>
 
           {role === "bidder" && (
-            <p className="mt-3 flex items-center gap-1.5 text-[11px] font-semibold text-zinc-600">
+            <p className="mt-3 flex items-center gap-1.5 text-[13px] font-semibold text-zinc-600">
               <Pencil className="h-3 w-3" /> 세부내역서에서 현장 확인 수량·재료단가·노무단가를 수정하면 합계가 즉시 재계산됩니다.
             </p>
           )}
@@ -250,13 +250,13 @@ function numToKorean(n: number): string {
 
 /* 2. 총괄표 (원가계산서) */
 function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updateJebi, setMargins }: any) {
-  const rateCls = "w-14 text-right text-[11px] border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-black tabular-nums";
+  const rateCls = "w-16 text-right text-[13px] border border-slate-300 rounded px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-black tabular-nums";
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-4 py-3">
         <div>
           <h2 className="text-sm font-bold text-gray-900">공사원가계산서 — 조달청 제비율 기준</h2>
-          <p className="text-[11px] text-gray-400 mt-0.5">소규모 인테리어 현장 기준 — 모든 요율 편집 가능. 인테리어는 대부분 <b>필수 아님</b>.</p>
+          <p className="text-[13px] text-gray-400 mt-0.5">소규모 인테리어 현장 기준 — 모든 요율 편집 가능. 인테리어는 대부분 <b>필수 아님</b>.</p>
         </div>
         <label className="flex items-center gap-2 text-xs font-medium cursor-pointer">
           <span className={includeJebi ? "text-black" : "text-gray-400"}>제비용 포함</span>
@@ -266,7 +266,7 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
         </label>
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-        <table className="w-full text-[11px]">
+        <table className="w-full text-[13px]">
           <thead>
             <tr className="bg-slate-100 text-slate-600 border-b border-slate-200">
               <th className="px-3 py-2 text-left font-semibold">비목</th>
@@ -293,8 +293,8 @@ function CostTab({ cost, jebi, margins, role, includeJebi, setIncludeJebi, updat
                   <td className="px-2 py-1.5 text-right tabular-nums text-slate-800">{won(row.amount)}</td>
                   <td className="px-2 py-1.5 text-center"><input type="checkbox" checked={j.include} onChange={(e) => updateJebi(j.key, { include: e.target.checked })} /></td>
                   <td className="px-2 py-1.5">{role === "bidder" ? (
-                    <input value={j.comment} placeholder="코멘트…" onChange={(e) => updateJebi(j.key, { comment: e.target.value })} className="w-full rounded border border-slate-200 px-1.5 py-1 text-[10px] focus:outline-none focus:ring-1 focus:ring-black" />
-                  ) : (<span className="text-[10px] text-slate-400">{j.note}</span>)}</td>
+                    <input value={j.comment} placeholder="코멘트…" onChange={(e) => updateJebi(j.key, { comment: e.target.value })} className="w-full rounded border border-slate-200 px-1.5 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-black" />
+                  ) : (<span className="text-xs text-slate-400">{j.note}</span>)}</td>
                 </tr>
               );
             })}
@@ -327,8 +327,8 @@ function RollupTab({ sheet, cost }: any) {
   const maxShare = Math.max(...rows.map((r: any) => r.share), 0.01);
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden overflow-x-auto">
-      <div className="px-4 py-3 border-b border-gray-200"><h2 className="text-sm font-bold text-gray-900">총괄내역서 — 공종별 집계표</h2><p className="text-[11px] text-gray-400 mt-0.5">직접비 + 간접비 안분 · 구성비(공급가액 기준)</p></div>
-      <table className="w-full text-[11px]">
+      <div className="px-4 py-3 border-b border-gray-200"><h2 className="text-base font-bold text-gray-900">총괄내역서 — 공종별 집계표</h2><p className="text-[13px] text-gray-400 mt-0.5">직접비 + 간접비 안분 · 구성비(공급가액 기준)</p></div>
+      <table className="w-full text-[13px]">
         <thead><tr className="bg-slate-100 text-slate-600 border-b border-slate-200"><th className="px-3 py-2 text-left font-semibold">공종</th><th className="px-2 py-2 text-right font-semibold">재료비</th><th className="px-2 py-2 text-right font-semibold">노무비</th><th className="px-2 py-2 text-right font-semibold">경비(안분)</th><th className="px-2 py-2 text-right font-semibold">합계</th><th className="px-3 py-2 text-left font-semibold w-40">구성비</th></tr></thead>
         <tbody>
           {rows.map((r: any) => (
@@ -338,12 +338,12 @@ function RollupTab({ sheet, cost }: any) {
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-600">{won(r.labSum)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums text-slate-500">{won(r.exp)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums font-semibold text-slate-900">{won(r.total)}</td>
-              <td className="px-3 py-1.5"><div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-black rounded-full" style={{ width: `${(r.share / maxShare) * 100}%` }} /></div><span className="text-[10px] text-slate-400 tabular-nums w-9 text-right">{(r.share * 100).toFixed(1)}%</span></div></td>
+              <td className="px-3 py-1.5"><div className="flex items-center gap-2"><div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-black rounded-full" style={{ width: `${(r.share / maxShare) * 100}%` }} /></div><span className="text-xs text-slate-400 tabular-nums w-10 text-right">{(r.share * 100).toFixed(1)}%</span></div></td>
             </tr>
           ))}
         </tbody>
         <tfoot>
-          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-black">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-[10px] text-slate-400">공급가액</td></tr>
+          <tr className="bg-slate-50 font-bold border-t-2 border-slate-200"><td className="px-3 py-2 text-slate-700">직접비 계</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directMaterial)}</td><td className="px-2 py-2 text-right tabular-nums">{won(sheet.directLabor)}</td><td className="px-2 py-2 text-right tabular-nums text-slate-500">{won(indirect)}</td><td className="px-2 py-2 text-right tabular-nums text-black">{won(cost.supplyPrice)}</td><td className="px-3 py-2 text-xs text-slate-400">공급가액</td></tr>
           <tr className="bg-slate-800 text-white"><td colSpan={4} className="px-3 py-2.5 font-bold">도급금액 (VAT 포함)</td><td colSpan={2} className="px-2 py-2.5 text-right text-base font-bold tabular-nums">{won(cost.contractPrice)}원</td></tr>
         </tfoot>
       </table>
@@ -356,13 +356,13 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
   return (
     <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between gap-2 flex-wrap">
-        <h2 className="text-sm font-bold text-gray-900">세부내역서 — {groupBy === "room" ? "실별 × 부위별" : "공종별"}</h2>
+        <h2 className="text-base font-bold text-gray-900">세부내역서 — {groupBy === "room" ? "실별 × 부위별" : "공종별"}</h2>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
             <button onClick={() => setGroupBy("room")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "room" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>실별</button>
             <button onClick={() => setGroupBy("trade")} className={`px-3 py-1.5 rounded-md text-xs font-bold ${groupBy === "trade" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"}`}>공종별</button>
           </div>
-          <span className="text-[11px] text-gray-400 hidden sm:inline">
+          <span className="text-[13px] text-gray-400 hidden sm:inline">
             {role === "bidder" ? "수량과 단가를 현장 확인값으로 수정할 수 있습니다" : "사업자 편집에서 현장 확인값을 조정할 수 있습니다"}
           </span>
         </div>
@@ -377,19 +377,19 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
               <div className="flex min-w-0 items-center gap-2">
                 {open ? <ChevronDown className="w-4 h-4 shrink-0 text-zinc-400" /> : <ChevronRight className="w-4 h-4 shrink-0 text-zinc-400" />}
                 <span className="truncate text-sm font-bold text-zinc-700">{String(g.order).padStart(2, "0")}. {g.trade}</span>
-                <span className="shrink-0 text-xs text-zinc-400">{g.lines.length}건</span>
+                <span className="shrink-0 text-sm text-zinc-400">{g.lines.length}건</span>
               </div>
               <span className="shrink-0 text-sm font-bold text-black tabular-nums">{won(g.sum)}원</span>
             </button>
             {open && (
               <>
                 {preceding && (
-                  <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-xs text-zinc-500">
+                  <div className="border-b border-zinc-100 bg-zinc-50 px-4 py-2 text-sm text-zinc-500">
                     <span className="font-bold text-zinc-600">선행 공정</span> {preceding} <span className="text-zinc-400">→ 완료 후 착수</span>
                   </div>
                 )}
                 <div className="overflow-x-auto">
-                  <table className="w-full text-xs border-collapse">
+                  <table className="w-full text-sm border-collapse">
                     <thead><tr className="bg-white border-b border-zinc-200 text-zinc-500">
                       <th className="px-2 py-2 text-center font-semibold w-14">부위</th>
                       <th className="px-2 py-2 text-left font-semibold min-w-[160px]">품명 / 자재</th>
@@ -420,10 +420,10 @@ function DetailTab({ sheet, groupBy, setGroupBy, expanded, toggleGroup, updateRo
 function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; deleteRow: any; role: "owner" | "bidder" }) {
   const hasMat = l.brand !== "-";
   const editable = role === "bidder";
-  const numCls = "w-full text-right text-xs bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent hover:border-zinc-200 focus:border-zinc-400 rounded px-1 py-1 focus:outline-none tabular-nums";
+  const numCls = "w-full text-right text-sm bg-transparent hover:bg-zinc-50 focus:bg-white border border-transparent hover:border-zinc-200 focus:border-zinc-400 rounded px-1 py-1 focus:outline-none tabular-nums";
   return (
     <tr className="border-b border-zinc-50 hover:bg-zinc-50/60">
-      <td className="px-2 py-1.5 text-center"><span className={`inline-block px-1.5 py-0.5 rounded text-[11px] font-medium ${PART_BADGE}`}>{l.part}</span></td>
+      <td className="px-2 py-2 text-center"><span className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium ${PART_BADGE}`}>{l.part}</span></td>
       <td className="px-2 py-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="font-medium text-zinc-800">{l.itemName}</span>
@@ -435,21 +435,21 @@ function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; de
         </div>
         {l.variationNotice && (
           <p
-            className="mt-0.5 max-w-md text-[10px] leading-4 text-zinc-400"
+            className="mt-0.5 max-w-md text-xs leading-4 text-zinc-400"
             title={(l.siteAdjustmentFactors || []).join(" · ")}
           >
             {l.variationNotice}
           </p>
         )}
         {l.siteConditionAdjustmentReason && (
-          <p className="mt-0.5 text-[10px] font-semibold text-zinc-600">
+          <p className="mt-0.5 text-xs font-semibold text-zinc-600">
             사용자 조건 반영 · {l.siteConditionAdjustmentReason}
             {l.siteConditionAdjustmentFactor != null && ` · ×${l.siteConditionAdjustmentFactor.toFixed(2)}`}
           </p>
         )}
         {hasMat && (
           <div className="relative inline-block group mt-0.5">
-            <span className="text-[11px] text-zinc-500 border-b border-dotted border-zinc-300 cursor-help">{l.brand} · {l.product}</span>
+            <span className="text-[13px] text-zinc-500 border-b border-dotted border-zinc-300 cursor-help">{l.brand} · {l.product}</span>
             <div className="hidden group-hover:block absolute left-0 top-full mt-1 z-40 w-64 bg-white border border-zinc-200 rounded-lg shadow-xl p-3">
               <div className="flex items-start gap-2"><div className="w-14 h-14 rounded-md bg-zinc-100 flex items-center justify-center flex-shrink-0"><ImageIcon className="w-5 h-5 text-zinc-300" /></div><div className="min-w-0"><p className="text-xs font-bold text-zinc-800">{l.brand}</p><p className="text-xs text-zinc-600 leading-tight">{l.product}</p><p className="text-[11px] text-zinc-400 mt-0.5">규격 {l.spec}</p></div></div>
               {l.priceBand && <p className="text-[11px] text-zinc-600 mt-2 font-medium">금액대 · {l.priceBand}</p>}
@@ -478,23 +478,23 @@ function ScheduleTab({ schedule, targetDays, setTargetDays }: any) {
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="flex items-center justify-between mb-4">
-        <div><h2 className="text-sm font-bold text-gray-900">공정표 — 견적 기반 막대그래프</h2><p className="text-[11px] text-gray-400 mt-0.5">공종별 금액 비중으로 공기 자동 배분 · 총 {schedule.totalDays}일</p></div>
-        <label className="flex items-center gap-1.5 text-xs font-semibold text-gray-600">목표 공사일<input type="number" value={targetDays} min={10} max={120} onChange={(e) => setTargetDays(Math.max(5, Number(e.target.value) || 30))} className="w-16 text-right text-xs font-bold border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black" /><span className="text-gray-400">일</span></label>
+        <div><h2 className="text-base font-bold text-gray-900">공정표 — 견적 기반 막대그래프</h2><p className="text-[13px] text-gray-400 mt-0.5">공종별 금액 비중으로 공기 자동 배분 · 총 {schedule.totalDays}일</p></div>
+        <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-600">목표 공사일<input type="number" value={targetDays} min={10} max={120} onChange={(e) => setTargetDays(Math.max(5, Number(e.target.value) || 30))} className="w-16 text-right text-sm font-bold border border-gray-300 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-black" /><span className="text-gray-400">일</span></label>
       </div>
-      <div className="flex items-center mb-1 pl-44"><div className="flex-1 relative h-4">{ticks.map((d) => (<span key={d} className="absolute text-[9px] text-slate-400 -translate-x-1/2" style={{ left: `${(d / total) * 100}%` }}>{d}일</span>))}</div></div>
+      <div className="flex items-center mb-1 pl-44"><div className="flex-1 relative h-4">{ticks.map((d) => (<span key={d} className="absolute text-[11px] text-slate-400 -translate-x-1/2" style={{ left: `${(d / total) * 100}%` }}>{d}일</span>))}</div></div>
       <div className="space-y-1.5">
         {schedule.phases.map((p: any) => (
           <div key={p.key} className="flex items-center">
-            <div className="w-44 flex-shrink-0 pr-2 text-[11px] text-slate-600 font-medium truncate" title={p.trades.join(", ")}>{p.name}</div>
+            <div className="w-44 flex-shrink-0 pr-2 text-[13px] text-slate-600 font-medium truncate" title={p.trades.join(", ")}>{p.name}</div>
             <div className="flex-1 relative h-6 bg-slate-50 rounded">
               {ticks.map((d) => (<span key={d} className="absolute top-0 bottom-0 border-l border-slate-100" style={{ left: `${(d / total) * 100}%` }} />))}
-              <div className="absolute top-0.5 bottom-0.5 rounded flex items-center px-1.5 text-[9px] text-white font-medium overflow-hidden whitespace-nowrap" style={{ left: `${(p.startDay / total) * 100}%`, width: `${(p.durationDays / total) * 100}%`, backgroundColor: "#111111" }} title={`${p.name} · ${p.durationDays}일 · ${won(p.cost)}원`}>{p.durationDays}일</div>
+              <div className="absolute top-0.5 bottom-0.5 rounded flex items-center px-1.5 text-[11px] text-white font-medium overflow-hidden whitespace-nowrap" style={{ left: `${(p.startDay / total) * 100}%`, width: `${(p.durationDays / total) * 100}%`, backgroundColor: "#111111" }} title={`${p.name} · ${p.durationDays}일 · ${won(p.cost)}원`}>{p.durationDays}일</div>
             </div>
-            <div className="w-24 flex-shrink-0 text-right text-[10px] text-slate-500 tabular-nums">{won(p.cost)}</div>
+            <div className="w-24 flex-shrink-0 text-right text-xs text-slate-500 tabular-nums">{won(p.cost)}</div>
           </div>
         ))}
       </div>
-      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs"><span className="text-slate-400">총 {schedule.phases.length}개 공정 · 순차 시공 기준</span><span className="font-bold text-slate-700">총 공사비 {won(schedule.totalCost)}원</span></div>
+      <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[13px]"><span className="text-slate-400">총 {schedule.phases.length}개 공정 · 순차 시공 기준</span><span className="font-bold text-slate-700">총 공사비 {won(schedule.totalCost)}원</span></div>
     </div>
   );
 }
