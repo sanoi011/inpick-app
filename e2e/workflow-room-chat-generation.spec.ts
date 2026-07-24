@@ -226,5 +226,9 @@ test("실별 상담에서 생성 요청을 보내면 선택한 실 한 장만 �
       expect.objectContaining({ role: "user", content: "이미지 생성해줘" }),
     ]),
   );
-  await expect(page.getByAltText("design-0")).toBeVisible();
+  await expect(page.getByAltText("design-1")).toBeVisible();
+
+  await page.getByRole("button", { name: /최종 이미지 선택 → 견적/ }).click();
+  await expect(page.getByText("견적에 사용할 실별 최종 이미지", { exact: true })).toBeVisible();
+  await expect(page.getByTestId(/^final-design-option-kitchen-/)).toHaveCount(2);
 });

@@ -39,6 +39,10 @@ import type { MaterialHint } from "@/lib/inpick/estimate-context/types";
 import { buildConstructionEstimateWithProductResolution } from "@/lib/inpick/estimate-v2/build-construction-estimate";
 import { buildSurfacePlansFromContext } from "@/lib/inpick/estimate-v2/surface-plan-builder";
 import {
+  applyResidentialCeilingFinishPreference,
+  type ResidentialCeilingFinish,
+} from "@/lib/inpick/estimate-v2/ceiling-finish-preference";
+import {
   deriveKitchenPlanOverridesFromStep1,
   deriveRequestedRoomsFromStep1,
   normalizeEstimateStep1Snapshot,
@@ -463,6 +467,7 @@ async function persistEstimateToDb(
  */
 async function buildConstructionEstimateFromContextId(
   contextId: string,
+  ceilingFinish: ResidentialCeilingFinish = "wallpaper",
 ): Promise<Record<string, unknown> | null> {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -520,7 +525,7 @@ async function buildConstructionEstimateFromContextId(
     roomAreasByName["전체"] = totalAreaM2;
   }
 
-  const { surfacePlans, quantityBasisByRoom } = buildSurfacePlansFromContext({
+  const { surfacePlans: rawSurfacePlans, quantityBasisByRoom } = buildSurfacePlansFromContext({
     projectId: String(data.project_id),
     projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
     designOutputs: Array.isArray(data.design_outputs_snapshot)
@@ -538,6 +543,15 @@ async function buildConstructionEstimateFromContextId(
     floorplanDimsByName,
     requestedRooms,
   });
+  const projectMode = data.project_mode as
+    | "apartment"
+    | "photo_only"
+    | "commercial";
+  const surfacePlans = applyResidentialCeilingFinishPreference(
+    rawSurfacePlans,
+    projectMode,
+    ceilingFinish,
+  );
   const kitchenPlanOverrides = deriveKitchenPlanOverridesFromStep1(
     step1,
     quantityBasisByRoom,
@@ -547,7 +561,7 @@ async function buildConstructionEstimateFromContextId(
   const constructionEstimate: ConstructionEstimate =
     await buildConstructionEstimateWithProductResolution({
       projectId: String(data.project_id),
-      projectMode: data.project_mode as "apartment" | "photo_only" | "commercial",
+      projectMode,
       surfacePlans,
       quantityBasisByRoom,
       kitchenPlanOverrides,
@@ -832,7 +846,12 @@ export async function POST(req: NextRequest) {
     if (typeof body.contextId === "string" && body.contextId.length > 0) {
       const useV2 = body.estimateVersion !== "legacy_surface";
       if (useV2) {
-        const v2Result = await buildConstructionEstimateFromContextId(body.contextId);
+        const ceilingFinish: ResidentialCeilingFinish =
+          body.ceilingFinish === "paint" ? "paint" : "wallpaper";
+        const v2Result = await buildConstructionEstimateFromContextId(
+          body.contextId,
+          ceilingFinish,
+        );
         if (v2Result) {
           trackGenerated("construction_trade_v2", { contextId: body.contextId });
           return NextResponse.json(v2Result);

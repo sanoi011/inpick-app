@@ -44,6 +44,7 @@ import {
 // P7: 공종별 견적 v2 타입 + 클라이언트 빌더 (인증 없어도 17공종 견적 생성)
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 import { buildConstructionEstimateClientSide } from "@/lib/inpick/estimate-v2/client-builder";
+import type { ResidentialCeilingFinish } from "@/lib/inpick/estimate-v2/ceiling-finish-preference";
 // P17-1: 견적 정확도 레벨 L0~L5
 import { computePrecisionLevel } from "@/lib/inpick/estimate-precision/precision-level";
 // community v2 (2026-05-14): 커뮤니티 견적 공유
@@ -682,6 +683,10 @@ function EstimatePage() {
   );
   // P7: 공종별 견적 v2 — contextId 경로에서 받음
   const [constructionEstimate, setConstructionEstimate] = useState<ConstructionEstimate | null>(null);
+  const [ceilingFinish, setCeilingFinish] =
+    useState<ResidentialCeilingFinish>("wallpaper");
+  const ceilingFinishRef =
+    useRef<ResidentialCeilingFinish>("wallpaper");
   const step1Ref = useRef<Step1Data | null>(null);
   const step2Ref = useRef<Step2Data | null>(null);
   const sawPendingSelectedAnalysisRef = useRef(false);
@@ -716,6 +721,18 @@ function EstimatePage() {
   useEffect(() => {
     router.prefetch("/workflow?step=2");
   }, [router]);
+
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem("workflow_ceiling_finish");
+      if (stored === "paint" || stored === "wallpaper") {
+        ceilingFinishRef.current = stored;
+        setCeilingFinish(stored);
+      }
+    } catch {
+      /* private mode */
+    }
+  }, []);
 
   useEffect(() => {
     if (!detailsAccessId) {
@@ -1080,6 +1097,7 @@ function EstimatePage() {
     s1: Step1Data,
     s2: Step2Data,
     contextIdOverride: string | null = resolvedContextId,
+    ceilingFinishOverride: ResidentialCeilingFinish = ceilingFinishRef.current,
   ) {
     setLoading(true);
     setError(null);
@@ -1092,7 +1110,10 @@ function EstimatePage() {
           const ctxRes = await fetch("/api/inpick/build-estimate", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contextId: contextIdOverride }),
+            body: JSON.stringify({
+              contextId: contextIdOverride,
+              ceilingFinish: ceilingFinishOverride,
+            }),
           });
           if (ctxRes.ok) {
             const ctxData = (await ctxRes.json()) as {
@@ -1267,6 +1288,7 @@ function EstimatePage() {
           const clientEstimate = buildConstructionEstimateClientSide({
             projectId: getOrCreateWorkflowProjectId() || "preview",
             projectMode: "photo_only",
+            ceilingFinish: ceilingFinishOverride,
             rooms: photoRooms.map((room) => ({
               roomName: room.roomName,
               areaM2: room.areaM2,
@@ -1340,6 +1362,7 @@ function EstimatePage() {
           const clientEstimate = buildConstructionEstimateClientSide({
             projectId: getOrCreateWorkflowProjectId() || "preview",
             projectMode: "commercial",
+            ceilingFinish: ceilingFinishOverride,
             rooms: zoneRooms,
             siteConditions: s1.siteConditions,
           });
@@ -1539,6 +1562,7 @@ function EstimatePage() {
         const clientEstimate = buildConstructionEstimateClientSide({
           projectId: getOrCreateWorkflowProjectId() || "preview",
           projectMode,
+          ceilingFinish: ceilingFinishOverride,
           rooms: roomEntries,
           siteConditions: s1.siteConditions,
         });
@@ -1575,6 +1599,25 @@ function EstimatePage() {
       setLoading(false);
     }
   }
+
+  const changeCeilingFinish = (next: ResidentialCeilingFinish) => {
+    if (next === ceilingFinishRef.current || loading) return;
+    ceilingFinishRef.current = next;
+    setCeilingFinish(next);
+    try {
+      sessionStorage.setItem("workflow_ceiling_finish", next);
+    } catch {
+      /* private mode */
+    }
+    if (step1Ref.current && step2Ref.current) {
+      void runEstimate(
+        step1Ref.current,
+        step2Ref.current,
+        resolvedContextId,
+        next,
+      );
+    }
+  };
 
   const filteredRooms = useMemo(() => {
     return estimates
@@ -2096,6 +2139,50 @@ function EstimatePage() {
                 )}
                 {!loading && !error && constructionEstimate && !showLegacy && (
                   <div className="mb-3">
+                    {step1?.workflowEntry !== "photo_commercial" && (
+                      <div className="mb-3 flex flex-col gap-3 rounded-[18px] border border-black/[0.08] bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="text-sm font-bold text-black">
+                            천장 마감 기준
+                          </p>
+                          <p className="mt-0.5 text-xs leading-5 text-black/50">
+                            일반 주거실 전체에 적용합니다. 욕실 SMC·발코니·특수 천장은 기존 설계를 유지합니다.
+                          </p>
+                        </div>
+                        <div
+                          className="grid shrink-0 grid-cols-2 rounded-xl bg-black/[0.05] p-1"
+                          role="radiogroup"
+                          aria-label="천장 마감 기준"
+                        >
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={ceilingFinish === "wallpaper"}
+                            onClick={() => changeCeilingFinish("wallpaper")}
+                            className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                              ceilingFinish === "wallpaper"
+                                ? "bg-black text-white shadow-sm"
+                                : "text-black/50 hover:text-black"
+                            }`}
+                          >
+                            도배 · 국내 기본
+                          </button>
+                          <button
+                            type="button"
+                            role="radio"
+                            aria-checked={ceilingFinish === "paint"}
+                            onClick={() => changeCeilingFinish("paint")}
+                            className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                              ceilingFinish === "paint"
+                                ? "bg-black text-white shadow-sm"
+                                : "text-black/50 hover:text-black"
+                            }`}
+                          >
+                            친환경 수성 도장
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <EstimateProForm
                       lines={constructionEstimateToDetailLines(constructionEstimate)}
                       category="residential"

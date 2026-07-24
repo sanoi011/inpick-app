@@ -6,6 +6,20 @@ test("room estimate stays consolidated and schedule uses quantity-based days", a
   await page.goto("/dev/estimate-work-package-sample");
 
   await page.getByRole("button", { name: /4\. 세부내역서/ }).click();
+  const siteConditionSummary = page.getByText("현장 확인 가정 및 변동 조건", {
+    exact: true,
+  });
+  await expect(siteConditionSummary).toBeVisible();
+  await expect(
+    page.getByText(/철거 공사 금액은 기본 철거 단가로 산정한 가견적/),
+  ).not.toBeVisible();
+  await siteConditionSummary.click();
+  await expect(
+    page.getByText(/철거 공사 금액은 기본 철거 단가로 산정한 가견적/),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/철거 공사 금액은 기본 철거 단가로 산정한 가견적/),
+  ).toHaveCount(1);
   const livingToggle = page.getByRole("button", { name: /01\. 거실/ });
   await livingToggle.click();
   const livingGroup = livingToggle.locator("..");

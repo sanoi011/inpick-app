@@ -343,22 +343,38 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
   })).filter((group) => group.rows.length > 0);
 
   if (groups.length === 0) return null;
+  const totalRows = groups.reduce((sum, group) => sum + group.rows.length, 0);
+  const totalAmount = groups.reduce((sum, group) => sum + group.amount, 0);
 
   return (
-    <section className="mb-4 rounded-xl border border-zinc-200 bg-white p-4">
-      <div className="flex items-start gap-2.5">
-        <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-zinc-600" />
-        <div className="min-w-0 flex-1">
+    <details className="group mb-4 overflow-hidden rounded-xl border border-zinc-200 bg-white">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3.5 marker:content-none hover:bg-zinc-50">
+        <div className="flex min-w-0 items-center gap-2.5">
+          <TriangleAlert className="h-4 w-4 shrink-0 text-zinc-600" />
+          <div className="min-w-0">
+            <p className="text-sm font-bold text-zinc-900">
+              현장 확인 가정 및 변동 조건
+            </p>
+            <p className="mt-0.5 truncate text-xs text-zinc-500">
+              철거·전기·설비 {totalRows}건 · 기본단가 가견적 {won(totalAmount)}원
+            </p>
+          </div>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600">
+          {role === "bidder" ? "사업자 수정 가능" : "눌러서 상세보기"}
+          <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+        </span>
+      </summary>
+
+      <div className="border-t border-zinc-200 px-4 py-4">
+        <div className="ml-6 min-w-0">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
-              <h2 className="text-sm font-bold text-zinc-900">현장 확인 공종</h2>
               <p className="mt-0.5 text-[13px] leading-5 text-zinc-500">
-                이미지·도면으로 확인하기 어려운 공종은 기본단가 가견적으로 먼저 반영했습니다.
+                이미지·도면으로 확인하기 어려운 조건을 공종별 한 번만 정리했습니다.
+                개별 아이템에는 반복 안내 대신 ‘기본단가·현장확인’ 표시만 제공합니다.
               </p>
             </div>
-            <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-600">
-              {role === "bidder" ? "사업자 수정 가능" : "현장 확인 후 확정"}
-            </span>
           </div>
 
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -383,7 +399,7 @@ function SiteConditionSummary({ rows, role }: { rows: Row[]; role: "owner" | "bi
           )}
         </div>
       </div>
-    </section>
+    </details>
   );
 }
 
@@ -740,14 +756,6 @@ function EditRow({ l, updateRow, deleteRow, role }: { l: Row; updateRow: any; de
             </span>
           )}
         </div>
-        {l.variationNotice && (
-          <p
-            className="mt-0.5 max-w-md text-xs leading-4 text-zinc-400"
-            title={(l.siteAdjustmentFactors || []).join(" · ")}
-          >
-            {l.variationNotice}
-          </p>
-        )}
         {l.siteConditionAdjustmentReason && (
           <p className="mt-0.5 text-xs font-semibold text-zinc-600">
             사용자 조건 반영 · {l.siteConditionAdjustmentReason}

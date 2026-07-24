@@ -16,7 +16,7 @@ import type {
   TradeSummaryRow,
 } from "./types";
 import { createEstimateDocumentNo } from "./document-number";
-import { SITE_CONDITION_NOTICES } from "@/lib/inpick/estimate-v2/site-condition-pricing";
+import { SITE_CONDITION_DOCUMENT_SUMMARY } from "@/lib/inpick/estimate-v2/site-condition-pricing";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
 
 export interface BuildSnapshotInput {
@@ -315,9 +315,7 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
     ),
   );
   const siteConditionAssumptions = [
-    SITE_CONDITION_NOTICES.demolition,
-    SITE_CONDITION_NOTICES.electrical,
-    SITE_CONDITION_NOTICES.plumbing,
+    SITE_CONDITION_DOCUMENT_SUMMARY,
     ...appliedSiteConditions.map((condition) => `사용자 현장조건 사전답변: ${condition}`),
     ...(input.mode === "contractor_bid"
       ? ["사업자 입찰 견적에서는 현장 확인 결과를 반영해 해당 공종의 수량·재료단가·노무단가를 수정할 수 있습니다."]
@@ -334,13 +332,9 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
     "관할 관청 인허가 비용",
     "이사비, 보관비, 청소비 (별도 협의)",
   ];
-  const warnings: string[] = Array.from(
-    new Set(
-      (input.constructionEstimate?.lines || [])
-        .filter((line) => line.siteVerificationRequired && line.variationNotice)
-        .map((line) => String(line.variationNotice)),
-    ),
-  );
+  // 현장조건은 위 assumptions에 한 번만 정리한다. 라인별 variationNotice를
+  // warnings에 다시 넣으면 PDF 특기사항에서 동일 장문이 반복된다.
+  const warnings: string[] = [];
   // mock 자재 매칭 결과는 warning
   const matchMeta = input.buildEstimateResult?.matchMetaByRoom || {};
   for (const room of Object.keys(matchMeta)) {

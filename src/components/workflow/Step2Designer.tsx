@@ -774,8 +774,16 @@ export default function Step2Designer({
     const draft: Record<string, number> = {};
     for (const room of finalSelectionRooms) {
       const selected = value.selectedByRoom[room.key];
-      draft[room.key] =
-        selected != null && room.renders[selected] ? selected : Math.max(0, room.renders.length - 1);
+      const selectedIsAvailable =
+        selected != null &&
+        room.renders.some(
+          (render, renderIndex) =>
+            (render.selectionIndex ?? renderIndex) === selected,
+        );
+      const fallbackRender = room.renders[room.renders.length - 1];
+      draft[room.key] = selectedIsAvailable
+        ? selected
+        : (fallbackRender.selectionIndex ?? Math.max(0, room.renders.length - 1));
     }
     setFinalSelectionDraft(draft);
     setEstimateTransitionError(null);
@@ -787,7 +795,10 @@ export default function Step2Designer({
     const finalSelectedImageUrlsByRoom: Record<string, string> = {};
     for (const room of finalSelectionRooms) {
       const selectedIndex = confirmedDraft[room.key];
-      const render = room.renders[selectedIndex];
+      const render = room.renders.find(
+        (candidate, renderIndex) =>
+          (candidate.selectionIndex ?? renderIndex) === selectedIndex,
+      );
       if (!render) {
         setEstimateTransitionError(`${room.label}의 최종 이미지를 1장 선택해주세요.`);
         return;
@@ -1135,6 +1146,8 @@ export default function Step2Designer({
         revisedPrompt: data.prompt,
         costUsd: data.costUsd ?? 0.01,
         timestamp: new Date().toISOString(),
+        accessState: "unlocked",
+        entitlementGranted: true,
         metadata: sourceRender.metadata,
       };
       const nextRenders = [...roomRenders, editedRender];
@@ -1623,6 +1636,8 @@ export default function Step2Designer({
         revisedPrompt: result.revisedPrompt,
         costUsd: result.costUsd ?? 0.19,
         timestamp: new Date().toISOString(),
+        accessState: "unlocked",
+        entitlementGranted: true,
         // P6-4: render-room이 채워준 도면 기반 메타 그대로 RenderItem에 저장
         metadata: result.metadata,
       };
@@ -3270,8 +3285,22 @@ function FinalDesignSelectionModal({
   onClose: () => void;
   onConfirm: (selectedByRoom: Record<string, number>) => void;
 }) {
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const previousBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
   if (typeof document === "undefined") return null;
-  const ready = rooms.every((room) => room.renders[selectedByRoom[room.key]]);
+  const ready = rooms.every((room) =>
+    room.renders.some(
+      (render, renderIndex) =>
+        (render.selectionIndex ?? renderIndex) === selectedByRoom[room.key],
+    ),
+  );
 
   return createPortal(
     <>
@@ -3309,7 +3338,13 @@ function FinalDesignSelectionModal({
           </button>
         </header>
 
-        <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5 sm:px-7">
+        <div
+          data-lenis-prevent
+          data-testid="final-design-selection-scroll"
+          tabIndex={0}
+          className="min-h-0 flex-1 touch-pan-y space-y-6 overflow-y-auto overscroll-contain px-5 py-5 outline-none sm:px-7"
+          style={{ WebkitOverflowScrolling: "touch", scrollbarGutter: "stable" }}
+        >
           {rooms.map((room) => (
             <section key={room.key}>
               <div className="mb-2.5 flex items-center justify-between">

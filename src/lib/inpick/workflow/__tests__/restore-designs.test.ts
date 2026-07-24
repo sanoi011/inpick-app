@@ -124,3 +124,54 @@ test("an expired final selection URL is replaced with the restored signed URL", 
     "https://signed.example/bath.webp",
   );
 });
+
+test("a public second-generation output is restored as an accessible final candidate", () => {
+  const restored = mergeRestoredDesigns(
+    emptyStep2(),
+    [
+      output({
+        id: "output-entry-edit-2",
+        targetId: "entrance",
+        targetName: "현관",
+        renderKind: "space_edit",
+        imageUrl: "https://public.example/entry-edit-2.webp",
+        createdAt: "2026-07-25T06:00:00.000Z",
+      }),
+    ],
+    [],
+  );
+  const render = restored.rendersByRoom.entrance[0];
+
+  assert.equal(render.url, "https://public.example/entry-edit-2.webp");
+  assert.equal(render.accessState, "free");
+  assert.equal(render.entitlementGranted, true);
+});
+
+test("an existing public output without access metadata is normalized as free", () => {
+  const step2 = emptyStep2();
+  step2.rendersByRoom.entrance = [
+    {
+      url: "https://public.example/entry-edit-2.webp",
+      prompt: "현관 2차 시안",
+      costUsd: 0.01,
+      timestamp: "2026-07-25T06:00:00.000Z",
+    },
+  ];
+
+  const restored = mergeRestoredDesigns(
+    step2,
+    [
+      output({
+        id: "output-entry-edit-2",
+        targetId: "entrance",
+        targetName: "현관",
+        renderKind: "space_edit",
+        imageUrl: "https://public.example/entry-edit-2.webp",
+      }),
+    ],
+    [],
+  );
+
+  assert.equal(restored.rendersByRoom.entrance.length, 1);
+  assert.equal(restored.rendersByRoom.entrance[0].accessState, "free");
+});

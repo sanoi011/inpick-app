@@ -136,12 +136,25 @@ export function mergeRestoredDesigns(
       continue;
     }
 
-    if (
-      existing.some(
-        (render) =>
-          render.url === output.imageUrl || render.refinedUrl === output.imageUrl,
-      )
-    ) {
+    const publicExistingIndex = existing.findIndex(
+      (render) =>
+        render.url === output.imageUrl || render.refinedUrl === output.imageUrl,
+    );
+    if (publicExistingIndex >= 0) {
+      const matchedRender = existing[publicExistingIndex];
+      if (
+        matchedRender.accessState !== "free" ||
+        matchedRender.entitlementGranted !== true
+      ) {
+        const normalized = [...existing];
+        normalized[publicExistingIndex] = {
+          ...matchedRender,
+          accessState: "free",
+          entitlementGranted: true,
+        };
+        next.rendersByRoom[roomKey] = normalized;
+        changed = true;
+      }
       continue;
     }
     const cleaned = existing.filter(
@@ -154,6 +167,10 @@ export function mergeRestoredDesigns(
       prompt: output.prompt || "",
       costUsd: 0,
       timestamp: output.createdAt || new Date().toISOString(),
+      // locked-design 마커가 아닌 공개 design_output은 이미 생성·지급된 결과다.
+      // 명시적인 free 상태가 없으면 비거실 2차 시안이 최종 선택창에서 걸러진다.
+      accessState: "free",
+      entitlementGranted: true,
     });
     next.rendersByRoom[roomKey] = cleaned;
     if (next.selectedByRoom[roomKey] == null) {

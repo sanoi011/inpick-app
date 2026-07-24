@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const PROJECT_ID = "11111111-2222-4333-8444-555555555555";
+const USER_ID = "99999999-2222-4333-8444-555555555555";
 
 function imageData(label: string, from: string, to: string): string {
   const svg = `
@@ -59,7 +60,29 @@ test("Step 2 routes one prompt to a room edit and carries only final room images
   };
 
   await page.addInitScript(
-    ({ projectId, seededStep1, seededStep2 }) => {
+    ({ projectId, seededStep1, seededStep2, userId }) => {
+      const user = {
+        id: userId,
+        aud: "authenticated",
+        role: "authenticated",
+        email: "qa@inpick.test",
+        app_metadata: {},
+        user_metadata: {},
+        created_at: "2026-07-25T00:00:00.000Z",
+      };
+      const authSession = JSON.stringify({
+        access_token: "qa-access-token",
+        refresh_token: "qa-refresh-token",
+        expires_in: 3_600,
+        expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+        token_type: "bearer",
+        user,
+      });
+      const encodedSession = btoa(authSession)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+      document.cookie = `sb-example-auth-token=base64-${encodedSession}; path=/; SameSite=Lax`;
       const snapshot = {
         projectId,
         step1: seededStep1,
@@ -77,9 +100,42 @@ test("Step 2 routes one prompt to a room edit and carries only final room images
       sessionStorage.setItem("workflow_step2", JSON.stringify(seededStep2));
       sessionStorage.setItem("workflow_step", "2");
     },
-    { projectId: PROJECT_ID, seededStep1: step1, seededStep2: step2 },
+    {
+      projectId: PROJECT_ID,
+      seededStep1: step1,
+      seededStep2: step2,
+      userId: USER_ID,
+    },
   );
 
+  await page.route("https://example.supabase.co/auth/v1/user**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        id: USER_ID,
+        aud: "authenticated",
+        role: "authenticated",
+        email: "qa@inpick.test",
+        app_metadata: {},
+        user_metadata: {},
+        created_at: "2026-07-25T00:00:00.000Z",
+      }),
+    });
+  });
+  await page.route("**/api/user/balance", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        balance: 50,
+        totalUsed: 0,
+        totalPurchased: 50,
+        authenticated: true,
+        userId: USER_ID,
+      }),
+    });
+  });
   await page.route("**/api/inpick/workflow-state", async (route) => {
     if (route.request().method() === "GET") {
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ exists: false }) });
@@ -153,6 +209,18 @@ test("Step 2 routes one prompt to a room edit and carries only final room images
   await page.getByRole("button", { name: /최종 이미지 선택 → 견적/ }).click();
   await expect(page.getByText("견적에 사용할 실별 최종 이미지", { exact: true })).toBeVisible();
   await expect(page.getByText("각 실에서 1장씩 선택하세요.", { exact: false })).toBeVisible();
+  await expect(page.getByTestId(/^final-design-option-master-/)).toHaveCount(3);
+  // 두 실만 있는 QA 데이터도 실제 6실 사용자와 같은 overflow 조건이 되도록 높이를 줄인다.
+  await page.setViewportSize({ width: 1000, height: 500 });
+  const selectionScroll = page.getByTestId("final-design-selection-scroll");
+  await selectionScroll.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await selectionScroll.hover();
+  await page.mouse.wheel(0, 700);
+  await expect
+    .poll(() => selectionScroll.evaluate((element) => element.scrollTop))
+    .toBeGreaterThan(0);
   const livingFirstOption = page.getByTestId("final-design-option-living-0");
   await livingFirstOption.click();
   await expect(livingFirstOption).toHaveAttribute("aria-pressed", "true");

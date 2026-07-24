@@ -21,6 +21,10 @@ import type {
   WorkAction,
 } from "./types";
 import type { SiteConditionAnswers } from "./site-condition-answers";
+import {
+  applyResidentialCeilingFinishPreference,
+  type ResidentialCeilingFinish,
+} from "./ceiling-finish-preference";
 
 interface MinimalRoom {
   /** "거실" / "안방" / "주방" 등 한국어 이름 */
@@ -56,6 +60,8 @@ export interface ClientBuildEstimateInput {
   projectMode: ProjectMode;
   rooms: MinimalRoom[];
   siteConditions?: SiteConditionAnswers;
+  /** 국내 주거 기본은 도배. 사용자가 도장을 명시적으로 선택할 수 있다. */
+  ceilingFinish?: ResidentialCeilingFinish;
 }
 
 /**
@@ -187,7 +193,11 @@ export function buildConstructionEstimateClientSide(
   return buildConstructionEstimate({
     projectId: input.projectId,
     projectMode: input.projectMode,
-    surfacePlans,
+    surfacePlans: applyResidentialCeilingFinishPreference(
+      surfacePlans,
+      input.projectMode,
+      input.ceilingFinish || "wallpaper",
+    ),
     quantityBasisByRoom,
     kitchenPlanOverrides: Object.fromEntries(
       input.rooms

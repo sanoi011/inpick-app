@@ -85,6 +85,10 @@ export const SITE_CONDITION_NOTICES = {
   waste: WASTE_NOTICE,
 } as const;
 
+/** PDF 특기사항에 공종별 장문을 반복하지 않고 한 번만 표기하는 문구. */
+export const SITE_CONDITION_DOCUMENT_SUMMARY =
+  "철거·전기·설비·폐기물 공사는 현장 확인 전 기본단가 가견적입니다. 기존 마감과 배선·배관 상태, 실제 폐기물량 및 양중·반출 조건을 확인한 뒤 사업자가 수량과 단가를 수정·확정합니다.";
+
 export function getSiteConditionPricingMeta(
   tradeCode: string,
 ): SiteConditionPricingMeta | undefined {
