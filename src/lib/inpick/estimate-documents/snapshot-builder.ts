@@ -166,13 +166,20 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
   // P13-1: v2 ConstructionEstimate가 있으면 그 lines 우선 사용 (manufacturer/supplier/priceSource 포함)
   if (input.constructionEstimate?.lines && Array.isArray(input.constructionEstimate.lines)) {
     for (const l of input.constructionEstimate.lines) {
+      const isSupportingWork = [
+        "철거", "제거", "바탕", "면정리", "보수", "부자재", "방습", "접착",
+        "폐기", "반출", "양중", "운반", "초배", "방수", "몰탈", "모르타르",
+        "실리콘", "줄눈",
+      ].some((keyword) => String(l.taskNameKo || "").includes(keyword));
       lines.push({
         id: `L${String(lineIdCounter++).padStart(4, "0")}`,
         tradeCode: String(l.tradeCode || "17"),
         tradeName: String(l.tradeNameKo || "기타공사"),
         roomName: l.roomName,
-        itemName: String(l.itemNameKo || l.productName || "자재"),
-        spec: l.spec || l.productSpec,
+        // 원가내역 품명은 실제 작업명을 사용한다. 구 resolver가 바탕·철거 라인의
+        // itemNameKo까지 최종 마감재명으로 덮어쓴 기존 견적도 문서 생성 시 복구한다.
+        itemName: String(l.taskNameKo || l.itemNameKo || l.productName || "자재"),
+        spec: isSupportingWork ? l.spec : l.productSpec || l.spec,
         unit: String(l.unit || "EA"),
         quantity: Number(l.quantity) || 0,
         materialUnitPrice: Number(l.materialUnitPrice) || 0,
@@ -183,21 +190,21 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
         expenseAmount: Number(l.expenseAmount) || 0,
         totalAmount: Number(l.totalAmount) || 0,
         // P13: product/price meta — PDF 자재집계표용
-        brand: l.brand,
-        productName: l.productName,
-        sku: l.sku,
-        materialProductId: l.materialProductId,
-        priceSource: l.materialPriceSource,
-        confidence: l.priceConfidence,
-        manufacturer: l.manufacturer,
-        supplierName: l.supplierName,
-        vendorName: l.vendorName,
-        modelNo: l.modelNo,
-        productSpec: l.productSpec,
-        materialCategoryName: l.materialCategoryName,
-        matchStatus: l.productMatchStatus,
-        fallbackReason: l.fallbackReason,
-        appliedAt: l.materialPriceAppliedAt,
+        brand: isSupportingWork ? undefined : l.brand,
+        productName: isSupportingWork ? undefined : l.productName,
+        sku: isSupportingWork ? undefined : l.sku,
+        materialProductId: isSupportingWork ? undefined : l.materialProductId,
+        priceSource: isSupportingWork ? undefined : l.materialPriceSource,
+        confidence: isSupportingWork ? undefined : l.priceConfidence,
+        manufacturer: isSupportingWork ? undefined : l.manufacturer,
+        supplierName: isSupportingWork ? undefined : l.supplierName,
+        vendorName: isSupportingWork ? undefined : l.vendorName,
+        modelNo: isSupportingWork ? undefined : l.modelNo,
+        productSpec: isSupportingWork ? undefined : l.productSpec,
+        materialCategoryName: isSupportingWork ? undefined : l.materialCategoryName,
+        matchStatus: isSupportingWork ? undefined : l.productMatchStatus,
+        fallbackReason: isSupportingWork ? undefined : l.fallbackReason,
+        appliedAt: isSupportingWork ? undefined : l.materialPriceAppliedAt,
         calculationBasis: l.quantityFormulaKo,
       });
     }

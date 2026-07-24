@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
   const { data: lines, error: lineErr } = await admin
     .from("construction_estimate_lines")
     .select(
-      "id, trade_code, trade_name_ko, task_name_ko, item_name_ko, brand, sku, spec, unit, quantity, material_unit_price, labor_unit_price, expense_unit_price, total_amount, source, product_match_status, material_category_code, assumptions, warnings, pricing_basis, contractor_editable, site_verification_required, variation_notice, site_adjustment_factors, site_condition_adjustment_factor, site_condition_adjustment_reason",
+      "id, sort_no, trade_code, trade_name_ko, sub_trade_code, sub_trade_name_ko, room_id, room_name, room_type, surface_type, task_name_ko, item_name_ko, brand, manufacturer, supplier_name, vendor_name, product_name, model_no, sku, spec, product_spec, unit, quantity_formula_ko, quantity, material_unit_price, labor_unit_price, expense_unit_price, material_amount, labor_amount, expense_amount, total_amount, included, source, confidence, evidence_refs, product_match_status, material_category_code, material_price_source, fallback_reason, assumptions, warnings, pricing_basis, contractor_editable, site_verification_required, variation_notice, site_adjustment_factors, site_condition_adjustment_factor, site_condition_adjustment_reason",
     )
     .eq("estimate_id", estimate.id)
     .order("trade_code", { ascending: true });

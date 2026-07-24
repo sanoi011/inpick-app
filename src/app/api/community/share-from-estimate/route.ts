@@ -42,6 +42,13 @@ function getAdmin() {
   });
 }
 
+interface RequestedDesignImage {
+  imageUrl?: string;
+  targetId?: string;
+  label?: string;
+  lockedAssetId?: string;
+}
+
 interface ShareBody {
   projectId?: string;
   estimateContextId?: string;
@@ -51,6 +58,106 @@ interface ShareBody {
   content?: string;
   visibility?: Partial<CommunityShareVisibilityV2>;
   snapshotType?: "estimate_share" | "design_share";
+  designImages?: RequestedDesignImage[];
+}
+
+interface DesignOutputRow {
+  id: string;
+  image_url: string;
+  target_id: string;
+  target_name: string;
+  status: string;
+  created_at: string;
+}
+
+interface LockedAssetPublishRow {
+  id: string;
+  design_output_id: string;
+  storage_bucket: string;
+  original_storage_path: string;
+  mime_type: string;
+}
+
+async function publishLockedDesignImages(
+  admin: NonNullable<ReturnType<typeof getAdmin>>,
+  userId: string,
+  projectId: string,
+  assetIds: string[],
+): Promise<Map<string, string>> {
+  const uniqueIds = Array.from(new Set(assetIds.filter(Boolean))).slice(0, 8);
+  if (uniqueIds.length === 0) return new Map();
+
+  const [{ data: assets, error: assetsError }, { data: grants, error: grantsError }] =
+    await Promise.all([
+      admin
+        .from("locked_design_assets")
+        .select(
+          "id, design_output_id, storage_bucket, original_storage_path, mime_type",
+        )
+        .eq("project_id", projectId)
+        .eq("user_id", userId)
+        .in("id", uniqueIds),
+      admin
+        .from("locked_design_access_grants")
+        .select("asset_id")
+        .eq("user_id", userId)
+        .in("asset_id", uniqueIds),
+    ]);
+  if (assetsError || grantsError) {
+    console.error(
+      "[share-from-estimate] locked image lookup failed:",
+      assetsError?.message || grantsError?.message,
+    );
+    return new Map();
+  }
+
+  const grantedIds = new Set(
+    ((grants ?? []) as Array<{ asset_id: string }>).map((grant) => grant.asset_id),
+  );
+  const result = new Map<string, string>();
+
+  for (const asset of (assets ?? []) as LockedAssetPublishRow[]) {
+    if (!grantedIds.has(asset.id)) continue;
+    const { data: privateImage, error: downloadError } = await admin.storage
+      .from(asset.storage_bucket || "private-design-renders")
+      .download(asset.original_storage_path);
+    if (downloadError || !privateImage) {
+      console.error(
+        "[share-from-estimate] private design download failed:",
+        downloadError?.message,
+      );
+      continue;
+    }
+
+    const extension =
+      asset.mime_type === "image/png"
+        ? "png"
+        : asset.mime_type === "image/jpeg"
+          ? "jpg"
+          : "webp";
+    const publicPath = `community/${userId}/projects/${projectId}/${asset.id}.${extension}`;
+    const bytes = new Uint8Array(await privateImage.arrayBuffer());
+    const { error: uploadError } = await admin.storage
+      .from("uploads")
+      .upload(publicPath, bytes, {
+        contentType: asset.mime_type || "image/webp",
+        cacheControl: "31536000",
+        upsert: true,
+      });
+    if (uploadError) {
+      console.error(
+        "[share-from-estimate] public design upload failed:",
+        uploadError.message,
+      );
+      continue;
+    }
+    const { data: publicData } = admin.storage
+      .from("uploads")
+      .getPublicUrl(publicPath);
+    if (publicData.publicUrl) result.set(asset.id, publicData.publicUrl);
+  }
+
+  return result;
 }
 
 export async function POST(req: NextRequest) {
@@ -130,22 +237,82 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 3) design_outputs 로드
-  const { data: designs } = await admin
+  // 3) design_outputs 로드 — 실제 스키마(target_name/status 4종)를 사용한다.
+  const { data: designs, error: designsError } = await admin
     .from("design_outputs")
-    .select("id, image_url, target_label, style, status")
+    .select("id, image_url, target_id, target_name, status, created_at")
     .eq("project_id", body.projectId)
-    .eq("status", "completed");
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  if (designsError) {
+    console.error("[share-from-estimate] design output lookup failed:", designsError.message);
+    return NextResponse.json(
+      { error: "design_output_lookup_failed", hint: designsError.message },
+      { status: 500 },
+    );
+  }
 
-  const designOutputs = (designs ?? []).map((d) => {
-    const row = d as Record<string, unknown>;
-    return {
-      id: row.id as string,
-      imageUrl: (row.image_url as string | null) ?? null,
-      targetLabel: (row.target_label as string | null) ?? null,
-      style: (row.style as string | null) ?? null,
+  const designRows = (designs ?? []) as DesignOutputRow[];
+  const requestedImages = Array.isArray(body.designImages)
+    ? body.designImages
+        .filter((image) => image && typeof image === "object")
+        .slice(0, 8)
+    : [];
+  const markerAssetIds = designRows.flatMap((row) =>
+    row.image_url.startsWith("locked-design:")
+      ? [row.image_url.slice("locked-design:".length)]
+      : [],
+  );
+  const requestedAssetIds = requestedImages.flatMap((image) =>
+    typeof image.lockedAssetId === "string" ? [image.lockedAssetId] : [],
+  );
+  const publicUrlByAsset = visibility.showDesignImages
+    ? await publishLockedDesignImages(
+        admin,
+        user.id,
+        body.projectId,
+        requestedAssetIds.length > 0 ? requestedAssetIds : markerAssetIds,
+      )
+    : new Map<string, string>();
+  const outputByTargetId = new Map<string, DesignOutputRow>();
+  for (const row of designRows) {
+    if (!outputByTargetId.has(row.target_id)) outputByTargetId.set(row.target_id, row);
+  }
+
+  const selectedSources =
+    requestedImages.length > 0
+      ? requestedImages
+      : designRows.map((row) => ({
+          imageUrl: row.image_url,
+          targetId: row.target_id,
+          label: row.target_name,
+          lockedAssetId: row.image_url.startsWith("locked-design:")
+            ? row.image_url.slice("locked-design:".length)
+            : undefined,
+        }));
+  const seenPublishedUrls = new Set<string>();
+  const designOutputs = selectedSources.flatMap((selection, index) => {
+    const matchedOutput =
+      (selection.targetId && outputByTargetId.get(selection.targetId)) ||
+      designRows.find((row) => row.image_url === selection.imageUrl);
+    const publicLockedUrl = selection.lockedAssetId
+      ? publicUrlByAsset.get(selection.lockedAssetId)
+      : undefined;
+    const verifiedPublicUrl =
+      matchedOutput?.image_url.startsWith("http")
+        ? matchedOutput.image_url
+        : undefined;
+    const imageUrl = publicLockedUrl || verifiedPublicUrl;
+    if (!imageUrl || seenPublishedUrls.has(imageUrl)) return [];
+    seenPublishedUrls.add(imageUrl);
+    return [{
+      id: matchedOutput?.id || `selected-design-${index}`,
+      imageUrl,
+      targetLabel:
+        selection.label || matchedOutput?.target_name || "디자인",
+      style: null,
       isPublicAllowed: true,
-    };
+    }];
   });
 
   // 4) redaction
@@ -262,10 +429,19 @@ export async function POST(req: NextRequest) {
       uploader_id: user.id,
       attachment_type: "design_output",
       url: d.imageUrl,
+      thumbnail_url: d.imageUrl,
       sort_order: idx,
       is_public: true,
     }));
-    await admin.from("community_attachments").insert(rows);
+    const { error: attachmentError } = await admin
+      .from("community_attachments")
+      .insert(rows);
+    if (attachmentError) {
+      console.error(
+        "[share-from-estimate] attachment insert failed:",
+        attachmentError.message,
+      );
+    }
   }
 
   // 10) analytics event — 스키마는 event_name/props인데 event_type/properties로 raw insert해

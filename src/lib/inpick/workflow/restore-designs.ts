@@ -61,6 +61,9 @@ export function mergeRestoredDesigns(
     ...step2,
     selectedByRoom: { ...(step2.selectedByRoom || {}) },
     rendersByRoom: { ...(step2.rendersByRoom || {}) },
+    finalSelectedImageUrlsByRoom: {
+      ...(step2.finalSelectedImageUrlsByRoom || {}),
+    },
   };
   let changed = false;
 
@@ -157,6 +160,23 @@ export function mergeRestoredDesigns(
       next.selectedByRoom[roomKey] = cleaned.length - 1;
     }
     changed = true;
+  }
+
+  // 최종 선택 당시 저장된 signed URL은 만료될 수 있다. 선택 인덱스가 가리키는
+  // 결제 완료 자산의 새 URL로 바꿔 Step3/PDF가 오래된 주소를 우선하지 않게 한다.
+  for (const roomKey of Object.keys(next.finalSelectedImageUrlsByRoom || {})) {
+    const selectedIndex = next.selectedByRoom[roomKey];
+    const selectedRender =
+      selectedIndex != null ? next.rendersByRoom[roomKey]?.[selectedIndex] : undefined;
+    const restoredUrl = selectedRender?.refinedUrl || selectedRender?.url;
+    if (
+      restoredUrl &&
+      selectedRender?.accessState !== "locked" &&
+      next.finalSelectedImageUrlsByRoom?.[roomKey] !== restoredUrl
+    ) {
+      next.finalSelectedImageUrlsByRoom![roomKey] = restoredUrl;
+      changed = true;
+    }
   }
 
   return changed ? next : step2;

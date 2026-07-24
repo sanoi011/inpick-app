@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { routePromptToRoom } from "../prompt-room-router";
+import {
+  isDesignGenerationRequest,
+  routePromptToRoom,
+} from "../prompt-room-router";
 
 const tabs = [
   { key: "all", label: "전체" },
@@ -59,4 +62,18 @@ test("keeps consultation mode when the target room has no generated image", () =
 
   assert.equal(route.roomKey, "bedroom");
   assert.equal(route.shouldEditExistingImage, false);
+});
+
+test("detects explicit room image generation requests", () => {
+  assert.equal(isDesignGenerationRequest("이 스타일로 이미지 생성해줘"), true);
+  assert.equal(isDesignGenerationRequest("현관 시안 만들어 주세요"), true);
+  assert.equal(isDesignGenerationRequest("골드 톤은 어떤가요?"), false);
+});
+
+test("treats an affirmative answer to the generation question as a request", () => {
+  assert.equal(
+    isDesignGenerationRequest("네", "이 컨셉으로 이미지를 생성하시겠습니까?"),
+    true,
+  );
+  assert.equal(isDesignGenerationRequest("네", "골드 톤으로 할까요?"), false);
 });

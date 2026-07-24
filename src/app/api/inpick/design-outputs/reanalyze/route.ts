@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "SERVICE_NOT_CONFIGURED" }, { status: 500 });
   }
 
-  let body: { projectId?: string };
+  let body: { projectId?: string; imageUrls?: string[] };
   try {
-    body = (await req.json()) as { projectId?: string };
+    body = (await req.json()) as { projectId?: string; imageUrls?: string[] };
   } catch {
     return NextResponse.json({ error: "INVALID_JSON" }, { status: 400 });
   }
@@ -53,13 +53,24 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "MISSING_PROJECT_ID" }, { status: 400 });
   }
 
-  const { data, error } = await admin
+  let query = admin
     .from("design_outputs")
     .select("*")
     .eq("project_id", body.projectId)
     .eq("user_id", user.id)
     .in("status", ["generated", "analysis_pending", "analysis_failed"])
     .order("created_at", { ascending: true });
+  const selectedImageUrls = Array.from(
+    new Set(
+      (body.imageUrls || [])
+        .filter((url): url is string => typeof url === "string" && url.length > 0)
+        .slice(0, 50),
+    ),
+  );
+  if (selectedImageUrls.length > 0) {
+    query = query.in("image_url", selectedImageUrls);
+  }
+  const { data, error } = await query;
 
   if (error) {
     console.error("[design-outputs/reanalyze] select failed:", error);

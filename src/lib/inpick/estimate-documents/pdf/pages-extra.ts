@@ -7,73 +7,96 @@
 import type jsPDF from "jspdf";
 import type { EstimateDocumentPackage } from "../types";
 import { PAGE } from "./format";
+import { buildScheduleFromDocumentLines } from "@/lib/estimate-pro/schedule-model";
 
 const M = 14; // 좌우 여백(mm)
 
-/* ── 8. 공정 순서·선행공정 ── */
-const PHASE_ORDER: Array<{ name: string; keywords: string[]; note: string }> = [
-  { name: "철거", keywords: ["철거", "폐기"], note: "보양 → 철거 → 폐기물 반출" },
-  { name: "설비·전기 배관", keywords: ["설비", "배관", "전기"], note: "벽체 매립 배관·배선 선시공" },
-  { name: "방수·조적·미장", keywords: ["방수", "조적", "미장"], note: "욕실 방수 후 담수 테스트" },
-  { name: "목공·타일", keywords: ["목공", "타일"], note: "구조 목공 → 벽·바닥 타일" },
-  { name: "마감(도배·도장·바닥·천장)", keywords: ["도배", "도장", "바닥", "마루", "천장", "필름"], note: "천장 → 벽 → 바닥 순 마감" },
-  { name: "창호·가구·주방", keywords: ["창호", "문", "가구", "주방", "샷시"], note: "마감 후 설치물 시공" },
-  { name: "마무리(조명·위생·정리)", keywords: ["조명", "위생", "도기", "걸레받이", "정리", "청소", "잡철", "고정"], note: "기구 부착 → 입주 청소" },
-];
-
 export function drawSchedulePage(doc: jsPDF, pkg: EstimateDocumentPackage) {
+  const schedule = buildScheduleFromDocumentLines(pkg.lines);
   doc.setFont("NanumGothic", "bold");
   doc.setFontSize(15);
-  doc.text("공정 순서 · 선행공정 분석", M, 20);
+  doc.text("수량 기반 예정 공정표", M, 20);
   doc.setFont("NanumGothic", "normal");
   doc.setFontSize(8.5);
   doc.setTextColor(120);
-  doc.text("본 견적의 공종을 표준 시공 순서에 배치한 것입니다. 각 공정은 선행 공정 완료 후 착수를 권장합니다.", M, 27);
+  doc.text(
+    `견적 수량과 표준 일당 시공량·품질 대기시간으로 산정한 예비 공기 ${schedule.totalDays}일입니다. 계약 전 사업자가 수정·확정합니다.`,
+    M,
+    27,
+  );
   doc.setTextColor(0);
 
-  const tradeNames = pkg.tradeSummaries.map((t) => t.tradeName);
-  const rows = PHASE_ORDER.map((p, i) => {
-    const included = tradeNames.filter((n) => p.keywords.some((k) => n.includes(k)));
-    return {
-      order: i + 1,
-      name: p.name,
-      included,
-      preceding: i === 0 ? "—" : PHASE_ORDER.slice(0, i).map((x) => x.name.split("(")[0]).join(" → "),
-      note: p.note,
-    };
-  }).filter((r) => r.included.length > 0);
-
-  const colX = [M, M + 12, M + 62, M + 130, M + 216];
-  let y = 36;
-  doc.setFillColor(240, 240, 240);
-  doc.rect(M, y - 5, PAGE.width - M * 2, 8, "F");
+  const labelWidth = 76;
+  const chartX = M + labelWidth;
+  const chartWidth = PAGE.width - M - chartX;
+  const safeTotalDays = Math.max(1, schedule.totalDays);
+  let y = 39;
+  doc.setFillColor(239, 246, 255);
+  doc.rect(M, y - 6, PAGE.width - M * 2, 9, "F");
   doc.setFont("NanumGothic", "bold");
-  doc.setFontSize(8.5);
-  ["순서", "공정", "포함 공종(본 견적)", "선행 공정", "비고"].forEach((h, i) => doc.text(h, colX[i] + 1, y));
+  doc.setFontSize(7.5);
+  doc.text("공정 / 산정 근거", M + 2, y);
+  [0, 0.25, 0.5, 0.75, 1].forEach((ratio) => {
+    const x = chartX + chartWidth * ratio;
+    doc.setDrawColor(210, 225, 245);
+    doc.line(x, y + 4, x, y + 4 + schedule.phases.length * 10);
+    doc.text(
+      `${Math.round(schedule.totalDays * ratio)}일`,
+      x,
+      y,
+      { align: ratio === 0 ? "left" : ratio === 1 ? "right" : "center" },
+    );
+  });
   y += 8;
-  doc.setFont("NanumGothic", "normal");
-  for (const r of rows) {
-    const inc = doc.splitTextToSize(r.included.join(", "), 64) as string[];
-    const pre = doc.splitTextToSize(r.preceding, 82) as string[];
-    const rowH = Math.max(inc.length, pre.length, 1) * 4.5 + 4;
-    doc.setDrawColor(225);
-    doc.line(M, y + rowH - 4.5, PAGE.width - M, y + rowH - 4.5);
-    doc.text(String(r.order), colX[0] + 3, y);
+
+  schedule.phases.forEach((phase, index) => {
+    const rowY = y + index * 10;
     doc.setFont("NanumGothic", "bold");
-    doc.text(r.name, colX[1] + 1, y);
+    doc.setFontSize(7.5);
+    doc.setTextColor(20, 50, 90);
+    doc.text(phase.name, M + 2, rowY + 3);
     doc.setFont("NanumGothic", "normal");
-    doc.text(inc, colX[2] + 1, y);
-    doc.text(pre, colX[3] + 1, y);
-    doc.setTextColor(120);
-    doc.text(r.note, colX[4] + 1, y);
+    doc.setFontSize(5.6);
+    doc.setTextColor(100);
+    doc.text(
+      doc.splitTextToSize(phase.basis, labelWidth - 5)[0] || "",
+      M + 2,
+      rowY + 6.5,
+    );
+
+    doc.setFillColor(244, 248, 253);
+    doc.roundedRect(chartX, rowY, chartWidth, 6.5, 1.5, 1.5, "F");
+    const barX = chartX + (phase.startDay / safeTotalDays) * chartWidth;
+    const barWidth = Math.max(
+      4,
+      (phase.durationDays / safeTotalDays) * chartWidth,
+    );
+    const blue = Math.max(90, 205 - index * 7);
+    doc.setFillColor(25, 95, blue);
+    doc.roundedRect(barX, rowY, Math.min(barWidth, chartX + chartWidth - barX), 6.5, 1.5, 1.5, "F");
+    doc.setTextColor(255);
+    doc.setFont("NanumGothic", "bold");
+    doc.setFontSize(6.5);
+    doc.text(
+      `${phase.durationDays}일`,
+      Math.min(barX + 2, chartX + chartWidth - 8),
+      rowY + 4.4,
+    );
     doc.setTextColor(0);
-    y += rowH;
+  });
+
+  y += schedule.phases.length * 10 + 3;
+  if (y < PAGE.height - 15) {
+    doc.setFont("NanumGothic", "normal");
+    doc.setFontSize(6.5);
+    doc.setTextColor(105);
+    doc.text(
+      "※ 병렬 투입, 작업 가능 시간, 자재 제작·납기, 현장 조건에 따라 계약 전 입찰 사업자가 시작일과 기간을 수정합니다.",
+      M,
+      y,
+    );
+    doc.setTextColor(0);
   }
-  y += 4;
-  doc.setFontSize(8);
-  doc.setTextColor(120);
-  doc.text("※ 실제 공사 기간·순서는 현장 여건과 시공사 계획에 따라 조정될 수 있습니다.", M, y);
-  doc.setTextColor(0);
 }
 
 /* ── 9. 특기사항·서명란 ── */

@@ -168,7 +168,8 @@ test("Step 2 consultation receives Step 1 apartment and spatial context", async 
   await expect(page.getByText(/입력하신 아파트와 주방 구조를 기준/)).toBeVisible();
 
   await expect.poll(() => chatRequest).not.toBeNull();
-  const context = chatRequest?.context as Record<string, unknown>;
+  const context = (chatRequest as unknown as Record<string, unknown>)
+    .context as Record<string, unknown>;
   expect(context.buildingType).toBe("apartment");
   expect(context.workflowEntry).toBe("apartment_drawing");
   expect(context.address).toBe("대전광역시 중구 대전천서로 709");

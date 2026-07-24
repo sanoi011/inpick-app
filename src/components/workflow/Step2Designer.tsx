@@ -59,7 +59,10 @@ import type {
 } from "@/lib/inpick/estimate-context/types";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
-import { routePromptToRoom } from "@/lib/inpick/workflow/prompt-room-router";
+import {
+  isDesignGenerationRequest,
+  routePromptToRoom,
+} from "@/lib/inpick/workflow/prompt-room-router";
 import { mapPhotoSourcesToRooms } from "@/lib/inpick/photo-source-mapping";
 import { formatPhotoFurnishingRequirements } from "@/lib/inpick/photo-render-prompt";
 import {
@@ -1215,6 +1218,23 @@ export default function Step2Designer({
       : hasImages
         ? "이 사진처럼 꾸미고 싶어요. 어떻게 추천해주실래요?"
         : "";
+    const previousAssistantMessage =
+      [...chatMessages].reverse().find((message) => message.role === "assistant")
+        ?.content || "";
+    if (
+      !hasImages &&
+      isDesignGenerationRequest(userText, previousAssistantMessage)
+    ) {
+      const nextMessages = [
+        ...chatMessages,
+        { role: "user" as const, content: userText },
+      ];
+      setChatMessages(nextMessages);
+      setPrompt("");
+      setPendingAttachments([]);
+      await handleChatToImage(nextMessages);
+      return;
+    }
     const promptRoute = routePromptToRoom(
       userText,
       availableTabs.map((tab) => ({ key: tab.v, label: tab.label })),
@@ -1469,14 +1489,18 @@ export default function Step2Designer({
     }
   };
 
-  const handleChatToImage = async () => {
-    if (chatMessages.length === 0 || extractingPrompt || generating) return;
+  const handleChatToImage = async (messagesOverride?: ChatMessage[]) => {
+    const messages =
+      messagesOverride && messagesOverride.length > 0
+        ? messagesOverride
+        : chatMessages;
+    if (messages.length === 0 || extractingPrompt || generating) return;
     setErrorMsg(null);
     setExtractingPrompt(true);
     try {
       // 이미지 attachment의 base64/data URL은 prompt 추출에 필요하지 않다.
       // text-only로 제한해 Vercel 413 plain-text 응답과 JSON parse crash를 방지한다.
-      const data = await extractDesignPrompt(chatMessages, designChatContext);
+      const data = await extractDesignPrompt(messages, designChatContext);
       // 모드 분기 — workflowEntry 명시적으로만 결정 (MD §3 silent fallback 금지)
       // MD plan §0 — photo_only/commercial은 절대 render-room 호출 X
       const hasSpatialBasis =
@@ -1499,8 +1523,13 @@ export default function Step2Designer({
         );
         return;
       }
-      // 아파트 도면 모드 — 방별 일괄 생성
-      await handleBulkGenerate(data.image_prompt);
+      // 사용자가 실 탭을 고른 경우 해당 실의 새 시안 1장만 생성한다.
+      // "전체" 탭에서만 선택된 모든 실을 일괄 생성한다.
+      if (activeRoom === "all") {
+        await handleBulkGenerate(data.image_prompt);
+      } else {
+        await handleGenerate(data.image_prompt);
+      }
     } catch (e) {
       setErrorMsg(e instanceof Error ? e.message : String(e));
     } finally {
@@ -2577,7 +2606,7 @@ export default function Step2Designer({
               <div className="px-4 py-3 border-t border-black/10 bg-white">
                 <button
                   type="button"
-                  onClick={handleChatToImage}
+                  onClick={() => void handleChatToImage()}
                   disabled={!canGenerate}
                   className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-base font-bold shadow-cta transition-all ${
                     canGenerate

@@ -129,7 +129,7 @@ export function collectFinalSelectionImageUrls(
   return new Set(
     [
       ...selectedOutputs.map((output) => output.imageUrl),
-      ...selections.flatMap((selection) => [selection.imageUrl, selection.sourceImageUrl]),
+      ...selections.map((selection) => selection.imageUrl),
     ].filter((value): value is string => typeof value === "string" && value.length > 0),
   );
 }

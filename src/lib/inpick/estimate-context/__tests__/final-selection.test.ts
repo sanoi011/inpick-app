@@ -42,11 +42,49 @@ test("keeps exactly one explicitly selected image per room", () => {
 test("creates a selected snapshot when its asynchronous DB save has not arrived yet", () => {
   const selected = selectFinalDesignOutputs(
     [],
-    [{ targetId: "master", targetName: "안방", imageUrl: "data:image/png;base64,abc" }],
+    [{
+      targetId: "master",
+      targetName: "안방",
+      imageUrl: "data:image/png;base64,abc",
+      prompt: "오크 강마루와 실크 벽지",
+    }],
     { projectId: "project-1", userId: "user-1", projectMode: "apartment" },
   );
 
   assert.equal(selected.length, 1);
   assert.equal(selected[0].targetName, "안방");
   assert.equal(selected[0].imageUrl, "data:image/png;base64,abc");
+  assert.deepEqual(
+    Array.from(new Set(selected[0].materialHints.map((hint) => hint.surfaceType))).sort(),
+    ["floor", "wall"],
+  );
+});
+
+test("does not copy material analysis from a different image in the same room", () => {
+  const old = output("bath", "https://img/old-bath.png", "2026-07-18T10:00:00.000Z");
+  old.materialHints = [{
+    surfaceType: "floor",
+    materialCategory: "old_tile",
+    materialNameKo: "이전 타일",
+    confidence: 0.9,
+    source: "vision_analysis",
+  }];
+
+  const selected = selectFinalDesignOutputs(
+    [old],
+    [{
+      targetId: "bath",
+      targetName: "욕실",
+      imageUrl: "https://img/new-bath.png",
+      prompt: "새 포세린 타일 욕실",
+    }],
+    { projectId: "project-1", userId: "user-1", projectMode: "apartment" },
+  );
+
+  assert.equal(selected[0].id.startsWith("final-selected:"), true);
+  assert.equal(selected[0].materialHints[0]?.materialCategory, "porcelain_tile");
+  assert.equal(
+    selected[0].materialHints.some((hint) => hint.materialCategory === "old_tile"),
+    false,
+  );
 });

@@ -194,12 +194,21 @@ export function getKitchenLineQuantity(
     case "12-16":
       return plan.faucetEa; // 수전
     case "12-17":
-      return Math.max(plan.hoodEa, plan.cooktopEa); // 후드/쿡탑 (묶음 — 최대값)
+      return plan.hoodEa; // 후드
+    case "12-18":
+      return plan.cooktopEa; // 쿡탑
     case "07-31":
       return plan.backsplashM2; // 백스플래시
     case "04-21":
       return plan.electricalAdditionsEa; // 추가 콘센트
+    case "04-22":
+    case "04-23":
+    case "04-24":
+      return 1; // 인덕션/식기세척기 전용회로, 조리대 작업등 각 1식
     case "05-21":
+      return 2; // 냉수·온수
+    case "05-22":
+    case "05-23":
     case "15-21":
       return 1; // 1식
     default:

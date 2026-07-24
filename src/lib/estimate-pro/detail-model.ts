@@ -35,10 +35,12 @@ export interface DetailLine {
   quantity: number;     // 수량(면적 등)
   matUnit: number;      // 재료비 단가
   labUnit: number;      // 노무비 단가
+  expenseUnit: number;  // 경비 단가
   labWas?: number;      // 보정 전 노무단가 (있으면 보정됨)
   labNote?: string;     // 노무 보정 사유
   matAmount: number;    // 재료비 금액
   labAmount: number;    // 노무비 금액
+  expenseAmount: number;// 경비 금액
   amount: number;       // 합계 금액
   room: string;         // 실(室)
   source: string;       // 단가 근거
@@ -51,6 +53,30 @@ export interface DetailLine {
   siteAdjustmentFactors?: string[];
   siteConditionAdjustmentFactor?: number;
   siteConditionAdjustmentReason?: string;
+  /** ConstructionEstimate의 surface_plan 단위. 실별 화면에서 같은 마감 공정을 1줄로 묶는 키 */
+  workPackageKey?: string;
+  /** 실별 표시에만 사용하는 공사 패키지 대표행 */
+  isWorkPackage?: boolean;
+  /** 대표 수량의 산출 기준(예: 방 바닥면적, 벽 면적) */
+  quantityBasis?: string;
+  /** 원가를 구성하는 철거·바탕·마감·부대공정. 공종별 원본 라인은 별도로 유지된다. */
+  workBreakdown?: DetailWorkBreakdownLine[];
+}
+
+export interface DetailWorkBreakdownLine {
+  id: string;
+  trade: string;
+  subTrade: string;
+  taskName: string;
+  itemName: string;
+  spec: string;
+  unit: string;
+  quantity: number;
+  quantityBasis: string;
+  matAmount: number;
+  laborAmount: number;
+  expenseAmount: number;
+  amount: number;
 }
 
 export interface DetailGroup {
@@ -59,6 +85,7 @@ export interface DetailGroup {
   lines: DetailLine[];
   matSum: number;
   labSum: number;
+  expenseSum: number;
   sum: number;
 }
 
@@ -66,6 +93,7 @@ export interface DetailSheet {
   groups: DetailGroup[];
   directMaterial: number;
   directLabor: number;
+  directExpense: number;
   directTotal: number;
   lineCount: number;
 }
@@ -125,9 +153,11 @@ function fromEngine(line: EstimateLine): DetailLine {
   // 노무 시장가 보정 (itemCode 기준)
   const calib = LABOR_CALIBRATION[line.itemCode];
   const labUnit = calib ? calib.labor : line.laborCost;
+  const expenseUnit = 0;
   const matUnit = line.materialCost;
   const matAmount = round(qty * matUnit);
   const labAmount = round(qty * labUnit);
+  const expenseAmount = 0;
 
   return {
     id: nextId(),
@@ -145,11 +175,13 @@ function fromEngine(line: EstimateLine): DetailLine {
     quantity: qty,
     matUnit,
     labUnit,
+    expenseUnit,
     labWas: calib ? calib.was : undefined,
     labNote: calib ? calib.note : undefined,
     matAmount,
     labAmount,
-    amount: matAmount + labAmount,
+    expenseAmount,
+    amount: matAmount + labAmount + expenseAmount,
     room: line.roomName || '공통',
     source: line.priceSource || '',
     optional: false,
@@ -166,13 +198,15 @@ function add(
   const meta = resolveMaterialMeta(itemName);
   const matAmount = round(qty * matUnit);
   const labAmount = round(qty * labUnit);
+  const expenseUnit = 0;
+  const expenseAmount = 0;
   return {
     id: nextId(),
     trade, order: orderOf(trade), itemCode: '',
     itemName, part: meta.part, spec,
     brand: meta.brand, product: meta.product, priceBand: meta.priceBand, imageHint: meta.imageHint,
-    unit, quantity: qty, matUnit, labUnit, matAmount, labAmount,
-    amount: matAmount + labAmount,
+    unit, quantity: qty, matUnit, labUnit, expenseUnit, matAmount, labAmount,
+    expenseAmount, amount: matAmount + labAmount + expenseAmount,
     room: opts.room || '공통',
     source: opts.source || '2025 서울 실거래 기준(보강)',
     optional: opts.optional || false,
@@ -295,18 +329,29 @@ export function assembleSheet(all: DetailLine[]): DetailSheet {
     .map(([trade, lines]) => {
       const matSum = lines.reduce((s, x) => s + x.matAmount, 0);
       const labSum = lines.reduce((s, x) => s + x.labAmount, 0);
-      return { trade, order: orderOf(trade), lines, matSum, labSum, sum: matSum + labSum };
+      const expenseSum = lines.reduce((s, x) => s + x.expenseAmount, 0);
+      return {
+        trade,
+        order: orderOf(trade),
+        lines,
+        matSum,
+        labSum,
+        expenseSum,
+        sum: matSum + labSum + expenseSum,
+      };
     })
     .sort((a, b) => a.order - b.order);
 
   const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
   const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
+  const directExpense = groups.reduce((s, g) => s + g.expenseSum, 0);
 
   return {
     groups,
     directMaterial,
     directLabor,
-    directTotal: directMaterial + directLabor,
+    directExpense,
+    directTotal: directMaterial + directLabor + directExpense,
     lineCount: all.length,
   };
 }
@@ -326,15 +371,143 @@ export function assembleByRoom(all: DetailLine[]): DetailSheet {
   }
   let idx = 0;
   const groups: DetailGroup[] = Array.from(byRoom.entries()).map(([room, lines]) => {
-    const sorted = lines.slice().sort((a, b) => (PART_ORDER[a.part] ?? 99) - (PART_ORDER[b.part] ?? 99));
+    // 소비자용 실별 내역은 같은 surface_plan에서 전개된 원가 라인을
+    // "거실 > 바닥 > 강마루 마감공사" 한 줄로 표시한다.
+    // 철거·바탕·부자재·마감·폐기물 원본은 workBreakdown과 공종별 화면에 그대로 보존한다.
+    const sorted = collapseSurfaceWorkPackages(lines)
+      .sort((a, b) => (PART_ORDER[a.part] ?? 99) - (PART_ORDER[b.part] ?? 99));
     const matSum = sorted.reduce((s, x) => s + x.matAmount, 0);
     const labSum = sorted.reduce((s, x) => s + x.labAmount, 0);
-    return { trade: room, order: ++idx, lines: sorted, matSum, labSum, sum: matSum + labSum };
+    const expenseSum = sorted.reduce((s, x) => s + x.expenseAmount, 0);
+    return {
+      trade: room,
+      order: ++idx,
+      lines: sorted,
+      matSum,
+      labSum,
+      expenseSum,
+      sum: matSum + labSum + expenseSum,
+    };
   });
   groups.sort((a, b) => (a.trade === '공통' ? 1 : 0) - (b.trade === '공통' ? 1 : 0)); // 공통 맨 뒤
   const directMaterial = groups.reduce((s, g) => s + g.matSum, 0);
   const directLabor = groups.reduce((s, g) => s + g.labSum, 0);
-  return { groups, directMaterial, directLabor, directTotal: directMaterial + directLabor, lineCount: all.length };
+  const directExpense = groups.reduce((s, g) => s + g.expenseSum, 0);
+  const lineCount = groups.reduce((sum, group) => sum + group.lines.length, 0);
+  return {
+    groups,
+    directMaterial,
+    directLabor,
+    directExpense,
+    directTotal: directMaterial + directLabor + directExpense,
+    lineCount,
+  };
+}
+
+const PACKAGE_PARTS = new Set<PartCode>(['바닥', '벽', '천장']);
+
+function collapseSurfaceWorkPackages(lines: DetailLine[]): DetailLine[] {
+  const buckets = new Map<string, DetailLine[]>();
+  const output: Array<{ index: number; line?: DetailLine; packageLines?: DetailLine[] }> = [];
+
+  lines.forEach((line, index) => {
+    if (!line.workPackageKey || !PACKAGE_PARTS.has(line.part)) {
+      output.push({ index, line });
+      return;
+    }
+    const existing = buckets.get(line.workPackageKey);
+    if (existing) {
+      existing.push(line);
+      return;
+    }
+    const packageLines = [line];
+    buckets.set(line.workPackageKey, packageLines);
+    output.push({ index, packageLines });
+  });
+
+  return output
+    .sort((a, b) => a.index - b.index)
+    .map((entry) => {
+      if (entry.line) return entry.line;
+      const packageLines = entry.packageLines!;
+      return packageLines.length > 1
+        ? createSurfaceWorkPackage(packageLines)
+        : packageLines[0];
+    });
+}
+
+function createSurfaceWorkPackage(lines: DetailLine[]): DetailLine {
+  // 마감재 라인은 일반적으로 패키지에서 재료비 비중이 가장 크다.
+  // 비동기 resolver가 모든 하위 라인의 품명을 덮어쓴 구 견적도 taskName 기반 어댑터와
+  // 이 선택 규칙으로 정상적인 대표 마감을 복구한다.
+  const finish = lines.reduce((best, line) =>
+    line.matAmount > best.matAmount ? line : best
+  );
+  const sameUnit = lines.filter((line) =>
+    line.unit === finish.unit && line.quantity > 0
+  );
+  const quantityBasisLine = sameUnit.reduce(
+    (best, line) => line.quantity < best.quantity ? line : best,
+    sameUnit[0] || finish,
+  );
+  const quantity = quantityBasisLine.quantity || finish.quantity || 1;
+  const matAmount = round(lines.reduce((sum, line) => sum + line.matAmount, 0));
+  const labAmount = round(lines.reduce((sum, line) => sum + line.labAmount, 0));
+  const expenseAmount = round(lines.reduce((sum, line) => sum + (line.expenseAmount || 0), 0));
+  const itemStem = finish.itemName
+    .replace(/^기존\s+/, '')
+    .replace(/\s+(철거|제거|시공|설치|교체|공사)$/, '')
+    .trim() || finish.itemName;
+  const pricingBases = new Set(lines.map((line) => line.pricingBasis).filter(Boolean));
+  const source = Array.from(new Set(lines.map((line) => line.source).filter(Boolean))).join(' · ');
+
+  return {
+    ...finish,
+    id: `wp-${finish.workPackageKey}`,
+    trade: `${finish.part} 마감공사`,
+    order: Math.min(...lines.map((line) => line.order)),
+    itemName: `${itemStem} ${finish.part} 마감공사`,
+    spec: finish.spec === '-'
+      ? `${lines.length}개 세부공정 포함`
+      : `${finish.spec} · ${lines.length}개 세부공정 포함`,
+    quantity,
+    matUnit: quantity > 0 ? round(matAmount / quantity) : 0,
+    labUnit: quantity > 0 ? round(labAmount / quantity) : 0,
+    expenseUnit: quantity > 0 ? round(expenseAmount / quantity) : 0,
+    matAmount,
+    labAmount,
+    expenseAmount,
+    amount: matAmount + labAmount + expenseAmount,
+    source,
+    isWorkPackage: true,
+    quantityBasis: quantityBasisLine.quantityBasis || `${finish.part} 순면적`,
+    workBreakdown: lines.map((line) => ({
+      id: line.id,
+      trade: line.trade,
+      subTrade: line.itemCode,
+      taskName: line.itemName,
+      itemName: line.product && line.product !== '-' ? line.product : line.itemName,
+      spec: line.spec,
+      unit: line.unit,
+      quantity: line.quantity,
+      quantityBasis: line.quantityBasis || '-',
+      matAmount: line.matAmount,
+      laborAmount: line.labAmount,
+      expenseAmount: line.expenseAmount,
+      amount: line.amount,
+    })),
+    contractorEditable: false,
+    pricingBasis: pricingBases.has('site_allowance')
+      ? 'site_allowance'
+      : finish.pricingBasis,
+    siteVerificationRequired: lines.some((line) => line.siteVerificationRequired),
+    variationNotice: Array.from(
+      new Set(lines.map((line) => line.variationNotice).filter(Boolean)),
+    ).join(' '),
+    siteAdjustmentFactors: Array.from(
+      new Set(lines.flatMap((line) => line.siteAdjustmentFactors || [])),
+    ),
+  };
 }
 
 // ─── 고정 마스터 내역 (모든 견적서 공통 항목셋) ───
@@ -371,29 +544,94 @@ const SURFACE_PART: Record<string, PartCode> = {
   baseboard: '걸레받이/몰딩', fixture: '욕실', sink: '주방', cabinet: '주방', counter: '주방', lighting: '전기',
 };
 
+function isSupportingWorkTask(taskName: string): boolean {
+  return [
+    '철거', '제거', '바탕', '면정리', '보수', '부자재', '방습', '접착',
+    '폐기', '반출', '양중', '운반', '초배', '방수', '몰탈', '모르타르',
+    '실리콘', '줄눈',
+  ].some((keyword) => taskName.includes(keyword));
+}
+
+function materialLookupNameForDiscipline(
+  taskName: string,
+  tradeCode?: string,
+): string {
+  if (tradeCode === '05') {
+    return taskName.replace(
+      /(주방|욕실|싱크대|싱크볼|양변기|세면대|샤워|식기세척기)/g,
+      '',
+    );
+  }
+  if (tradeCode === '04') {
+    return taskName.replace(
+      /(주방|욕실|상부장|인덕션|식기세척기|오븐|환풍기)/g,
+      '',
+    );
+  }
+  return taskName;
+}
+
 export function constructionEstimateToDetailLines(est: ConstructionEstimate): DetailLine[] {
   const lines = (est.lines || []).filter((l) => l.included !== false);
   let i = 0;
   return lines.map((l) => {
     const trade = l.tradeNameKo || l.tradeCode || '기타';
-    const itemName = l.itemNameKo || l.taskNameKo || l.subTradeNameKo || '항목';
-    const meta = resolveMaterialMeta(itemName);
+    // taskName은 원가 라인의 실제 작업(철거/바탕/마감)을 나타낸다.
+    // 구 버전 resolver가 itemNameKo를 최종 마감재명으로 덮어쓴 견적도 여기서 복구한다.
+    const itemName = l.taskNameKo || l.itemNameKo || l.subTradeNameKo || '항목';
+    const materialLookupName = materialLookupNameForDiscipline(itemName, l.tradeCode);
+    const resolvedMeta = resolveMaterialMeta(materialLookupName);
+    const meta =
+      resolvedMeta.brand === '-' && resolvedMeta.product === materialLookupName
+        ? { ...resolvedMeta, product: itemName }
+        : resolvedMeta;
+    const semanticPart = resolvePart(itemName);
+    const disciplinePart: PartCode | undefined =
+      l.tradeCode === '04'
+        ? '전기'
+        : l.tradeCode === '05'
+          ? '설비'
+          : undefined;
+    const preferSemanticPart =
+      semanticPart !== '공통' &&
+      !(l.surfaceType === 'ceiling' && semanticPart === '벽');
     const part: PartCode =
-      (l.surfaceType && SURFACE_PART[l.surfaceType]) || resolvePart(itemName) || meta.part;
-    const brand = l.brand || l.manufacturer || l.productName || meta.brand;
-    const product = l.productName || l.modelNo || l.sku || meta.product;
+      // 전기·설비는 주방/욕실 SurfacePlan에서 파생돼도 독립 공종으로 표시한다.
+      disciplinePart ||
+      // fixture/sink 계획 안의 천장·욕실·주방 작업과 LH의 AB(걸레받이)는
+      // 실제 작업 부위를 우선한다. 단, 천장 벽지는 "벽"으로 오인하지 않는다.
+      (preferSemanticPart
+        ? semanticPart
+        : (l.surfaceType && SURFACE_PART[l.surfaceType]) || semanticPart || meta.part);
+    const supportingWork = isSupportingWorkTask(l.taskNameKo || itemName);
+    // 구 견적의 하위 공정에 잘못 복제된 최종 마감재 상품 메타도 제거한다.
+    const brand = supportingWork
+      ? meta.brand
+      : l.brand || l.manufacturer || meta.brand;
+    const product = supportingWork
+      ? meta.product
+      : l.productName || l.modelNo || l.sku || meta.product;
     const spec = l.spec || l.productSpec || meta.priceBand || '-';
     const qty = Math.round((l.quantity || 0) * 100) / 100;
     const matUnit = Math.round(l.materialUnitPrice || 0);
-    // v2의 경비(expense)는 우리 모델의 노무 측에 합산 (총액 일치 보존)
-    const labUnit = Math.round((l.laborUnitPrice || 0) + (l.expenseUnitPrice || 0));
+    const labUnit = Math.round(l.laborUnitPrice || 0);
+    const expenseUnit = Math.round(l.expenseUnitPrice || 0);
     const matAmount = Math.round(l.materialAmount || 0);
-    const labAmount = Math.round((l.laborAmount || 0) + (l.expenseAmount || 0));
+    const labAmount = Math.round(l.laborAmount || 0);
+    const expenseAmount = Math.round(l.expenseAmount || 0);
+    const surfacePlanRefs = Array.from(new Set(
+      (l.evidenceRefs || [])
+        .filter((ref) => ref.type === 'surface_plan')
+        .map((ref) => ref.id),
+    )).sort();
+    const workPackageKey = surfacePlanRefs.length > 0 && l.surfaceType
+      ? `${l.roomId}:${l.surfaceType}:${surfacePlanRefs.join('+')}`
+      : undefined;
     return {
-      id: `ce-${i++}`,
+      id: l.id || `ce-${i++}`,
       trade,
       order: orderOf(trade),
-      itemCode: l.tradeCode || '',
+      itemCode: l.subTradeCode || l.tradeCode || '',
       itemName,
       part,
       spec,
@@ -405,9 +643,11 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       quantity: qty,
       matUnit,
       labUnit,
+      expenseUnit,
       matAmount,
       labAmount,
-      amount: matAmount + labAmount,
+      expenseAmount,
+      amount: matAmount + labAmount + expenseAmount,
       room: l.roomName || '공통',
       source:
         l.materialPriceSource ||
@@ -422,8 +662,106 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       siteAdjustmentFactors: l.siteAdjustmentFactors,
       siteConditionAdjustmentFactor: l.siteConditionAdjustmentFactor,
       siteConditionAdjustmentReason: l.siteConditionAdjustmentReason,
+      workPackageKey,
+      quantityBasis: l.quantityFormulaKo,
     };
   });
+}
+
+/**
+ * Supabase construction_estimate_lines 응답을 정식 견적 폼 라인으로 변환한다.
+ * 사업자 입찰 화면에서도 소비자 견적과 동일한 문서·수량·공정 모델을 사용하기 위한 어댑터.
+ */
+export function storedConstructionEstimateLinesToDetailLines(
+  storedLines: Array<Record<string, unknown>>,
+): DetailLine[] {
+  const lines = storedLines.map((line, index) => ({
+    id: String(line.id || `stored-${index}`),
+    sortNo: Number(line.sort_no || index),
+    tradeCode: String(line.trade_code || ""),
+    tradeNameKo: String(line.trade_name_ko || line.trade_code || "기타"),
+    subTradeCode: String(line.sub_trade_code || line.trade_code || ""),
+    subTradeNameKo: String(
+      line.sub_trade_name_ko || line.task_name_ko || "세부공종",
+    ),
+    roomId: String(line.room_id || "common"),
+    roomName: String(line.room_name || "공통"),
+    roomType: String(line.room_type || "unknown"),
+    surfaceType: line.surface_type
+      ? String(line.surface_type)
+      : undefined,
+    taskNameKo: String(line.task_name_ko || line.item_name_ko || "항목"),
+    itemNameKo: String(line.item_name_ko || line.task_name_ko || "항목"),
+    brand: line.brand ? String(line.brand) : undefined,
+    manufacturer: line.manufacturer
+      ? String(line.manufacturer)
+      : undefined,
+    supplierName: line.supplier_name
+      ? String(line.supplier_name)
+      : undefined,
+    vendorName: line.vendor_name ? String(line.vendor_name) : undefined,
+    productName: line.product_name ? String(line.product_name) : undefined,
+    modelNo: line.model_no ? String(line.model_no) : undefined,
+    sku: line.sku ? String(line.sku) : undefined,
+    spec: line.spec ? String(line.spec) : undefined,
+    productSpec: line.product_spec
+      ? String(line.product_spec)
+      : undefined,
+    materialCategoryCode: line.material_category_code
+      ? String(line.material_category_code)
+      : undefined,
+    materialPriceSource: line.material_price_source
+      ? String(line.material_price_source)
+      : undefined,
+    productMatchStatus: line.product_match_status
+      ? String(line.product_match_status)
+      : undefined,
+    fallbackReason: line.fallback_reason
+      ? String(line.fallback_reason)
+      : undefined,
+    unit: String(line.unit || "lot"),
+    quantityFormulaKo: String(line.quantity_formula_ko || "저장 견적 수량"),
+    quantity: Number(line.quantity || 0),
+    materialUnitPrice: Number(line.material_unit_price || 0),
+    laborUnitPrice: Number(line.labor_unit_price || 0),
+    expenseUnitPrice: Number(line.expense_unit_price || 0),
+    materialAmount: Number(line.material_amount || 0),
+    laborAmount: Number(line.labor_amount || 0),
+    expenseAmount: Number(line.expense_amount || 0),
+    totalAmount: Number(line.total_amount || 0),
+    included: line.included !== false,
+    source: String(line.source || "standard_fallback_material"),
+    confidence: Number(line.confidence || 0),
+    pricingBasis: line.pricing_basis
+      ? String(line.pricing_basis)
+      : undefined,
+    contractorEditable: Boolean(line.contractor_editable),
+    siteVerificationRequired: Boolean(line.site_verification_required),
+    variationNotice: line.variation_notice
+      ? String(line.variation_notice)
+      : undefined,
+    siteAdjustmentFactors: Array.isArray(line.site_adjustment_factors)
+      ? line.site_adjustment_factors.map(String)
+      : [],
+    siteConditionAdjustmentFactor:
+      line.site_condition_adjustment_factor == null
+        ? undefined
+        : Number(line.site_condition_adjustment_factor),
+    siteConditionAdjustmentReason: line.site_condition_adjustment_reason
+      ? String(line.site_condition_adjustment_reason)
+      : undefined,
+    evidenceRefs: Array.isArray(line.evidence_refs)
+      ? line.evidence_refs
+      : [],
+    assumptions: Array.isArray(line.assumptions)
+      ? line.assumptions.map(String)
+      : [],
+    warnings: Array.isArray(line.warnings) ? line.warnings.map(String) : [],
+  }));
+
+  return constructionEstimateToDetailLines({
+    lines,
+  } as unknown as ConstructionEstimate);
 }
 
 // 마스터 → DetailSheet (수량 0 항목은 옵션으로 숨김 가능)
@@ -434,14 +772,18 @@ export function masterToSheet(items: MasterItem[], opts: { dropZeroQty?: boolean
     .map((m) => {
       const matAmount = round(m.quantity * m.matUnit);
       const labAmount = round(m.quantity * m.labUnit);
+      const expenseUnit = 0;
+      const expenseAmount = 0;
       return {
         id: `m-${i++}`,
         trade: m.trade, order: m.order, itemCode: '', itemName: m.itemName,
         part: m.part, spec: m.spec, brand: m.brand, product: m.product,
         priceBand: m.priceBand, imageHint: m.imageHint,
         unit: m.unit, quantity: m.quantity, matUnit: m.matUnit, labUnit: m.labUnit,
+        expenseUnit,
         labWas: m.labWas, labNote: m.labNote,
-        matAmount, labAmount, amount: matAmount + labAmount,
+        matAmount, labAmount, expenseAmount,
+        amount: matAmount + labAmount + expenseAmount,
         room: '전체', source: m.source, optional: m.optional, added: false,
       };
     });

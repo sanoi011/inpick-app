@@ -456,6 +456,20 @@ function drawTradeDetailPages(doc: jsPDF, pkg: EstimateDocumentPackage) {
       if (y > PAGE.height - 12) {
         doc.addPage("a4", "landscape");
         y = 20;
+        doc.setFont("NanumGothic", "bold");
+        doc.setFontSize(8);
+        doc.text(`공 종 별 내 역 서 · [${code}] ${lines[0].tradeName}`, PAGE.marginX, y);
+        y += 6;
+        doc.setFontSize(6.5);
+        doc.setFillColor(245, 245, 250);
+        doc.rect(PAGE.marginX, y - 2, PAGE.width - PAGE.marginX * 2, 5, "F");
+        for (const c of cols) {
+          const tx = c.align === "right" ? c.x + c.w - 1 : c.x + 1;
+          doc.text(c.label, tx, y + 2, { align: c.align || "left" });
+        }
+        y += 5;
+        doc.setFont("NanumGothic", "normal");
+        doc.setFontSize(6.5);
       }
       doc.text(String(no), cols[0].x + cols[0].w - 1, y + 3, { align: "right" });
       doc.text(truncate(l.roomName || "-", 12), cols[1].x + 1, y + 3);

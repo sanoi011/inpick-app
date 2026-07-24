@@ -99,3 +99,28 @@ test("an existing lightweight render is rehydrated instead of duplicated", () =>
   );
   assert.equal(restored.rendersByRoom.bath[0].accessState, "unlocked");
 });
+
+test("an expired final selection URL is replaced with the restored signed URL", () => {
+  const step2 = emptyStep2();
+  step2.rendersByRoom.bath = [
+    {
+      url: "https://signed.example/expired.webp",
+      lockedAssetId: "asset-bath",
+      accessState: "unlocked",
+      prompt: "밝은 욕실",
+      costUsd: 0,
+      timestamp: "2026-07-24T00:00:00.000Z",
+    },
+  ];
+  step2.selectedByRoom.bath = 0;
+  step2.finalSelectedImageUrlsByRoom = {
+    bath: "https://signed.example/expired.webp",
+  };
+
+  const restored = mergeRestoredDesigns(step2, [output()], [asset()]);
+
+  assert.equal(
+    restored.finalSelectedImageUrlsByRoom?.bath,
+    "https://signed.example/bath.webp",
+  );
+});

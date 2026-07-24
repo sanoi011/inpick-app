@@ -26,9 +26,28 @@ const ROOM_ALIASES: Record<string, string[]> = {
 
 const EDIT_VERB =
   /(바꿔|바꾸|변경|수정|교체|없애|제거|추가|설치|달아|적용|칠해|꾸며|고쳐|보여\s*줘|replace|change|edit|remove|add)/i;
+const GENERATION_REQUEST =
+  /(?:이미지|디자인|시안|렌더(?:링)?)\s*(?:을|를)?\s*(?:생성|만들|뽑|그려|제작)|(?:생성|만들|뽑|그려|제작)\s*(?:해|해줘|해주세요|해\s*주세요|하자|진행)/i;
+const GENERATION_QUESTION =
+  /(?:이미지|디자인|시안|렌더(?:링)?)\s*(?:을|를)?\s*(?:생성|만들|뽑|그려|제작).{0,12}(?:할까요|하시겠습니까|해드릴까요|진행할까요)/i;
+const AFFIRMATIVE =
+  /^(?:네|넵|예|응|어|그래|좋아|좋습니다|해줘|해주세요|진행해|진행해주세요|만들어줘|생성해줘|그렇게\s*해줘)[.!?\s]*$/i;
 
 function normalize(value: string): string {
   return value.toLocaleLowerCase().replace(/[·_,./()[\]{}:;!?"']/g, " ").replace(/\s+/g, " ").trim();
+}
+
+export function isDesignGenerationRequest(
+  prompt: string,
+  previousAssistantMessage = "",
+): boolean {
+  const normalizedPrompt = normalize(prompt);
+  if (!normalizedPrompt) return false;
+  if (GENERATION_REQUEST.test(normalizedPrompt)) return true;
+  return (
+    AFFIRMATIVE.test(normalizedPrompt) &&
+    GENERATION_QUESTION.test(normalize(previousAssistantMessage))
+  );
 }
 
 function aliasesFor(tab: PromptRoomTab): string[] {

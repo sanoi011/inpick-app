@@ -385,7 +385,11 @@ function materialEvidenceToUserEdit(evidence: MaterialEvidenceSnapshot): Record<
 }
 
 function mapEvidenceSurface(surfaceType: string): string {
-  if (["floor", "wall", "ceiling", "door", "window", "lighting"].includes(surfaceType)) {
+  if (
+    ["floor", "wall", "ceiling", "door", "window", "lighting", "fixture", "sink"].includes(
+      surfaceType,
+    )
+  ) {
     return surfaceType;
   }
   if (surfaceType === "cabinet") return "built_in_furniture";
@@ -399,7 +403,9 @@ function dedupeMaterialEdits(edits: unknown[]): unknown[] {
   for (const edit of edits) {
     if (!edit || typeof edit !== "object") continue;
     const row = edit as Record<string, unknown>;
-    const key = `${String(row.roomId || row.room_id || "")}:${String(row.surfaceType || row.surface_type || "")}`;
+    const key = `${String(row.roomId || row.room_id || "")}:${String(
+      row.surfaceType || row.surface_type || "",
+    )}:${String(row.partCode || row.part_code || "")}`;
     map.set(key, edit);
   }
   return Array.from(map.values());

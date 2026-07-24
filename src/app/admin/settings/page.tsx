@@ -152,7 +152,7 @@ export default function AdminSettingsPage() {
             <code className="bg-white px-1 rounded ml-1">NEXT_PUBLIC_TOSS_CLIENT_KEY</code>를 등록하고 재배포하면 자동 전환됩니다.
           </p>
           <p>
-            상품: 토큰 1개=500원 (10/30/100/300개 패키지) + 견적서 PDF 단발 9,900원 (부가세 포함).
+            상품: 토큰 1개=500원 (10/30/100/300개 패키지) · Step3 세부견적/계약·견적 문서 통합 공개 10토큰.
           </p>
         </div>
       </div>

@@ -90,7 +90,7 @@ export async function resolveMaterialProductForLine(
 ): Promise<ResolvedMaterialProduct> {
   const surface = input.surfaceType ?? input.surfacePlan?.surfaceType;
   const materialName =
-    input.surfacePlan?.materialNameKo ||
+    (input.useSelectedSurfaceProduct ? input.surfacePlan?.materialNameKo : undefined) ||
     input.workOutput.defaultItemNameKo ||
     input.workOutput.taskNameKo;
 

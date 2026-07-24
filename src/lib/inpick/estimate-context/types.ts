@@ -44,6 +44,8 @@ export type SurfaceTypeKind =
   | "partition"
   | "lighting"
   | "built_in_furniture"
+  | "fixture"
+  | "sink"
   | "unknown";
 
 export interface MaterialHint {

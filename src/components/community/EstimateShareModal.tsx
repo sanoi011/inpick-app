@@ -14,6 +14,12 @@ interface Props {
   projectId: string;
   estimateContextId?: string;
   estimateId?: string;
+  designImages?: Array<{
+    imageUrl: string;
+    targetId: string;
+    label: string;
+    lockedAssetId?: string;
+  }>;
   /** 기본 제목/본문 자동 생성용 힌트 */
   hints?: {
     areaLabel?: string;
@@ -41,6 +47,7 @@ export default function EstimateShareModal({
   projectId,
   estimateContextId,
   estimateId,
+  designImages,
   hints,
   onClose,
 }: Props) {
@@ -73,6 +80,7 @@ export default function EstimateShareModal({
           content,
           visibility,
           snapshotType: "estimate_share",
+          designImages: visibility.showDesignImages ? designImages : [],
         }),
       });
       const data = await res.json();
