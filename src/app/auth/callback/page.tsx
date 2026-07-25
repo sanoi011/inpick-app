@@ -11,7 +11,6 @@ import {
   AUTH_SESSION_RESTORE_TIMEOUT_MS,
   isAuthOperationTimeoutError,
   waitForOAuthCookieHandoff,
-  withAuthTimeout,
 } from "@/lib/auth/resilience";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
@@ -62,20 +61,14 @@ export default function OAuthCallbackPage() {
       }
 
       try {
-        // 브라우저 클라이언트의 자동 PKCE 교환 자체가 끝날 때까지 기다린다.
-        // initialize()는 이미 생성자에서 시작된 동일 Promise를 반환하므로 code를
-        // 중복 소비하지 않는다. 완료 뒤 getSession/getUser를 다시 호출하지 않는다.
-        const supabase = createClient();
-        const initialization = await withAuthTimeout(
-          supabase.auth.initialize(),
-          undefined,
-          "browser-oauth-initialize",
-        );
-        if (initialization.error) throw initialization.error;
+        // 클라이언트 생성 시 자동 PKCE 교환이 시작된다. initialize() Promise는
+        // 토큰 교환과 세션 쿠키 저장이 이미 끝난 뒤에도 Arc/WebView의 auth lock
+        // 또는 AbortError에 막힐 수 있으므로 성공 조건으로 기다리지 않는다.
+        createClient();
 
-        // Arc에는 같은 verifier 쿠키가 host/domain 범위로 중복 잔존할 수 있다.
-        // initialize 성공 뒤에는 세션 쿠키 존재가 handoff의 기준이며 verifier
-        // 잔존 여부가 성공을 막아서는 안 된다.
+        // 세션 쿠키는 보호 API가 서버에서 다시 검증한다. 콜백은 쿠키 저장만
+        // 확인하고 즉시 복귀해, 성공한 OAuth가 클라이언트 초기화 오류로 취소되지
+        // 않게 한다. verifier 쿠키가 중복 잔존해도 세션 쿠키가 있으면 완료다.
         await waitForOAuthCookieHandoff(
           () => document.cookie,
           AUTH_SESSION_RESTORE_TIMEOUT_MS,
@@ -109,7 +102,7 @@ export default function OAuthCallbackPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stage: "browser_oauth_initialize",
+            stage: "browser_oauth_cookie_handoff",
             errorCode,
             errorMessage,
           }),
