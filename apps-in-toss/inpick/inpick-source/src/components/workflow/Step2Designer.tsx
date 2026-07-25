@@ -1959,6 +1959,94 @@ export default function Step2Designer({
   ).length;
   const totalCount = realRoomTabs.length;
 
+  // 진행 상황 카드 — 데스크톱은 좌측 사이드바 하단, 모바일은 프롬프트 바 아래 최하단에 렌더된다.
+  const progressCard = (
+          <motion.div
+            layout
+            className={`relative mt-auto min-h-[154px] overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
+              estimateTransitioning
+                ? "border-black bg-black text-white shadow-[0_14px_35px_rgba(0,0,0,0.16)]"
+                : "border-black/[0.07] bg-white"
+            }`}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {estimateTransitioning ? (
+                <motion.div
+                  key="estimate-loading"
+                  initial={{ opacity: 0, scale: 0.96 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex min-h-[128px] flex-col items-center justify-center text-center"
+                >
+                  <div className="relative h-12 w-12">
+                    <div className="absolute inset-0 rounded-full border-4 border-white/25" />
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
+                      className="absolute inset-0 rounded-full border-4 border-transparent border-t-white border-r-white"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Sparkles className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm font-extrabold">견적 화면으로 이동 중</p>
+                  <p className="mt-1 text-[0.67rem] font-medium text-white/80">
+                    실별 최종 선택 이미지를 견적에 연결하고 있어요
+                  </p>
+                  <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
+                    <motion.div
+                      animate={{ width: `${estimateTransitionProgress}%` }}
+                      transition={{ duration: 0.35, ease: "easeOut" }}
+                      className="h-full rounded-full bg-white"
+                    />
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="estimate-ready"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <p className="text-xs font-semibold text-black">진행 상황</p>
+                    <span className="text-[0.65rem] tabular font-bold text-black">
+                      {completedCount}/{totalCount}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
+                      transition={{ duration: 0.5 }}
+                      className="h-full bg-black"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={openFinalSelection}
+                    disabled={!hasAnyGeneratedRender}
+                    className={`relative z-10 mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-full bg-black px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-black/75 ${
+                      allRoomsDecided ? "ring-2 ring-black/10" : ""
+                    } disabled:cursor-not-allowed disabled:opacity-35`}
+                  >
+                    {allRoomsDecided ? "최종 이미지 선택 → 견적" : "생성한 실만 선택 → 견적"}
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                  {estimateTransitionError && (
+                    <p className="mt-2 text-center text-[0.68rem] font-semibold text-danger-text">
+                      {estimateTransitionError} 다시 시도해 주세요.
+                    </p>
+                  )}
+                  <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-black/35">
+                    실마다 최종 시안 1장을 고른 뒤 견적서로 이동합니다.
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+  );
+
   return (
     // 기존 InPick 순백색 레이아웃: 사이드바와 메인 캔버스 모두 white
     // 채팅 무한 늘어남 X — 화면 높이 고정, 메시지 영역만 스크롤
@@ -2240,90 +2328,7 @@ export default function Step2Designer({
         </div>}
 
         {/* 진행 상황 — 견적 요청 시 카드 전체가 전환 상태로 바뀐다. */}
-        <motion.div
-          layout
-          className={`relative mt-auto min-h-[154px] overflow-hidden rounded-2xl border p-3 shadow-sm transition-colors duration-300 ${
-            estimateTransitioning
-              ? "border-black bg-black text-white shadow-[0_14px_35px_rgba(0,0,0,0.16)]"
-              : "border-black/[0.07] bg-white"
-          }`}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {estimateTransitioning ? (
-              <motion.div
-                key="estimate-loading"
-                initial={{ opacity: 0, scale: 0.96 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex min-h-[128px] flex-col items-center justify-center text-center"
-              >
-                <div className="relative h-12 w-12">
-                  <div className="absolute inset-0 rounded-full border-4 border-white/25" />
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 0.8, repeat: Infinity, ease: "linear" }}
-                    className="absolute inset-0 rounded-full border-4 border-transparent border-t-white border-r-white"
-                  />
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Sparkles className="h-4 w-4" />
-                  </div>
-                </div>
-                <p className="mt-3 text-sm font-extrabold">견적 화면으로 이동 중</p>
-                <p className="mt-1 text-[0.67rem] font-medium text-white/80">
-                  실별 최종 선택 이미지를 견적에 연결하고 있어요
-                </p>
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/25">
-                  <motion.div
-                    animate={{ width: `${estimateTransitionProgress}%` }}
-                    transition={{ duration: 0.35, ease: "easeOut" }}
-                    className="h-full rounded-full bg-white"
-                  />
-                </div>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="estimate-ready"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-              >
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-xs font-semibold text-black">진행 상황</p>
-                  <span className="text-[0.65rem] tabular font-bold text-black">
-                    {completedCount}/{totalCount}
-                  </span>
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-black/[0.06]">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${(completedCount / Math.max(1, totalCount)) * 100}%` }}
-                    transition={{ duration: 0.5 }}
-                    className="h-full bg-black"
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={openFinalSelection}
-                  disabled={!hasAnyGeneratedRender}
-                  className={`relative z-10 mt-3 inline-flex w-full cursor-pointer items-center justify-center gap-1 rounded-full bg-black px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-black/75 ${
-                    allRoomsDecided ? "ring-2 ring-black/10" : ""
-                  } disabled:cursor-not-allowed disabled:opacity-35`}
-                >
-                  {allRoomsDecided ? "최종 이미지 선택 → 견적" : "생성한 실만 선택 → 견적"}
-                  <ChevronRight className="h-3 w-3" />
-                </button>
-                {estimateTransitionError && (
-                  <p className="mt-2 text-center text-[0.68rem] font-semibold text-danger-text">
-                    {estimateTransitionError} 다시 시도해 주세요.
-                  </p>
-                )}
-                <p className="mt-1.5 text-center text-[0.62rem] leading-snug text-black/35">
-                  실마다 최종 시안 1장을 고른 뒤 견적서로 이동합니다.
-                </p>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
+        <div className="hidden lg:contents">{progressCard}</div>
       </aside>
 
       {/* ─── 메인 캔버스: 순백색 ─── */}
@@ -2755,23 +2760,26 @@ export default function Step2Designer({
                   </button>
                 </>
               )}
-              <div className="flex-1 rounded-full border border-black/10 bg-white px-5 py-3 shadow-sm focus-within:border-black/10 focus-within:ring-2 focus-within:ring-black/10">
-                <textarea
-                  value={currentPrompt}
-                  onChange={(e) => setPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (chatMode) handleChatSend();
-                      else handleGenerate();
-                    }
-                  }}
-                  placeholder={pendingAttachments.length > 0
-                    ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요"
-                    : "상담 또는 수정 요청 — 예) 안방 문만 밝은 오크로 바꿔줘"}
-                  rows={hasGenerated || chatMode ? 1 : 2}
-                  className="w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-black/40"
-                />
+              {/* 채팅 입력 — 푸른 그라데이션 링 + 은은한 글로우로 입력창임을 드러낸다 */}
+              <div className="relative flex-1 rounded-full bg-gradient-to-r from-sky-400/45 via-blue-500/35 to-indigo-400/45 p-[1.5px] shadow-[0_0_20px_rgba(59,130,246,0.22)] transition-shadow duration-300 focus-within:shadow-[0_0_28px_rgba(59,130,246,0.38)]">
+                <div className="rounded-full bg-white px-5 py-3">
+                  <textarea
+                    value={currentPrompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        if (chatMode) handleChatSend();
+                        else handleGenerate();
+                      }
+                    }}
+                    placeholder={pendingAttachments.length > 0
+                      ? "이 사진처럼 꾸며줘 — 원하는 분위기·요청사항을 적어주세요"
+                      : "상담 또는 수정 요청 — 예) 안방 문만 밝은 오크로 바꿔줘"}
+                    rows={hasGenerated || chatMode ? 1 : 2}
+                    className="w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-black/40"
+                  />
+                </div>
               </div>
               <button
                 type="button"
@@ -3265,6 +3273,9 @@ export default function Step2Designer({
           onConfirm={(confirmedDraft) => void confirmFinalSelection(confirmedDraft)}
         />
       )}
+
+      {/* 모바일: 진행 상황 카드 — 프롬프트 작성 → 실 선택 → 견적 순서가 되도록 최하단 배치 */}
+      <div className="lg:hidden">{progressCard}</div>
 
       {/* 토큰 부족 모달 */}
       <AnimatePresence>
