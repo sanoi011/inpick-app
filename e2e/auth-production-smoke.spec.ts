@@ -65,6 +65,12 @@ test.describe("production authentication smoke", () => {
         "redirect_to",
       );
       expect(requestedCallback).toBe(EXPECTED_CALLBACK);
+      const cookieNames = (await page.context().cookies()).map(
+        (cookie) => cookie.name,
+      );
+      expect(
+        cookieNames.some((name) => name.includes("auth-token-code-verifier")),
+      ).toBe(true);
     });
   }
 });
