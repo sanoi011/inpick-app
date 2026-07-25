@@ -43,6 +43,10 @@ export async function GET(request: Request) {
       }
       return NextResponse.redirect(`${origin}${next}`);
     }
+    console.error("[auth/callback] code exchange failed", {
+      code: error.code,
+      message: error.message,
+    });
   }
 
   // 에러 시 auth 페이지로 리다이렉트

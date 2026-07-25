@@ -1,8 +1,24 @@
 import { NextResponse, type NextRequest } from "next/server";
+import {
+  getCanonicalAuthUrl,
+  getRootOAuthRecoveryUrl,
+} from "@/lib/auth/oauth-recovery";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // OAuth PKCE 쿠키가 www/비-www 사이에서 유실되지 않도록 운영 호스트를 하나로 고정한다.
+  const canonicalUrl = getCanonicalAuthUrl(request.url);
+  if (canonicalUrl) {
+    return NextResponse.redirect(canonicalUrl, 307);
+  }
+
+  // Supabase Redirect URL 허용 목록이 어긋나 Site URL(/)로 폴백해도 code를 교환한다.
+  const recoveredCallbackUrl = getRootOAuthRecoveryUrl(request.url);
+  if (recoveredCallbackUrl) {
+    return NextResponse.redirect(recoveredCallbackUrl, 307);
+  }
 
   // Admin API 인증 (login 제외)
   if (pathname.startsWith("/api/admin") && !pathname.startsWith("/api/admin/login")) {

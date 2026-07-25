@@ -27,7 +27,13 @@ test("서버 세션 검증이 멈춰도 복원된 로그인으로 워크플로�
       .replace(/\+/g, "-")
       .replace(/\//g, "_")
       .replace(/=+$/g, "");
-    document.cookie = `sb-example-auth-token=base64-${encodedSession}; path=/; SameSite=Lax`;
+    // 로컬 placeholder와 인픽 운영 Supabase ref 양쪽에서 같은 회귀 검사를 실행한다.
+    for (const storageKey of [
+      "sb-example-auth-token",
+      "sb-pyhsjjtxcfmkcqmaxozd-auth-token",
+    ]) {
+      document.cookie = `${storageKey}=base64-${encodedSession}; path=/; SameSite=Lax`;
+    }
     sessionStorage.setItem("inpick_purged_v4", "1");
     localStorage.setItem(
       "inpick_token_state_v2",
@@ -40,7 +46,7 @@ test("서버 세션 검증이 멈춰도 복원된 로그인으로 워크플로�
     );
   }, USER_ID);
 
-  await page.route("https://example.supabase.co/auth/v1/user**", async (route) => {
+  await page.route("**/auth/v1/user**", async (route) => {
     // 배포 직후 토큰 검증이 잠기는 상황을 재현한다. UI는 이 응답을 기다리면 안 된다.
     await new Promise((resolve) => setTimeout(resolve, 8_000));
     await route.fulfill({
@@ -102,4 +108,22 @@ test("세션이 없으면 로딩 화면에 머물지 않고 로그인 페이지�
   await expect(
     page.getByText("로그인 상태를 확인하고 있어요.", { exact: true }),
   ).toHaveCount(0);
+});
+
+test("Supabase가 Site URL 루트로 보낸 OAuth code를 callback으로 복구한다", async ({
+  request,
+}) => {
+  const code = "abcdefghijklmnopqrstuvwxyz123456";
+  const response = await request.get(`/?code=${code}&next=%2Fworkflow`, {
+    maxRedirects: 0,
+  });
+
+  expect(response.status()).toBe(307);
+  const location = new URL(
+    response.headers().location,
+    "https://www.interiorpick.co.kr",
+  );
+  expect(`${location.pathname}${location.search}`).toBe(
+    `/auth/callback?code=${code}&next=%2Fworkflow`,
+  );
 });
