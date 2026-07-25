@@ -171,28 +171,42 @@ export function TokensProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (cancelled) return;
-      if (user) {
-        await loadFromSupabase(user.id);
-      } else {
-        const f = readFallback();
-        setState({ ...f, loading: false, authenticated: false, userId: null });
-      }
-    })();
 
-    // 단일 listener — Provider 마운트 동안 영구 유지
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const setSignedOutState = () => {
+      if (cancelled) return;
+      const f = readFallback();
+      setState({ ...f, loading: false, authenticated: false, userId: null });
+    };
+
+    const loadBalanceOutsideAuthCallback = (userId: string) => {
+      // Supabase는 onAuthStateChange 콜백의 Promise가 끝날 때까지 인증 초기화
+      // lock을 유지한다. 이 콜백 안에서 API/DB 작업을 await하면 OAuth 저장과
+      // getSession이 서로 기다리는 교착이 생기므로 다음 task로 완전히 분리한다.
+      window.setTimeout(() => {
+        if (cancelled) return;
+        void loadFromSupabase(userId);
+      }, 0);
+    };
+
+    // 리스너는 반드시 동기적으로 반환해야 한다. INITIAL_SESSION 이벤트가
+    // 최초 세션 복원까지 담당하므로 별도의 동시 getUser 호출도 필요 없다.
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (cancelled) return;
       if (event === "SIGNED_OUT") {
-        const f = readFallback();
-        setState({ ...f, loading: false, authenticated: false, userId: null });
+        setSignedOutState();
         return;
       }
       if (session?.user) {
-        await loadFromSupabase(session.user.id);
+        setState((current) => ({
+          ...current,
+          loading: true,
+          authenticated: true,
+          userId: session.user.id,
+        }));
+        loadBalanceOutsideAuthCallback(session.user.id);
+      } else if (event === "INITIAL_SESSION") {
+        const f = readFallback();
+        setState({ ...f, loading: false, authenticated: false, userId: null });
       }
     });
 

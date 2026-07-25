@@ -38,10 +38,12 @@ TypeScript·Next.js 빌드 대상에 다시 섞일 수 있으므로, 소스 원�
 
 1. 로그인 화면은 웹 OAuth 복귀 주소를 `/auth/callback`으로 고정한다.
 2. 복귀할 워크플로우 경로는 `sessionStorage`에 별도로 저장한다.
-3. Supabase 브라우저 클라이언트가 PKCE code를 교환한다.
-4. 콜백은 `세션 쿠키 생성 + code-verifier 쿠키 제거`만 확인한다.
-5. 콜백에서 `getSession()` 또는 `getUser()`를 중복 호출하지 않고 즉시 복귀한다.
-6. 보호 화면과 서버 API가 실제 세션 권한을 최종 검증한다.
+3. Supabase 브라우저 클라이언트의 `initialize()`가 PKCE code 교환을 완료한다.
+4. 전역 인증 이벤트 리스너는 동기 반환하며 DB·API 후처리는 다음 task로 분리한다.
+5. 초기화 성공 뒤 세션 쿠키 생성을 확인한다. Arc에서 중복 잔존하는 verifier
+   쿠키는 성공을 막는 기준으로 사용하지 않는다.
+6. 콜백에서 `getSession()` 또는 `getUser()`를 중복 호출하지 않고 즉시 복귀한다.
+7. 보호 화면과 서버 API가 실제 세션 권한을 최종 검증한다.
 
 ## 복구·조회 방법
 

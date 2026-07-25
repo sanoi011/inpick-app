@@ -61,7 +61,7 @@ test("분할 세션 쿠키가 저장되고 verifier가 사라지면 OAuth 교환
   });
 });
 
-test("기존 세션이 있어도 verifier가 남아 있으면 새 OAuth 교환을 기다린다", () => {
+test("Arc에서 verifier가 중복 잔존해도 저장된 세션 handoff를 인정한다", () => {
   const state = getOAuthCookieHandoffState(
     [
       "sb-project-auth-token=base64-old-session",
@@ -70,7 +70,7 @@ test("기존 세션이 있어도 verifier가 남아 있으면 새 OAuth 교환�
   );
 
   assert.deepEqual(state, {
-    completed: false,
+    completed: true,
     hasVerifierCookie: true,
     sessionCookieCount: 1,
   });

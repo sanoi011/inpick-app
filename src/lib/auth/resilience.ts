@@ -57,9 +57,10 @@ export type OAuthCookieHandoffState = {
 /**
  * 브라우저 PKCE 교환 완료 여부를 쿠키 이름만으로 확인한다.
  *
- * @supabase/ssr는 교환이 끝나면 code-verifier 쿠키를 지우고 세션 쿠키를
- * 기록한다. 큰 OAuth 사용자 세션은 `.0`, `.1`처럼 여러 쿠키로 분할될 수
- * 있으므로 특정 쿠키 하나가 아니라 auth-token 계열 전체를 센다.
+ * 큰 OAuth 사용자 세션은 `.0`, `.1`처럼 여러 쿠키로 분할될 수 있으므로
+ * 특정 쿠키 하나가 아니라 auth-token 계열 전체를 센다. Arc에서는 동일한
+ * verifier가 host/domain 범위로 중복 잔존할 수 있어, 호출부가 initialize()
+ * 성공을 확인한 뒤에는 세션 쿠키 존재만 handoff 완료 기준으로 사용한다.
  */
 export function getOAuthCookieHandoffState(
   cookieHeader: string,
@@ -83,16 +84,16 @@ export function getOAuthCookieHandoffState(
   }
 
   return {
-    completed: !hasVerifierCookie && sessionCookieCount > 0,
+    completed: sessionCookieCount > 0,
     hasVerifierCookie,
     sessionCookieCount,
   };
 }
 
 /**
- * 브라우저 클라이언트가 OAuth code를 교환해 쿠키 저장을 끝낼 때까지만
- * 기다린다. 여기서 getSession/getUser를 다시 호출하면 이미 성공한 교환이
- * 브라우저 lock·AbortError에 막혀 실패로 오인될 수 있다.
+ * initialize() 성공 뒤 브라우저가 세션 쿠키 저장을 끝낼 때까지만 기다린다.
+ * 여기서 getSession/getUser를 다시 호출하면 이미 성공한 교환이 브라우저
+ * lock·AbortError에 막혀 실패로 오인될 수 있다.
  */
 export async function waitForOAuthCookieHandoff(
   readCookie: () => string = () => document.cookie,

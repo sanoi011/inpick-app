@@ -63,6 +63,9 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
     });
   });
   await page.route("**/api/user/balance", async (route) => {
+    // 운영에서 전역 token listener의 await가 OAuth initialize를 잡고 있던
+    // 교착을 재현한다. 잔액 후처리가 멈춰도 callback 이동은 기다리면 안 된다.
+    await new Promise((resolve) => setTimeout(resolve, 6_000));
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -123,7 +126,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
 
   await expect(
     page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
-  ).toBeVisible({ timeout: 8_000 });
+  ).toBeVisible({ timeout: 4_000 });
   await expect(page).toHaveURL(/\/workflow\?step=1$/);
   const sessionCookies = (await context.cookies()).filter((cookie) =>
     cookie.name.startsWith(PRODUCTION_STORAGE_KEY),

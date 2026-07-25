@@ -8,8 +8,10 @@ import {
   WEB_AUTH_RETURN_STORAGE_KEY,
 } from "@/lib/auth/access-policy";
 import {
+  AUTH_SESSION_RESTORE_TIMEOUT_MS,
   isAuthOperationTimeoutError,
   waitForOAuthCookieHandoff,
+  withAuthTimeout,
 } from "@/lib/auth/resilience";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
@@ -60,11 +62,24 @@ export default function OAuthCallbackPage() {
       }
 
       try {
-        // 브라우저 클라이언트 초기화 자체가 URL의 OAuth code를 교환하고
-        // 세션 쿠키를 기록한다. 운영 Arc에서 교환 뒤 getSession()만
-        // AbortError(code 20)로 끊긴 사례가 있어 중복 세션 조회는 하지 않는다.
-        createClient();
-        await waitForOAuthCookieHandoff();
+        // 브라우저 클라이언트의 자동 PKCE 교환 자체가 끝날 때까지 기다린다.
+        // initialize()는 이미 생성자에서 시작된 동일 Promise를 반환하므로 code를
+        // 중복 소비하지 않는다. 완료 뒤 getSession/getUser를 다시 호출하지 않는다.
+        const supabase = createClient();
+        const initialization = await withAuthTimeout(
+          supabase.auth.initialize(),
+          undefined,
+          "browser-oauth-initialize",
+        );
+        if (initialization.error) throw initialization.error;
+
+        // Arc에는 같은 verifier 쿠키가 host/domain 범위로 중복 잔존할 수 있다.
+        // initialize 성공 뒤에는 세션 쿠키 존재가 handoff의 기준이며 verifier
+        // 잔존 여부가 성공을 막아서는 안 된다.
+        await waitForOAuthCookieHandoff(
+          () => document.cookie,
+          AUTH_SESSION_RESTORE_TIMEOUT_MS,
+        );
 
         try {
           sessionStorage.removeItem(WEB_AUTH_RETURN_STORAGE_KEY);
@@ -94,7 +109,7 @@ export default function OAuthCallbackPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stage: "browser_cookie_handoff",
+            stage: "browser_oauth_initialize",
             errorCode,
             errorMessage,
           }),
