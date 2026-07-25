@@ -16,13 +16,15 @@ function hasLikelyOAuthCode(url: URL): boolean {
  */
 export function getCanonicalAuthUrl(requestUrl: string): URL | null {
   const url = new URL(requestUrl);
-  if (
-    url.hostname !== LEGACY_PRODUCTION_HOST ||
-    url.pathname !== "/" ||
-    !hasLikelyOAuthCode(url)
-  ) {
+  if (url.hostname !== LEGACY_PRODUCTION_HOST) {
     return null;
   }
+
+  const isRootCodeFallback =
+    url.pathname === "/" && hasLikelyOAuthCode(url);
+  const isOAuthSurface =
+    url.pathname === "/auth" || url.pathname === "/auth/callback";
+  if (!isRootCodeFallback && !isOAuthSurface) return null;
 
   url.hostname = PRODUCTION_HOST;
   return url;

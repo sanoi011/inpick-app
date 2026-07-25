@@ -16,12 +16,27 @@ test("비-www 운영 OAuth 요청을 www 호스트로 옮기며 query를 보존�
   );
 });
 
+test("비-www 로그인 시작과 callback도 www 호스트로 통일한다", () => {
+  assert.equal(
+    getCanonicalAuthUrl(
+      "https://interiorpick.co.kr/auth?type=consumer&returnUrl=%2Fworkflow",
+    )?.toString(),
+    "https://www.interiorpick.co.kr/auth?type=consumer&returnUrl=%2Fworkflow",
+  );
+  assert.equal(
+    getCanonicalAuthUrl(
+      "https://interiorpick.co.kr/auth/callback?code=abcdefghijklmnopqrstuvwxyz123456",
+    )?.toString(),
+    "https://www.interiorpick.co.kr/auth/callback?code=abcdefghijklmnopqrstuvwxyz123456",
+  );
+});
+
 test("일반 페이지와 www·로컬 호스트에는 canonical redirect를 만들지 않는다", () => {
   assert.equal(
     getCanonicalAuthUrl("https://www.interiorpick.co.kr/auth"),
     null,
   );
-  assert.equal(getCanonicalAuthUrl("https://interiorpick.co.kr/auth"), null);
+  assert.equal(getCanonicalAuthUrl("https://interiorpick.co.kr/community"), null);
   assert.equal(getCanonicalAuthUrl("http://127.0.0.1:3000/auth"), null);
 });
 

@@ -1,6 +1,120 @@
 import { expect, test } from "@playwright/test";
 
 const USER_ID = "aaaaaaaa-2222-4333-8444-555555555555";
+const PRODUCTION_STORAGE_KEY = "sb-pyhsjjtxcfmkcqmaxozd-auth-token";
+
+test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워크플로우를 연다", async ({
+  page,
+  context,
+}) => {
+  const expiresAt = Math.floor(Date.now() / 1_000) + 3_600;
+  const oauthUser = {
+    id: USER_ID,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "oauth-browser@inpick.test",
+    app_metadata: { provider: "google", providers: ["google"] },
+    // 운영 Google 계정처럼 세션이 쿠키 2개 이상으로 분할되는 크기를 재현한다.
+    user_metadata: { name: "OAuth Browser Test", padding: "x".repeat(5_500) },
+    created_at: "2026-07-25T00:00:00.000Z",
+  };
+  const payload = btoa(
+    JSON.stringify({
+      sub: USER_ID,
+      aud: "authenticated",
+      role: "authenticated",
+      email: oauthUser.email,
+      exp: expiresAt,
+    }),
+  )
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+  const accessToken = `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.${payload}.test-signature`;
+
+  await page.addInitScript(() => {
+    sessionStorage.setItem("inpick_purged_v4", "1");
+  });
+  await page.route("**/auth/v1/token?grant_type=pkce", async (route) => {
+    const requestBody = route.request().postDataJSON() as {
+      auth_code?: string;
+      code_verifier?: string;
+    };
+    expect(requestBody.auth_code).toBe("test-oauth-code");
+    expect(requestBody.code_verifier).toBe("test-code-verifier");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        access_token: accessToken,
+        refresh_token: "oauth-browser-refresh-token",
+        expires_in: 3_600,
+        expires_at: expiresAt,
+        token_type: "bearer",
+        user: oauthUser,
+      }),
+    });
+  });
+  await page.route("**/auth/v1/user**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(oauthUser),
+    });
+  });
+  await page.route("**/api/user/balance", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        balance: 50,
+        authenticated: true,
+        userId: USER_ID,
+      }),
+    });
+  });
+  await page.route("**/api/inpick/workflow-state**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ exists: false }),
+    });
+  });
+
+  // 실제 흐름처럼 로그인 페이지에서 verifier를 만든 뒤 callback으로 이동한다.
+  await page.goto("/auth?type=consumer");
+  await page.evaluate((storageKey) => {
+    const encodedVerifier = btoa("test-code-verifier")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    document.cookie = `${storageKey}-code-verifier=base64-${encodedVerifier}; path=/; SameSite=Lax`;
+  }, PRODUCTION_STORAGE_KEY);
+  await expect
+    .poll(() =>
+      page.evaluate(
+        (storageKey) =>
+          document.cookie.includes(`${storageKey}-code-verifier=`),
+        PRODUCTION_STORAGE_KEY,
+      ),
+    )
+    .toBe(true);
+
+  await page.goto(
+    "/auth/callback?code=test-oauth-code&next=%2Fworkflow%3Fstep%3D1",
+  );
+
+  await expect(
+    page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
+  ).toBeVisible({ timeout: 8_000 });
+  await expect(page).toHaveURL(/\/workflow\?step=1$/);
+  const sessionCookies = (await context.cookies()).filter((cookie) =>
+    cookie.name.startsWith(PRODUCTION_STORAGE_KEY),
+  );
+  expect(
+    sessionCookies.filter((cookie) => cookie.name.includes(".")).length,
+  ).toBeGreaterThanOrEqual(2);
+});
 
 test("서버 세션 검증이 멈춰도 복원된 로그인으로 워크플로우를 연다", async ({
   page,
