@@ -3,7 +3,7 @@
 마지막 갱신: 2026-07-26 (KST)
 현재 작업 경로: `/Users/seonbonkim/Desktop/AIOD/개발/inpick beta ver1/inpick_product_hide_hotfix`
 현재 로컬 브랜치: `codex/hide-product-and-enlarge-estimate`
-작성 시점 원격 기준: `origin/main`의 `d17d533`
+핸드오프 작성 전 원격 기준: `origin/main`의 `d17d533`
 최신 핸드오프: `docs/status/HANDOFF-2026-07-26-WEB-AUTH-AND-MOBILE-STEP2.md`
 
 이 문서는 터미널, Codex, Claude Code를 완전히 종료한 뒤에도 현재 상태에서 바로

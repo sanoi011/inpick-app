@@ -4,8 +4,8 @@
 - 저장소: `https://github.com/sanoi011/inpick-app.git`
 - 작업 경로: `/Users/seonbonkim/Desktop/AIOD/개발/inpick beta ver1/inpick_product_hide_hotfix`
 - 현재 로컬 브랜치: `codex/hide-product-and-enlarge-estimate`
-- 현재 로컬 HEAD: `fc81b0b docs(auth): record web PKCE session incident`
-- 작성 시점 `origin/main`: `d17d533 feat(workflow): move design-generate action below prompt bar`
+- 핸드오프 작성 전 로컬 HEAD: `fc81b0b docs(auth): record web PKCE session incident`
+- 핸드오프 작성 전 `origin/main`: `d17d533 feat(workflow): move design-generate action below prompt bar`
 - 운영 사이트: `https://www.interiorpick.co.kr`
 - 운영 Vercel 프로젝트: `sanois-projects/inpick-app`
 
@@ -110,13 +110,15 @@ e3f5d7f fix(auth): exchange OAuth code outside browser lock
 fc81b0b docs(auth): record web PKCE session incident
 ```
 
-`fc81b0b` push 이후 다른 터미널이 Step 2 모바일 변경을 `main`에 추가했다. 작성
-시점 원격 최신 커밋은 `d17d533`이며, `fc81b0b`는 해당 커밋의 조상이다. 이
-작업 브랜치는 깨끗하지만 원격 `main`보다 뒤에 있다.
+`fc81b0b` push 이후 다른 터미널이 Step 2 모바일 변경을 `main`에 추가했다.
+핸드오프 작성 전 원격 최신 커밋은 `d17d533`이며, `fc81b0b`는 해당 커밋의
+조상이다. 핸드오프 문서 커밋은 `d17d533` 위로 rebase한 뒤 `main`과 현재 작업
+브랜치에 push했다. 종료 시 로컬 HEAD와 `origin/main`은 동기화됐다.
 
 ```text
-local HEAD:  fc81b0b
-origin/main: d17d533
+pre-handoff local HEAD:  fc81b0b
+pre-handoff origin/main: d17d533
+final state: local HEAD == origin/main
 ```
 
 다른 터미널 변경을 덮지 말고 재개 시 먼저 다음을 실행한다.
@@ -142,7 +144,8 @@ aliases:
 
 `d17d533`은 `Step2Designer.tsx` 변경이며 인증 해결 커밋을 포함한다. Vercel build는
 성공했다. 예상 가능한 기존 경고는 Bodoni Moda override와 `onnxruntime-web`
-critical dependency 경고다.
+critical dependency 경고다. 이후 push한 핸드오프 커밋은 문서만 변경하므로 운영
+런타임 코드는 `d17d533`과 동일하다.
 
 ## 6. 다음 작업: 앱/모바일 Step 2
 
@@ -217,4 +220,3 @@ git log --oneline --first-parent -10 origin/main
 > Step 2 모바일 흐름을 실제로 재현·검수해. 이미 반영된 부분을 다시 고치지 말고,
 > 남은 UI 순서·PDF·도면 정확도 문제를 증거 기준으로 우선순위대로 수정해. 인증 관련
 > 변경이나 웹 배포 전에는 반드시 `$inpick-auth-regression` 전체 게이트를 통과시켜.
-
