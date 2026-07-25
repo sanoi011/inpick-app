@@ -2761,7 +2761,7 @@ export default function Step2Designer({
                 </>
               )}
               {/* 채팅 입력 — 푸른 그라데이션 링 + 은은한 글로우로 입력창임을 드러낸다 */}
-              <div className="relative flex-1 rounded-full bg-gradient-to-r from-sky-400/45 via-blue-500/35 to-indigo-400/45 p-[1.5px] shadow-[0_0_20px_rgba(59,130,246,0.22)] transition-shadow duration-300 focus-within:shadow-[0_0_28px_rgba(59,130,246,0.38)]">
+              <div className="relative flex-1 rounded-full bg-gradient-to-r from-sky-400/50 via-blue-500/40 to-indigo-400/50 p-[2px] shadow-[0_0_34px_6px_rgba(59,130,246,0.28)] transition-shadow duration-300 focus-within:shadow-[0_0_46px_10px_rgba(59,130,246,0.42)]">
                 <div className="rounded-full bg-white px-5 py-3">
                   <textarea
                     value={currentPrompt}
