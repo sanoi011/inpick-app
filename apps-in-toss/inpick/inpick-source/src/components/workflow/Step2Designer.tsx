@@ -8,6 +8,7 @@ import {
   Hexagon,
   Loader2,
   Check,
+  ChevronDown,
   ChevronRight,
   AlertCircle,
   Send,
@@ -1959,6 +1960,23 @@ export default function Step2Designer({
   ).length;
   const totalCount = realRoomTabs.length;
 
+  // 모바일: 프롬프트 입력창이 화면 아래쪽에 있음을 알리는 스크롤 힌트.
+  // 입력창이 화면에 들어오면(스크롤 도달) 자동으로 사라진다.
+  const promptBarRef = useRef<HTMLDivElement | null>(null);
+  const [showScrollHint, setShowScrollHint] = useState(true);
+  useEffect(() => {
+    const target = promptBarRef.current;
+    if (!target || typeof IntersectionObserver === "undefined") return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) setShowScrollHint(false);
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
   // 진행 상황 카드 — 데스크톱은 좌측 사이드바 하단, 모바일은 프롬프트 바 아래 최하단에 렌더된다.
   const progressCard = (
           <motion.div
@@ -2680,7 +2698,7 @@ export default function Step2Designer({
           })()}
 
           {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
-          <div className="border-t border-black/10 bg-white p-4">
+          <div ref={promptBarRef} className="border-t border-black/10 bg-white p-4">
             {/* 첨부 이미지 미리보기 (chat 모드에서만) */}
             {chatMode && pendingAttachments.length > 0 && (
               <div className="mx-auto max-w-3xl mb-2 flex flex-wrap gap-1.5">
@@ -3276,6 +3294,36 @@ export default function Step2Designer({
 
       {/* 모바일: 진행 상황 카드 — 프롬프트 작성 → 실 선택 → 견적 순서가 되도록 최하단 배치 */}
       <div className="lg:hidden">{progressCard}</div>
+
+      {/* 모바일: 아래에 채팅 입력창이 있음을 알리는 스크롤 힌트 — 탭하면 입력창으로 이동 */}
+      <AnimatePresence>
+        {showScrollHint && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+            transition={{ duration: 0.3 }}
+            onClick={() => {
+              setShowScrollHint(false);
+              promptBarRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 lg:hidden"
+            aria-label="채팅 입력창으로 이동"
+          >
+            <span className="flex items-center gap-1.5 rounded-full border border-blue-200/70 bg-white/95 px-4 py-2 text-xs font-bold text-blue-600 shadow-[0_6px_24px_rgba(59,130,246,0.35)] backdrop-blur">
+              아래에서 AI에게 디자인 요청
+              <motion.span
+                animate={{ y: [0, 4, 0] }}
+                transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                className="inline-flex"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </motion.span>
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* 토큰 부족 모달 */}
       <AnimatePresence>
