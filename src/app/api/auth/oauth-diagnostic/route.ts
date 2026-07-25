@@ -9,7 +9,7 @@ function clean(value: unknown, fallback: string): string {
 }
 
 /**
- * OAuth provider 복귀 뒤의 브라우저 교환 실패만 기록한다.
+ * OAuth 교환과 보호 경로 세션 복구의 실패 지점만 기록한다.
  * 인증 code·token·cookie 값은 받거나 기록하지 않는다.
  */
 export async function POST(request: NextRequest) {
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
   const authCookies = request.cookies
     .getAll()
     .filter(({ name }) => name.includes("auth-token"));
-  console.error("[auth/oauth-diagnostic] callback failed", {
+  console.error("[auth/diagnostic] auth flow recovery event", {
     stage: clean(body.stage, "unknown"),
     errorCode: clean(body.errorCode, "unknown"),
     errorMessage: clean(body.errorMessage, "unknown"),

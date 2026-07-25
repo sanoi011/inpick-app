@@ -22,6 +22,10 @@ import {
   NATIVE_AUTH_RETURN_STORAGE_KEY,
   WEB_AUTH_RETURN_STORAGE_KEY,
 } from "@/lib/auth/access-policy";
+import {
+  getOAuthSessionCookieFingerprint,
+  WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY,
+} from "@/lib/auth/resilience";
 
 export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
 
@@ -50,6 +54,12 @@ export async function startOAuth(
           : WEB_AUTH_RETURN_STORAGE_KEY,
         returnPath,
       );
+      if (!isNative) {
+        sessionStorage.setItem(
+          WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY,
+          getOAuthSessionCookieFingerprint(document.cookie),
+        );
+      }
     } catch {
       /* private mode: callback safely falls back to home */
     }

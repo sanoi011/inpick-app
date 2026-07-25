@@ -6,6 +6,8 @@ import type { User } from "@supabase/supabase-js";
 import { buildConsumerAuthHref } from "@/lib/auth/access-policy";
 import {
   AUTH_SESSION_RESTORE_TIMEOUT_MS,
+  fetchServerAuthSession,
+  getOAuthCookieHandoffState,
   withAuthTimeout,
 } from "@/lib/auth/resilience";
 import { isNativeApp } from "@/lib/mobile/platform";
@@ -17,6 +19,20 @@ export function useAuth() {
 
   useEffect(() => {
     let done = false;
+    const restoreFromServer = async () => {
+      try {
+        const result = await fetchServerAuthSession<User>();
+        if (done) return;
+        setUser(result.authenticated ? result.user : null);
+        setLoading(false);
+      } catch {
+        if (done) return;
+        // 서버 복구까지 실패해도 헤더를 영구 로딩으로 남기지 않는다.
+        // 늦게 도착하는 SIGNED_IN/INITIAL_SESSION 이벤트는 아래 listener가 반영한다.
+        setLoading(false);
+      }
+    };
+
     // 로컬 세션 복원이나 서버 검증이 멈춰도 헤더를 무한 placeholder로 두지 않는다.
     void withAuthTimeout(
       supabase.auth.getSession(),
@@ -25,10 +41,18 @@ export function useAuth() {
     )
       .then(({ data: { session } }) => {
         if (done) return;
-        setUser(session?.user ?? null);
+        if (!session?.user) {
+          if (getOAuthCookieHandoffState(document.cookie).completed) {
+            void restoreFromServer();
+          } else {
+            setUser(null);
+            setLoading(false);
+          }
+          return;
+        }
+        setUser(session.user);
         setLoading(false);
 
-        if (!session?.user) return;
         void withAuthTimeout(
           supabase.auth.getUser(),
           AUTH_SESSION_RESTORE_TIMEOUT_MS,
@@ -45,15 +69,30 @@ export function useAuth() {
       })
       .catch(() => {
         if (done) return;
-        setUser(null);
-        setLoading(false);
+        if (getOAuthCookieHandoffState(document.cookie).completed) {
+          void restoreFromServer();
+        } else {
+          setUser(null);
+          setLoading(false);
+        }
       });
 
     // 상태 변경 감지 (로그인/로그아웃 즉시 반영)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setUser(session?.user ?? null);
-        setLoading(false);
+      (event, session) => {
+        if (session?.user) {
+          setUser(session.user);
+          setLoading(false);
+        } else if (event === "SIGNED_OUT") {
+          setUser(null);
+          setLoading(false);
+        } else if (
+          event === "INITIAL_SESSION" &&
+          !getOAuthCookieHandoffState(document.cookie).completed
+        ) {
+          setUser(null);
+          setLoading(false);
+        }
       }
     );
 

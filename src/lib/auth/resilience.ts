@@ -2,6 +2,8 @@ export const AUTH_SESSION_RESTORE_TIMEOUT_MS = 2_500;
 export const AUTH_REQUEST_TIMEOUT_MS = 12_000;
 export const AUTH_POST_LOGIN_TIMEOUT_MS = 1_500;
 export const AUTH_OAUTH_COOKIE_POLL_INTERVAL_MS = 50;
+export const WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY =
+  "inpick_web_oauth_session_fingerprint_before_login";
 
 export class AuthOperationTimeoutError extends Error {
   readonly code = "AUTH_OPERATION_TIMEOUT";
@@ -91,6 +93,37 @@ export function getOAuthCookieHandoffState(
 }
 
 /**
+ * token 원문을 별도 저장하지 않고 OAuth 전후 세션 변경만 비교하는 짧은 지문.
+ * verifier는 제외해 PKCE 시작 단계의 쿠키 추가가 세션 교환으로 오인되지 않게 한다.
+ */
+export function getOAuthSessionCookieFingerprint(cookieHeader: string): string {
+  const sessionCookies: string[] = [];
+
+  for (const rawCookie of cookieHeader.split(";")) {
+    const separatorIndex = rawCookie.indexOf("=");
+    if (separatorIndex < 0) continue;
+    const name = rawCookie.slice(0, separatorIndex).trim();
+    const value = rawCookie.slice(separatorIndex + 1).trim();
+    if (
+      !name.includes("auth-token") ||
+      name.includes("code-verifier") ||
+      value.length === 0
+    ) {
+      continue;
+    }
+    sessionCookies.push(`${name}=${value}`);
+  }
+
+  const source = sessionCookies.sort().join(";");
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < source.length; index += 1) {
+    hash ^= source.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return `${sessionCookies.length}:${(hash >>> 0).toString(16)}`;
+}
+
+/**
  * 브라우저 클라이언트가 시작한 자동 PKCE 교환으로 세션 쿠키 저장이 끝날
  * 때까지만 기다린다. initialize/getSession/getUser를 완료 조건으로 기다리면
  * 이미 성공한 교환이 브라우저 lock·AbortError에 막혀 실패로 오인될 수 있다.
@@ -99,12 +132,19 @@ export async function waitForOAuthCookieHandoff(
   readCookie: () => string = () => document.cookie,
   timeoutMs = AUTH_REQUEST_TIMEOUT_MS,
   pollIntervalMs = AUTH_OAUTH_COOKIE_POLL_INTERVAL_MS,
+  previousSessionFingerprint?: string,
 ): Promise<OAuthCookieHandoffState> {
   const startedAt = Date.now();
 
   while (true) {
-    const state = getOAuthCookieHandoffState(readCookie());
-    if (state.completed) return state;
+    const cookieHeader = readCookie();
+    const state = getOAuthCookieHandoffState(cookieHeader);
+    const currentFingerprint =
+      getOAuthSessionCookieFingerprint(cookieHeader);
+    const sessionChanged =
+      previousSessionFingerprint === undefined ||
+      currentFingerprint !== previousSessionFingerprint;
+    if (state.completed && sessionChanged) return state;
 
     const elapsedMs = Date.now() - startedAt;
     if (elapsedMs >= timeoutMs) {
@@ -121,6 +161,47 @@ export async function waitForOAuthCookieHandoff(
 }
 
 export type PostLoginResult = "completed" | "timed_out" | "failed";
+
+export type ServerAuthSessionResult<TUser> =
+  | { authenticated: true; user: TUser }
+  | { authenticated: false; user: null };
+
+/**
+ * 브라우저 auth lock이 늦어질 때 서버가 같은 쿠키를 직접 검증하는 복구 경로다.
+ * 401은 확정 로그아웃으로 반환하고, 5xx/timeout은 일시 장애로 예외 처리해
+ * 이미 확인한 브라우저 세션을 성급히 폐기하지 않게 한다.
+ */
+export async function fetchServerAuthSession<TUser>(
+  fetcher: typeof fetch = fetch,
+  timeoutMs = AUTH_REQUEST_TIMEOUT_MS,
+): Promise<ServerAuthSessionResult<TUser>> {
+  const response = await withAuthTimeout(
+    fetcher("/api/auth/session", {
+      method: "GET",
+      cache: "no-store",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    }),
+    timeoutMs,
+    "server-auth-session",
+  );
+
+  if (response.status === 401) {
+    return { authenticated: false, user: null };
+  }
+  if (!response.ok) {
+    throw new Error(`SERVER_AUTH_SESSION_${response.status}`);
+  }
+
+  const payload = (await response.json()) as {
+    authenticated?: boolean;
+    user?: TUser | null;
+  };
+  if (!payload.authenticated || !payload.user) {
+    return { authenticated: false, user: null };
+  }
+  return { authenticated: true, user: payload.user };
+}
 
 /**
  * 프로필 보강·감사 기록은 로그인 성공 후처리다.

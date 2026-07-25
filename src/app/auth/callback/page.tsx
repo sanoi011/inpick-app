@@ -8,9 +8,10 @@ import {
   WEB_AUTH_RETURN_STORAGE_KEY,
 } from "@/lib/auth/access-policy";
 import {
-  AUTH_SESSION_RESTORE_TIMEOUT_MS,
+  AUTH_REQUEST_TIMEOUT_MS,
   isAuthOperationTimeoutError,
   waitForOAuthCookieHandoff,
+  WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY,
 } from "@/lib/auth/resilience";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
@@ -19,9 +20,9 @@ import { AnalyticsEvents } from "@/lib/analytics/events";
  * OAuth PKCE 교환을 브라우저에서 완료한다.
  *
  * 서버 Route Handler가 만든 다중 Set-Cookie가 Arc/WebView의 다음 문서에서
- * 누락되는 사례가 있어, @supabase/ssr 브라우저 클라이언트의 자동 PKCE
- * 교환과 세션 쿠키 저장을 사용한다. 여기서 수동으로 코드를 다시 교환하면
- * verifier와 일회용 code가 중복 소비되므로 완료된 세션만 확인한다.
+ * 누락되는 사례가 있어 @supabase/ssr 브라우저 클라이언트의 자동 PKCE
+ * 교환과 세션 쿠키 저장을 사용한다. 로그인 시작 직전 세션 지문과 비교해
+ * 이전 실패에서 남은 쿠키를 새 로그인 성공으로 오인하지 않는다.
  */
 export default function OAuthCallbackPage() {
   const startedRef = useRef(false);
@@ -45,6 +46,15 @@ export default function OAuthCallbackPage() {
       const next = sanitizeAuthReturnPath(
         currentUrl.searchParams.get("next") || storedReturnPath,
       );
+      let previousSessionFingerprint: string | undefined;
+      try {
+        previousSessionFingerprint =
+          sessionStorage.getItem(
+            WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY,
+          ) || undefined;
+      } catch {
+        /* private mode */
+      }
       setRetryHref(buildConsumerAuthHref(next));
       const providerError =
         currentUrl.searchParams.get("error_description") ||
@@ -61,28 +71,28 @@ export default function OAuthCallbackPage() {
       }
 
       try {
-        // 클라이언트 생성 시 자동 PKCE 교환이 시작된다. initialize() Promise는
-        // 토큰 교환과 세션 쿠키 저장이 이미 끝난 뒤에도 Arc/WebView의 auth lock
-        // 또는 AbortError에 막힐 수 있으므로 성공 조건으로 기다리지 않는다.
+        // client 생성 시 자동 PKCE 교환이 시작된다. initialize Promise가 아닌
+        // 실제 세션 쿠키의 신규 저장을 성공 조건으로 사용한다.
         createClient();
-
-        // 세션 쿠키는 보호 API가 서버에서 다시 검증한다. 콜백은 쿠키 저장만
-        // 확인하고 즉시 복귀해, 성공한 OAuth가 클라이언트 초기화 오류로 취소되지
-        // 않게 한다. verifier 쿠키가 중복 잔존해도 세션 쿠키가 있으면 완료다.
         await waitForOAuthCookieHandoff(
           () => document.cookie,
-          AUTH_SESSION_RESTORE_TIMEOUT_MS,
+          AUTH_REQUEST_TIMEOUT_MS,
+          undefined,
+          previousSessionFingerprint,
         );
 
         try {
           sessionStorage.removeItem(WEB_AUTH_RETURN_STORAGE_KEY);
+          sessionStorage.removeItem(
+            WEB_OAUTH_SESSION_FINGERPRINT_STORAGE_KEY,
+          );
         } catch {
           /* private mode */
         }
         trackClientEvent(AnalyticsEvents.LoginCompleted, {
           props: {
             provider: "unknown",
-            method: "oauth_web_browser",
+            method: "oauth_web_browser_cookie_change",
           },
         });
 
@@ -102,7 +112,7 @@ export default function OAuthCallbackPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stage: "browser_oauth_cookie_handoff",
+            stage: "browser_oauth_cookie_change",
             errorCode,
             errorMessage,
           }),

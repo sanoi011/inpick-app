@@ -7,6 +7,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
   page,
   context,
 }) => {
+  let tokenExchangeCount = 0;
   const expiresAt = Math.floor(Date.now() / 1_000) + 3_600;
   const oauthUser = {
     id: USER_ID,
@@ -36,6 +37,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
     sessionStorage.setItem("inpick_purged_v4", "1");
   });
   await page.route("**/auth/v1/token?grant_type=pkce", async (route) => {
+    tokenExchangeCount += 1;
     const requestBody = route.request().postDataJSON() as {
       auth_code?: string;
       code_verifier?: string;
@@ -94,6 +96,36 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
   await page.goto(
     "/auth?type=consumer&returnUrl=%2Fworkflow%3Fstep%3D1",
   );
+  // 이전 실패의 세션이 남아 있어도 새 OAuth code 교환을 건너뛰면 안 된다.
+  await page.evaluate(
+    ({ storageKey, userId }) => {
+      const staleSession = JSON.stringify({
+        access_token: "stale-access-token",
+        refresh_token: "stale-refresh-token",
+        expires_in: 3_600,
+        expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+        token_type: "bearer",
+        user: {
+          id: userId,
+          aud: "authenticated",
+          role: "authenticated",
+          email: "stale-session@inpick.test",
+          app_metadata: {},
+          user_metadata: {},
+          created_at: "2026-07-24T00:00:00.000Z",
+        },
+      });
+      const encoded = btoa(staleSession)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+      document.cookie = `${storageKey}=base64-${encoded}; path=/; SameSite=Lax`;
+    },
+    {
+      storageKey: PRODUCTION_STORAGE_KEY,
+      userId: "bbbbbbbb-2222-4333-8444-555555555555",
+    },
+  );
   const expectedCallback = new URL("/auth/callback", page.url()).toString();
   await page.getByRole("button", { name: "Google" }).click();
   await expect.poll(() => authorizeUrl).not.toBe("");
@@ -128,6 +160,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
     page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
   ).toBeVisible({ timeout: 4_000 });
   await expect(page).toHaveURL(/\/workflow\?step=1$/);
+  expect(tokenExchangeCount).toBe(1);
   const sessionCookies = (await context.cookies()).filter((cookie) =>
     cookie.name.startsWith(PRODUCTION_STORAGE_KEY),
   );
@@ -296,6 +329,82 @@ test("추가 사용자 검증이 일시 실패해도 복원된 로그인을 유�
     page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
   ).toBeVisible({ timeout: 4_000 });
   await expect(page).toHaveURL(/\/workflow\?step=1$/);
+});
+
+test("브라우저 세션 복원이 실패해도 서버가 쿠키를 검증하면 워크플로우를 유지한다", async ({
+  page,
+}) => {
+  let serverRecoveryCount = 0;
+  const serverUser = {
+    id: USER_ID,
+    aud: "authenticated",
+    role: "authenticated",
+    email: "server-recovered@inpick.test",
+    app_metadata: { provider: "google" },
+    user_metadata: { name: "Server Recovered" },
+    created_at: "2026-07-25T00:00:00.000Z",
+  };
+
+  await page.addInitScript(
+    ({ storageKey, user }) => {
+      const authSession = JSON.stringify({
+        access_token: "server-recovery-access-token",
+        refresh_token: "server-recovery-refresh-token",
+        expires_in: 3_600,
+        expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+        token_type: "bearer",
+        user,
+      });
+      const encodedSession = btoa(authSession)
+        .replace(/\+/g, "-")
+        .replace(/\//g, "_")
+        .replace(/=+$/g, "");
+      document.cookie = `${storageKey}=base64-${encodedSession}; path=/; SameSite=Lax`;
+      // 운영에서 관측한 브라우저 auth lock 정지를 재현한다. 쿠키 자체는 유효하다.
+      Object.defineProperty(navigator, "locks", {
+        configurable: true,
+        value: {
+          request: () => new Promise(() => undefined),
+        },
+      });
+      sessionStorage.setItem("inpick_purged_v4", "1");
+    },
+    { storageKey: PRODUCTION_STORAGE_KEY, user: serverUser },
+  );
+  await page.route("**/api/auth/session", async (route) => {
+    serverRecoveryCount += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ authenticated: true, user: serverUser }),
+    });
+  });
+  await page.route("**/api/user/balance", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        balance: 50,
+        authenticated: true,
+        userId: USER_ID,
+      }),
+    });
+  });
+  await page.route("**/api/inpick/workflow-state**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ exists: false }),
+    });
+  });
+
+  await page.goto("/workflow?step=1");
+
+  await expect(
+    page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
+  ).toBeVisible({ timeout: 4_000 });
+  await expect(page).toHaveURL(/\/workflow\?step=1$/);
+  await expect.poll(() => serverRecoveryCount, { timeout: 5_000 }).toBeGreaterThan(0);
 });
 
 test("세션이 없으면 로딩 화면에 머물지 않고 로그인 페이지로 이동한다", async ({

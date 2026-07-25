@@ -10,6 +10,8 @@ import {
 } from "@/lib/auth/access-policy";
 import {
   AUTH_SESSION_RESTORE_TIMEOUT_MS,
+  fetchServerAuthSession,
+  getOAuthCookieHandoffState,
   withAuthTimeout,
 } from "@/lib/auth/resilience";
 import { isNativeApp } from "@/lib/mobile/platform";
@@ -25,22 +27,11 @@ type GateSnapshot = {
 function AuthLoadingScreen({ loginHref }: { loginHref: string }) {
   return (
     <main
-      className="flex min-h-screen items-center justify-center bg-white px-6 text-[#0d0d0d]"
+      className="min-h-screen bg-white"
       aria-live="polite"
       aria-busy="true"
-    >
-      <div className="text-center">
-        <span className="hex-mask mx-auto block h-10 w-10 animate-pulse text-primary-500" />
-        <p className="mt-5 text-[18px] font-bold tracking-[-0.055em]">inpick</p>
-        <p className="mt-2 text-xs text-black/45">로그인 상태를 확인하고 있어요.</p>
-        <a
-          href={loginHref}
-          className="mt-5 inline-flex rounded-full border border-black/10 px-4 py-2 text-xs font-bold text-black/65 transition hover:bg-black/[0.04]"
-        >
-          로그인 화면 바로 열기
-        </a>
-      </div>
-    </main>
+      data-login-href={loginHref}
+    />
   );
 }
 
@@ -79,6 +70,7 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
     let cancelled = false;
     let redirectStarted = false;
     let sessionRestored = false;
+    const initialCookieState = getOAuthCookieHandoffState(document.cookie);
 
     const redirectToLogin = () => {
       if (cancelled || redirectStarted) return;
@@ -107,14 +99,59 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
       });
     };
 
+    const reportRecovery = (
+      stage: string,
+      errorCode: string,
+      errorMessage: string,
+    ) => {
+      void fetch("/api/auth/oauth-diagnostic", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stage, errorCode, errorMessage }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+
+    const confirmWithServer = async (
+      clientFailureStage: string,
+    ): Promise<"authenticated" | "signed_out" | "transient_failure"> => {
+      try {
+        const result = await fetchServerAuthSession();
+        if (cancelled) return "transient_failure";
+        if (result.authenticated) {
+          allow();
+          return "authenticated";
+        }
+        reportRecovery(
+          "auth_gate_server_rejected",
+          "UNAUTHENTICATED",
+          clientFailureStage,
+        );
+        return "signed_out";
+      } catch (error) {
+        reportRecovery(
+          "auth_gate_server_recovery_failed",
+          error && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "unknown",
+          error instanceof Error ? error.message : String(error),
+        );
+        return "transient_failure";
+      }
+    };
+
     setSnapshot({
       pathname,
       runtime: native ? "native" : "web",
       state: "checking",
     });
 
+    // OAuth callback이 이미 세션 쿠키 저장을 완료했다면 화면을 즉시 연다.
+    // 동일 쿠키는 아래 서버 복구 요청에서 검증되며 보호 API도 각각 재검증한다.
+    if (initialCookieState.completed) allow();
+
     // 배포 직후 오래된 탭의 세션 잠금·토큰 갱신 요청이 멈춰도 로딩 화면에
-    // 영구 체류하지 않는다. 로컬 세션은 먼저 복원하고 서버 검증은 뒤에서 수행한다.
+    // 영구 체류하거나 성공한 OAuth를 로그아웃으로 오판하지 않는다.
     void withAuthTimeout(
       supabase.auth.getSession(),
       AUTH_SESSION_RESTORE_TIMEOUT_MS,
@@ -123,7 +160,16 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
       .then(({ data }) => {
         if (cancelled) return;
         if (!data.session?.user) {
-          redirectToLogin();
+          const cookieState = getOAuthCookieHandoffState(document.cookie);
+          if (!cookieState.completed) {
+            redirectToLogin();
+            return;
+          }
+          void confirmWithServer("CLIENT_SESSION_MISSING").then((result) => {
+            if (cancelled) return;
+            if (result === "signed_out") redirectToLogin();
+            // 5xx/timeout은 이미 확인한 쿠키 세션을 폐기하지 않는다.
+          });
           return;
         }
 
@@ -153,8 +199,18 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
             // 보호 API는 서버에서 세션을 다시 검증하므로 권한이 확대되지 않는다.
           });
       })
-      .catch(() => {
-        if (!sessionRestored) redirectToLogin();
+      .catch((error) => {
+        const cookieState = getOAuthCookieHandoffState(document.cookie);
+        if (!cookieState.completed) {
+          if (!sessionRestored) redirectToLogin();
+          return;
+        }
+        void confirmWithServer(
+          error instanceof Error ? error.message : "CLIENT_SESSION_TIMEOUT",
+        ).then((result) => {
+          if (cancelled) return;
+          if (result === "signed_out") redirectToLogin();
+        });
       });
 
     const {

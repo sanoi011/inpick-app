@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AuthOperationTimeoutError,
+  fetchServerAuthSession,
   getOAuthCookieHandoffState,
+  getOAuthSessionCookieFingerprint,
   runPostLoginBestEffort,
   waitForOAuthCookieHandoff,
   withAuthTimeout,
@@ -76,6 +78,21 @@ test("Arc에서 verifier가 중복 잔존해도 저장된 세션 handoff를 인�
   });
 });
 
+test("세션 지문은 verifier를 제외하고 실제 auth-token 변경만 반영한다", () => {
+  const before = getOAuthSessionCookieFingerprint(
+    "sb-project-auth-token=old; sb-project-auth-token-code-verifier=first",
+  );
+  const verifierChanged = getOAuthSessionCookieFingerprint(
+    "sb-project-auth-token=old; sb-project-auth-token-code-verifier=second",
+  );
+  const sessionChanged = getOAuthSessionCookieFingerprint(
+    "sb-project-auth-token.0=new-first; sb-project-auth-token.1=new-second",
+  );
+
+  assert.equal(verifierChanged, before);
+  assert.notEqual(sessionChanged, before);
+});
+
 test("getSession 추가 호출 없이 쿠키 handoff 완료 즉시 복귀한다", async () => {
   let reads = 0;
   const state = await waitForOAuthCookieHandoff(
@@ -92,4 +109,58 @@ test("getSession 추가 호출 없이 쿠키 handoff 완료 즉시 복귀한다"
   assert.equal(state.completed, true);
   assert.equal(state.sessionCookieCount, 2);
   assert.equal(reads, 2);
+});
+
+test("기존 세션 쿠키가 있으면 새 세션 지문으로 바뀔 때까지 기다린다", async () => {
+  const oldCookie = "sb-project-auth-token=old-session";
+  const oldFingerprint = getOAuthSessionCookieFingerprint(oldCookie);
+  let reads = 0;
+  const state = await waitForOAuthCookieHandoff(
+    () => {
+      reads += 1;
+      return reads < 3
+        ? oldCookie
+        : "sb-project-auth-token.0=new-first; sb-project-auth-token.1=new-second";
+    },
+    100,
+    1,
+    oldFingerprint,
+  );
+
+  assert.equal(state.completed, true);
+  assert.equal(state.sessionCookieCount, 2);
+  assert.equal(reads, 3);
+});
+
+test("서버가 검증한 사용자 세션을 브라우저 복구 결과로 반환한다", async () => {
+  const result = await fetchServerAuthSession<{ id: string }>(
+    (() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({
+            authenticated: true,
+            user: { id: "verified-user" },
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      )) as typeof fetch,
+    50,
+  );
+
+  assert.deepEqual(result, {
+    authenticated: true,
+    user: { id: "verified-user" },
+  });
+});
+
+test("서버 401은 확정된 비로그인 복구 결과로 반환한다", async () => {
+  const result = await fetchServerAuthSession(
+    (() => Promise.resolve(new Response(null, { status: 401 }))) as typeof fetch,
+    50,
+  );
+
+  assert.deepEqual(result, { authenticated: false, user: null });
 });
