@@ -34,8 +34,10 @@ export function useAuth() {
           AUTH_SESSION_RESTORE_TIMEOUT_MS,
           "use-auth-user",
         )
-          .then(({ data: { user: verifiedUser } }) => {
-            if (!done) setUser(verifiedUser);
+          .then(({ data: { user: verifiedUser }, error }) => {
+            // 이미 복원된 세션은 background 검증 오류로 null 처리하지 않는다.
+            // 명시적인 SIGNED_OUT 이벤트만 로그인 UI로 되돌린다.
+            if (!done && !error && verifiedUser) setUser(verifiedUser);
           })
           .catch(() => {
             // 복원 세션은 유지한다. 서버 보호 API가 최종 권한을 검증한다.

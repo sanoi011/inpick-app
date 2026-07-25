@@ -21,6 +21,63 @@ function redirectWithCookies(
   return response;
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+/**
+ * OAuth 제공자 → callback → 메인으로 이어지는 연속 307 체인에서는 일부
+ * 브라우저/WebView가 Set-Cookie를 다음 문서보다 늦게 반영했다. 콜백을 짧은
+ * 200 완료 문서로 끝내 브라우저가 세션 쿠키를 먼저 확정한 뒤 이동하게 한다.
+ */
+function completionWithCookies(
+  url: URL,
+  pendingCookies: PendingCookie[],
+) {
+  const destination = `${url.pathname}${url.search}${url.hash}`;
+  const scriptDestination = JSON.stringify(destination).replace(
+    /</g,
+    "\\u003c",
+  );
+  const response = new NextResponse(
+    `<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta http-equiv="refresh" content="1;url=${escapeHtml(destination)}" />
+    <title>로그인 완료 · INPICK</title>
+    <style>
+      html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#fff;color:#0d0d0d;font-family:system-ui,-apple-system,sans-serif}
+      main{text-align:center}.mark{width:38px;height:38px;margin:0 auto 16px;border-radius:14px;background:linear-gradient(135deg,#4f8cff,#2457d6);animation:pulse 1s ease-in-out infinite alternate}
+      p{margin:0;font-size:14px;font-weight:700}@keyframes pulse{to{opacity:.45;transform:scale(.92)}}
+    </style>
+  </head>
+  <body>
+    <main><div class="mark"></div><p>로그인이 완료되었습니다.</p></main>
+    <script>window.location.replace(${scriptDestination});</script>
+  </body>
+</html>`,
+    {
+      status: 200,
+      headers: {
+        "cache-control": "no-store, max-age=0",
+        "content-type": "text/html; charset=utf-8",
+        "referrer-policy": "no-referrer",
+        "x-inpick-auth-completion": "session-established",
+      },
+    },
+  );
+  pendingCookies.forEach(({ name, value, options }) => {
+    response.cookies.set(name, value, options);
+  });
+  return response;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
@@ -54,6 +111,12 @@ export async function GET(request: NextRequest) {
     if (!error) {
       console.info("[auth/callback] code exchange succeeded", {
         pendingCookieCount: pendingCookies.length,
+        sessionCookieCount: pendingCookies.filter(
+          ({ name, value }) =>
+            name.includes("auth-token") &&
+            !name.includes("code-verifier") &&
+            value.length > 0,
+        ).length,
       });
       // 웹 OAuth 로그인 완료 계측 (fire-and-forget, 실패해도 로그인 흐름 무영향)
       const user = data?.user ?? data?.session?.user ?? null;
@@ -83,7 +146,7 @@ export async function GET(request: NextRequest) {
           props: { provider, method: "oauth_web", is_new_user: isNewUser },
         });
       }
-      return redirectWithCookies(new URL(next, origin), pendingCookies);
+      return completionWithCookies(new URL(next, origin), pendingCookies);
     }
     console.error("[auth/callback] code exchange failed", {
       code: error.code,

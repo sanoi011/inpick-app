@@ -35,14 +35,11 @@ export async function updateSession(
           supabaseResponse = NextResponse.next({
             request,
           });
-          // 보안: 세션 쿠키로 강제 (maxAge/expires 제거 → 브라우저 닫으면 자동 삭제)
-          // 사용자가 브라우저 끄고 다시 켰을 때 자동 로그인 방지 → 다른 사람이 같은 컴퓨터로 진입 시 익명 시작
-          cookiesToSet.forEach(({ name, value, options }) => {
-            const sessionOptions = { ...options };
-            delete sessionOptions.maxAge;
-            delete sessionOptions.expires;
-            supabaseResponse.cookies.set(name, value, sessionOptions);
-          });
+          // 공식 Supabase 쿠키 수명과 refresh 옵션을 보존한다. 임의로
+          // maxAge/expires를 제거하면 브라우저·WebView 재진입 시 세션이 사라진다.
+          cookiesToSet.forEach(({ name, value, options }) =>
+            supabaseResponse.cookies.set(name, value, options),
+          );
         },
       },
     }

@@ -93,6 +93,77 @@ test("서버 세션 검증이 멈춰도 복원된 로그인으로 워크플로�
   await expect(page).toHaveURL(/\/workflow\?step=1$/);
 });
 
+test("추가 사용자 검증이 일시 실패해도 복원된 로그인을 유지한다", async ({
+  page,
+}) => {
+  await page.addInitScript((userId) => {
+    const user = {
+      id: userId,
+      aud: "authenticated",
+      role: "authenticated",
+      email: "auth-recovered@inpick.test",
+      app_metadata: {},
+      user_metadata: {},
+      created_at: "2026-07-25T00:00:00.000Z",
+    };
+    const authSession = JSON.stringify({
+      access_token: "auth-recovered-access-token",
+      refresh_token: "auth-recovered-refresh-token",
+      expires_in: 3_600,
+      expires_at: Math.floor(Date.now() / 1_000) + 3_600,
+      token_type: "bearer",
+      user,
+    });
+    const encodedSession = btoa(authSession)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+    for (const storageKey of [
+      "sb-example-auth-token",
+      "sb-pyhsjjtxcfmkcqmaxozd-auth-token",
+    ]) {
+      document.cookie = `${storageKey}=base64-${encodedSession}; path=/; SameSite=Lax`;
+    }
+    sessionStorage.setItem("inpick_purged_v4", "1");
+  }, USER_ID);
+
+  await page.route("**/auth/v1/user**", async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "temporarily_unavailable",
+        message: "temporary auth validation failure",
+      }),
+    });
+  });
+  await page.route("**/api/user/balance", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        balance: 50,
+        authenticated: true,
+        userId: USER_ID,
+      }),
+    });
+  });
+  await page.route("**/api/inpick/workflow-state**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ exists: false }),
+    });
+  });
+
+  await page.goto("/workflow?step=1");
+
+  await expect(
+    page.getByRole("heading", { name: "어떤 공간을 바꾸고 싶으세요?" }),
+  ).toBeVisible({ timeout: 4_000 });
+  await expect(page).toHaveURL(/\/workflow\?step=1$/);
+});
+
 test("세션이 없으면 로딩 화면에 머물지 않고 로그인 페이지로 이동한다", async ({
   page,
 }) => {

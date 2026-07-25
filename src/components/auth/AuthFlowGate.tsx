@@ -135,8 +135,18 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
         )
           .then(({ data: userData, error }) => {
             if (cancelled) return;
-            if (!error && userData.user) allow();
-            else redirectToLogin();
+            if (!error && userData.user) {
+              allow();
+              return;
+            }
+            // getSession으로 복원한 세션을 일시적인 네트워크/getUser 오류
+            // 하나로 폐기하지 않는다. 보호 API는 서버에서 다시 검증한다.
+            console.warn("[auth-gate] background user validation failed", {
+              code:
+                error && typeof error === "object" && "code" in error
+                  ? error.code
+                  : "unknown",
+            });
           })
           .catch(() => {
             // 네트워크 검증이 timeout이어도 복원된 세션으로 화면은 연다.
