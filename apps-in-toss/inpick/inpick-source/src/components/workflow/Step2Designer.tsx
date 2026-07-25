@@ -1977,33 +1977,6 @@ export default function Step2Designer({
     return () => observer.disconnect();
   }, []);
 
-  // 모바일: 진입 직후 페이지를 살짝 내렸다 올려 '아래로 스크롤하면 된다'는 동작을 직접 보여준다.
-  // 사용자가 먼저 터치하면 프로그램 스크롤은 즉시 포기한다 (조작 방해 금지).
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (window.matchMedia("(min-width: 1024px)").matches) return;
-    let cancelled = false;
-    const cancel = () => {
-      cancelled = true;
-    };
-    window.addEventListener("touchstart", cancel, { once: true, passive: true });
-    window.addEventListener("wheel", cancel, { once: true, passive: true });
-    const downTimer = window.setTimeout(() => {
-      if (cancelled) return;
-      window.scrollTo({ top: Math.round(window.innerHeight * 0.38), behavior: "smooth" });
-    }, 700);
-    const upTimer = window.setTimeout(() => {
-      if (cancelled) return;
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    }, 1600);
-    return () => {
-      window.clearTimeout(downTimer);
-      window.clearTimeout(upTimer);
-      window.removeEventListener("touchstart", cancel);
-      window.removeEventListener("wheel", cancel);
-    };
-  }, []);
-
   // 진행 상황 카드 — 데스크톱은 좌측 사이드바 하단, 모바일은 프롬프트 바 아래 최하단에 렌더된다.
   const progressCard = (
           <motion.div
@@ -2098,10 +2071,10 @@ export default function Step2Designer({
     <div className="grid min-h-[calc(100vh-180px)] items-stretch gap-3 rounded-[26px] bg-white p-3 lg:grid-cols-[268px_1fr]">
       {/* ─── 좌측 툴바 (순백색) ─── */}
       <aside className="flex flex-col gap-3">
-        {/* 대표 거실 디자인 생성 — 좌측 상단 (방 선택 위) */}
+        {/* 디자인 추천 생성 — 좌측 상단 (방 선택 위) */}
         <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <p className="mb-2 text-xs font-semibold text-black">
-            대표 거실 디자인 생성
+            디자인 추천 생성
           </p>
           <div className="grid grid-cols-2 gap-1.5">
             {STYLE_PRESETS.map((preset) => (
@@ -2131,7 +2104,7 @@ export default function Step2Designer({
             <p className="text-xs font-semibold text-black">방 선택</p>
             <span className="text-[0.6rem] tabular text-black/38">{pyeongLabel}</span>
           </div>
-          <div className="space-y-1">
+          <div className="grid grid-cols-3 gap-1.5 lg:flex lg:flex-col lg:gap-1">
             {availableTabs.map((t) => {
               const isAll = t.v === "all";
               const sel = activeRoom === t.v;
@@ -2158,7 +2131,7 @@ export default function Step2Designer({
                   : sel
               );
               return (
-                <div key={t.v} className="relative group">
+                <div key={t.v} className={`relative group ${isAll ? "col-span-3 lg:col-auto" : ""}`}>
                   <button
                     data-room-tab
                     onClick={(e) => {
@@ -2172,7 +2145,7 @@ export default function Step2Designer({
                         setOpenRoomPopup(openRoomPopup === t.v ? null : t.v);
                       }
                     }}
-                    className={`flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm font-semibold transition-all ${
+                    className={`flex w-full items-center justify-between gap-1 rounded-lg px-2 py-1.5 text-left text-xs font-semibold transition-all lg:gap-2 lg:px-3 lg:py-2 lg:text-sm ${
                       isGeneratingThis
                         ? "animate-pulse bg-black text-white ring-2 ring-black/10 ring-offset-1"
                         : sel
@@ -2186,9 +2159,9 @@ export default function Step2Designer({
                             : "bg-zinc-50 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700"
                     }`}
                   >
-                    <span className="inline-flex items-center gap-2">
-                      <Icon className="h-3.5 w-3.5" />
-                      {t.label}
+                    <span className="inline-flex min-w-0 items-center gap-1 lg:gap-2">
+                      <Icon className="h-3.5 w-3.5 shrink-0" />
+                      <span className="truncate">{t.label}</span>
                     </span>
                     {isGeneratingThis ? (
                       <span className="inline-flex items-center gap-1 rounded bg-white/25 px-1.5 py-0.5 text-[0.6rem] font-bold text-white">
@@ -2269,7 +2242,8 @@ export default function Step2Designer({
                 </div>
               );
             })}
-            {/* 사용자 실 추가 — 모든 모드 공통 */}
+            {/* 사용자 실 추가 — 모든 모드 공통 (모바일: 방 선택 그리드 아래 독립 한 줄) */}
+            <div className="col-span-3 mt-0.5 lg:col-auto lg:mt-0">
             {showAddTabInput ? (
               <div className="flex items-center gap-1.5 rounded-lg border border-black/10 bg-white px-2 py-1.5">
                 <input
@@ -2304,6 +2278,7 @@ export default function Step2Designer({
                 + 실 추가
               </button>
             )}
+            </div>
           </div>
         </div>
 
@@ -2478,7 +2453,7 @@ export default function Step2Designer({
           {/* 채팅 본문 */}
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             {!hasGenerated && !generating && !(chatMode && chatMessages.length > 0) && (
-              <div className="h-full flex items-center justify-center min-h-[40vh]">
+              <div className="h-full flex items-center justify-center min-h-[22vh] lg:min-h-[40vh]">
                 <div className="text-center max-w-md">
                   <div className="mx-auto inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-black mb-4">
                     <Sparkles className="h-8 w-8" />
@@ -3338,15 +3313,24 @@ export default function Step2Designer({
             className="fixed bottom-6 left-1/2 z-40 -translate-x-1/2 lg:hidden"
             aria-label="채팅 입력창으로 이동"
           >
-            <span className="flex items-center gap-1.5 rounded-full border border-blue-200/70 bg-white/95 px-4 py-2 text-xs font-bold text-blue-600 shadow-[0_6px_24px_rgba(59,130,246,0.35)] backdrop-blur">
-              아래에서 AI에게 디자인 요청
-              <motion.span
-                animate={{ y: [0, 4, 0] }}
-                transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-                className="inline-flex"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </motion.span>
+            <span className="flex items-center gap-2 rounded-full border border-blue-200/70 bg-white/95 px-4 py-2 text-xs font-bold text-blue-600 shadow-[0_6px_24px_rgba(59,130,246,0.35)] backdrop-blur">
+              <span className="relative flex h-5 w-4 items-center justify-center overflow-hidden">
+                <motion.span
+                  className="absolute inline-flex"
+                  animate={{ y: [-12, 12], opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut" }}
+                >
+                  <ChevronDown className="h-4 w-4" strokeWidth={3} />
+                </motion.span>
+                <motion.span
+                  className="absolute inline-flex"
+                  animate={{ y: [-12, 12], opacity: [0, 1, 0] }}
+                  transition={{ duration: 1.3, repeat: Infinity, ease: "easeInOut", delay: 0.65 }}
+                >
+                  <ChevronDown className="h-4 w-4" strokeWidth={3} />
+                </motion.span>
+              </span>
+              아래로 스크롤 — AI에게 디자인 요청
             </span>
           </motion.button>
         )}
