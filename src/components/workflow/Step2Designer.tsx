@@ -2066,6 +2066,33 @@ export default function Step2Designer({
     return () => observer.disconnect();
   }, []);
 
+  // 모바일: 진입 직후 페이지를 살짝 내렸다 올려 '아래로 스크롤하면 된다'는 동작을 직접 보여준다.
+  // 사용자가 먼저 터치하면 프로그램 스크롤은 즉시 포기한다 (조작 방해 금지).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(min-width: 1024px)").matches) return;
+    let cancelled = false;
+    const cancel = () => {
+      cancelled = true;
+    };
+    window.addEventListener("touchstart", cancel, { once: true, passive: true });
+    window.addEventListener("wheel", cancel, { once: true, passive: true });
+    const downTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      window.scrollTo({ top: Math.round(window.innerHeight * 0.38), behavior: "smooth" });
+    }, 700);
+    const upTimer = window.setTimeout(() => {
+      if (cancelled) return;
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }, 1600);
+    return () => {
+      window.clearTimeout(downTimer);
+      window.clearTimeout(upTimer);
+      window.removeEventListener("touchstart", cancel);
+      window.removeEventListener("wheel", cancel);
+    };
+  }, []);
+
   // 진행 상황 카드 — 데스크톱은 좌측 사이드바 하단, 모바일은 프롬프트 바 아래 최하단에 렌더된다.
   const progressCard = (
           <motion.div
