@@ -1,15 +1,28 @@
 # InPick 작업 재개 핸드오프
 
-마지막 갱신: 2026-07-21 22:53 (KST)
-저장소: `/Users/seonbonkim/Desktop/AIOD/개발/InPick/inpick-app`  
-브랜치: `main`  
-기준 커밋: `774b8fb feat(apps-in-toss): replace payments with Toss Pay`
+마지막 갱신: 2026-07-26 (KST)
+현재 작업 경로: `/Users/seonbonkim/Desktop/AIOD/개발/inpick beta ver1/inpick_product_hide_hotfix`
+현재 로컬 브랜치: `codex/hide-product-and-enlarge-estimate`
+작성 시점 원격 기준: `origin/main`의 `d17d533`
+최신 핸드오프: `docs/status/HANDOFF-2026-07-26-WEB-AUTH-AND-MOBILE-STEP2.md`
 
 이 문서는 터미널, Codex, Claude Code를 완전히 종료한 뒤에도 현재 상태에서 바로
 작업을 재개하기 위한 단일 기준 문서다. 날짜가 붙은 예전 핸드오프보다 이 파일을
 먼저 사용한다.
 
-## 0. 2026-07-21 22:53 최신 재개 상태 — 84㎡ 골든 타입만 진행
+## 0. 2026-07-26 최신 상태
+
+아래의 과거 기록보다 다음 최신 핸드오프를 우선한다.
+
+- `docs/status/HANDOFF-2026-07-26-WEB-AUTH-AND-MOBILE-STEP2.md`
+- 웹 Google 로그인은 운영에서 실제 사용자 로그인과 세션 유지까지 확인됐다.
+- 확정 원인과 재발 방지는
+  `docs/ops/WEB_OAUTH_PKCE_INCIDENT_2026-07-25.md`가 정본이다.
+- 작성 시점 `origin/main`은 `d17d533`이며, 다른 터미널의 Step 2 모바일 변경을
+  포함한다. 해당 변경을 덮어쓰지 말고 최신 핸드오프의 검수 순서부터 진행한다.
+- 인증 관련 변경이나 웹 배포 전에 반드시 `$inpick-auth-regression`을 실행한다.
+
+## 0-A. 2026-07-21 22:53 과거 재개 상태 — 84㎡ 골든 타입만 진행
 
 이 절은 아래의 2026-07-19 지시보다 최신이며, 범위가 충돌하면 이 절을 우선한다.
 
