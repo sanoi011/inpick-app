@@ -27,8 +27,17 @@ type CallbackState = "exchanging" | "failed";
 export default function OAuthCallbackPage() {
   const startedRef = useRef(false);
   const [state, setState] = useState<CallbackState>("exchanging");
+  const [showProgress, setShowProgress] = useState(false);
   const [message, setMessage] = useState("로그인 정보를 안전하게 연결하고 있습니다.");
   const [retryHref, setRetryHref] = useState("/auth?type=consumer");
+
+  useEffect(() => {
+    if (state !== "exchanging") return;
+    // 정상 OAuth 교환은 짧게 끝난다. 일반 성공 흐름에서는 별도 중간
+    // 화면을 노출하지 않고, 실제 네트워크 지연일 때만 상태를 안내한다.
+    const timer = window.setTimeout(() => setShowProgress(true), 2_000);
+    return () => window.clearTimeout(timer);
+  }, [state]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -119,6 +128,16 @@ export default function OAuthCallbackPage() {
 
     void complete();
   }, []);
+
+  if (state === "exchanging" && !showProgress) {
+    return (
+      <main
+        className="min-h-screen bg-white"
+        aria-label="로그인 처리 중"
+        aria-busy="true"
+      />
+    );
+  }
 
   return (
     <main className="grid min-h-screen place-items-center bg-white px-6 text-[#0d0d0d]">
