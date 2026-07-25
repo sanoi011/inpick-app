@@ -17,8 +17,10 @@ import { detectPlatform, openOAuthExternal } from "@/lib/mobile/platform";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
 import {
+  getWebOAuthCallbackUrl,
   getReturnPathFromOAuthRedirect,
   NATIVE_AUTH_RETURN_STORAGE_KEY,
+  WEB_AUTH_RETURN_STORAGE_KEY,
 } from "@/lib/auth/access-policy";
 
 export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
@@ -38,13 +40,18 @@ export async function startOAuth(
 ): Promise<{ error?: string }> {
   const platform = detectPlatform();
   const isNative = platform === "ios" || platform === "android";
-  const nativeReturnPath = getReturnPathFromOAuthRedirect(opts.redirectTo);
+  const returnPath = getReturnPathFromOAuthRedirect(opts.redirectTo);
 
-  if (isNative && typeof window !== "undefined") {
+  if (typeof window !== "undefined") {
     try {
-      sessionStorage.setItem(NATIVE_AUTH_RETURN_STORAGE_KEY, nativeReturnPath);
+      sessionStorage.setItem(
+        isNative
+          ? NATIVE_AUTH_RETURN_STORAGE_KEY
+          : WEB_AUTH_RETURN_STORAGE_KEY,
+        returnPath,
+      );
     } catch {
-      /* private mode: native callback safely falls back to home */
+      /* private mode: callback safely falls back to home */
     }
   }
 
@@ -76,7 +83,7 @@ export async function startOAuth(
       } catch {
         /* private mode */
       }
-      window.location.href = nativeReturnPath;
+      window.location.href = returnPath;
     }
     return {};
   }
@@ -85,7 +92,9 @@ export async function startOAuth(
     provider,
     options: {
       // 네이티브: 딥링크로 복귀(appUrlOpen 리스너가 처리) / 웹·PWA: 기존 콜백 URL
-      redirectTo: isNative ? NATIVE_OAUTH_REDIRECT : opts.redirectTo,
+      redirectTo: isNative
+        ? NATIVE_OAUTH_REDIRECT
+        : getWebOAuthCallbackUrl(opts.redirectTo),
       queryParams: opts.queryParams,
       // 네이티브: 자동 redirect 막고 우리가 외부 브라우저로 직접 오픈
       skipBrowserRedirect: isNative,
@@ -93,9 +102,13 @@ export async function startOAuth(
   });
 
   if (error) {
-    if (isNative && typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
       try {
-        sessionStorage.removeItem(NATIVE_AUTH_RETURN_STORAGE_KEY);
+        sessionStorage.removeItem(
+          isNative
+            ? NATIVE_AUTH_RETURN_STORAGE_KEY
+            : WEB_AUTH_RETURN_STORAGE_KEY,
+        );
       } catch {
         /* private mode */
       }

@@ -4,6 +4,10 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { sanitizeAuthReturnPath } from "@/lib/auth/return-path";
 import {
+  buildConsumerAuthHref,
+  WEB_AUTH_RETURN_STORAGE_KEY,
+} from "@/lib/auth/access-policy";
+import {
   isAuthOperationTimeoutError,
   withAuthTimeout,
 } from "@/lib/auth/resilience";
@@ -24,6 +28,7 @@ export default function OAuthCallbackPage() {
   const startedRef = useRef(false);
   const [state, setState] = useState<CallbackState>("exchanging");
   const [message, setMessage] = useState("로그인 정보를 안전하게 연결하고 있습니다.");
+  const [retryHref, setRetryHref] = useState("/auth?type=consumer");
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -32,7 +37,16 @@ export default function OAuthCallbackPage() {
     const complete = async () => {
       const currentUrl = new URL(window.location.href);
       const code = currentUrl.searchParams.get("code");
-      const next = sanitizeAuthReturnPath(currentUrl.searchParams.get("next"));
+      let storedReturnPath: string | null = null;
+      try {
+        storedReturnPath = sessionStorage.getItem(WEB_AUTH_RETURN_STORAGE_KEY);
+      } catch {
+        /* private mode: safe root fallback */
+      }
+      const next = sanitizeAuthReturnPath(
+        currentUrl.searchParams.get("next") || storedReturnPath,
+      );
+      setRetryHref(buildConsumerAuthHref(next));
       const providerError =
         currentUrl.searchParams.get("error_description") ||
         currentUrl.searchParams.get("error");
@@ -58,6 +72,11 @@ export default function OAuthCallbackPage() {
           throw error || new Error("OAUTH_SESSION_MISSING");
         }
 
+        try {
+          sessionStorage.removeItem(WEB_AUTH_RETURN_STORAGE_KEY);
+        } catch {
+          /* private mode */
+        }
         trackClientEvent(AnalyticsEvents.LoginCompleted, {
           props: {
             provider:
@@ -73,6 +92,22 @@ export default function OAuthCallbackPage() {
         window.location.replace(next);
       } catch (error) {
         console.error("[auth/callback] browser exchange failed", error);
+        const errorCode =
+          error && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "unknown";
+        const errorMessage =
+          error instanceof Error ? error.message : String(error);
+        void fetch("/api/auth/oauth-diagnostic", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            stage: "browser_session_restore",
+            errorCode,
+            errorMessage,
+          }),
+          keepalive: true,
+        }).catch(() => {});
         setState("failed");
         setMessage(
           isAuthOperationTimeoutError(error)
@@ -99,7 +134,7 @@ export default function OAuthCallbackPage() {
         <p className="mt-2 text-xs text-black/50">{message}</p>
         {state === "failed" ? (
           <a
-            href="/auth?type=consumer"
+            href={retryHref}
             className="mt-5 inline-flex rounded-full bg-black px-5 py-2.5 text-xs font-bold text-white"
           >
             로그인 다시 시도

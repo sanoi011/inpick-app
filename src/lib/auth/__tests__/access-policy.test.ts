@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   buildConsumerAuthHref,
   getReturnPathFromOAuthRedirect,
+  getWebOAuthCallbackUrl,
   isNativePublicPath,
   requiresConsumerAuthOnWeb,
 } from "../access-policy";
@@ -52,5 +53,14 @@ test("native OAuth return path is recovered from the existing callback contract"
       "https://www.interiorpick.co.kr/auth/callback?next=https%3A%2F%2Fevil.example",
     ),
     "/",
+  );
+});
+
+test("web OAuth uses a fixed query-free callback while preserving origin", () => {
+  assert.equal(
+    getWebOAuthCallbackUrl(
+      "https://www.interiorpick.co.kr/auth/callback?next=%2Fworkflow%3Fstep%3D1",
+    ),
+    "https://www.interiorpick.co.kr/auth/callback",
   );
 });

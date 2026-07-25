@@ -8,6 +8,7 @@ const NATIVE_PUBLIC_PATHS = [
 ] as const;
 
 export const NATIVE_AUTH_RETURN_STORAGE_KEY = "inpick_native_auth_return_to";
+export const WEB_AUTH_RETURN_STORAGE_KEY = "inpick_web_auth_return_to";
 
 /** Web visitors must authenticate before entering the free AI workflow. */
 export function requiresConsumerAuthOnWeb(pathname: string): boolean {
@@ -40,5 +41,19 @@ export function getReturnPathFromOAuthRedirect(redirectTo: string): string {
     return sanitizeAuthReturnPath(parsed.searchParams.get("next"));
   } catch {
     return "/";
+  }
+}
+
+/**
+ * Supabase 운영 Redirect URL 허용 목록에는 query 없는 callback만 사용한다.
+ * `next`는 별도 sessionStorage에 보존해 정확한 URL 매칭 실패로 Site URL에
+ * 폴백하는 것을 막는다.
+ */
+export function getWebOAuthCallbackUrl(redirectTo: string): string {
+  try {
+    const parsed = new URL(redirectTo);
+    return `${parsed.origin}/auth/callback`;
+  } catch {
+    return "/auth/callback";
   }
 }

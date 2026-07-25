@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 const EXPECTED_CALLBACK =
-  "https://www.interiorpick.co.kr/auth/callback?next=%2Fworkflow";
+  "https://www.interiorpick.co.kr/auth/callback";
 
 test.describe("production authentication smoke", () => {
   test.setTimeout(20_000);
@@ -65,6 +65,12 @@ test.describe("production authentication smoke", () => {
         "redirect_to",
       );
       expect(requestedCallback).toBe(EXPECTED_CALLBACK);
+      await page.goto("/auth?type=consumer&returnUrl=%2Fworkflow");
+      expect(
+        await page.evaluate(() =>
+          sessionStorage.getItem("inpick_web_auth_return_to"),
+        ),
+      ).toBe("/workflow");
       const cookieNames = (await page.context().cookies()).map(
         (cookie) => cookie.name,
       );

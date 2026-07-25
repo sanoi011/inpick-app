@@ -41,7 +41,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
       code_verifier?: string;
     };
     expect(requestBody.auth_code).toBe("test-oauth-code");
-    expect(requestBody.code_verifier).toBe("test-code-verifier");
+    expect(requestBody.code_verifier?.length).toBeGreaterThan(20);
     await route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -81,15 +81,32 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
     });
   });
 
-  // 실제 흐름처럼 로그인 페이지에서 verifier를 만든 뒤 callback으로 이동한다.
-  await page.goto("/auth?type=consumer");
-  await page.evaluate((storageKey) => {
-    const encodedVerifier = btoa("test-code-verifier")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/g, "");
-    document.cookie = `${storageKey}-code-verifier=base64-${encodedVerifier}; path=/; SameSite=Lax`;
-  }, PRODUCTION_STORAGE_KEY);
+  // 실제 흐름처럼 로그인 버튼이 verifier와 복귀 경로를 저장한 뒤 고정
+  // callback을 요청하게 한다. 외부 provider 이동만 테스트에서 차단한다.
+  let authorizeUrl = "";
+  await page.route("**/auth/v1/authorize**", async (route) => {
+    authorizeUrl = route.request().url();
+    await route.abort();
+  });
+  await page.goto(
+    "/auth?type=consumer&returnUrl=%2Fworkflow%3Fstep%3D1",
+  );
+  const expectedCallback = new URL("/auth/callback", page.url()).toString();
+  await page.getByRole("button", { name: "Google" }).click();
+  await expect.poll(() => authorizeUrl).not.toBe("");
+  expect(new URL(authorizeUrl).searchParams.get("redirect_to")).toBe(
+    expectedCallback,
+  );
+  // 차단된 외부 provider 오류 문서에서 인픽 origin으로 복귀한 뒤,
+  // 해당 origin의 sessionStorage와 쿠키를 확인한다.
+  await page.goto(
+    "/auth?type=consumer&returnUrl=%2Fworkflow%3Fstep%3D1",
+  );
+  expect(
+    await page.evaluate(() =>
+      sessionStorage.getItem("inpick_web_auth_return_to"),
+    ),
+  ).toBe("/workflow?step=1");
   await expect
     .poll(() =>
       page.evaluate(
@@ -101,7 +118,7 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
     .toBe(true);
 
   await page.goto(
-    "/auth/callback?code=test-oauth-code&next=%2Fworkflow%3Fstep%3D1",
+    "/auth/callback?code=test-oauth-code",
   );
 
   await expect(
