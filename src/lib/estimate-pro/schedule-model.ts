@@ -67,7 +67,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 120, m: 80, ea: 20, set: 4, lot: 2 },
     minWorkDays: 1,
     standardRef: "견적 수량 기반 소규모 현장 준비 작업",
-    gradient: "linear-gradient(90deg, #1d4ed8 0%, #3b82f6 55%, #60a5fa 100%)",
+    gradient: "linear-gradient(90deg, #b7cae3 0%, #cbdced 55%, #b9d9ea 100%)",
   },
   {
     key: "demo",
@@ -76,7 +76,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 60, m: 35, ea: 10, set: 3, lot: 1 },
     minWorkDays: 1,
     standardRef: "2026 표준품셈 유지관리 작업량과 소규모 현장 보정",
-    gradient: "linear-gradient(90deg, #1e40af 0%, #2563eb 50%, #38bdf8 100%)",
+    gradient: "linear-gradient(90deg, #adbfda 0%, #c5d7e9 50%, #b8d7e8 100%)",
   },
   {
     key: "window",
@@ -85,7 +85,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 18, m: 15, ea: 4, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 개소·세트 수량 기반",
-    gradient: "linear-gradient(90deg, #1e3a8a 0%, #2563eb 52%, #0ea5e9 100%)",
+    gradient: "linear-gradient(90deg, #b8c5de 0%, #cbd9ea 52%, #b6d5e7 100%)",
   },
   {
     key: "rough_mep",
@@ -105,7 +105,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 40, m: 35, ea: 12, set: 4, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 배관 길이·기구 개소·회로 수 기반",
-    gradient: "linear-gradient(90deg, #075985 0%, #0284c7 52%, #22d3ee 100%)",
+    gradient: "linear-gradient(90deg, #abc9d9 0%, #c3dbe7 52%, #b9dfe5 100%)",
   },
   {
     key: "fire",
@@ -114,7 +114,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 50, m: 40, ea: 12, set: 4, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 기구·회로·배관 수량 기반",
-    gradient: "linear-gradient(90deg, #1e40af 0%, #3b82f6 60%, #67e8f9 100%)",
+    gradient: "linear-gradient(90deg, #b4c5df 0%, #c8daeb 60%, #c0e1e8 100%)",
   },
   {
     key: "substrate",
@@ -123,7 +123,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 30, m: 25, ea: 8, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "2026 표준품셈 공종별 일당 작업량 준용",
-    gradient: "linear-gradient(90deg, #1d4ed8 0%, #2563eb 45%, #06b6d4 100%)",
+    gradient: "linear-gradient(90deg, #b6c8e1 0%, #c9d9ea 45%, #b8d9df 100%)",
   },
   {
     key: "waterproof",
@@ -133,7 +133,7 @@ const PHASE_DEFS: PhaseDef[] = [
     minWorkDays: 1,
     qualityHoldDays: 2,
     standardRef: "KCS 41 40 01 · 담수 후 약 48시간 누수 확인",
-    gradient: "linear-gradient(90deg, #0c4a6e 0%, #0284c7 48%, #38bdf8 100%)",
+    gradient: "linear-gradient(90deg, #a9c3d2 0%, #bfd7e3 48%, #bad9e8 100%)",
   },
   {
     key: "tile",
@@ -145,7 +145,7 @@ const PHASE_DEFS: PhaseDef[] = [
     minWorkDays: 1,
     minCalendarDays: 3,
     standardRef: "2026 표준품셈 타일 작업량 · KCS 41 48 01 시공 후 3일 보양",
-    gradient: "linear-gradient(90deg, #164e63 0%, #0891b2 52%, #22d3ee 100%)",
+    gradient: "linear-gradient(90deg, #acc8d1 0%, #c0d9df 52%, #bee0e3 100%)",
   },
   {
     key: "wood",
@@ -154,7 +154,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 35, m: 30, ea: 8, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "2026 표준품셈 수장·목공 일당 작업량 준용",
-    gradient: "linear-gradient(90deg, #1e3a8a 0%, #3b82f6 52%, #7dd3fc 100%)",
+    gradient: "linear-gradient(90deg, #bdc8df 0%, #cedbea 52%, #c2ddec 100%)",
   },
   {
     key: "finish",
@@ -163,7 +163,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 85, m: 30, ea: 6, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "2026 표준품셈 도배 85㎡/일 기준 · 천장·현장조건 보정",
-    gradient: "linear-gradient(90deg, #312e81 0%, #4f46e5 48%, #38bdf8 100%)",
+    gradient: "linear-gradient(90deg, #c4c3dd 0%, #d3d5e8 48%, #bfd9e9 100%)",
   },
   {
     key: "floor",
@@ -172,7 +172,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 50, m: 45, ea: 10, set: 3, lot: 1 },
     minWorkDays: 1,
     standardRef: "2026 표준품셈 플로어링 마루 50㎡/일 기준",
-    gradient: "linear-gradient(90deg, #1e40af 0%, #2563eb 45%, #60a5fa 100%)",
+    gradient: "linear-gradient(90deg, #b5c6df 0%, #c9d8e9 45%, #bfd8e8 100%)",
   },
   {
     key: "furniture",
@@ -183,7 +183,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 15, m: 6, ea: 6, set: 1, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 가구 길이·개소 기준 현장 조립 및 설치",
-    gradient: "linear-gradient(90deg, #172554 0%, #1d4ed8 48%, #0ea5e9 100%)",
+    gradient: "linear-gradient(90deg, #afbcd5 0%, #c4d2e6 48%, #b9d6e6 100%)",
   },
   {
     key: "fixtures",
@@ -194,7 +194,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 30, m: 25, ea: 8, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 위생·조명·부속기구 개소 기준",
-    gradient: "linear-gradient(90deg, #1e40af 0%, #0ea5e9 55%, #67e8f9 100%)",
+    gradient: "linear-gradient(90deg, #b7c6de 0%, #bed7e5 55%, #c1e0e6 100%)",
   },
   {
     key: "sign",
@@ -203,7 +203,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 15, m: 15, ea: 5, set: 2, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 면적·개소 기준",
-    gradient: "linear-gradient(90deg, #312e81 0%, #2563eb 52%, #06b6d4 100%)",
+    gradient: "linear-gradient(90deg, #c2c1da 0%, #cad5e7 52%, #bad8df 100%)",
   },
   {
     key: "clean",
@@ -212,7 +212,7 @@ const PHASE_DEFS: PhaseDef[] = [
     productivity: { m2: 100, m: 80, ea: 20, set: 4, lot: 1 },
     minWorkDays: 1,
     standardRef: "견적 면적·세대 수량 기준",
-    gradient: "linear-gradient(90deg, #1e3a8a 0%, #0284c7 55%, #38bdf8 100%)",
+    gradient: "linear-gradient(90deg, #bac5dc 0%, #c0d6e4 55%, #bcd9e7 100%)",
   },
 ];
 
@@ -304,7 +304,7 @@ export function buildSchedule(groups: DetailGroup[]): ScheduleResult {
       minWorkDays: 1,
       standardRef: "견적 단위 수량 기반 예비 작업량",
       gradient:
-        "linear-gradient(90deg, #1e3a8a 0%, #3b82f6 52%, #7dd3fc 100%)",
+        "linear-gradient(90deg, #bdc8df 0%, #cedbea 52%, #c2ddec 100%)",
       lines: unmatched,
     });
   }

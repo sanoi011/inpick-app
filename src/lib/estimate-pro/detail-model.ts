@@ -55,8 +55,20 @@ export interface DetailLine {
   siteConditionAdjustmentReason?: string;
   /** ConstructionEstimate의 surface_plan 단위. 실별 화면에서 같은 마감 공정을 1줄로 묶는 키 */
   workPackageKey?: string;
+  /** 원본 SurfaceType. 견적 행 안에서 제공할 마감/제품 옵션 판정에 사용 */
+  surfaceType?: string;
+  /** 철거·바탕이 아닌 최종 마감/등기구 제품 행 */
+  materialSelectable?: boolean;
+  /** 견적서 안에서 사용자가 고른 마감/제품 옵션 */
+  materialOptionId?: string;
+  /** 동적 브랜드 옵션의 최초 단가 기준값 */
+  optionBaseMatUnit?: number;
+  optionBaseLabUnit?: number;
   /** 실별 표시에만 사용하는 공사 패키지 대표행 */
   isWorkPackage?: boolean;
+  /** 패키지를 구성하는 원본 원가 행과 대표 마감 행 */
+  sourceLineIds?: string[];
+  finishLineId?: string;
   /** 대표 수량의 산출 기준(예: 방 바닥면적, 벽 면적) */
   quantityBasis?: string;
   /** 원가를 구성하는 철거·바탕·마감·부대공정. 공종별 원본 라인은 별도로 유지된다. */
@@ -480,6 +492,12 @@ function createSurfaceWorkPackage(lines: DetailLine[]): DetailLine {
     amount: matAmount + labAmount + expenseAmount,
     source,
     isWorkPackage: true,
+    materialSelectable: finish.materialSelectable,
+    materialOptionId: finish.materialOptionId,
+    optionBaseMatUnit: finish.optionBaseMatUnit,
+    optionBaseLabUnit: finish.optionBaseLabUnit,
+    sourceLineIds: lines.map((line) => line.id),
+    finishLineId: finish.id,
     quantityBasis: quantityBasisLine.quantityBasis || `${finish.part} 순면적`,
     workBreakdown: lines.map((line) => ({
       id: line.id,
@@ -604,6 +622,9 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
         ? semanticPart
         : (l.surfaceType && SURFACE_PART[l.surfaceType]) || semanticPart || meta.part);
     const supportingWork = isSupportingWorkTask(l.taskNameKo || itemName);
+    const lightingProduct =
+      /(조명|등기구|다운라이트|센서등|펜던트|LED)/i.test(itemName) &&
+      !/(배선|회로|전원|스위치|콘센트|차단기)/.test(itemName);
     // 구 견적의 하위 공정에 잘못 복제된 최종 마감재 상품 메타도 제거한다.
     const brand = supportingWork
       ? meta.brand
@@ -663,6 +684,11 @@ export function constructionEstimateToDetailLines(est: ConstructionEstimate): De
       siteConditionAdjustmentFactor: l.siteConditionAdjustmentFactor,
       siteConditionAdjustmentReason: l.siteConditionAdjustmentReason,
       workPackageKey,
+      surfaceType: l.surfaceType,
+      materialSelectable:
+        !supportingWork &&
+        (["floor", "wall", "ceiling"].includes(l.surfaceType || "") ||
+          lightingProduct),
       quantityBasis: l.quantityFormulaKo,
     };
   });

@@ -366,8 +366,9 @@ function drawTradeSummaryPage(doc: jsPDF, pkg: EstimateDocumentPackage) {
 
   doc.setFont("NanumGothic", "normal");
   doc.setFontSize(8);
-  for (const t of pkg.tradeSummaries) {
-    doc.text(t.tradeCode, cols[0].x + 1, y + 4);
+  for (let index = 0; index < pkg.tradeSummaries.length; index += 1) {
+    const t = pkg.tradeSummaries[index];
+    doc.text(String(index + 1).padStart(4, "0"), cols[0].x + 1, y + 4);
     doc.text(truncate(t.tradeName, 16), cols[1].x + 1, y + 4);
     doc.text(fmtWon(t.materialAmount), cols[2].x + cols[2].w - 1, y + 4, { align: "right" });
     doc.text(fmtWon(t.laborAmount), cols[3].x + cols[3].w - 1, y + 4, { align: "right" });

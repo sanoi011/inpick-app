@@ -28,10 +28,22 @@ test("room estimate stays consolidated and schedule uses quantity-based days", a
   await expect(livingGroup.getByText(/실크벽지.*벽.*마감공사/)).toHaveCount(1);
   await expect(livingGroup.getByText(/실크벽지.*천장.*마감공사/)).toHaveCount(1);
   await expect(livingGroup.getByText("세부 산출근거 5개 보기")).toBeVisible();
+  const floorOption = livingGroup.getByLabel("거실 바닥 옵션");
+  const ceilingOption = livingGroup.getByLabel("거실 천장 옵션");
+  await expect(floorOption).toHaveValue("floor-engineered-wood");
+  await expect(ceilingOption).toHaveValue("ceiling-wallpaper");
+  await floorOption.selectOption("floor-porcelain-600");
+  await ceilingOption.selectOption("ceiling-water-paint");
+  await expect(livingGroup.getByText(/포세린 타일.*바닥.*마감공사/)).toBeVisible();
+  await expect(livingGroup.getByText(/친환경 수성 도장.*천장.*마감공사/)).toBeVisible();
   await page.screenshot({
     path: "/tmp/inpick-estimate-room-packages.png",
     fullPage: true,
   });
+
+  await page.getByRole("button", { name: /3\. 총괄내역서/ }).click();
+  await expect(page.getByText(/^0001\.\s/)).toBeVisible();
+  await expect(page.getByText(/^99\.\s/)).toHaveCount(0);
 
   await page.getByRole("button", { name: "공정표" }).click();
   await expect(page.getByText("공정표 — 견적 수량 기반 예정 공기")).toBeVisible();

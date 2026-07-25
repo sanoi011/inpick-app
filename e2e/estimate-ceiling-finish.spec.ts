@@ -94,7 +94,7 @@ function constructionEstimate(ceilingFinish: "wallpaper" | "paint") {
   };
 }
 
-test("천장 마감 선택은 견적 재생성과 PDF 원본 데이터에 동일하게 반영된다", async ({
+test("천장 마감은 별도 UI 없이 세부견적 행에서 선택하고 즉시 재산정한다", async ({
   page,
 }) => {
   const requests: Array<Record<string, unknown>> = [];
@@ -257,19 +257,18 @@ test("천장 마감 선택은 견적 재생성과 PDF 원본 데이터에 동일
   });
 
   await page.goto(`/workflow/estimate?projectId=${PROJECT_ID}`);
-  const wallpaper = page.getByRole("radio", { name: "도배 · 국내 기본" });
-  const paint = page.getByRole("radio", { name: "친환경 수성 도장" });
-  await expect(wallpaper).toHaveAttribute("aria-checked", "true");
-  await expect.poll(() => requests.length).toBe(1);
-  expect(requests[0].ceilingFinish).toBe("wallpaper");
-
-  await paint.click();
-  await expect.poll(() => requests.length).toBe(2);
-  expect(requests[1].ceilingFinish).toBe("paint");
-  await expect(paint).toHaveAttribute("aria-checked", "true");
+  await expect.poll(() => requests.length).toBeGreaterThan(0);
+  expect(requests[0].ceilingFinish).toBeUndefined();
+  const requestCountBeforeInlineEdit = requests.length;
+  await expect(page.getByText("천장 마감 기준", { exact: true })).toHaveCount(0);
 
   await page.getByRole("button", { name: /4\. 세부내역서/ }).click();
   await page.getByRole("button", { name: /01\. 거실/ }).click();
-  await expect(page.getByText("친환경 수성 도장 2회", { exact: true })).toBeVisible();
+  const ceilingOption = page.getByLabel("거실 천장 옵션");
+  await expect(ceilingOption).toHaveValue("ceiling-wallpaper");
+  await ceilingOption.selectOption("ceiling-water-paint");
+  await expect(ceilingOption).toHaveValue("ceiling-water-paint");
+  await expect(page.getByText("천장 친환경 수성 도장", { exact: true })).toBeVisible();
   await expect(page.getByText("천장 실크벽지 도배", { exact: true })).toHaveCount(0);
+  await expect.poll(() => requests.length).toBe(requestCountBeforeInlineEdit);
 });

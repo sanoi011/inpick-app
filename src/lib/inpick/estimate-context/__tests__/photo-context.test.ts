@@ -101,6 +101,49 @@ test("requested photo rooms survive missing or failed design analysis as room-sc
   assert.equal(result.quantityBasisByRoom.kitchen.roomName, "주방");
 });
 
+test("apartment selected rooms override a stale whole-space design label", () => {
+  const staleLiving: DesignOutput = {
+    id: "living-stale-label",
+    projectId: "apartment-project",
+    userId: "user-1",
+    projectMode: "apartment",
+    targetType: "room",
+    targetId: "living",
+    targetName: "전체",
+    renderKind: "room_render",
+    imageUrl: "https://img/living.png",
+    materialHints: [],
+    status: "generated",
+    createdAt: "2026-07-25T01:00:00.000Z",
+    updatedAt: "2026-07-25T01:00:00.000Z",
+  };
+  const result = buildSurfacePlansFromContext({
+    projectId: "apartment-project",
+    projectMode: "apartment",
+    designOutputs: [staleLiving],
+    requestedRooms: [
+      { roomId: "living", roomName: "거실" },
+      { roomId: "kitchen", roomName: "주방" },
+    ],
+  });
+
+  assert.equal(result.quantityBasisByRoom.living.roomName, "거실");
+  assert.ok(
+    result.surfacePlans.some(
+      (plan) => plan.roomId === "living" && plan.roomName === "거실",
+    ),
+  );
+  assert.ok(
+    result.surfacePlans.some(
+      (plan) => plan.roomId === "kitchen" && plan.roomName === "주방",
+    ),
+  );
+  assert.equal(
+    result.surfacePlans.some((plan) => plan.roomName === "전체"),
+    false,
+  );
+});
+
 test("final-images-only keeps evidence and user edits relevant to the exact selected image", () => {
   const selections = [
     {

@@ -19,6 +19,10 @@ import { computeRoomQuantityBasis } from "@/lib/inpick/estimate-v2/quantity-form
 import { WOOD_FLOOR_RULE } from "@/lib/inpick/estimate-v2/work-package-rules";
 import { buildSchedule, buildScheduleFromDocumentLines } from "../schedule-model";
 import { resolveMaterialMeta } from "../material-meta";
+import {
+  applyEstimateLineOption,
+  getEstimateLineOptions,
+} from "../line-options";
 import type {
   RoomQuantityBasis,
   SurfacePlan,
@@ -130,6 +134,116 @@ test("실별 견적은 바닥·벽·천장을 각각 하나의 공사 패키지�
       .reduce((sum, line) => sum + line.totalAmount, 0),
   );
   assert.ok(tradeSheet.lineCount > roomSheet.lineCount);
+});
+
+test("견적 행 안의 바닥·천장 옵션은 원가 행과 실별 패키지를 함께 바꾼다", () => {
+  const estimate = buildConstructionEstimate({
+    projectId: "estimate-option-sample",
+    projectMode: "apartment",
+    surfacePlans: [
+      surfacePlan("option-floor", "floor", "engineered_floor", "강마루", 65_000),
+      surfacePlan("option-ceiling", "ceiling", "wallpaper", "천장 도배", 8_500),
+    ],
+    quantityBasisByRoom: { [roomBasis.roomId]: roomBasis },
+  });
+  const atomic = constructionEstimateToDetailLines(estimate);
+  const initialRoom = assembleByRoom(atomic).groups.find(
+    (group) => group.trade === "거실",
+  );
+  const ceiling = initialRoom?.lines.find((line) => line.part === "천장");
+  const floor = initialRoom?.lines.find((line) => line.part === "바닥");
+
+  assert.ok(ceiling);
+  assert.ok(floor);
+  assert.deepEqual(
+    getEstimateLineOptions(ceiling!).map((option) => option.id),
+    ["ceiling-wallpaper", "ceiling-water-paint"],
+  );
+  assert.deepEqual(
+    getEstimateLineOptions(floor!).map((option) => option.id),
+    ["floor-engineered-wood", "floor-vinyl-22", "floor-porcelain-600"],
+  );
+
+  const painted = applyEstimateLineOption(
+    atomic,
+    ceiling!,
+    "ceiling-water-paint",
+  );
+  const paintedRoom = assembleByRoom(painted).groups.find(
+    (group) => group.trade === "거실",
+  );
+  const paintedCeiling = paintedRoom?.lines.find(
+    (line) => line.part === "천장",
+  );
+  assert.match(paintedCeiling?.itemName || "", /친환경 수성 도장/);
+  assert.equal(paintedCeiling?.materialOptionId, "ceiling-water-paint");
+  assert.equal(
+    paintedCeiling?.workBreakdown?.some((line) =>
+      line.taskName.includes("초배지"),
+    ),
+    false,
+  );
+
+  const tiled = applyEstimateLineOption(
+    painted,
+    floor!,
+    "floor-porcelain-600",
+  );
+  const tiledRoom = assembleByRoom(tiled).groups.find(
+    (group) => group.trade === "거실",
+  );
+  const tiledFloor = tiledRoom?.lines.find((line) => line.part === "바닥");
+  assert.match(tiledFloor?.itemName || "", /포세린 타일/);
+  assert.equal(tiledFloor?.materialOptionId, "floor-porcelain-600");
+  assert.ok((tiledFloor?.amount || 0) !== (floor?.amount || 0));
+});
+
+test("조명 제품 행은 브랜드별 옵션과 단가를 제공한다", () => {
+  const lighting: DetailLine = {
+    id: "living-light",
+    trade: "전기공사",
+    order: 9,
+    itemCode: "04-20",
+    itemName: "거실 LED 평판등 설치",
+    part: "전기",
+    spec: "640각 · 50W",
+    brand: "비츠온",
+    product: "거실 LED 평판등",
+    unit: "개",
+    quantity: 1,
+    matUnit: 180_000,
+    labUnit: 30_000,
+    expenseUnit: 5_000,
+    matAmount: 180_000,
+    labAmount: 30_000,
+    expenseAmount: 5_000,
+    amount: 215_000,
+    room: "거실",
+    source: "표준 기본값",
+    optional: false,
+    added: false,
+    surfaceType: "lighting",
+    materialSelectable: true,
+  };
+  const options = getEstimateLineOptions(lighting);
+
+  assert.deepEqual(
+    options.map((option) => option.id),
+    [
+      "lighting-vitson",
+      "lighting-kumho",
+      "lighting-ledvance",
+      "lighting-philips",
+    ],
+  );
+  const selected = applyEstimateLineOption(
+    [lighting],
+    lighting,
+    "lighting-philips",
+  )[0];
+  assert.equal(selected.brand, "필립스");
+  assert.equal(selected.materialOptionId, "lighting-philips");
+  assert.ok(selected.matUnit > lighting.matUnit);
 });
 
 test("상품 resolver는 최종 마감재 라인에만 실행된다", () => {

@@ -434,7 +434,9 @@ function collectRoomsFromOutputs(
     if (!m.has(roomId)) m.set(roomId, o.targetName);
   }
   for (const room of requestedRooms) {
-    if (room.roomId && room.roomName && !m.has(room.roomId)) {
+    if (room.roomId && room.roomName) {
+      // Step1의 현재 실 선택은 오래된 design_output의 "전체" 같은
+      // 잘못된 targetName보다 우선한다. 이미지 분석 힌트는 roomId로 유지된다.
       m.set(room.roomId, room.roomName);
     }
   }

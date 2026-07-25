@@ -18,6 +18,7 @@ import type {
 import { createEstimateDocumentNo } from "./document-number";
 import { SITE_CONDITION_DOCUMENT_SUMMARY } from "@/lib/inpick/estimate-v2/site-condition-pricing";
 import type { ConstructionEstimate } from "@/lib/inpick/estimate-v2/types";
+import type { DetailLine } from "@/lib/estimate-pro/detail-model";
 
 export interface BuildSnapshotInput {
   projectId: string;
@@ -64,6 +65,8 @@ export interface BuildSnapshotInput {
   // P13-1: v2 ConstructionEstimate 직접 전달 — PDF 자재집계표/산출근거서용
   //   있으면 buildEstimateResult.estimates 대신 이 lines 사용 (manufacturer/supplier/source 포함)
   constructionEstimate?: ConstructionEstimate;
+  /** 견적서 안에서 사용자가 마감·브랜드 옵션을 바꾼 현재 원가 행 */
+  detailLines?: DetailLine[];
 }
 
 /**
@@ -163,8 +166,34 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
   const lines: EstimateDocumentLine[] = [];
   let lineIdCounter = 1;
 
+  // 화면에서 선택한 마감/브랜드 옵션이 있으면 현재 편집행을 PDF 원본으로 사용한다.
+  if (input.detailLines?.length) {
+    for (const l of input.detailLines) {
+      const brand = l.brand && l.brand !== "-" ? l.brand : undefined;
+      lines.push({
+        id: `L${String(lineIdCounter++).padStart(4, "0")}`,
+        tradeCode: String(l.order || 99).padStart(2, "0"),
+        tradeName: l.trade || "기타공사",
+        roomName: l.room,
+        itemName: l.itemName,
+        spec: l.spec,
+        unit: l.unit || "식",
+        quantity: Number(l.quantity) || 0,
+        materialUnitPrice: Number(l.matUnit) || 0,
+        materialAmount: Number(l.matAmount) || 0,
+        laborUnitPrice: Number(l.labUnit) || 0,
+        laborAmount: Number(l.labAmount) || 0,
+        expenseUnitPrice: Number(l.expenseUnit) || 0,
+        expenseAmount: Number(l.expenseAmount) || 0,
+        totalAmount: Number(l.amount) || 0,
+        brand,
+        productName: brand ? l.product : undefined,
+        priceSource: l.source,
+        calculationBasis: l.quantityBasis,
+      });
+    }
   // P13-1: v2 ConstructionEstimate가 있으면 그 lines 우선 사용 (manufacturer/supplier/priceSource 포함)
-  if (input.constructionEstimate?.lines && Array.isArray(input.constructionEstimate.lines)) {
+  } else if (input.constructionEstimate?.lines && Array.isArray(input.constructionEstimate.lines)) {
     for (const l of input.constructionEstimate.lines) {
       const isSupportingWork = [
         "철거", "제거", "바탕", "면정리", "보수", "부자재", "방습", "접착",
@@ -247,9 +276,18 @@ export function buildEstimateDocumentPackage(input: BuildSnapshotInput): Estimat
     laborTotal: 0,
     totalWon: 0,
   };
-  const materialAmount = grand.mainTotal + grand.auxTotal;
-  const laborAmount = grand.laborTotal;
-  const expenseAmount = 0; // 현재 엔진은 별도 expense 컬럼 X
+  const lineBasedSummary =
+    Boolean(input.detailLines?.length) ||
+    Boolean(input.constructionEstimate?.lines?.length);
+  const materialAmount = lineBasedSummary
+    ? lines.reduce((sum, line) => sum + (line.materialAmount || 0), 0)
+    : grand.mainTotal + grand.auxTotal;
+  const laborAmount = lineBasedSummary
+    ? lines.reduce((sum, line) => sum + (line.laborAmount || 0), 0)
+    : grand.laborTotal;
+  const expenseAmount = lineBasedSummary
+    ? lines.reduce((sum, line) => sum + (line.expenseAmount || 0), 0)
+    : 0;
   const directCost = materialAmount + laborAmount + expenseAmount;
   const indirectCost = Math.round(directCost * 0.06);
   const profit = Math.round(directCost * 0.05);

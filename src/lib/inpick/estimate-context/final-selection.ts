@@ -39,6 +39,10 @@ export function selectFinalDesignOutputs(
       const seenSurfaces = new Set(matched.materialHints.map((hint) => hint.surfaceType));
       return {
         ...matched,
+        // 사용자가 최종 선택창에서 확정한 현재 실 이름을 신뢰한다.
+        // 과거 DB 행에 targetName="전체"가 남아 있으면 living 결과가
+        // 세부견적의 "전체" 그룹으로 빠져 거실이 사라져 보였다.
+        targetName: selection.targetName || matched.targetName,
         imageUrl: selection.imageUrl,
         prompt,
         materialHints: [

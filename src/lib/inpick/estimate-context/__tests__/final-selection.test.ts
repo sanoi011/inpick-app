@@ -39,6 +39,28 @@ test("keeps exactly one explicitly selected image per room", () => {
   assert.equal(selected[0].imageUrl, "https://img/final.png");
 });
 
+test("final room label replaces a stale whole-space label on a matched output", () => {
+  const stale = output(
+    "living",
+    "https://img/living.png",
+    "2026-07-25T01:00:00.000Z",
+  );
+  stale.targetName = "전체";
+
+  const selected = selectFinalDesignOutputs(
+    [stale],
+    [{
+      targetId: "living",
+      targetName: "거실",
+      imageUrl: "https://img/living.png",
+    }],
+    { projectId: "project-1", userId: "user-1", projectMode: "apartment" },
+  );
+
+  assert.equal(selected[0].targetId, "living");
+  assert.equal(selected[0].targetName, "거실");
+});
+
 test("creates a selected snapshot when its asynchronous DB save has not arrived yet", () => {
   const selected = selectFinalDesignOutputs(
     [],

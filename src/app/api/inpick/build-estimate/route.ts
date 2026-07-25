@@ -501,7 +501,9 @@ async function buildConstructionEstimateFromContextId(
     siteConditions?: unknown;
   };
   const requestedRooms =
-    data.project_mode === "photo_only" ? deriveRequestedRoomsFromStep1(step1) : [];
+    data.project_mode === "commercial"
+      ? []
+      : deriveRequestedRoomsFromStep1(step1);
   const roomAreasByName: Record<string, number> = {};
   // P14-1: 방 도면 치수 (mm) → KitchenPlan/RoomQuantityBasis에 전달
   const floorplanDimsByName: Record<string, { widthMm?: number; depthMm?: number }> = {};

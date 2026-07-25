@@ -27,6 +27,7 @@ import {
   hasEstimateBundleAccess,
   normalizeEstimateAccessId,
 } from "@/lib/inpick/estimate-bundle-access";
+import type { DetailLine } from "@/lib/estimate-pro/detail-model";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -46,6 +47,8 @@ interface BodyInput {
   // P13-1: v2 ConstructionEstimate 전달 — PDF 자재집계표/산출근거서용
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   constructionEstimate?: any;
+  /** 세부견적 행 안에서 선택한 마감재·조명 브랜드 반영본 */
+  detailLines?: DetailLine[];
   /** scope summary 보강 — 호출자 입력 */
   projectName?: string;
   addressText?: string;
@@ -175,6 +178,7 @@ export async function POST(req: NextRequest) {
     inpick,
     buildEstimateResult: body.buildEstimateResult,
     constructionEstimate: body.constructionEstimate,
+    detailLines: Array.isArray(body.detailLines) ? body.detailLines : undefined,
   });
 
   // DB insert — preview 모드는 실패해도 200 (anonymous 사용자 PDF 다운로드 지원)
