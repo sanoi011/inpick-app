@@ -48,6 +48,8 @@ export interface NormalizedRoom {
   widthMm: number;
   depthMm: number;
   heightMm: number;
+  xMm?: number;
+  yMm?: number;
   source: "vision" | "standard";
 }
 

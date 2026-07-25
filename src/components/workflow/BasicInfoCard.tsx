@@ -32,7 +32,7 @@ import {
 } from "@/lib/inpick/floorplan/normalize-request";
 
 type InputMode = "address" | "upload" | "lidar";
-const FLOORPLAN_PIPELINE_VERSION = 7;
+const FLOORPLAN_PIPELINE_VERSION = 8;
 
 export interface BasicInfoData {
   mode: InputMode;
@@ -45,6 +45,7 @@ export interface BasicInfoData {
     exclusiveArea: number;
     grandPlanUrl?: string;
     roomCnt?: number;
+    bathroomCnt?: number;
   };
   // 도면 업로드
   uploadedFloorplan?: { dataUrl: string; filename: string; isHandDrawn: boolean };
@@ -74,6 +75,8 @@ export interface BasicInfoData {
     widthMm: number;
     depthMm: number;
     heightMm: number;
+    xMm?: number;
+    yMm?: number;
     source: "vision" | "standard";
   }>;
   normalizedOpenings?: Array<{ wall?: string; type?: string; widthMm?: number; heightMm?: number }>;
@@ -302,6 +305,7 @@ function AddressMode({ value, onChange }: Props) {
       exclusiveArea: number;
       grandPlanUrl?: string;
       roomCnt?: number;
+      bathroomCnt?: number;
     }>
   >([]);
   const [loadingBuilding, setLoadingBuilding] = useState(false);
@@ -479,6 +483,7 @@ function AddressMode({ value, onChange }: Props) {
       exclusiveArea: number;
       grandPlanUrl?: string;
       roomCnt?: number;
+      bathroomCnt?: number;
     },
     expansion: "basic" | "extended",
   ) => {
@@ -556,13 +561,16 @@ function AddressMode({ value, onChange }: Props) {
             ...(sourceUrl ? { imageUrl: sourceUrl } : {}),
             exclusiveAreaM2: p.exclusiveArea,
             roomCount: p.roomCnt,
+            bathroomCount: p.bathroomCnt,
             unitName: aptName,
             address,
             aptName,
             // 도면이 있으면 형식을 재생성하지 않고 워터마크만 최소 정리한다.
             // 도면이 없으면 평형 통계 평균값으로 실별 치수를 산출한다.
-            skipImageClean: !sourceUrl,
-            processingMode: sourceUrl ? "watermark_only" : "area_average",
+            // 실제 도면이 있으면 평균 평형으로 대체하지 않고 구조 분석을 수행한다.
+            // 원본은 그대로 Storage에 보존하고 이미지 재생성(clean edit)은 생략한다.
+            skipImageClean: true,
+            processingMode: sourceUrl ? "structure_only" : "area_average",
             expansion: expansion === "extended",
             layoutVariant: expansion,
           }),
@@ -652,6 +660,7 @@ function AddressMode({ value, onChange }: Props) {
     exclusiveArea: number;
     grandPlanUrl?: string;
     roomCnt?: number;
+    bathroomCnt?: number;
   }) => {
     onChange({
       ...value,

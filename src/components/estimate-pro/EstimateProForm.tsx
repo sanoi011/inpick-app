@@ -905,35 +905,77 @@ function ScheduleTab({
       {schedule.phases.length > 0 ? (
         <>
           <div
-            className={`mb-1 flex items-center ${
-              bidder ? "pr-[154px]" : "pr-[72px]"
-            }`}
+            className="space-y-2 md:hidden"
+            data-testid="schedule-mobile-list"
           >
-            <div className="w-48 shrink-0" />
-            <div className="relative h-4 flex-1">
-              {ticks.map((day) => (
-                <span
-                  key={day}
-                  className="absolute -translate-x-1/2 text-[11px] text-blue-400"
-                  style={{ left: `${(day / total) * 100}%` }}
-                >
-                  {day}일
+            {schedule.phases.map((phase) => (
+              <div
+                key={phase.key}
+                className="flex items-center justify-between gap-3 rounded-xl border border-blue-100/80 bg-blue-50/45 px-3 py-2.5"
+              >
+                <span className="min-w-0 truncate text-[13px] font-bold text-slate-700">
+                  {phase.name}
                 </span>
-              ))}
-            </div>
+                {bidder ? (
+                  <label className="flex shrink-0 items-center gap-1 text-xs font-semibold text-blue-700">
+                    <input
+                      aria-label={`${phase.name} 공사기간`}
+                      type="number"
+                      min={1}
+                      value={phase.durationDays}
+                      onChange={(event) =>
+                        updateSchedulePhase(phase.key, {
+                          durationDays: Math.max(
+                            1,
+                            Number(event.target.value) || 1,
+                          ),
+                        })
+                      }
+                      className="w-14 rounded-lg border border-blue-100 bg-white px-2 py-1.5 text-right font-bold outline-none focus:border-blue-300"
+                    />
+                    일
+                  </label>
+                ) : (
+                  <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-xs font-bold tabular-nums text-blue-700 ring-1 ring-blue-100">
+                    {phase.durationDays}일
+                  </span>
+                )}
+              </div>
+            ))}
           </div>
 
-          <div className="space-y-2">
-            {schedule.phases.map((phase) => (
-              <ScheduleRow
-                key={phase.key}
-                phase={phase}
-                total={total}
-                ticks={ticks}
-                bidder={bidder}
-                updateSchedulePhase={updateSchedulePhase}
-              />
-            ))}
+          <div className="hidden md:block" data-testid="schedule-desktop-chart">
+            <div
+              className={`mb-1 flex items-center ${
+                bidder ? "pr-[154px]" : "pr-[72px]"
+              }`}
+            >
+              <div className="w-48 shrink-0" />
+              <div className="relative h-4 flex-1">
+                {ticks.map((day) => (
+                  <span
+                    key={day}
+                    className="absolute -translate-x-1/2 text-[11px] text-blue-400"
+                    style={{ left: `${(day / total) * 100}%` }}
+                  >
+                    {day}일
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {schedule.phases.map((phase) => (
+                <ScheduleRow
+                  key={phase.key}
+                  phase={phase}
+                  total={total}
+                  ticks={ticks}
+                  bidder={bidder}
+                  updateSchedulePhase={updateSchedulePhase}
+                />
+              ))}
+            </div>
           </div>
         </>
       ) : (

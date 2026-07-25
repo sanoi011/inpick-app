@@ -74,7 +74,19 @@ export interface FloorplanMetadata {
   source_url: string;
   cached_at: string;
   /** 추가 정보 (정형화 결과) */
-  rooms?: Array<{ name: string; widthMm: number; depthMm: number }>;
+  rooms?: Array<{
+    name: string;
+    widthMm: number;
+    depthMm: number;
+    xMm?: number;
+    yMm?: number;
+  }>;
+  openings?: Array<{
+    wall?: string;
+    type?: string;
+    widthMm?: number;
+    heightMm?: number;
+  }>;
   total_width_mm?: number;
   total_depth_mm?: number;
   pyeong?: string;

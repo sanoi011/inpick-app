@@ -61,6 +61,11 @@ import { postEstimateJson } from "@/lib/inpick/estimate-client";
 import { buildPhotoEstimateRooms } from "@/lib/inpick/photo-estimate-rooms";
 import { buildWorkflowEstimateEvidence } from "@/lib/inpick/estimate-context/workflow-evidence";
 import { mergeRestoredDesigns } from "@/lib/inpick/workflow/restore-designs";
+import {
+  buildApartmentRoomDescriptors,
+  buildWorkflowRoomNameMap,
+  expandWorkflowRoomSelection,
+} from "@/lib/inpick/workflow/room-instances";
 import { ESTIMATE_BUNDLE_TOKEN_COST } from "@/types/credits";
 
 // P12: 단가 출처 라벨 (estimate-v2 MaterialPriceSource 매핑)
@@ -332,6 +337,13 @@ const ROOM_ICONS: Record<string, typeof Home> = {
   dress: Layers,
 };
 
+function roomNameMapForStep1(step1: Step1Data | null): Record<string, string> {
+  return {
+    ...ROOM_NAME_MAP,
+    ...buildWorkflowRoomNameMap(step1?.normalizedFloorplan?.rooms),
+  };
+}
+
 interface DesignGalleryOutput {
   id: string;
   imageUrl: string;
@@ -352,11 +364,12 @@ interface DesignGalleryItem {
 function buildSelectedDesignGallery(
   step2: Step2Data | null,
   outputs: DesignGalleryOutput[],
+  roomNameMap: Record<string, string> = ROOM_NAME_MAP,
 ): DesignGalleryItem[] {
   if (step2) {
     const evidence = buildWorkflowEstimateEvidence(
       step2,
-      (roomKey) => ROOM_NAME_MAP[roomKey] || roomKey,
+      (roomKey) => roomNameMap[roomKey] || roomKey,
     );
     if (evidence.selectedDesigns.length > 0) {
       return evidence.selectedDesigns.map((design) => {
@@ -374,7 +387,7 @@ function buildSelectedDesignGallery(
           key: `selected-${design.targetId}`,
           imageUrl: design.imageUrl,
           targetId: design.targetId,
-          label: design.targetName || ROOM_NAME_MAP[design.targetId] || design.targetId,
+          label: design.targetName || roomNameMap[design.targetId] || design.targetId,
           status: output?.status,
           lockedAssetId: selectedRender?.lockedAssetId,
         };
@@ -495,21 +508,18 @@ async function downloadEstimatePdf(input: {
     return;
   }
   const { renderEstimatePackagePdf } = await import("@/lib/inpick/estimate-documents/pdf/estimate-pdf");
+  const { saveOrShareBlob } = await import("@/lib/mobile/file-download");
   const { pdfBlob } = await renderEstimatePackagePdf({
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     package: data.package as any,
     designImages: input.designImages,
     includeStandardContract: true,
   });
-  const url = URL.createObjectURL(pdfBlob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `INPICK_계약견적_통합문서_${data.documentNo || "draft"}.pdf`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
+  await saveOrShareBlob({
+    blob: pdfBlob,
+    fileName: `INPICK_계약견적_통합문서_${data.documentNo || "draft"}.pdf`,
+    title: "INPICK 계약·견적 통합 문서",
+  });
 }
 
 // P11-FIX: useSearchParams 사용 페이지는 Suspense로 감싸야 prerender 통과 (Vercel 빌드 에러 4회 원인)
@@ -680,9 +690,18 @@ function EstimatePage() {
   const [designOutputsForGallery, setDesignOutputsForGallery] = useState<
     DesignGalleryOutput[]
   >([]);
+  const workflowRoomNameMap = useMemo(
+    () => roomNameMapForStep1(step1),
+    [step1],
+  );
   const selectedDesignGalleryItems = useMemo(
-    () => buildSelectedDesignGallery(step2, designOutputsForGallery),
-    [step2, designOutputsForGallery],
+    () =>
+      buildSelectedDesignGallery(
+        step2,
+        designOutputsForGallery,
+        workflowRoomNameMap,
+      ),
+    [step2, designOutputsForGallery, workflowRoomNameMap],
   );
   // P7: 공종별 견적 v2 — contextId 경로에서 받음
   const [constructionEstimate, setConstructionEstimate] = useState<ConstructionEstimate | null>(null);
@@ -805,7 +824,7 @@ function EstimatePage() {
           : "apartment";
     const evidence = buildWorkflowEstimateEvidence(
       s2,
-      (roomKey) => ROOM_NAME_MAP[roomKey] || roomKey,
+      (roomKey) => roomNameMapForStep1(s1)[roomKey] || roomKey,
     );
     try {
       const data = await postEstimateJson<{ contextId?: string }>(
@@ -916,7 +935,8 @@ function EstimatePage() {
         currentStep2
           ? buildWorkflowEstimateEvidence(
               currentStep2,
-              (roomKey) => ROOM_NAME_MAP[roomKey] || roomKey,
+              (roomKey) =>
+                roomNameMapForStep1(step1Ref.current)[roomKey] || roomKey,
             ).selectedImageUrls
           : [],
       );
@@ -1382,6 +1402,8 @@ function EstimatePage() {
 
       // 아파트 도면 모드 (기존 흐름) ────────────────────────────────
       const normalizedRooms = s1.normalizedFloorplan?.rooms || [];
+      const roomNameMap = roomNameMapForStep1(s1);
+      const roomDescriptors = buildApartmentRoomDescriptors(normalizedRooms);
       const pyeong = area ? classifyPyeong(area) : "30평";
       const standardDims = estimateRoomDimsFromPyeong(pyeong);
 
@@ -1391,14 +1413,20 @@ function EstimatePage() {
       //    - 둘 다 없으면 API가 평수 기반 표준 방 셋으로 마지막 폴백
       let selectedRoomKeys: string[] = [];
       if (s1.rooms?.includes("all")) {
-        selectedRoomKeys = Object.keys(ROOM_NAME_MAP);
+        selectedRoomKeys = expandWorkflowRoomSelection(["all"], roomDescriptors);
       } else if (s1.rooms?.length) {
-        selectedRoomKeys = s1.rooms.filter((r) => r in ROOM_NAME_MAP);
+        selectedRoomKeys = expandWorkflowRoomSelection(
+          s1.rooms,
+          roomDescriptors,
+        );
       } else {
         // P0 폴백: Step1 방 선택 없으면 Step2에서 이미지 생성된 방 키로
         // (= 사용자가 실제 시공하려는 공간 = 이미지 만든 공간)
         const generatedKeys = Object.keys(s2.rendersByRoom || {}).filter(
-          (k) => k !== "all" && k in ROOM_NAME_MAP && (s2.rendersByRoom[k]?.length ?? 0) > 0,
+          (k) =>
+            k !== "all" &&
+            k in roomNameMap &&
+            (s2.rendersByRoom[k]?.length ?? 0) > 0,
         );
         if (generatedKeys.length > 0) {
           selectedRoomKeys = generatedKeys;
@@ -1413,8 +1441,11 @@ function EstimatePage() {
       }> = [];
 
       for (const key of selectedRoomKeys) {
-        const koreanName = ROOM_NAME_MAP[key];
+        const koreanName = roomNameMap[key];
         if (!koreanName) continue;
+        const roomDescriptor = roomDescriptors.find(
+          (descriptor) => descriptor.key === key,
+        );
 
         const renders = s2.rendersByRoom?.[key] || [];
         const idx = s2.selectedByRoom?.[key];
@@ -1425,7 +1456,9 @@ function EstimatePage() {
 
         // 치수: 정형화 → 평형 표준 → 일반 표준
         let dim = normalizedRooms.find(
-          (r) => r.name === koreanName || r.name.includes(koreanName.replace(/\d+$/, "")),
+          (r) =>
+            r.name === roomDescriptor?.dimKey ||
+            r.name === koreanName,
         );
         if (!dim) {
           const std = standardDims[koreanName] || standardDims[koreanName.replace(/\d+$/, "")];
@@ -1511,15 +1544,21 @@ function EstimatePage() {
         const generatedKeys = Object.keys(s2.rendersByRoom || {}).filter(
           (k) => k !== "all" && (s2.rendersByRoom[k]?.length ?? 0) > 0,
         );
-        const userRoomKeys = s1.rooms?.includes("all")
-          ? Object.keys(ROOM_NAME_MAP)
-          : s1.rooms || [];
+        const userRoomKeys = expandWorkflowRoomSelection(
+          s1.rooms || [],
+          roomDescriptors,
+        );
         const allRoomKeys = new Set<string>([...userRoomKeys, ...generatedKeys]);
         for (const k of Array.from(allRoomKeys)) {
-          if (!(k in ROOM_NAME_MAP)) continue;
-          const koreanName = ROOM_NAME_MAP[k];
+          if (!(k in roomNameMap)) continue;
+          const koreanName = roomNameMap[k];
+          const roomDescriptor = roomDescriptors.find(
+            (descriptor) => descriptor.key === k,
+          );
           const norm = normRooms.find(
-            (r) => r.name === koreanName || r.name.includes(koreanName.replace(/\d+$/, "")),
+            (r) =>
+              r.name === roomDescriptor?.dimKey ||
+              r.name === koreanName,
           );
           const widthM = norm?.widthMm ? norm.widthMm / 1000 : undefined;
           const depthM = norm?.depthMm ? norm.depthMm / 1000 : undefined;
@@ -1755,9 +1794,12 @@ function EstimatePage() {
   const budgetWon = budgetMan * 10000;
   const budgetDelta = finalTotal - budgetWon;
 
-  const availableRoomKeys = step1?.rooms?.includes("all")
-    ? Object.keys(ROOM_NAME_MAP)
-    : step1?.rooms?.filter((r) => r in ROOM_NAME_MAP) || [];
+  const availableRoomKeys = step1
+    ? expandWorkflowRoomSelection(
+        step1.rooms || [],
+        buildApartmentRoomDescriptors(step1.normalizedFloorplan?.rooms),
+      )
+    : [];
 
   // 총 공사금액을 먼저 보여준 뒤 세부견적 잠금 안내를 노출한다.
   useEffect(() => {
@@ -1796,8 +1838,8 @@ function EstimatePage() {
               <Layers className="h-4 w-4" />
             </button>
             {availableRoomKeys.map((key) => {
-              const Icon = ROOM_ICONS[key] || Home;
-              const koreanName = ROOM_NAME_MAP[key];
+              const Icon = ROOM_ICONS[key.replace(/-\d+$/, "")] || Home;
+              const koreanName = workflowRoomNameMap[key];
               const sel = filterRoom === koreanName;
               return (
                 <button

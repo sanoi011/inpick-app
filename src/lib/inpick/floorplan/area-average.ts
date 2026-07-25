@@ -3,10 +3,12 @@ import {
   estimateRoomDimsFromPyeong,
   type RoomDim,
 } from "@/lib/inpick/korean-apt-dimensions";
+import { canonicalizeFloorplanRoomNames } from "@/lib/inpick/workflow/room-instances";
 
 export interface AreaAverageInput {
   exclusiveAreaM2: number;
   roomCount?: number;
+  bathroomCount?: number;
   expansion?: boolean;
   unitName?: string;
 }
@@ -29,7 +31,6 @@ function roundTo10(value: number): number {
 
 function sanitizeRooms(value: unknown): RoomDim[] {
   if (!Array.isArray(value)) return [];
-  const seen = new Set<string>();
   const rooms: RoomDim[] = [];
   for (const item of value) {
     if (!item || typeof item !== "object") continue;
@@ -40,7 +41,6 @@ function sanitizeRooms(value: unknown): RoomDim[] {
     const heightMm = Number(room.heightMm || 2400);
     if (
       !name ||
-      seen.has(name) ||
       !Number.isFinite(widthMm) ||
       !Number.isFinite(depthMm) ||
       widthMm < 900 ||
@@ -50,7 +50,6 @@ function sanitizeRooms(value: unknown): RoomDim[] {
     ) {
       continue;
     }
-    seen.add(name);
     rooms.push({
       name,
       widthMm: roundTo10(widthMm),
@@ -61,7 +60,7 @@ function sanitizeRooms(value: unknown): RoomDim[] {
           : 2400,
     });
   }
-  return rooms;
+  return canonicalizeFloorplanRoomNames(rooms);
 }
 
 /**
@@ -93,12 +92,18 @@ export function buildStandardAreaAverage(input: AreaAverageInput): AreaAverageRe
   const bedroomCount = input.roomCount
     ? Math.max(0, Math.min(6, Math.round(input.roomCount) - 1))
     : undefined;
+  const bathroomCount = input.bathroomCount
+    ? Math.max(1, Math.min(5, Math.round(input.bathroomCount)))
+    : undefined;
+  const detectedRoomCount: Record<string, number> = {};
+  if (bedroomCount) detectedRoomCount.침실 = bedroomCount;
+  if (bathroomCount) detectedRoomCount.욕실 = bathroomCount;
   const standard = estimateRoomDimsFromPyeong(
     pyeong,
-    bedroomCount ? { 침실: bedroomCount } : undefined,
+    Object.keys(detectedRoomCount).length > 0 ? detectedRoomCount : undefined,
   );
   const rooms = fitAverageRoomsToExclusiveArea(
-    Object.values(standard),
+    canonicalizeFloorplanRoomNames(Object.values(standard)),
     input.exclusiveAreaM2,
   );
   return {
@@ -116,6 +121,7 @@ export function buildAreaAveragePrompt(input: AreaAverageInput): string {
 입력:
 - 전용면적: ${input.exclusiveAreaM2.toFixed(1)}㎡
 - 침실 수 참고값: ${input.roomCount ?? "미확인"}
+- 욕실 수 참고값: ${input.bathroomCount ?? "미확인"}
 - 세대명: ${input.unitName || "미확인"}
 - 발코니 형태: ${input.expansion ? "확장형" : "기본형"}
 
@@ -130,6 +136,7 @@ export function buildAreaAveragePrompt(input: AreaAverageInput): string {
 
 규칙:
 - 거실, 안방, 주방, 욕실, 현관과 면적에 맞는 침실을 포함합니다.
+- 욕실 수 참고값이 있으면 반드시 욕실1, 욕실2처럼 각각 독립 실로 반환합니다.
 - 기본형이면 발코니를 포함하고, 확장형도 확장부 산정을 위해 발코니 항목을 유지합니다.
 - 실내 실들의 바닥면적 합은 전용면적의 85~95% 범위로 두고 나머지는 복도·벽체·수납 여유로 둡니다.
 - 치수는 mm 정수이며 실제 도면에서 읽었다고 표현하지 않습니다.`;

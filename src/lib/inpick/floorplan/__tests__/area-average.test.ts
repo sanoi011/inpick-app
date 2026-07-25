@@ -42,3 +42,18 @@ test("prompt response is sanitized and rescaled for estimate use", () => {
   assert.ok(interiorArea > 53);
   assert.ok(interiorArea < 57);
 });
+
+test("known bathroom count is preserved as separate bathroom instances", () => {
+  const result = buildStandardAreaAverage({
+    exclusiveAreaM2: 84.9,
+    roomCount: 3,
+    bathroomCount: 2,
+  });
+
+  assert.deepEqual(
+    result.rooms
+      .filter((room) => room.name.startsWith("욕실"))
+      .map((room) => room.name),
+    ["욕실1", "욕실2"],
+  );
+});

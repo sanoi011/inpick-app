@@ -97,11 +97,12 @@ function getRoomSpecificDescription(roomName: string, expansion?: boolean): stri
           "(built-in only), one full window on outer wall.",
     침실: "Bedroom (침실): standard size, one outer-wall window, " +
           "simple finish for furniture move-in.",
-    부엌: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
-          "upper + lower cabinets, range hood, refrigerator alcove. " +
-          "Modern Korean apartment kitchen.",
-    주방: "Kitchen (부엌/주방): U-shape or L-shape kitchen counter built-in, " +
-          "upper + lower cabinets, range hood, refrigerator alcove.",
+    부엌: "Kitchen (부엌/주방): derive the cabinet run and circulation from the attached floor plan. " +
+          "It may be one-wall, galley, L-shaped or U-shaped; never force a generic layout. " +
+          "Keep every doorway, utility-balcony opening and dining connection in its measured position.",
+    주방: "Kitchen (부엌/주방): derive the cabinet run and circulation from the attached floor plan. " +
+          "It may be one-wall, galley, L-shaped or U-shaped; never force a generic layout. " +
+          "Keep every doorway, utility-balcony opening and dining connection in its measured position.",
     욕실: "Bathroom (욕실): compact wet space, full tile walls + floor, " +
           "vanity/toilet/shower built-in. Korean apartment bathroom.",
     현관: "Korean apartment entryway / foyer (현관): " +
@@ -133,7 +134,13 @@ function getRoomSpecificDescription(roomName: string, expansion?: boolean): stri
              "tile floor, washing machine + storage shelves, no window or one small window.",
     팬트리: "Pantry (팬트리): kitchen storage closet, full-height shelving on both walls, no window.",
   };
-  return map[roomName] || "";
+  if (map[roomName]) return map[roomName];
+  if (/욕실|화장실/.test(roomName)) return map.욕실;
+  if (/침실|작은방|방\d/.test(roomName)) return map.침실;
+  if (/주방|부엌/.test(roomName)) return map.주방;
+  if (/발코니|베란다/.test(roomName)) return map.발코니;
+  if (/드레스/.test(roomName)) return map.드레스룸;
+  return "";
 }
 
 export async function generateRoomRender(input: RenderRoomInput): Promise<RenderRoomResult> {

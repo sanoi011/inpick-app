@@ -45,6 +45,7 @@ import {
   parseAreaAverageResponse,
   type AreaAverageInput,
 } from "@/lib/inpick/floorplan/area-average";
+import { canonicalizeFloorplanRoomNames } from "@/lib/inpick/workflow/room-instances";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -74,6 +75,7 @@ interface Body {
     | "structure_only"
     | "clean_preview";
   roomCount?: number;
+  bathroomCount?: number;
   expansion?: boolean;
   layoutVariant?: "basic" | "extended";
   /** 가이드 §1-2 — propertyId 시스템: address+aptName+areaSqm 해시로 영구 저장 */
@@ -267,6 +269,7 @@ export async function POST(req: NextRequest) {
       const averageInput: AreaAverageInput = {
         exclusiveAreaM2,
         roomCount: body.roomCount,
+        bathroomCount: body.bathroomCount,
         expansion: expansionRequested,
         unitName: body.unitName || body.aptName,
       };
@@ -353,7 +356,7 @@ export async function POST(req: NextRequest) {
           totalWidthMm: meta.total_width_mm || 0,
           totalDepthMm: meta.total_depth_mm || 0,
           pyeong: meta.pyeong || classifyPyeong(exclusiveAreaM2 || 84.9),
-          openings: [],
+          openings: meta.openings || [],
           notes: "cache hit",
           cleanModel: "cache",
           cleanQuality: meta.clean_quality || "high",
@@ -365,6 +368,7 @@ export async function POST(req: NextRequest) {
       const cachedAverage = buildStandardAreaAverage({
         exclusiveAreaM2: exclusiveAreaM2 || 84.9,
         roomCount: body.roomCount,
+        bathroomCount: body.bathroomCount,
         expansion: expansionRequested,
         unitName: body.unitName || body.aptName,
       });
@@ -446,6 +450,7 @@ export async function POST(req: NextRequest) {
             {
               exclusiveAreaM2: exclusiveAreaM2 || 84.9,
               roomCount: body.roomCount,
+              bathroomCount: body.bathroomCount,
               expansion: expansionRequested,
               unitName: body.unitName || body.aptName,
             },
@@ -540,6 +545,7 @@ export async function POST(req: NextRequest) {
     const averageFallback = buildStandardAreaAverage({
       exclusiveAreaM2: areaM2,
       roomCount: body.roomCount,
+      bathroomCount: body.bathroomCount,
       expansion: expansionRequested,
       unitName: body.unitName || body.aptName,
     });
@@ -548,7 +554,7 @@ export async function POST(req: NextRequest) {
     );
 
     // 실 머지 (Vision + 표준 fallback)
-    const visionRooms = parsed.rooms || [];
+    const visionRooms = canonicalizeFloorplanRoomNames(parsed.rooms || []);
     const merged: Array<RoomDim & { source: "vision" | "standard"; xMm?: number; yMm?: number }> = [];
     const seen = new Set<string>();
     for (const vr of visionRooms) {
@@ -676,7 +682,14 @@ export async function POST(req: NextRequest) {
         area_sqm: areaM2,
         source_url: body.imageUrl || "(base64)",
         cached_at: new Date().toISOString(),
-        rooms: merged.map((r) => ({ name: r.name, widthMm: r.widthMm, depthMm: r.depthMm })),
+        rooms: merged.map((r) => ({
+          name: r.name,
+          widthMm: r.widthMm,
+          depthMm: r.depthMm,
+          xMm: r.xMm,
+          yMm: r.yMm,
+        })),
+        openings: parsed.openings || [],
         total_width_mm: totalWidthMm,
         total_depth_mm: totalDepthMm,
         pyeong,

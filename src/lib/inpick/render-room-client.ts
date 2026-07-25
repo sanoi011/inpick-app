@@ -48,6 +48,12 @@ export interface RenderRoomBody {
   isFromFloorplan?: boolean;
   propertyId?: string;
   floorplanImageUrl?: string;
+  normalizedFloorplan?: {
+    rooms?: Array<Record<string, unknown>>;
+    doors?: Array<Record<string, unknown>>;
+    windows?: Array<Record<string, unknown>>;
+    openings?: Array<Record<string, unknown>>;
+  };
   previousReference?: string;
   // geometry-first (Phase 4+ optional)
   roomGeometry?: Record<string, unknown>;

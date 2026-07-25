@@ -75,22 +75,26 @@ import {
   carryRoomProductCustomizationToSource,
   type RoomProductCustomization,
 } from "@/lib/inpick/room-product-customization";
+import {
+  buildApartmentRoomDescriptors,
+  buildRenderFloorplanPayload,
+  expandWorkflowRoomSelection,
+  type WorkflowRoomKind,
+} from "@/lib/inpick/workflow/room-instances";
 
 // legacy compat — MaterialEditor가 더이상 export하지 않음
 export type MaterialRegion = unknown;
 
-// 아파트 도면 모드 — 9개 방 (기존)
-const APARTMENT_ROOM_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
-  { v: "all", label: "전체", dimKey: "거실", icon: Layers },
-  { v: "living", label: "거실", dimKey: "거실", icon: Home },
-  { v: "master", label: "안방", dimKey: "안방", icon: Bed },
-  { v: "kitchen", label: "부엌", dimKey: "주방", icon: ChefHat },
-  { v: "bath", label: "욕실", dimKey: "욕실1", icon: Bath },
-  { v: "bedroom", label: "침실", dimKey: "침실1", icon: Bed },
-  { v: "entrance", label: "현관", dimKey: "현관", icon: DoorOpen },
-  { v: "balcony", label: "베란다", dimKey: "발코니", icon: Layers },
-  { v: "dress", label: "드레스룸", dimKey: "드레스룸", icon: Layers },
-];
+const APARTMENT_ROOM_ICONS: Record<WorkflowRoomKind, typeof Home> = {
+  living: Home,
+  master: Bed,
+  kitchen: ChefHat,
+  bath: Bath,
+  bedroom: Bed,
+  entrance: DoorOpen,
+  balcony: Layers,
+  dress: Layers,
+};
 
 // 도면 없는 주거 모드 — 단순화된 공간 6개
 const PHOTO_RESIDENTIAL_TABS: Array<{ v: string; label: string; dimKey: string; icon: typeof Home }> = [
@@ -415,10 +419,25 @@ export default function Step2Designer({
       if (workflowEntry === "photo_residential") {
         return PHOTO_RESIDENTIAL_TABS;
       }
-      return APARTMENT_ROOM_TABS;
+      return [
+        { v: "all", label: "전체", dimKey: "거실", icon: Layers },
+        ...buildApartmentRoomDescriptors(normalizedFloorplan?.rooms).map(
+          (room) => ({
+            v: room.key,
+            label: room.label,
+            dimKey: room.dimKey,
+            icon: APARTMENT_ROOM_ICONS[room.kind],
+          }),
+        ),
+      ];
     })();
     return [...base, ...customTabs];
-  }, [workflowEntry, commercialBusiness, customTabs]);
+  }, [
+    workflowEntry,
+    commercialBusiness,
+    customTabs,
+    normalizedFloorplan?.rooms,
+  ]);
 
   const addCustomTab = () => {
     const label = newTabLabel.trim();
@@ -437,7 +456,13 @@ export default function Step2Designer({
   };
 
   const availableTabs = useMemo(
-    () => ROOM_TABS.filter((t) => !RENDER_EXCLUDED.includes(t.v)),
+    () =>
+      ROOM_TABS.filter(
+        (tab) =>
+          !RENDER_EXCLUDED.includes(tab.v) &&
+          !/^balcony-\d+$/.test(tab.v) &&
+          !/^dress-\d+$/.test(tab.v),
+      ),
     [ROOM_TABS],
   );
   // Step1에서 선택한 방 = 진행 카운트의 분모 (베란다/드레스룸 제외). 비어있거나 "all"이면 모든 렌더 대상.
@@ -446,8 +471,15 @@ export default function Step2Designer({
       .filter((t) => t.v !== "all")
       .map((t) => t.v);
     if (rooms.length === 0 || rooms.includes("all")) return allRenderable;
+    if (workflowEntry === "apartment_drawing") {
+      const expanded = expandWorkflowRoomSelection(
+        rooms,
+        buildApartmentRoomDescriptors(normalizedFloorplan?.rooms),
+      );
+      return expanded.filter((roomKey) => allRenderable.includes(roomKey));
+    }
     return rooms.filter((r) => r !== "all" && !RENDER_EXCLUDED.includes(r));
-  }, [rooms, availableTabs]);
+  }, [rooms, availableTabs, workflowEntry, normalizedFloorplan?.rooms]);
 
   const [activeRoom, setActiveRoom] = useState<string>(() => {
     // 견적 화면에서 돌아왔거나 저장된 디자인을 복원한 경우, 빈 "전체" 탭보다
@@ -694,6 +726,16 @@ export default function Step2Designer({
     if (area) return estimateRoomDimsFromPyeong(area);
     return estimateRoomDimsFromPyeong("30평");
   }, [normalizedFloorplan, basicInfo.selectedPyeong?.exclusiveArea]);
+  const normalizedRenderFloorplan = useMemo(
+    () =>
+      normalizedFloorplan?.rooms?.length
+        ? buildRenderFloorplanPayload({
+            rooms: normalizedFloorplan.rooms,
+            openings: normalizedFloorplan.openings,
+          })
+        : undefined,
+    [normalizedFloorplan],
+  );
 
   const pyeongLabel = useMemo(() => {
     const area = basicInfo.selectedPyeong?.exclusiveArea;
@@ -946,7 +988,37 @@ export default function Step2Designer({
           const sharedDoor = (normalizedFloorplan.openings || []).some(
             (op) => op.wall?.includes(me.name) && op.wall?.includes(other.name),
           );
-          if (sharedDoor) adjacentRooms.push(other.name);
+          const meX = me.xMm;
+          const meY = me.yMm;
+          const otherX = other.xMm;
+          const otherY = other.yMm;
+          const bboxAdjacent =
+            meX != null &&
+            meY != null &&
+            otherX != null &&
+            otherY != null &&
+            (() => {
+              const toleranceMm = 250;
+              const horizontalGap = Math.max(
+                0,
+                Math.max(
+                  meX - (otherX + other.widthMm),
+                  otherX - (meX + me.widthMm),
+                ),
+              );
+              const verticalGap = Math.max(
+                0,
+                Math.max(
+                  meY - (otherY + other.depthMm),
+                  otherY - (meY + me.depthMm),
+                ),
+              );
+              return (
+                horizontalGap <= toleranceMm &&
+                verticalGap <= toleranceMm
+              );
+            })();
+          if (sharedDoor || bboxAdjacent) adjacentRooms.push(other.name);
         }
       }
     }
@@ -1000,9 +1072,32 @@ export default function Step2Designer({
       return `  - ${dir.charAt(0).toUpperCase() + dir.slice(1)} wall (${length}m)${tag}${opsText}`;
     };
 
-    // exterior 추정: 발코니/거실/안방/침실 = 외벽 가능, 욕실/드레스룸/현관 = 내벽
+    // 좌표가 있으면 도면 외곽 bbox로 실제 외벽 방향을 계산한다.
     const exteriorRooms = ["거실", "안방", "침실", "주방", "발코니", "베란다", "다이닝"];
     const isExterior = exteriorRooms.some((k) => roomLabel.includes(k));
+    const totalWidthMm = basicInfo.totalWidthMm || 0;
+    const totalDepthMm = basicInfo.totalDepthMm || 0;
+    const toleranceMm = 300;
+    const hasPosition =
+      xMm != null &&
+      yMm != null &&
+      totalWidthMm > 0 &&
+      totalDepthMm > 0;
+    const exteriorByDirection = {
+      north: hasPosition ? yMm <= toleranceMm : false,
+      east: hasPosition
+        ? xMm + me.widthMm >= totalWidthMm - toleranceMm
+        : false,
+      south: hasPosition
+        ? yMm + me.depthMm >= totalDepthMm - toleranceMm
+        : isExterior,
+      west: hasPosition ? xMm <= toleranceMm : false,
+    };
+    const relativePosition =
+      hasPosition
+        ? `${xMm + me.widthMm / 2 < totalWidthMm / 3 ? "west" : xMm + me.widthMm / 2 > (totalWidthMm * 2) / 3 ? "east" : "center"} / ` +
+          `${yMm + me.depthMm / 2 < totalDepthMm / 3 ? "north" : yMm + me.depthMm / 2 > (totalDepthMm * 2) / 3 ? "south" : "center"}`
+        : null;
 
     const hasExactFloorplanReference = Boolean(
       basicInfo.normalizedImageUrl ||
@@ -1017,11 +1112,19 @@ export default function Step2Designer({
       ...(xMm != null && yMm != null
         ? [`- Position in apartment: xMm=${xMm}, yMm=${yMm} (top-left corner)`]
         : []),
+      ...(relativePosition
+        ? [`- Relative position in apartment: ${relativePosition}`]
+        : []),
       `- Wall layout (4 walls clockwise from north):`,
-      wallLine("north", w, false),
-      wallLine("east", d, false),
-      wallLine("south", w, isExterior),
-      wallLine("west", d, false),
+      wallLine("north", w, exteriorByDirection.north),
+      wallLine("east", d, exteriorByDirection.east),
+      wallLine("south", w, exteriorByDirection.south),
+      wallLine("west", d, exteriorByDirection.west),
+      ...(roomLabel.includes("주방") || roomLabel.includes("부엌")
+        ? [
+            "- Kitchen cabinet/counter geometry must follow these exact walls and openings; do not default to U-shape or L-shape.",
+          ]
+        : []),
     ];
 
     return lines.join("\n");
@@ -1617,6 +1720,7 @@ export default function Step2Designer({
         // 가이드 §3 — propertyId로 Storage normalized.png 자동 로드
         propertyId: basicInfo.floorplanPropertyId,
         floorplanImageUrl: floorplanReferenceUrl,
+        normalizedFloorplan: normalizedRenderFloorplan,
         previousReference,
       };
       // Phase 9 — sync/async 자동 처리 (jobId 응답 시 polling)
@@ -1754,6 +1858,7 @@ export default function Step2Designer({
             furnishingOptions: roomFurnishings?.[tab.v] || [],
             propertyId: basicInfo.floorplanPropertyId,
             floorplanImageUrl: floorplanReferenceUrl,
+            normalizedFloorplan: normalizedRenderFloorplan,
             lockedDelivery: tabIsLiving
               ? undefined
               : {

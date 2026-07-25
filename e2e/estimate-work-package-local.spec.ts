@@ -4,6 +4,9 @@ test("room estimate stays consolidated and schedule uses quantity-based days", a
   page,
 }) => {
   await page.goto("/dev/estimate-work-package-sample");
+  await expect(page.getByText("33일", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
 
   await page.getByRole("button", { name: /4\. 세부내역서/ }).click();
   const siteConditionSummary = page.getByText("현장 확인 가정 및 변동 조건", {
@@ -52,4 +55,24 @@ test("room estimate stays consolidated and schedule uses quantity-based days", a
     path: "/tmp/inpick-estimate-quantity-schedule.png",
     fullPage: true,
   });
+});
+
+test("mobile schedule shows only each phase duration without the wide chart", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/dev/estimate-work-package-sample");
+  await expect(page.getByText("33일", { exact: true })).toBeVisible({
+    timeout: 15_000,
+  });
+  await page.getByRole("button", { name: "공정표" }).click();
+
+  const mobileList = page.getByTestId("schedule-mobile-list");
+  await expect(mobileList).toBeVisible();
+  await expect(page.getByTestId("schedule-desktop-chart")).toBeHidden();
+  await expect(mobileList.getByText(/^\d+일$/).first()).toBeVisible();
+  const fitsViewport = await mobileList.evaluate(
+    (element) => element.scrollWidth <= element.clientWidth,
+  );
+  expect(fitsViewport).toBe(true);
 });

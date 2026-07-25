@@ -56,6 +56,45 @@ export function compileRenderPrompt(input: CompilePromptInput): string {
     lines.push(
       `- Target room: ${spec.targetRoom.name} / ${spec.targetRoom.type}.`,
     );
+    if (spec.targetRoom.bbox) {
+      lines.push(
+        `- Exact target boundary: x=${spec.targetRoom.bbox.x}mm, y=${spec.targetRoom.bbox.y}mm, ` +
+          `width=${spec.targetRoom.bbox.width}mm, depth=${spec.targetRoom.bbox.height}mm.`,
+      );
+    }
+    if (spec.targetRoom.areaM2) {
+      lines.push(`- Exact target floor area: ${spec.targetRoom.areaM2.toFixed(2)}m².`);
+    }
+
+    const roomInventory = new Map<string, string[]>();
+    for (const room of spec.rooms) {
+      const names = roomInventory.get(room.type) || [];
+      names.push(room.name);
+      roomInventory.set(room.type, names);
+    }
+    lines.push(
+      `- Complete floor-plan room inventory: ${Array.from(roomInventory.entries())
+        .map(([type, names]) => `${type}=${names.length} [${names.join(", ")}]`)
+        .join("; ")}.`,
+    );
+    const sameTypeRooms = spec.rooms.filter(
+      (room) => room.type === spec.targetRoom.type,
+    );
+    if (sameTypeRooms.length > 1) {
+      lines.push(
+        `- This plan has ${sameTypeRooms.length} separate ${spec.targetRoom.type} rooms. ` +
+          `Render ${spec.targetRoom.name} only; do not merge, omit, or substitute it with ${sameTypeRooms
+            .filter((room) => room.id !== spec.targetRoom.id)
+            .map((room) => room.name)
+            .join(", ")}.`,
+      );
+    }
+    if (spec.targetRoom.type === "kitchen") {
+      lines.push(
+        "- Kitchen layout identity is determined by this target boundary and its openings. " +
+          "Do not default to a standard U-shaped or L-shaped Korean apartment kitchen.",
+      );
+    }
 
     // attachedZones
     for (const zone of spec.attachedZones) {
@@ -139,6 +178,7 @@ export function compileRenderPrompt(input: CompilePromptInput): string {
   lines.push("- Photorealistic Korean apartment interior");
   lines.push("- Realistic proportions and ceiling height ~2400mm");
   lines.push("- No extra rooms, no impossible windows");
+  lines.push("- Never substitute a generic apartment layout for the supplied floor plan");
   lines.push("- Natural daylight, eye-level wide angle");
   lines.push("- Clear visible floor, walls, ceiling (for segmentation accuracy)");
 
