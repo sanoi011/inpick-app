@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   AuthOperationTimeoutError,
+  getOAuthCookieHandoffState,
   runPostLoginBestEffort,
+  waitForOAuthCookieHandoff,
   withAuthTimeout,
 } from "../resilience";
 
@@ -41,4 +43,53 @@ test("로그인 후처리 실패는 로그인 흐름에 예외를 전파하지 �
   const result = await runPostLoginBestEffort(failedFetch, 50);
 
   assert.equal(result, "failed");
+});
+
+test("분할 세션 쿠키가 저장되고 verifier가 사라지면 OAuth 교환 완료로 본다", () => {
+  const state = getOAuthCookieHandoffState(
+    [
+      "theme=light",
+      "sb-project-auth-token.0=base64-first",
+      "sb-project-auth-token.1=base64-second",
+    ].join("; "),
+  );
+
+  assert.deepEqual(state, {
+    completed: true,
+    hasVerifierCookie: false,
+    sessionCookieCount: 2,
+  });
+});
+
+test("기존 세션이 있어도 verifier가 남아 있으면 새 OAuth 교환을 기다린다", () => {
+  const state = getOAuthCookieHandoffState(
+    [
+      "sb-project-auth-token=base64-old-session",
+      "sb-project-auth-token-code-verifier=verifier",
+    ].join("; "),
+  );
+
+  assert.deepEqual(state, {
+    completed: false,
+    hasVerifierCookie: true,
+    sessionCookieCount: 1,
+  });
+});
+
+test("getSession 추가 호출 없이 쿠키 handoff 완료 즉시 복귀한다", async () => {
+  let reads = 0;
+  const state = await waitForOAuthCookieHandoff(
+    () => {
+      reads += 1;
+      return reads < 2
+        ? "sb-project-auth-token-code-verifier=verifier"
+        : "sb-project-auth-token.0=first; sb-project-auth-token.1=second";
+    },
+    100,
+    1,
+  );
+
+  assert.equal(state.completed, true);
+  assert.equal(state.sessionCookieCount, 2);
+  assert.equal(reads, 2);
 });

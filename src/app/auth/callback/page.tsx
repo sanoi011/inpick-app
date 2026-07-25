@@ -9,12 +9,10 @@ import {
 } from "@/lib/auth/access-policy";
 import {
   isAuthOperationTimeoutError,
-  withAuthTimeout,
+  waitForOAuthCookieHandoff,
 } from "@/lib/auth/resilience";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
-
-type CallbackState = "exchanging" | "failed";
 
 /**
  * OAuth PKCE 교환을 브라우저에서 완료한다.
@@ -26,18 +24,9 @@ type CallbackState = "exchanging" | "failed";
  */
 export default function OAuthCallbackPage() {
   const startedRef = useRef(false);
-  const [state, setState] = useState<CallbackState>("exchanging");
-  const [showProgress, setShowProgress] = useState(false);
-  const [message, setMessage] = useState("로그인 정보를 안전하게 연결하고 있습니다.");
+  const [failed, setFailed] = useState(false);
+  const [message, setMessage] = useState("");
   const [retryHref, setRetryHref] = useState("/auth?type=consumer");
-
-  useEffect(() => {
-    if (state !== "exchanging") return;
-    // 정상 OAuth 교환은 짧게 끝난다. 일반 성공 흐름에서는 별도 중간
-    // 화면을 노출하지 않고, 실제 네트워크 지연일 때만 상태를 안내한다.
-    const timer = window.setTimeout(() => setShowProgress(true), 2_000);
-    return () => window.clearTimeout(timer);
-  }, [state]);
 
   useEffect(() => {
     if (startedRef.current) return;
@@ -61,7 +50,7 @@ export default function OAuthCallbackPage() {
         currentUrl.searchParams.get("error");
 
       if (!code || providerError) {
-        setState("failed");
+        setFailed(true);
         setMessage(
           providerError
             ? "소셜 로그인 제공자가 인증을 완료하지 못했습니다."
@@ -71,15 +60,11 @@ export default function OAuthCallbackPage() {
       }
 
       try {
-        const supabase = createClient();
-        const { data, error } = await withAuthTimeout(
-          supabase.auth.getSession(),
-          undefined,
-          "browser-oauth-session-restore",
-        );
-        if (error || !data.session?.user) {
-          throw error || new Error("OAUTH_SESSION_MISSING");
-        }
+        // 브라우저 클라이언트 초기화 자체가 URL의 OAuth code를 교환하고
+        // 세션 쿠키를 기록한다. 운영 Arc에서 교환 뒤 getSession()만
+        // AbortError(code 20)로 끊긴 사례가 있어 중복 세션 조회는 하지 않는다.
+        createClient();
+        await waitForOAuthCookieHandoff();
 
         try {
           sessionStorage.removeItem(WEB_AUTH_RETURN_STORAGE_KEY);
@@ -88,9 +73,7 @@ export default function OAuthCallbackPage() {
         }
         trackClientEvent(AnalyticsEvents.LoginCompleted, {
           props: {
-            provider:
-              (data.session.user.app_metadata?.provider as string | undefined) ||
-              "unknown",
+            provider: "unknown",
             method: "oauth_web_browser",
           },
         });
@@ -111,13 +94,13 @@ export default function OAuthCallbackPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            stage: "browser_session_restore",
+            stage: "browser_cookie_handoff",
             errorCode,
             errorMessage,
           }),
           keepalive: true,
         }).catch(() => {});
-        setState("failed");
+        setFailed(true);
         setMessage(
           isAuthOperationTimeoutError(error)
             ? "로그인 서버 응답이 지연되고 있습니다. 다시 시도해주세요."
@@ -129,7 +112,9 @@ export default function OAuthCallbackPage() {
     void complete();
   }, []);
 
-  if (state === "exchanging" && !showProgress) {
+  // 정상 OAuth 교환 동안 별도 로딩 화면을 표시하지 않는다. 교환은 백그라운드로
+  // 완료되고 즉시 목적지로 이동하며, 실제 실패 때만 복구 UI를 보여준다.
+  if (!failed) {
     return (
       <main
         className="min-h-screen bg-white"
@@ -143,22 +128,18 @@ export default function OAuthCallbackPage() {
     <main className="grid min-h-screen place-items-center bg-white px-6 text-[#0d0d0d]">
       <div className="text-center">
         <span
-          className={`mx-auto block h-10 w-10 rounded-[14px] bg-gradient-to-br from-blue-400 to-blue-700 ${
-            state === "exchanging" ? "animate-pulse" : ""
-          }`}
+          className="mx-auto block h-10 w-10 rounded-[14px] bg-gradient-to-br from-blue-400 to-blue-700"
         />
         <p className="mt-5 text-[18px] font-bold tracking-[-0.04em]">
-          {state === "exchanging" ? "로그인 완료 중" : "로그인을 완료하지 못했습니다"}
+          로그인을 완료하지 못했습니다
         </p>
         <p className="mt-2 text-xs text-black/50">{message}</p>
-        {state === "failed" ? (
-          <a
-            href={retryHref}
-            className="mt-5 inline-flex rounded-full bg-black px-5 py-2.5 text-xs font-bold text-white"
-          >
-            로그인 다시 시도
-          </a>
-        ) : null}
+        <a
+          href={retryHref}
+          className="mt-5 inline-flex rounded-full bg-black px-5 py-2.5 text-xs font-bold text-white"
+        >
+          로그인 다시 시도
+        </a>
       </div>
     </main>
   );
