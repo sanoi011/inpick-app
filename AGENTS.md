@@ -81,3 +81,7 @@ npm run dev:full-v47
 - Use `$inpick-auth-regression` before committing, pushing, or deploying web changes.
 - Treat a permanently spinning login or `로그인 상태를 확인하고 있어요` screen as a release blocker.
 - Run the skill's type, authentication unit, and browser regression checks against a local server before deployment.
+- Before changing OAuth callbacks, global auth providers, middleware session refresh,
+  or Supabase browser-client initialization, read
+  `docs/ops/WEB_OAUTH_PKCE_INCIDENT_2026-07-25.md` and preserve its
+  single-exchange invariants.
