@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -45,7 +45,6 @@ function AuthLoadingScreen({ loginHref }: { loginHref: string }) {
  */
 export default function AuthFlowGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() || "/";
-  const supabase = useMemo(() => createClient(), []);
   const [snapshot, setSnapshot] = useState<GateSnapshot>(() => ({
     pathname,
     runtime: "web",
@@ -67,6 +66,9 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
       return;
     }
 
+    // OAuth callback에서는 client를 만들지 않는다. callback 전용 서버 교환이
+    // 일회용 code를 소비한 뒤 URL에서 제거할 때까지 자동 PKCE와 경쟁하면 안 된다.
+    const supabase = createClient();
     let cancelled = false;
     let redirectStarted = false;
     let sessionRestored = false;
@@ -228,7 +230,7 @@ export default function AuthFlowGate({ children }: { children: React.ReactNode }
       cancelled = true;
       subscription.unsubscribe();
     };
-  }, [pathname, supabase]);
+  }, [pathname]);
 
   // A client-side route change renders before its effect runs. Never reuse an
   // "allowed" decision from the previous path for a newly protected path.

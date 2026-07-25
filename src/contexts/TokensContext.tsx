@@ -5,7 +5,6 @@ import {
   useCallback,
   useContext,
   useEffect,
-  useMemo,
   useState,
   type ReactNode,
 } from "react";
@@ -116,7 +115,6 @@ const TokensContext = createContext<TokensContextValue | null>(null);
 
 export function TokensProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<TokenState>(initial);
-  const supabase = useMemo(() => createClient(), []);
 
   const loadFromSupabase = useCallback(
     async (userId: string) => {
@@ -139,6 +137,7 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       }
       // 폴백: client 직접 조회 (RLS 통과되는 케이스) — user_credits 단일 소스
       // (user_tokens는 운영 DB에 없는 죽은 테이블이라 2026-07-07 조회 제거)
+      const supabase = createClient();
       const { data: cred } = await supabase
         .from("user_credits")
         .select("balance")
@@ -154,10 +153,11 @@ export function TokensProvider({ children }: { children: ReactNode }) {
         userId,
       });
     },
-    [supabase],
+    [],
   );
 
   const refresh = useCallback(async () => {
+    const supabase = createClient();
     const {
       data: { user },
     } = await supabase.auth.getUser();
@@ -167,9 +167,14 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       const f = readFallback();
       setState({ ...f, loading: false, authenticated: false, userId: null });
     }
-  }, [supabase, loadFromSupabase]);
+  }, [loadFromSupabase]);
 
   useEffect(() => {
+    // callback은 code를 전용 서버 API가 먼저 교환한다. 전역 token listener가
+    // browser client를 선점해 자동 PKCE를 시작하지 않도록 이 문서에서는 쉰다.
+    if (window.location.pathname === "/auth/callback") return;
+
+    const supabase = createClient();
     let cancelled = false;
 
     const setSignedOutState = () => {
@@ -214,13 +219,14 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       cancelled = true;
       sub.subscription.unsubscribe();
     };
-  }, [supabase, loadFromSupabase]);
+  }, [loadFromSupabase]);
 
   const consume = useCallback(
     async (
       amount: number,
       feature: NonNullable<TokenTransaction["feature"]>,
     ): Promise<boolean> => {
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -283,7 +289,7 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       });
       return ok;
     },
-    [supabase, loadFromSupabase],
+    [loadFromSupabase],
   );
 
   const purchase = useCallback(
@@ -292,6 +298,7 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       paymentId: string,
       metadata?: Record<string, unknown>,
     ): Promise<boolean> => {
+      const supabase = createClient();
       const {
         data: { user },
       } = await supabase.auth.getUser();
@@ -332,7 +339,7 @@ export function TokensProvider({ children }: { children: ReactNode }) {
       });
       return true;
     },
-    [supabase, loadFromSupabase],
+    [loadFromSupabase],
   );
 
   const value: TokensContextValue = {

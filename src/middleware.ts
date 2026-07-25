@@ -20,10 +20,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(recoveredCallbackUrl, 307);
   }
 
-  // OAuth callback의 PKCE verifier는 Supabase 브라우저 클라이언트가 한 번만 교환한다.
-  // 미들웨어에서 getUser()를 먼저 호출하면 브라우저의 자동 code 교환과 경쟁해
-  // 소셜 로그인 직후 익명 상태로 돌아갈 수 있다.
-  if (pathname === "/auth/callback") {
+  // OAuth callback의 PKCE verifier는 callback 전용 API가 한 번만 교환한다.
+  // 미들웨어에서 getUser()를 먼저 호출하면 기존 세션 refresh가 verifier/code
+  // 교환과 경쟁할 수 있으므로 callback 문서와 교환 API는 그대로 통과시킨다.
+  if (
+    pathname === "/auth/callback" ||
+    pathname === "/api/auth/oauth-exchange"
+  ) {
     return NextResponse.next();
   }
 

@@ -36,24 +36,20 @@ test("OAuth callback이 큰 세션을 브라우저 쿠키에 저장한 뒤 워�
   await page.addInitScript(() => {
     sessionStorage.setItem("inpick_purged_v4", "1");
   });
-  await page.route("**/auth/v1/token?grant_type=pkce", async (route) => {
+  await page.route("**/api/auth/oauth-exchange", async (route) => {
     tokenExchangeCount += 1;
-    const requestBody = route.request().postDataJSON() as {
-      auth_code?: string;
-      code_verifier?: string;
-    };
-    expect(requestBody.auth_code).toBe("test-oauth-code");
-    expect(requestBody.code_verifier?.length).toBeGreaterThan(20);
+    const requestBody = route.request().postDataJSON() as { code?: string };
+    expect(requestBody.code).toBe("test-oauth-code");
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({
-        access_token: accessToken,
-        refresh_token: "oauth-browser-refresh-token",
-        expires_in: 3_600,
-        expires_at: expiresAt,
-        token_type: "bearer",
-        user: oauthUser,
+        ok: true,
+        provider: "google",
+        session: {
+          access_token: accessToken,
+          refresh_token: "oauth-browser-refresh-token",
+        },
       }),
     });
   });
