@@ -2725,56 +2725,6 @@ export default function Step2Designer({
             <div ref={chatEndRef} />
           </div>
 
-          {/* AI 상담 모드 — '디자인 생성' 액션 영역 (chatMode 진입 시 항상 노출) */}
-          {chatMode && (() => {
-            const userTurns = chatMessages.filter((m) => m.role === "user").length;
-            const canGenerate = userTurns >= 1 && !extractingPrompt && !generating && !chatStreaming;
-            const helperText = userTurns === 0
-              ? "AI와 1턴 이상 대화한 뒤 활성화됩니다"
-              : userTurns < 3
-                ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
-                : "대화 충분 — 언제든 디자인 생성 가능";
-            return (
-              <div className="px-4 py-3 border-t border-black/10 bg-white">
-                <button
-                  type="button"
-                  onClick={() => void handleChatToImage()}
-                  disabled={!canGenerate}
-                  className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-base font-bold shadow-cta transition-all ${
-                    canGenerate
-                      ? "bg-gradient-to-r from-black to-black text-white hover:opacity-95 ring-2 ring-black/10"
-                      : "bg-zinc-300 text-zinc-500 cursor-not-allowed"
-                  }`}
-                >
-                  {extractingPrompt ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      상담 내용 정리 중…
-                    </>
-                  ) : generating ? (
-                    <>
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                      이미지 생성 중…
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-5 w-5" />
-                      이 컨셉으로 디자인 생성하기
-                      {userTurns > 0 && (
-                        <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs">
-                          {userTurns}턴
-                        </span>
-                      )}
-                    </>
-                  )}
-                </button>
-                <p className="mt-1.5 text-[0.7rem] text-black/70 text-center">
-                  💡 {helperText}
-                </p>
-              </div>
-            );
-          })()}
-
           {/* 하단 sticky prompt bar — 캡처 레퍼런스 스타일 (둥근, 가운데, 단색) */}
           <div ref={promptBarRef} className="border-t border-black/10 bg-white p-4">
             {/* 첨부 이미지 미리보기 (chat 모드에서만) */}
@@ -2934,6 +2884,56 @@ export default function Step2Designer({
               </div>
             )}
           </div>
+
+          {/* AI 상담 — 채팅·프롬프트에 이어지는 '디자인 생성' 액션 (상담 완료 → 생성 → 견적 플로우) */}
+          {chatMode && (() => {
+            const userTurns = chatMessages.filter((m) => m.role === "user").length;
+            const canGenerate = userTurns >= 1 && !extractingPrompt && !generating && !chatStreaming;
+            const helperText = userTurns === 0
+              ? "AI와 1턴 이상 대화한 뒤 활성화됩니다"
+              : userTurns < 3
+                ? `대화 ${userTurns}/3턴 진행 — 더 대화하면 정확도 ↑ (지금 생성도 가능)`
+                : "대화 충분 — 언제든 디자인 생성 가능";
+            return (
+              <div className="px-4 py-3 border-t border-black/10 bg-white">
+                <button
+                  type="button"
+                  onClick={() => void handleChatToImage()}
+                  disabled={!canGenerate}
+                  className={`w-full inline-flex items-center justify-center gap-2 rounded-full px-4 py-3.5 text-base font-bold shadow-cta transition-all ${
+                    canGenerate
+                      ? "bg-gradient-to-r from-black to-black text-white hover:opacity-95 ring-2 ring-black/10"
+                      : "bg-zinc-300 text-zinc-500 cursor-not-allowed"
+                  }`}
+                >
+                  {extractingPrompt ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      상담 내용 정리 중…
+                    </>
+                  ) : generating ? (
+                    <>
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      이미지 생성 중…
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-5 w-5" />
+                      이 컨셉으로 디자인 생성하기
+                      {userTurns > 0 && (
+                        <span className="rounded-full bg-white/25 px-2 py-0.5 text-xs">
+                          {userTurns}턴
+                        </span>
+                      )}
+                    </>
+                  )}
+                </button>
+                <p className="mt-1.5 text-[0.7rem] text-black/70 text-center">
+                  💡 {helperText}
+                </p>
+              </div>
+            );
+          })()}
 
           {/* 생성 중 캔버스 오버레이 — 큰 placeholder + 진행률 + 이전 이미지 흐림 */}
           <AnimatePresence>
