@@ -15,6 +15,12 @@ import { startOAuth } from "@/lib/auth/oauth-start";
 import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import {
+  isAuthOperationTimeoutError,
+  runPostLoginBestEffort,
+  withAuthTimeout,
+} from "@/lib/auth/resilience";
+import { sanitizeAuthReturnPath } from "@/lib/auth/return-path";
 
 interface LoginModalProps {
   open: boolean;
@@ -25,6 +31,7 @@ interface LoginModalProps {
 
 export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: LoginModalProps) {
   const supabase = createClient();
+  const safeReturnUrl = sanitizeAuthReturnPath(returnUrl);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -57,7 +64,11 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
     setNeedsConfirm(false);
     setLoading(true);
     try {
-      const { error: err } = await supabase.auth.signInWithPassword({ email, password });
+      const { error: err } = await withAuthTimeout(
+        supabase.auth.signInWithPassword({ email, password }),
+        undefined,
+        "login-modal-email",
+      );
       if (err) {
         const msg = err.message || "";
         if (msg.toLowerCase().includes("email not confirmed")) {
@@ -76,10 +87,15 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
       trackClientEvent(AnalyticsEvents.LoginCompleted, {
         props: { provider: "email", method: "password" },
       });
-      window.location.href = returnUrl || "/";
+      await runPostLoginBestEffort();
+      window.location.replace(safeReturnUrl);
     } catch (err) {
       console.error("[login-modal] error", err);
-      setError("로그인 중 오류가 발생했습니다.");
+      setError(
+        isAuthOperationTimeoutError(err)
+          ? "로그인 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+          : "로그인 중 오류가 발생했습니다.",
+      );
     } finally {
       setLoading(false);
     }
@@ -98,13 +114,21 @@ export function LoginModal({ open, onClose, onSwitchToSignup, returnUrl }: Login
       const callback = returnUrl
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
         : `${window.location.origin}/auth/callback`;
-      const { error: oauthErr } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
-        redirectTo: callback,
-      });
+      const { error: oauthErr } = await withAuthTimeout(
+        startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+          redirectTo: callback,
+        }),
+        undefined,
+        `login-modal-${provider}`,
+      );
       if (oauthErr) setError(`${provider} 로그인 실패: ${oauthErr}`);
     } catch (err) {
       console.error("[login-modal] oauth error", err);
-      setError("소셜 로그인 중 오류가 발생했습니다.");
+      setError(
+        isAuthOperationTimeoutError(err)
+          ? "소셜 로그인 연결이 지연되고 있습니다. 다시 시도해주세요."
+          : "소셜 로그인 중 오류가 발생했습니다.",
+      );
     }
   };
 

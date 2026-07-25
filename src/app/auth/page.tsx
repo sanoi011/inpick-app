@@ -20,6 +20,12 @@ import { NAVER_LOGIN_ENABLED } from "@/lib/auth/naver-login-flag";
 import { SignupModal } from "@/components/auth/SignupModal";
 import { trackClientEvent } from "@/lib/analytics/client";
 import { AnalyticsEvents } from "@/lib/analytics/events";
+import {
+  isAuthOperationTimeoutError,
+  runPostLoginBestEffort,
+  withAuthTimeout,
+} from "@/lib/auth/resilience";
+import { sanitizeAuthReturnPath } from "@/lib/auth/return-path";
 
 type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 
@@ -134,6 +140,7 @@ function ConsumerAuthForm() {
   // 복귀 URL — 코드베이스에 returnUrl/next/redirect 세 이름이 혼재하므로 모두 허용(2026-07-05 로그인 후 복귀 실패 수정)
   const returnUrl =
     searchParams.get("returnUrl") || searchParams.get("next") || searchParams.get("redirect");
+  const safeReturnUrl = sanitizeAuthReturnPath(returnUrl);
   const [showSignupModal, setShowSignupModal] = useState(searchParams.get("mode") === "signup");
   const [forgotMode, setForgotMode] = useState(false);
   const [email, setEmail] = useState("");
@@ -176,7 +183,14 @@ function ConsumerAuthForm() {
     try {
       // signup API가 lowercase+trim으로 저장하므로 로그인도 동일하게 정규화
       const normalizedEmail = email.toLowerCase().trim();
-      const { error } = await supabase.auth.signInWithPassword({ email: normalizedEmail, password });
+      const { error } = await withAuthTimeout(
+        supabase.auth.signInWithPassword({
+          email: normalizedEmail,
+          password,
+        }),
+        undefined,
+        "consumer-email-login",
+      );
       if (error) {
         const msg = (error.message || "").toLowerCase();
         // 로그인 실패 사유를 명확히 분리 — "없는 이메일"로 뭉뚱그리지 않는다.
@@ -195,12 +209,9 @@ function ConsumerAuthForm() {
         }
         return;
       }
-      // 프로필 자동 보강(orphan self-heal) + 로그인 audit 기록. 실패해도 로그인은 진행.
-      try {
-        await fetch("/api/auth/post-login", { method: "POST" });
-      } catch {
-        /* non-blocking: 후처리 실패는 로그인 흐름을 막지 않음 */
-      }
+      // 프로필 자동 보강·감사 기록은 최대 1.5초만 기다린다.
+      // 후처리 장애가 성공한 로그인을 다시 무한 로딩으로 만들 수 없다.
+      await runPostLoginBestEffort();
       // 이메일 로그인 완료 계측 (sendBeacon — hard nav에도 전송됨)
       trackClientEvent(AnalyticsEvents.LoginCompleted, {
         props: { provider: "email", method: "password" },
@@ -215,10 +226,14 @@ function ConsumerAuthForm() {
         /* private mode */
       }
       // hard navigation — 미들웨어가 새 인증 쿠키를 읽도록 보장
-      window.location.href = returnUrl || "/";
+      window.location.replace(safeReturnUrl);
     } catch (err) {
       console.error("[auth] login error", err);
-      setError("로그인 중 오류가 발생했습니다.");
+      setError(
+        isAuthOperationTimeoutError(err)
+          ? "로그인 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+          : "로그인 중 오류가 발생했습니다.",
+      );
     } finally {
       setLoading(false);
     }
@@ -266,16 +281,24 @@ function ConsumerAuthForm() {
       const callbackUrl = returnUrl
         ? `${window.location.origin}/auth/callback?next=${encodeURIComponent(returnUrl)}`
         : `${window.location.origin}/auth/callback`;
-      const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
-        redirectTo: callbackUrl,
-      });
+      const { error } = await withAuthTimeout(
+        startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+          redirectTo: callbackUrl,
+        }),
+        undefined,
+        `consumer-${provider}-oauth`,
+      );
       if (error) {
         setError(`${provider} 로그인에 실패했습니다: ${error}`);
         setOauthLoading(null);
       }
     } catch (err) {
       console.error("[auth] oauth error", err);
-      setError("소셜 로그인 중 오류가 발생했습니다.");
+      setError(
+        isAuthOperationTimeoutError(err)
+          ? "소셜 로그인 연결이 지연되고 있습니다. 다시 시도해주세요."
+          : "소셜 로그인 중 오류가 발생했습니다.",
+      );
       setOauthLoading(null);
     }
   };
@@ -615,11 +638,15 @@ function ContractorAuthForm() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/contractor/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+      const res = await withAuthTimeout(
+        fetch("/api/contractor/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        }),
+        undefined,
+        "contractor-email-login",
+      );
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || "로그인에 실패했습니다.");
@@ -633,8 +660,12 @@ function ContractorAuthForm() {
         props: { provider: "email", method: "password", account_type: "contractor" },
       });
       router.push("/contractor");
-    } catch {
-      setError("서버 오류가 발생했습니다.");
+    } catch (error) {
+      setError(
+        isAuthOperationTimeoutError(error)
+          ? "로그인 서버 응답이 지연되고 있습니다. 잠시 후 다시 시도해주세요."
+          : "서버 오류가 발생했습니다.",
+      );
     } finally {
       setLoading(false);
     }
@@ -653,17 +684,25 @@ function ContractorAuthForm() {
       }
       // 사업자도 supabase OAuth 사용 — callback에서 contractor 등록 페이지로 분기
       const callbackUrl = `${window.location.origin}/auth/callback?next=${encodeURIComponent("/contractor")}`;
-      const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
-        redirectTo: callbackUrl,
-        queryParams: { account_type: "contractor" },
-      });
+      const { error } = await withAuthTimeout(
+        startOAuth(supabase, provider as "google" | "kakao" | "apple", {
+          redirectTo: callbackUrl,
+          queryParams: { account_type: "contractor" },
+        }),
+        undefined,
+        `contractor-${provider}-oauth`,
+      );
       if (error) {
         setError(`${provider} 로그인에 실패했습니다: ${error}`);
         setOauthLoading(null);
       }
     } catch (err) {
       console.error("[auth] contractor oauth error", err);
-      setError("소셜 로그인 중 오류가 발생했습니다.");
+      setError(
+        isAuthOperationTimeoutError(err)
+          ? "소셜 로그인 연결이 지연되고 있습니다. 다시 시도해주세요."
+          : "소셜 로그인 중 오류가 발생했습니다.",
+      );
       setOauthLoading(null);
     }
   };

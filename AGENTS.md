@@ -75,3 +75,9 @@ npm run dev:full-v47
 - Vercel build command: `rm -rf .next && next build`.
 - `.vercel/` is local link metadata and must not be committed.
 - Supabase migrations live in `supabase/migrations/`; review RLS and service-role use before applying remote DB changes.
+
+## Authentication Release Gate
+
+- Use `$inpick-auth-regression` before committing, pushing, or deploying web changes.
+- Treat a permanently spinning login or `로그인 상태를 확인하고 있어요` screen as a release blocker.
+- Run the skill's type, authentication unit, and browser regression checks against a local server before deployment.
