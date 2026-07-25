@@ -2282,19 +2282,6 @@ export default function Step2Designer({
           </div>
         </div>
 
-        {/* 보유 토큰 */}
-        <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold text-black">보유 토큰</p>
-            <span className="text-lg tabular font-semibold text-black">
-              ⬢ {tokenBalance}
-            </span>
-          </div>
-          <p className="mt-1 text-[0.65rem] leading-snug text-black/38">
-            거실 5 · 추가 공간/부분 수정 1토큰
-          </p>
-        </div>
-
         {/* 생성 결과 유무와 관계없이 항상 보이는 자재 수정 진입점 */}
         {PARTIAL_MATERIAL_VIEW_ENABLED && <div className="rounded-2xl border border-black/[0.07] bg-white p-3">
           <input
