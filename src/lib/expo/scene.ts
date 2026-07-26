@@ -307,6 +307,43 @@ export function evaluateExpoScene(scene: ExpoBoothScene): ExpoSceneWarning[] {
   return warnings;
 }
 
+export interface ExpoDecalPlacement {
+  x: number;
+  y: number;
+  z: number;
+  rotationY: number;
+  faceWidth: number;
+  faceHeight: number;
+}
+
+/**
+ * 벽 요소 정면(로고 데칼) 배치 — 렌더러 독립 순수 계산.
+ * rotation 0=+z(부스 안쪽), 90=+x, 180=-z, 270=-x 방향 면.
+ */
+export function expoDecalPlacement(
+  component: ExpoSceneComponent,
+  item: ExpoCatalogItem,
+): ExpoDecalPlacement {
+  const size = componentFootprintSize(component);
+  const gap = 0.012;
+  const rot = (((component.rotation % 360) + 360) % 360) as 0 | 90 | 180 | 270;
+  const offsets: Record<number, { dx: number; dz: number; ry: number }> = {
+    0: { dx: 0, dz: size.d / 2 + gap, ry: 0 },
+    90: { dx: size.w / 2 + gap, dz: 0, ry: Math.PI / 2 },
+    180: { dx: 0, dz: -(size.d / 2 + gap), ry: Math.PI },
+    270: { dx: -(size.w / 2 + gap), dz: 0, ry: -Math.PI / 2 },
+  };
+  const offset = offsets[rot] ?? offsets[0];
+  return {
+    x: component.x + offset.dx,
+    y: item.heightM / 2,
+    z: component.z + offset.dz,
+    rotationY: offset.ry,
+    faceWidth: rot % 180 === 0 ? size.w : size.d,
+    faceHeight: item.heightM,
+  };
+}
+
 export function isExpoBoothScene(value: unknown): value is ExpoBoothScene {
   if (!value || typeof value !== "object") return false;
   const scene = value as ExpoBoothScene;

@@ -1,11 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { createClient } from "@/lib/supabase/server";
-import {
-  ImageInputError,
-  assertSafeRemoteImageUrl,
-} from "@/lib/inpick/storage/image-storage";
+import { ImageInputError } from "@/lib/inpick/storage/image-storage";
 import { extractBrandCandidates } from "@/lib/expo/brand-import";
+import { fetchSafe } from "@/lib/expo/server/safe-fetch";
 
 /**
  * POST /api/expo/brand-import — 참고 웹사이트에서 브랜드 "후보" 추출.
@@ -22,61 +20,6 @@ export const dynamic = "force-dynamic";
 
 const MAX_HTML_BYTES = 1_000_000;
 const MAX_LOGO_BYTES = 5_000_000;
-const MAX_REDIRECTS = 3;
-const FETCH_TIMEOUT_MS = 8_000;
-
-async function fetchSafe(
-  startUrl: string,
-  accept: string,
-  maxBytes: number,
-): Promise<{ buffer: Buffer; finalUrl: string; contentType: string }> {
-  let current = (await assertSafeRemoteImageUrl(startUrl)).toString();
-  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    try {
-      const response = await fetch(current, {
-        redirect: "manual",
-        headers: { Accept: accept, "User-Agent": "INPICK-EXPO-BrandImporter/1.0" },
-        signal: controller.signal,
-      });
-      if (response.status >= 300 && response.status < 400) {
-        const location = response.headers.get("location");
-        if (!location) throw new Error("REDIRECT_WITHOUT_LOCATION");
-        // 리다이렉트 대상도 동일한 SSRF 가드를 통과해야 한다
-        current = (
-          await assertSafeRemoteImageUrl(new URL(location, current).toString())
-        ).toString();
-        continue;
-      }
-      if (!response.ok) throw new Error(`FETCH_${response.status}`);
-      const declared = Number(response.headers.get("content-length") ?? "0");
-      if (declared > maxBytes) throw new Error("RESPONSE_TOO_LARGE");
-      if (!response.body) throw new Error("EMPTY_RESPONSE");
-      const reader = response.body.getReader();
-      const chunks: Uint8Array[] = [];
-      let total = 0;
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        total += value.byteLength;
-        if (total > maxBytes) {
-          await reader.cancel();
-          throw new Error("RESPONSE_TOO_LARGE");
-        }
-        chunks.push(value);
-      }
-      return {
-        buffer: Buffer.concat(chunks),
-        finalUrl: current,
-        contentType: (response.headers.get("content-type") ?? "").toLowerCase(),
-      };
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  }
-  throw new Error("TOO_MANY_REDIRECTS");
-}
 
 /** 로고 이미지 대표색 → #rrggbb (실패 시 null — 후보가 없어도 실패 아님) */
 async function dominantHexFromLogo(logoUrl: string): Promise<string | null> {

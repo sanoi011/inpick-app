@@ -431,17 +431,39 @@ export default function ExpoBriefPage() {
     }
   }
 
-  function applyBrand() {
-    if (!brandCandidates) return;
+  async function applyBrand() {
+    if (!brandCandidates || brandLoading) return;
+    setBrandLoading(true);
+    // 로고는 우리 스토리지로 재호스팅 (3D 데칼 CORS + 원본 변경 대비 스냅샷).
+    // 실패하면 원본 URL 유지 — 데칼만 생략되고 킷은 살아 있다.
+    let logoUrl = brandLogoPick;
+    if (brandLogoPick) {
+      try {
+        const response = await fetch("/api/expo/brand-logo-store", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ logoUrl: brandLogoPick }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          hostedLogoUrl?: string;
+        };
+        if (response.ok && payload.hostedLogoUrl) {
+          logoUrl = payload.hostedLogoUrl;
+        }
+      } catch {
+        // 재호스팅 실패는 치명적이지 않음
+      }
+    }
     setBrandKit({
       name: brandCandidates.siteName ?? brandCandidates.title,
-      logoUrl: brandLogoPick,
+      logoUrl,
       colorHex: brandColorPick,
       sourceUrl: brandCandidates.sourceUrl,
       retrievedAt: brandCandidates.retrievedAt,
       rightsConfirmed: true,
     });
     setBrandCandidates(null);
+    setBrandLoading(false);
   }
 
   async function generateConcept() {
@@ -655,6 +677,7 @@ export default function ExpoBriefPage() {
               cameraPreset={cameraPreset}
               onCameraPresetChange={setCameraPreset}
               brandColorHex={brandKit?.colorHex ?? null}
+              brandLogoUrl={brandKit?.logoUrl ?? null}
             />
 
             {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
@@ -758,7 +781,7 @@ export default function ExpoBriefPage() {
                       {brandKit.name ?? "브랜드"}
                     </p>
                     <p className="text-[10px] text-black/40">
-                      벽 요소에 브랜드 컬러 적용됨 · 로고 데칼은 다음 단계
+                      그래픽 월에 로고 데칼·브랜드 컬러 적용됨
                     </p>
                   </div>
                   <button
@@ -793,7 +816,7 @@ export default function ExpoBriefPage() {
                       disabled={brandLoading}
                       className="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      {brandLoading ? "가져오는 중…" : "가져오기"}
+                      {brandLoading && !brandCandidates ? "가져오는 중…" : "가져오기"}
                     </button>
                   </div>
                   {brandError && (
@@ -863,7 +886,9 @@ export default function ExpoBriefPage() {
                         disabled={!brandLogoPick && !brandColorPick}
                         className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                       >
-                        이 브랜드 사용 — 로고·컬러 사용 권한 보유를 확인합니다
+                        {brandLoading
+                          ? "적용 중…"
+                          : "이 브랜드 사용 — 로고·컬러 사용 권한 보유를 확인합니다"}
                       </button>
                       <p className="mt-1.5 text-[10px] leading-4 text-black/40">
                         출처: {brandCandidates.sourceUrl} · 수집{" "}

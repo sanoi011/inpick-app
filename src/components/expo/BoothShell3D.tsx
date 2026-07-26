@@ -3,9 +3,11 @@
 import { Component, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
+import * as THREE from "three";
 import type { ExpoProvisionalFootprint } from "@/lib/expo/footprint";
 import {
   componentFootprintSize,
+  expoDecalPlacement,
   findCatalogItem,
   type ExpoBoothScene,
 } from "@/lib/expo/scene";
@@ -29,6 +31,8 @@ export interface BoothSceneViewProps {
   onCameraPresetChange?: (preset: ExpoCameraPreset) => void;
   /** 확정된 브랜드 컬러 — 벽 요소(그래픽 월/라이트박스)에 결정적으로 적용 */
   brandColorHex?: string | null;
+  /** 재호스팅된 로고 URL — 그래픽 월 정면에 결정적 데칼로 렌더 */
+  brandLogoUrl?: string | null;
   scene?: ExpoBoothScene | null;
   selectedComponentId?: string | null;
   onSelectComponent?: (id: string | null) => void;
@@ -43,6 +47,7 @@ export default function BoothShell3D({
   cameraPreset = "hero",
   onCameraPresetChange,
   brandColorHex = null,
+  brandLogoUrl = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -124,6 +129,7 @@ export default function BoothShell3D({
         cameraPreset={cameraPreset}
         onCameraPresetChange={onCameraPresetChange}
         brandColorHex={brandColorHex}
+        brandLogoUrl={brandLogoUrl}
       />
     </ShellErrorBoundary>
   );
@@ -196,6 +202,68 @@ class ShellErrorBoundary extends Component<
   }
 }
 
+function BrandLogoDecal({
+  url,
+  placement,
+}: {
+  url: string;
+  placement: ReturnType<typeof expoDecalPlacement>;
+}) {
+  const [texture, setTexture] = useState<THREE.Texture | null>(null);
+
+  useEffect(() => {
+    let disposed = false;
+    let loaded: THREE.Texture | null = null;
+    // useLoader는 실패 시 throw → 에러 바운더리가 캔버스 전체를 죽이므로
+    // 수동 로드: 실패하면 데칼만 조용히 생략한다.
+    new THREE.TextureLoader().load(
+      url,
+      (result) => {
+        if (disposed) {
+          result.dispose();
+          return;
+        }
+        result.colorSpace = THREE.SRGBColorSpace;
+        loaded = result;
+        setTexture(result);
+      },
+      undefined,
+      () => {},
+    );
+    return () => {
+      disposed = true;
+      loaded?.dispose();
+      setTexture(null);
+    };
+  }, [url]);
+
+  if (!texture) return null;
+  const image = texture.image as { width?: number; height?: number } | undefined;
+  const aspect =
+    image?.width && image?.height ? image.width / image.height : 1;
+  let width = placement.faceWidth * 0.55;
+  let height = width / aspect;
+  const maxHeight = placement.faceHeight * 0.5;
+  if (height > maxHeight) {
+    height = maxHeight;
+    width = height * aspect;
+  }
+  return (
+    <mesh
+      position={[placement.x, placement.y, placement.z]}
+      rotation={[0, placement.rotationY, 0]}
+    >
+      <planeGeometry args={[width, height]} />
+      <meshBasicMaterial
+        map={texture}
+        transparent
+        toneMapped={false}
+        side={THREE.DoubleSide}
+      />
+    </mesh>
+  );
+}
+
 function CameraRig({
   preset,
   width,
@@ -251,6 +319,7 @@ function BoothShellCanvas({
   cameraPreset = "hero",
   onCameraPresetChange,
   brandColorHex = null,
+  brandLogoUrl = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -345,24 +414,31 @@ function BoothShellCanvas({
           const size = componentFootprintSize(component);
           const isSelected = component.id === selectedComponentId;
           return (
-            <mesh
-              key={component.id}
-              position={[component.x, item.heightM / 2, component.z]}
-              onClick={(event) => {
-                event.stopPropagation();
-                onSelectComponent?.(component.id);
-              }}
-              castShadow
-            >
-              <boxGeometry args={[size.w, item.heightM, size.d]} />
-              <meshStandardMaterial
-                color={
-                  item.wallMounted && brandColorHex ? brandColorHex : item.color
-                }
-                emissive={isSelected ? "#1d4ed8" : "#000000"}
-                emissiveIntensity={isSelected ? 0.45 : 0}
-              />
-            </mesh>
+            <group key={component.id}>
+              <mesh
+                position={[component.x, item.heightM / 2, component.z]}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onSelectComponent?.(component.id);
+                }}
+                castShadow
+              >
+                <boxGeometry args={[size.w, item.heightM, size.d]} />
+                <meshStandardMaterial
+                  color={
+                    item.wallMounted && brandColorHex ? brandColorHex : item.color
+                  }
+                  emissive={isSelected ? "#1d4ed8" : "#000000"}
+                  emissiveIntensity={isSelected ? 0.45 : 0}
+                />
+              </mesh>
+              {component.catalogId === "graphic_wall" && brandLogoUrl && (
+                <BrandLogoDecal
+                  url={brandLogoUrl}
+                  placement={expoDecalPlacement(component, item)}
+                />
+              )}
+            </group>
           );
         })}
 

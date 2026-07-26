@@ -9,6 +9,7 @@ import {
   componentFootprintSize,
   createExpoScene,
   evaluateExpoScene,
+  expoDecalPlacement,
   isExpoBoothScene,
   moveExpoComponent,
   removeExpoComponent,
@@ -170,4 +171,17 @@ test("new wall catalog items are priced in the costbook", () => {
       `missing line: ${id}`,
     );
   }
+});
+
+test("decal placement follows rotation to the facing side", () => {
+  const item = EXPO_BASE_CATALOG.find((i) => i.catalogId === "graphic_wall")!;
+  const base = { id: "g1", catalogId: "graphic_wall", catalogVersion: 1, x: 0, z: -1.45, rotation: 0 };
+  const front = expoDecalPlacement(base, item);
+  assert.ok(front.z > base.z); // +z (부스 안쪽)
+  assert.equal(front.rotationY, 0);
+  assert.equal(front.faceWidth, item.widthM);
+  assert.equal(front.faceHeight, item.heightM);
+  const side = expoDecalPlacement({ ...base, rotation: 90 }, item);
+  assert.ok(side.x > base.x); // +x
+  assert.equal(side.faceWidth, item.widthM); // 회전해도 보이는 면 폭은 3m
 });
