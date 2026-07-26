@@ -327,6 +327,8 @@ function BoothShellCanvas({
   const { widthM: width, depthM: depth } = footprint.selected;
   const wallHeight = footprint.wallHeightM;
   const wallThickness = 0.08;
+  // 실제 3D 궤도 자동 회전 (가짜 360 금지 원칙 — 진짜 씬 회전만 제공)
+  const [autoRotate, setAutoRotate] = useState(false);
 
   const camera = useMemo(() => {
     const radius = Math.max(width, depth);
@@ -450,6 +452,8 @@ function BoothShellCanvas({
         />
         <OrbitControls
           makeDefault
+          autoRotate={autoRotate}
+          autoRotateSpeed={1.6}
           enablePan={false}
           minDistance={Math.max(width, depth) * 0.6}
           maxDistance={Math.max(width, depth) * 3}
@@ -463,6 +467,19 @@ function BoothShellCanvas({
         aria-label="카메라 시점"
         className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-white/90 p-1 shadow backdrop-blur"
       >
+        <button
+          type="button"
+          aria-pressed={autoRotate}
+          aria-label="360도 자동 회전"
+          onClick={() => setAutoRotate((rotating) => !rotating)}
+          className={
+            autoRotate
+              ? "whitespace-nowrap rounded-full bg-indigo-600 px-3 py-1 text-[11px] font-bold text-white"
+              : "whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-bold text-black/55 hover:text-indigo-700"
+          }
+        >
+          360°
+        </button>
         {EXPO_CAMERA_PRESETS.map((preset) => (
           <button
             key={preset.id}
