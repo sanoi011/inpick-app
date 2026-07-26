@@ -48,11 +48,15 @@ import {
 } from "@/lib/expo/client-decision";
 import {
   createEmptyEventInfo,
+  createEmptyOfficialServices,
   evaluateEventRules,
   hasEventRuleInput,
   hasEventRuleViolation,
+  hasOfficialServicesInput,
   isExpoEventInfo,
+  isExpoOfficialServices,
   type ExpoEventInfo,
+  type ExpoOfficialServices,
 } from "@/lib/expo/event-rules";
 import {
   isExpoBrandKit,
@@ -126,6 +130,7 @@ interface ExpoBriefDraft {
   conceptImageUrl?: string;
   brandKit?: ExpoBrandKit;
   eventInfo?: ExpoEventInfo;
+  officialServices?: ExpoOfficialServices;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -185,6 +190,9 @@ export default function ExpoBriefPage() {
   const [brandKit, setBrandKit] = useState<ExpoBrandKit | null>(null);
   // 행사 규정 — 전부 사용자가 행사 매뉴얼에서 입력한 값 (source = 사용자 입력)
   const [eventInfo, setEventInfo] = useState<ExpoEventInfo>(createEmptyEventInfo);
+  const [officialServices, setOfficialServices] = useState<ExpoOfficialServices>(
+    createEmptyOfficialServices,
+  );
   // Clone & Reflow — 저장된 프로젝트를 새 면적으로 복제
   const [cloneProjects, setCloneProjects] = useState<CloneSourceProject[] | null>(null);
   const [cloneState, setCloneState] = useState<"idle" | "loading" | "signed_out" | "error">("idle");
@@ -309,6 +317,9 @@ export default function ExpoBriefPage() {
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
           if (isExpoEventInfo(draft.eventInfo)) setEventInfo(draft.eventInfo);
+          if (isExpoOfficialServices(draft.officialServices)) {
+            setOfficialServices(draft.officialServices);
+          }
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -337,6 +348,7 @@ export default function ExpoBriefPage() {
           : undefined,
       brandKit: brandKit ?? undefined,
       eventInfo,
+      officialServices,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -345,7 +357,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, officialServices, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -379,6 +391,7 @@ export default function ExpoBriefPage() {
                 : null,
             brand: brandKit,
             event: { ...eventInfo, eventName: eventInfo.eventName || eventName },
+            officialServices,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -396,7 +409,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, officialServices, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -548,11 +561,13 @@ export default function ExpoBriefPage() {
   const catalogEstimate = useMemo(() => {
     if (!confirmedDims) return null;
     try {
-      return buildCatalogEstimate(scene, confirmedDims);
+      return buildCatalogEstimate(scene, confirmedDims, {
+        powerKw: eventInfo.powerKw,
+      });
     } catch {
       return null;
     }
-  }, [scene, confirmedDims]);
+  }, [scene, confirmedDims, eventInfo.powerKw]);
 
   // 행사 규정 검토 — 사용자 입력값 기준 (source 명시)
   const mergedEventInfo = useMemo(
@@ -587,9 +602,10 @@ export default function ExpoBriefPage() {
               violation: hasEventRuleViolation(eventReviewItems),
             },
             clientDecision: clientDecision?.decision ?? null,
+            officialServicesEntered: hasOfficialServicesInput(officialServices),
           })
         : null,
-    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems, clientDecision],
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems, clientDecision, officialServices],
   );
 
   async function importBrand() {
@@ -1567,6 +1583,42 @@ export default function ExpoBriefPage() {
                   className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                 />
               </div>
+              <div className="mt-3 border-t border-black/[0.06] pt-2.5">
+                <p className="text-xs font-bold text-black/70">
+                  공식 서비스 신청 현황 (주최측)
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {(
+                    [
+                      ["expo-svc-power", "전기 신청함", officialServices.powerApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, powerApplied: v }))],
+                      ["expo-svc-rig", "리깅 신청함", officialServices.riggingApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, riggingApplied: v }))],
+                      ["expo-svc-net", "인터넷 신청함", officialServices.internetApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, internetApplied: v }))],
+                    ] as const
+                  ).map(([id, label, checked, setter]) => (
+                    <label key={id} htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-black/70">
+                      <input
+                        id={id}
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => setter(e.target.checked)}
+                        className="h-4 w-4 rounded border-black/20 accent-blue-600"
+                      />
+                      {label}
+                    </label>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  value={officialServices.note}
+                  onChange={(e) =>
+                    setOfficialServices((s) => ({ ...s, note: e.target.value }))
+                  }
+                  placeholder="신청 메모 (예: 전기 3kW 6/30 신청 완료)"
+                  aria-label="공식 서비스 신청 메모"
+                  className="mt-2 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+
               {eventReviewItems.length > 0 && (
                 <ul className="mt-2 space-y-1">
                   {eventReviewItems.map((item) => (

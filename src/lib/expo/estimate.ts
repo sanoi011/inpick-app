@@ -69,7 +69,7 @@ export interface ExpoEstimateLine {
   trade: ExpoTradeCategory;
   label: string;
   quantity: number;
-  unit: "sqm" | "ea" | "lot" | "pct";
+  unit: "sqm" | "ea" | "lot" | "pct" | "kw";
   unitAmountKrw: number;
   amountKrw: number;
   source: ExpoMoneySource;
@@ -146,6 +146,8 @@ export const EXPO_ALLOWANCE_COSTBOOK = {
       amountKrw: 150_000,
     },
   ],
+  /** 행사 매뉴얼 전기 용량 입력 시 kW당 단가로 대체 */
+  electricalPerKwKrw: 150_000,
   /** 카탈로그 컴포넌트별 단가 — catalogId 기준 */
   componentUnits: {
     info_counter: {
@@ -263,9 +265,15 @@ export function buildConceptualRange(areaSqm: number): ExpoConceptualRange {
 }
 
 /** 치수 확정 후 — 확정 면적 + 씬 컴포넌트 기반 라인아이템 견적. */
+export interface ExpoEstimateOptions {
+  /** 행사 매뉴얼에서 입력한 전기 용량 (kW) — 있으면 기본 1kW 가정을 대체 */
+  powerKw?: number | null;
+}
+
 export function buildCatalogEstimate(
   scene: ExpoBoothScene | null,
   confirmed: ExpoConfirmedDimensions | null,
+  options: ExpoEstimateOptions = {},
 ): ExpoCatalogEstimate {
   if (!confirmed) {
     throw new ExpoEstimateError(
@@ -291,17 +299,38 @@ export function buildCatalogEstimate(
       source: "allowance",
     });
   }
-  for (const fixed of book.fixedLines) {
+  const powerKw =
+    typeof options.powerKw === "number" &&
+    Number.isFinite(options.powerKw) &&
+    options.powerKw > 0 &&
+    options.powerKw <= 500
+      ? options.powerKw
+      : null;
+  if (powerKw !== null) {
     lines.push({
-      id: `fixed_${fixed.trade}`,
-      trade: fixed.trade,
-      label: fixed.label,
-      quantity: 1,
-      unit: "lot",
-      unitAmountKrw: fixed.amountKrw,
-      amountKrw: fixed.amountKrw,
+      id: "fixed_electrical_venue",
+      trade: "electrical_venue",
+      label: `전기 인입/분전 (${powerKw}kW — 매뉴얼 입력)`,
+      quantity: powerKw,
+      unit: "kw",
+      unitAmountKrw: book.electricalPerKwKrw,
+      amountKrw: roundKrw(book.electricalPerKwKrw * powerKw, 1_000),
       source: "allowance",
+      note: "행사 매뉴얼 입력 용량 기준",
     });
+  } else {
+    for (const fixed of book.fixedLines) {
+      lines.push({
+        id: `fixed_${fixed.trade}`,
+        trade: fixed.trade,
+        label: fixed.label,
+        quantity: 1,
+        unit: "lot",
+        unitAmountKrw: fixed.amountKrw,
+        amountKrw: fixed.amountKrw,
+        source: "allowance",
+      });
+    }
   }
 
   // 씬 컴포넌트 — catalogId별 수량 집계 (컴포넌트 없는 씬도 유효)

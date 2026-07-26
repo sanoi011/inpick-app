@@ -121,3 +121,28 @@ test("estimate is deterministic for the same inputs", () => {
     buildCatalogEstimate(scene, CONFIRMED_6X3),
   );
 });
+
+test("manual power capacity replaces the base electrical allowance", () => {
+  const base = buildCatalogEstimate(createExpoScene(6, 3), CONFIRMED_6X3);
+  const baseLine = base.lines.find((l) => l.id === "fixed_electrical_venue");
+  assert.ok(baseLine);
+  assert.equal(baseLine.amountKrw, 150_000);
+
+  const powered = buildCatalogEstimate(createExpoScene(6, 3), CONFIRMED_6X3, {
+    powerKw: 3,
+  });
+  const poweredLine = powered.lines.find((l) => l.id === "fixed_electrical_venue");
+  assert.ok(poweredLine);
+  assert.equal(poweredLine.unit, "kw");
+  assert.equal(poweredLine.amountKrw, 450_000);
+  assert.ok(poweredLine.label.includes("매뉴얼 입력"));
+  assert.ok(powered.totalKrw > base.totalKrw);
+
+  const bogus = buildCatalogEstimate(createExpoScene(6, 3), CONFIRMED_6X3, {
+    powerKw: -1,
+  });
+  assert.equal(
+    bogus.lines.find((l) => l.id === "fixed_electrical_venue")?.amountKrw,
+    150_000,
+  );
+});

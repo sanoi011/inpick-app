@@ -14,7 +14,9 @@ import {
   evaluateEventRules,
   hasEventRuleInput,
   hasEventRuleViolation,
+  hasOfficialServicesInput,
   isExpoEventInfo,
+  isExpoOfficialServices,
 } from "@/lib/expo/event-rules";
 import {
   EXPO_READINESS_STATE_LABELS,
@@ -49,7 +51,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, client_decision, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -60,6 +62,9 @@ export default async function ExpoSharedProposalPage({
     (project.confirmed_dimensions as ExpoConfirmedDimensions | null) ?? null;
   const brand = isExpoBrandKit(project.brand) ? project.brand : null;
   const event = isExpoEventInfo(project.event) ? project.event : null;
+  const officialServices = isExpoOfficialServices(project.official_services)
+    ? project.official_services
+    : null;
   const footprint = project.footprint as {
     canonicalAreaSqm?: number;
     selected?: { widthM?: number; depthM?: number; label?: string };
@@ -69,7 +74,10 @@ export default async function ExpoSharedProposalPage({
   let estimate: ExpoCatalogEstimate | null = null;
   let range: ExpoConceptualRange | null = null;
   try {
-    if (confirmed) estimate = buildCatalogEstimate(scene, confirmed);
+    if (confirmed)
+      estimate = buildCatalogEstimate(scene, confirmed, {
+        powerKw: event?.powerKw ?? null,
+      });
     else if (footprint?.canonicalAreaSqm)
       range = buildConceptualRange(footprint.canonicalAreaSqm);
   } catch {
@@ -96,6 +104,9 @@ export default async function ExpoSharedProposalPage({
       violation: hasEventRuleViolation(eventItems),
     },
     clientDecision: clientDecision?.decision ?? null,
+    officialServicesEntered: officialServices
+      ? hasOfficialServicesInput(officialServices)
+      : false,
   });
 
   const componentCounts = new Map<string, number>();
@@ -159,6 +170,22 @@ export default async function ExpoSharedProposalPage({
             {event?.eventName && <li>· 행사: {event.eventName}</li>}
             {event?.venue && <li>· 장소: {event.venue}</li>}
             {event?.boothNumber && <li>· 부스 번호: {event.boothNumber}</li>}
+            {officialServices && hasOfficialServicesInput(officialServices) && (
+              <li>
+                · 공식 서비스:{" "}
+                {[
+                  officialServices.powerApplied && "전기",
+                  officialServices.riggingApplied && "리깅",
+                  officialServices.internetApplied && "인터넷",
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "메모만"}{" "}
+                신청됨
+                {officialServices.note && (
+                  <span className="text-black/45"> — {officialServices.note}</span>
+                )}
+              </li>
+            )}
             {brand && (
               <li className="flex items-center gap-2">
                 · 브랜드: <b>{brand.name ?? "확정됨"}</b>

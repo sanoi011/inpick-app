@@ -109,3 +109,43 @@ export function evaluateEventRules(
 export function hasEventRuleViolation(items: ExpoEventReviewItem[]): boolean {
   return items.some((item) => item.severity === "violation");
 }
+
+export interface ExpoOfficialServices {
+  powerApplied: boolean;
+  riggingApplied: boolean;
+  internetApplied: boolean;
+  note: string;
+}
+
+export function createEmptyOfficialServices(): ExpoOfficialServices {
+  return {
+    powerApplied: false,
+    riggingApplied: false,
+    internetApplied: false,
+    note: "",
+  };
+}
+
+export function isExpoOfficialServices(
+  value: unknown,
+): value is ExpoOfficialServices {
+  if (!value || typeof value !== "object") return false;
+  const services = value as ExpoOfficialServices;
+  return (
+    typeof services.powerApplied === "boolean" &&
+    typeof services.riggingApplied === "boolean" &&
+    typeof services.internetApplied === "boolean" &&
+    typeof services.note === "string"
+  );
+}
+
+export function hasOfficialServicesInput(
+  services: ExpoOfficialServices,
+): boolean {
+  return (
+    services.powerApplied ||
+    services.riggingApplied ||
+    services.internetApplied ||
+    Boolean(services.note.trim())
+  );
+}

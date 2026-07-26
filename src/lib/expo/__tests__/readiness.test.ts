@@ -126,3 +126,20 @@ test("client decision drives the last readiness dimension", () => {
     "needs_review",
   );
 });
+
+test("official services confirm on self-checked input", () => {
+  const base = {
+    hasFootprint: true,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: null,
+  };
+  assert.equal(stateOf(evaluateProposalReadiness(base), "official_services"), "unstarted");
+  assert.equal(
+    stateOf(
+      evaluateProposalReadiness({ ...base, officialServicesEntered: true }),
+      "official_services",
+    ),
+    "confirmed",
+  );
+});

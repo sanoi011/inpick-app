@@ -51,6 +51,8 @@ export interface ExpoReadinessInput {
   eventRules?: { entered: boolean; violation: boolean };
   /** 고객 결정 (공유 페이지에서 기록) */
   clientDecision?: "approved" | "changes_requested" | null;
+  /** 공식 서비스(전기/리깅/인터넷) 신청 현황 입력 여부 */
+  officialServicesEntered?: boolean;
 }
 
 export function evaluateProposalReadiness(
@@ -64,6 +66,7 @@ export function evaluateProposalReadiness(
     brandConfirmed = false,
     eventRules = { entered: false, violation: false },
     clientDecision = null,
+    officialServicesEntered = false,
   } = input;
 
   const space: ExpoReadinessItem = dimensionsConfirmed
@@ -161,12 +164,19 @@ export function evaluateProposalReadiness(
             state: "unstarted" as const,
             detail: "행사 매뉴얼의 허용 높이·전기 용량을 입력하세요",
           },
-    {
-      dimension: "official_services",
-      label: "공식 서비스",
-      state: "unstarted",
-      detail: "전기/리깅 등 주최측 신청 연동 준비 중",
-    },
+    officialServicesEntered
+      ? {
+          dimension: "official_services" as const,
+          label: "공식 서비스",
+          state: "confirmed" as const,
+          detail: "주최측 신청 현황 입력됨 (사용자 자가 체크)",
+        }
+      : {
+          dimension: "official_services" as const,
+          label: "공식 서비스",
+          state: "unstarted" as const,
+          detail: "전기/리깅/인터넷 신청 여부를 체크하세요",
+        },
     clientDecision === "approved"
       ? {
           dimension: "client_decision" as const,
