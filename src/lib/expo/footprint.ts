@@ -224,3 +224,88 @@ function round(value: number, digits: number): number {
 function trimZero(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
+
+// ─── 치수 확정 (provisional 해제) ───────────────────────────────────────────
+
+export interface ExpoConfirmedDimensions {
+  widthM: number;
+  depthM: number;
+  boothType: ExpoBoothType;
+  openSides: number;
+  wallHeightM: number;
+  areaSqm: number;
+  confirmedAt: string;
+}
+
+export class ExpoDimensionError extends Error {
+  constructor(
+    public readonly code:
+      | "EXPO_DIM_WIDTH_INVALID"
+      | "EXPO_DIM_DEPTH_INVALID"
+      | "EXPO_DIM_HEIGHT_INVALID"
+      | "EXPO_DIM_BOOTH_TYPE_INVALID",
+  ) {
+    super(code);
+    this.name = "ExpoDimensionError";
+  }
+}
+
+export const EXPO_MIN_SIDE_M = 1;
+export const EXPO_MAX_SIDE_M = 60;
+export const EXPO_MIN_WALL_HEIGHT_M = 2;
+export const EXPO_MAX_WALL_HEIGHT_M = 8;
+
+/**
+ * 사용자가 실측/행사 매뉴얼 기준으로 치수를 확정한다. 확정 면적은 입력
+ * 면적이 아니라 확정 폭×깊이에서 다시 계산한다 — 면적은 더 이상 추정값이
+ * 아니다. confirmedAt은 호출자가 넘긴다 (순수 함수 유지).
+ */
+export function confirmExpoDimensions(
+  input: {
+    widthM: number;
+    depthM: number;
+    boothType: ExpoBoothType;
+    wallHeightM: number;
+  },
+  confirmedAt: string,
+): ExpoConfirmedDimensions {
+  const width = Number(input.widthM);
+  const depth = Number(input.depthM);
+  const height = Number(input.wallHeightM);
+  if (
+    !Number.isFinite(width) ||
+    width < EXPO_MIN_SIDE_M ||
+    width > EXPO_MAX_SIDE_M
+  ) {
+    throw new ExpoDimensionError("EXPO_DIM_WIDTH_INVALID");
+  }
+  if (
+    !Number.isFinite(depth) ||
+    depth < EXPO_MIN_SIDE_M ||
+    depth > EXPO_MAX_SIDE_M
+  ) {
+    throw new ExpoDimensionError("EXPO_DIM_DEPTH_INVALID");
+  }
+  if (
+    !Number.isFinite(height) ||
+    height < EXPO_MIN_WALL_HEIGHT_M ||
+    height > EXPO_MAX_WALL_HEIGHT_M
+  ) {
+    throw new ExpoDimensionError("EXPO_DIM_HEIGHT_INVALID");
+  }
+  if (!(input.boothType in EXPO_OPEN_SIDES)) {
+    throw new ExpoDimensionError("EXPO_DIM_BOOTH_TYPE_INVALID");
+  }
+  const w = Math.round(width * 10) / 10;
+  const d = Math.round(depth * 10) / 10;
+  const h = Math.round(height * 10) / 10;
+  return {
+    widthM: w,
+    depthM: d,
+    boothType: input.boothType,
+    openSides: EXPO_OPEN_SIDES[input.boothType],
+    wallHeightM: h,
+    areaSqm: Math.round(w * d * 100) / 100,
+    confirmedAt,
+  };
+}

@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ExpoDimensionError,
   ExpoFootprintError,
+  confirmExpoDimensions,
   SQFT_PER_SQM,
   convertArea,
   createProvisionalFootprint,
@@ -103,6 +105,44 @@ test("selected candidate area stays close to the canonical area", () => {
     assert.ok(
       Math.abs(fp.selected.areaSqm - fp.canonicalAreaSqm) <= 1.5,
       `${area}㎡ selected=${fp.selected.areaSqm}`,
+    );
+  }
+});
+
+test("dimension confirmation recomputes area from confirmed sides", () => {
+  const confirmed = confirmExpoDimensions(
+    { widthM: 6, depthM: 3, boothType: "corner", wallHeightM: 2.5 },
+    "2026-07-26T00:00:00.000Z",
+  );
+  assert.equal(confirmed.areaSqm, 18);
+  assert.equal(confirmed.openSides, 2);
+  assert.equal(confirmed.confirmedAt, "2026-07-26T00:00:00.000Z");
+});
+
+test("dimension confirmation rounds to 0.1m and validates bounds", () => {
+  const confirmed = confirmExpoDimensions(
+    { widthM: 6.66, depthM: 3.04, boothType: "island", wallHeightM: 4 },
+    "2026-07-26T00:00:00.000Z",
+  );
+  assert.equal(confirmed.widthM, 6.7);
+  assert.equal(confirmed.depthM, 3);
+  assert.equal(confirmed.openSides, 4);
+  for (const [patch, code] of [
+    [{ widthM: 0.5 }, "EXPO_DIM_WIDTH_INVALID"],
+    [{ widthM: 61 }, "EXPO_DIM_WIDTH_INVALID"],
+    [{ depthM: Number.NaN }, "EXPO_DIM_DEPTH_INVALID"],
+    [{ wallHeightM: 1 }, "EXPO_DIM_HEIGHT_INVALID"],
+    [{ wallHeightM: 9 }, "EXPO_DIM_HEIGHT_INVALID"],
+    [{ boothType: "mega" as never }, "EXPO_DIM_BOOTH_TYPE_INVALID"],
+  ] as const) {
+    assert.throws(
+      () =>
+        confirmExpoDimensions(
+          { widthM: 6, depthM: 3, boothType: "inline", wallHeightM: 2.5, ...patch },
+          "2026-07-26T00:00:00.000Z",
+        ),
+      (error: unknown) =>
+        error instanceof ExpoDimensionError && error.code === code,
     );
   }
 });

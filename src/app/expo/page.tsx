@@ -3,11 +3,16 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import {
+  ExpoDimensionError,
   ExpoFootprintError,
+  confirmExpoDimensions,
   createProvisionalFootprint,
   type ExpoAreaUnit,
+  type ExpoBoothType,
+  type ExpoConfirmedDimensions,
   type ExpoProvisionalFootprint,
 } from "@/lib/expo/footprint";
+import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const BoothShell3D = dynamic(() => import("@/components/expo/BoothShell3D"), {
   ssr: false,
@@ -28,12 +33,14 @@ const BUILDER_KITS = [
 type StartMode = "quick_area" | "builder_kit";
 
 interface ExpoBriefDraft {
-  version: 1;
+  version: 2;
   savedAt: string;
   startMode: StartMode;
   areaInput: string;
   unit: ExpoAreaUnit;
   selectedCandidateLabel: string | null;
+  confirmedDimensions: ExpoConfirmedDimensions | null;
+  serverProjectId: string | null;
   quickFields: {
     builderName: string;
     clientName: string;
@@ -41,7 +48,14 @@ interface ExpoBriefDraft {
   };
 }
 
-const DRAFT_KEY = "expo_brief_draft_v1";
+const DRAFT_KEY = "expo_brief_draft_v2";
+
+const BOOTH_TYPE_LABELS: Record<ExpoBoothType, string> = {
+  inline: "인라인 (오픈 1면)",
+  corner: "코너 (오픈 2면)",
+  peninsula: "반도형 (오픈 3면)",
+  island: "아일랜드 (오픈 4면)",
+};
 
 export default function ExpoBriefPage() {
   const [startMode, setStartMode] = useState<StartMode>("quick_area");
@@ -55,6 +69,14 @@ export default function ExpoBriefPage() {
   const [clientName, setClientName] = useState("");
   const [eventName, setEventName] = useState("");
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [confirmedDims, setConfirmedDims] = useState<ExpoConfirmedDimensions | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [serverProjectId, setServerProjectId] = useState<string | null>(null);
+  const [saveState, setSaveState] = useState<"local" | "saving" | "saved" | "signed_out">("local");
+  const [dimWidth, setDimWidth] = useState("");
+  const [dimDepth, setDimDepth] = useState("");
+  const [dimHeight, setDimHeight] = useState("2.5");
+  const [dimBoothType, setDimBoothType] = useState<ExpoBoothType>("inline");
 
   // 초기 복구 — 로컬 임시 저장분 (서버 저장은 다음 슬라이스, UI에 정직하게 표기)
   useEffect(() => {
@@ -62,7 +84,7 @@ export default function ExpoBriefPage() {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const draft = JSON.parse(raw) as ExpoBriefDraft;
-      if (draft.version !== 1) return;
+      if (draft.version !== 2) return;
       setStartMode(draft.startMode);
       setAreaInput(draft.areaInput);
       setUnit(draft.unit);
@@ -75,6 +97,8 @@ export default function ExpoBriefPage() {
           const fp = createProvisionalFootprint(area, draft.unit);
           setFootprint(fp);
           setSelectedLabel(draft.selectedCandidateLabel);
+          setConfirmedDims(draft.confirmedDimensions);
+          setServerProjectId(draft.serverProjectId);
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -88,12 +112,14 @@ export default function ExpoBriefPage() {
   // autosave (로컬)
   useEffect(() => {
     const draft: ExpoBriefDraft = {
-      version: 1,
+      version: 2,
       savedAt: new Date().toISOString(),
       startMode,
       areaInput,
       unit,
       selectedCandidateLabel: selectedLabel,
+      confirmedDimensions: confirmedDims,
+      serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
     try {
@@ -101,7 +127,51 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, serverProjectId, builderName, clientName, eventName]);
+
+  // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
+  // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
+  useEffect(() => {
+    if (!footprint) return;
+    const timer = window.setTimeout(async () => {
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) {
+          setSaveState("signed_out");
+          return;
+        }
+        setSaveState("saving");
+        const response = await fetch("/api/expo/projects", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: serverProjectId,
+            title: eventName || builderName || "새 부스 프로젝트",
+            areaInput: Number(areaInput),
+            areaUnit: unit,
+            footprint,
+            confirmedDimensions: confirmedDims,
+            quickFields: { builderName, clientName, eventName },
+          }),
+        });
+        const payload = (await response.json().catch(() => ({}))) as {
+          project?: { id?: string };
+        };
+        if (response.ok && payload.project?.id) {
+          setServerProjectId(payload.project.id);
+          setSaveState("saved");
+        } else {
+          setSaveState("local");
+        }
+      } catch {
+        setSaveState("local");
+      }
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [footprint, confirmedDims, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -109,6 +179,10 @@ export default function ExpoBriefPage() {
       const fp = createProvisionalFootprint(areaValue, areaUnit);
       setFootprint(fp);
       setSelectedLabel(fp.selected.label);
+      setConfirmedDims(null);
+      setDimWidth(String(fp.selected.widthM));
+      setDimDepth(String(fp.selected.depthM));
+      setDimHeight(String(fp.wallHeightM));
     } catch (cause) {
       setFootprint(null);
       setSelectedLabel(null);
@@ -290,8 +364,27 @@ export default function ExpoBriefPage() {
         )}
 
         {displayFootprint && (
-          <section aria-label="임시 3D 부스 셸" className="mt-5">
-            <BoothShell3D footprint={displayFootprint} />
+          <section aria-label="3D 부스 셸" className="mt-5">
+            <BoothShell3D
+              footprint={
+                confirmedDims
+                  ? {
+                      ...displayFootprint,
+                      selected: {
+                        widthM: confirmedDims.widthM,
+                        depthM: confirmedDims.depthM,
+                        areaSqm: confirmedDims.areaSqm,
+                        standardMatch: false,
+                        label: `${confirmedDims.widthM}m × ${confirmedDims.depthM}m`,
+                      },
+                      boothType: confirmedDims.boothType,
+                      openSides: confirmedDims.openSides,
+                      wallHeightM: confirmedDims.wallHeightM,
+                    }
+                  : displayFootprint
+              }
+              confirmed={Boolean(confirmedDims)}
+            />
 
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -333,6 +426,131 @@ export default function ExpoBriefPage() {
                 </li>
               </ul>
             </div>
+
+            {/* 치수 확정 — provisional 해제 단계 */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              {confirmedDims ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-green-700">
+                      치수 확정됨 — {confirmedDims.widthM}m ×{" "}
+                      {confirmedDims.depthM}m ·{" "}
+                      {BOOTH_TYPE_LABELS[confirmedDims.boothType]} · 높이{" "}
+                      {confirmedDims.wallHeightM}m
+                    </p>
+                    <p className="mt-0.5 text-xs text-black/50">
+                      확정 면적 {confirmedDims.areaSqm}㎡ — 이 값이 이후
+                      견적·BOM의 기준이 됩니다.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmedDims(null)}
+                    className="shrink-0 rounded-lg border border-black/15 px-3 py-1.5 text-xs font-semibold text-black/70 hover:bg-zinc-50"
+                  >
+                    수정
+                  </button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    setConfirmError(null);
+                    try {
+                      setConfirmedDims(
+                        confirmExpoDimensions(
+                          {
+                            widthM: Number(dimWidth),
+                            depthM: Number(dimDepth),
+                            boothType: dimBoothType,
+                            wallHeightM: Number(dimHeight),
+                          },
+                          new Date().toISOString(),
+                        ),
+                      );
+                    } catch (cause) {
+                      setConfirmError(
+                        cause instanceof ExpoDimensionError
+                          ? dimensionErrorMessage(cause.code)
+                          : "치수를 확인해 주세요.",
+                      );
+                    }
+                  }}
+                  noValidate
+                >
+                  <p className="text-sm font-bold text-black">치수 확정</p>
+                  <p className="mt-0.5 text-xs text-black/50">
+                    행사 매뉴얼/실측 기준의 실제 값을 입력하면 가정 상태가
+                    해제됩니다.
+                  </p>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {(
+                      [
+                        ["expo-dim-width", "폭 (m)", dimWidth, setDimWidth],
+                        ["expo-dim-depth", "깊이 (m)", dimDepth, setDimDepth],
+                        ["expo-dim-height", "벽 높이 (m)", dimHeight, setDimHeight],
+                      ] as const
+                    ).map(([id, label, value, setter]) => (
+                      <div key={id}>
+                        <label htmlFor={id} className="block text-[11px] font-semibold text-black/60">
+                          {label}
+                        </label>
+                        <input
+                          id={id}
+                          type="number"
+                          inputMode="decimal"
+                          step="0.1"
+                          min="0"
+                          value={value}
+                          onChange={(e) => setter(e.target.value)}
+                          className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <label htmlFor="expo-dim-type" className="sr-only">
+                      부스 타입
+                    </label>
+                    <select
+                      id="expo-dim-type"
+                      value={dimBoothType}
+                      onChange={(e) => setDimBoothType(e.target.value as ExpoBoothType)}
+                      className="flex-1 rounded-lg border border-black/15 px-3 py-2 text-sm"
+                    >
+                      {(Object.keys(BOOTH_TYPE_LABELS) as ExpoBoothType[]).map(
+                        (type) => (
+                          <option key={type} value={type}>
+                            {BOOTH_TYPE_LABELS[type]}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2 text-sm font-bold text-white"
+                    >
+                      치수 확정
+                    </button>
+                  </div>
+                  {confirmError && (
+                    <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                      {confirmError}
+                    </p>
+                  )}
+                </form>
+              )}
+            </div>
+
+            <p role="status" className="mt-2 text-right text-[11px] font-medium text-black/40">
+              {saveState === "saved"
+                ? "서버에 저장됨"
+                : saveState === "saving"
+                  ? "서버 저장 중…"
+                  : saveState === "signed_out"
+                    ? "로그인하면 서버에 저장됩니다 (현재 이 기기에만 저장)"
+                    : "이 기기에 임시 저장됨"}
+            </p>
           </section>
         )}
 
@@ -370,6 +588,19 @@ export default function ExpoBriefPage() {
       </div>
     </main>
   );
+}
+
+function dimensionErrorMessage(code: ExpoDimensionError["code"]): string {
+  switch (code) {
+    case "EXPO_DIM_WIDTH_INVALID":
+      return "폭은 1m~60m 사이여야 합니다.";
+    case "EXPO_DIM_DEPTH_INVALID":
+      return "깊이는 1m~60m 사이여야 합니다.";
+    case "EXPO_DIM_HEIGHT_INVALID":
+      return "벽 높이는 2m~8m 사이여야 합니다.";
+    case "EXPO_DIM_BOOTH_TYPE_INVALID":
+      return "부스 타입을 선택해 주세요.";
+  }
 }
 
 function footprintErrorMessage(code: ExpoFootprintError["code"]): string {

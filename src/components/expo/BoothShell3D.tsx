@@ -12,8 +12,10 @@ import type { ExpoProvisionalFootprint } from "@/lib/expo/footprint";
  */
 export default function BoothShell3D({
   footprint,
+  confirmed = false,
 }: {
   footprint: ExpoProvisionalFootprint;
+  confirmed?: boolean;
 }) {
   const [webglReady, setWebglReady] = useState<boolean | null>(null);
   const [glCrashed, setGlCrashed] = useState(false);
@@ -77,12 +79,13 @@ export default function BoothShell3D({
       <BoothShellPoster
         footprint={footprint}
         reason={glCrashed ? "render_error" : "webgl_unavailable"}
+        confirmed={confirmed}
       />
     );
   }
   return (
-    <ShellErrorBoundary fallback={<BoothShellPoster footprint={footprint} reason="render_error" />}>
-      <BoothShellCanvas footprint={footprint} />
+    <ShellErrorBoundary fallback={<BoothShellPoster footprint={footprint} reason="render_error" confirmed={confirmed} />}>
+      <BoothShellCanvas footprint={footprint} confirmed={confirmed} />
     </ShellErrorBoundary>
   );
 }
@@ -91,9 +94,11 @@ export default function BoothShell3D({
 function BoothShellPoster({
   footprint,
   reason,
+  confirmed = false,
 }: {
   footprint: ExpoProvisionalFootprint;
   reason: "webgl_unavailable" | "render_error";
+  confirmed?: boolean;
 }) {
   const { widthM: w, depthM: d } = footprint.selected;
   const pad = 1;
@@ -122,8 +127,14 @@ function BoothShellPoster({
           : "3D 표시에 문제가 있어 평면 미리보기로 전환했습니다."}
       </p>
       <div className="pointer-events-none absolute left-3 top-3">
-        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800 shadow-sm">
-          가정 기반 임시 배치 — 치수 확정 전
+        <span
+          className={
+            confirmed
+              ? "rounded-full bg-green-100 px-3 py-1 text-[11px] font-semibold text-green-800 shadow-sm"
+              : "rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800 shadow-sm"
+          }
+        >
+          {confirmed ? "치수 확정됨" : "가정 기반 임시 배치 — 치수 확정 전"}
         </span>
       </div>
     </div>
@@ -148,8 +159,10 @@ class ShellErrorBoundary extends Component<
 
 function BoothShellCanvas({
   footprint,
+  confirmed = false,
 }: {
   footprint: ExpoProvisionalFootprint;
+  confirmed?: boolean;
 }) {
   const { widthM: width, depthM: depth } = footprint.selected;
   const wallHeight = footprint.wallHeightM;
@@ -198,14 +211,16 @@ function BoothShellCanvas({
           position={[0, 0.0005, 0]}
         />
 
-        {/* 뒷벽 — 오픈면(전면)의 반대편 */}
-        <mesh
-          position={[0, wallHeight / 2, -depth / 2 + wallThickness / 2]}
-          castShadow
-        >
-          <boxGeometry args={[width, wallHeight, wallThickness]} />
-          <meshStandardMaterial color="#ffffff" />
-        </mesh>
+        {/* 뒷벽 — 아일랜드(오픈 4면)는 벽 없음 */}
+        {footprint.openSides <= 3 && (
+          <mesh
+            position={[0, wallHeight / 2, -depth / 2 + wallThickness / 2]}
+            castShadow
+          >
+            <boxGeometry args={[width, wallHeight, wallThickness]} />
+            <meshStandardMaterial color="#ffffff" />
+          </mesh>
+        )}
 
         {/* 측벽 — inline(오픈 1면) 기준. 부스 타입별 확장은 다음 슬라이스 */}
         {footprint.openSides <= 2 && (
@@ -241,8 +256,14 @@ function BoothShellCanvas({
         <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow">
           {footprint.selected.label} · 높이 {footprint.wallHeightM}m
         </span>
-        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800 shadow-sm">
-          가정 기반 임시 배치 — 치수 확정 전
+        <span
+          className={
+            confirmed
+              ? "rounded-full bg-green-100 px-3 py-1 text-[11px] font-semibold text-green-800 shadow-sm"
+              : "rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold text-amber-800 shadow-sm"
+          }
+        >
+          {confirmed ? "치수 확정됨" : "가정 기반 임시 배치 — 치수 확정 전"}
         </span>
       </div>
     </div>
