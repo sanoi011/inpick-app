@@ -65,6 +65,8 @@ export async function POST(request: NextRequest) {
     event?: unknown;
     officialServices?: unknown;
     estimateOverrides?: unknown;
+    conceptGallery?: unknown;
+    contractPrep?: unknown;
     quickFields?: unknown;
   };
   try {
@@ -122,6 +124,35 @@ export async function POST(request: NextRequest) {
         ? body.quickFields
         : {},
   };
+
+  // 갤러리/계약준비 — 유효값이 있을 때만 행에 포함 (컬럼 미적용 환경 보호)
+  const conceptGallery = Array.isArray(body.conceptGallery)
+    ? body.conceptGallery
+        .filter(
+          (item): item is { url: string; prompt: string; createdAt: string } =>
+            Boolean(item) &&
+            typeof (item as { url?: unknown }).url === "string" &&
+            /^https:\/\//.test((item as { url: string }).url),
+        )
+        .slice(0, 8)
+    : null;
+  if (conceptGallery && conceptGallery.length > 0) {
+    (row as Record<string, unknown>).concept_images = conceptGallery;
+  }
+  const contractPrep = body.contractPrep as
+    | { startedAt?: unknown; note?: unknown }
+    | null
+    | undefined;
+  if (
+    contractPrep &&
+    typeof contractPrep === "object" &&
+    typeof contractPrep.startedAt === "string"
+  ) {
+    (row as Record<string, unknown>).contract_prep = {
+      startedAt: contractPrep.startedAt,
+      note: typeof contractPrep.note === "string" ? contractPrep.note.slice(0, 300) : "",
+    };
+  }
 
   const projectId = typeof body.id === "string" ? body.id : null;
   const query = projectId

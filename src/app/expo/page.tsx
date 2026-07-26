@@ -144,6 +144,7 @@ interface ExpoBriefDraft {
   conceptImageUrl?: string;
   brandKit?: ExpoBrandKit;
   conceptGallery?: Array<{ url: string; prompt: string; createdAt: string }>;
+  contractPrep?: { startedAt: string; note: string } | null;
   eventInfo?: ExpoEventInfo;
   officialServices?: ExpoOfficialServices;
   estimateOverrides?: ExpoEstimateOverrides;
@@ -226,6 +227,8 @@ export default function ExpoBriefPage() {
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied" | "error">("idle");
   const [clientDecision, setClientDecision] = useState<ExpoClientDecision | null>(null);
   const [proposal, setProposal] = useState<ExpoProposalSnapshot | null>(null);
+  // 계약 준비 기록 — contract 단계 아님 (계약서·법무 검토는 별도)
+  const [contractPrep, setContractPrep] = useState<{ startedAt: string; note: string } | null>(null);
   const [publishState, setPublishState] = useState<"idle" | "loading" | "error">("idle");
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
@@ -346,6 +349,15 @@ export default function ExpoBriefPage() {
             setConceptImage(draft.conceptImageUrl);
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
+          if (
+            draft.contractPrep &&
+            typeof draft.contractPrep.startedAt === "string"
+          ) {
+            setContractPrep({
+              startedAt: draft.contractPrep.startedAt,
+              note: typeof draft.contractPrep.note === "string" ? draft.contractPrep.note : "",
+            });
+          }
           if (Array.isArray(draft.conceptGallery)) {
             setConceptGallery(
               draft.conceptGallery
@@ -395,6 +407,7 @@ export default function ExpoBriefPage() {
           : undefined,
       brandKit: brandKit ?? undefined,
       conceptGallery,
+      contractPrep,
       eventInfo,
       officialServices,
       estimateOverrides,
@@ -406,7 +419,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, contractPrep, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -442,6 +455,8 @@ export default function ExpoBriefPage() {
             event: { ...eventInfo, eventName: eventInfo.eventName || eventName },
             officialServices,
             estimateOverrides,
+            conceptGallery,
+            contractPrep,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -459,7 +474,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, conceptGallery, contractPrep, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -625,6 +640,7 @@ export default function ExpoBriefPage() {
       setDimDepth(String(dims.depthM));
       setDimHeight(String(dims.wallHeightM));
       setProposal(null); // serverProjectId 효과가 서버에서 다시 로드
+      setContractPrep(null);
       setClientDecision(null);
     } catch (cause) {
       setError(
@@ -655,6 +671,7 @@ export default function ExpoBriefPage() {
       setServerProjectId(null); // 복제본은 새 프로젝트로 저장
       setClientDecision(null);
       setProposal(null);
+      setContractPrep(null);
       const sourceScene = isExpoBoothScene(source.scene) ? source.scene : null;
       setSceneHistory(
         createSceneHistory(
@@ -2116,6 +2133,50 @@ export default function ExpoBriefPage() {
                 </span>
               </p>
             )}
+            {(() => {
+              const fresh =
+                proposal && scene && catalogEstimate
+                  ? !isProposalStale(proposal, scene, catalogEstimate)
+                  : false;
+              if (contractPrep) {
+                return (
+                  <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-emerald-50 px-3 py-2.5">
+                    <p className="text-xs font-bold text-emerald-700">
+                      계약 준비 중 —{" "}
+                      {new Date(contractPrep.startedAt).toLocaleDateString("ko-KR")}{" "}
+                      기록
+                      <span className="ml-1.5 font-medium text-black/50">
+                        (계약서·법무 검토는 별도 진행 — 상태 표시용)
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setContractPrep(null)}
+                      className="shrink-0 rounded-lg border border-black/15 px-2 py-1 text-[10px] font-semibold text-black/60"
+                    >
+                      해제
+                    </button>
+                  </div>
+                );
+              }
+              if (fresh && clientDecision?.decision === "approved") {
+                return (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setContractPrep({
+                        startedAt: new Date().toISOString(),
+                        note: "",
+                      })
+                    }
+                    className="mt-2 w-full rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+                  >
+                    계약 준비 시작 기록 — 발행 제안 + 고객 승인 완료됨
+                  </button>
+                );
+              }
+              return null;
+            })()}
             <div className="mt-2 flex items-center justify-between gap-2">
               {serverProjectId ? (
                 <button
