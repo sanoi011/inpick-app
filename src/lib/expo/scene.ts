@@ -26,6 +26,8 @@ export interface ExpoCatalogItem {
   depthM: number;
   heightM: number;
   color: string;
+  /** 벽 요소 — 경계까지 밀착 배치를 허용하고 벽접촉 경고에서 제외한다. */
+  wallMounted?: boolean;
 }
 
 /** Release 1 기본 카탈로그 — 실측 가능한 일반 규격. 행사 매뉴얼이 우선. */
@@ -65,6 +67,35 @@ export const EXPO_BASE_CATALOG: ExpoCatalogItem[] = [
     depthM: 0.5,
     heightM: 2.4,
     color: "#f59e0b",
+  },
+  {
+    catalogId: "graphic_wall",
+    catalogVersion: 1,
+    nameKo: "그래픽 월(3m)",
+    widthM: 3,
+    depthM: 0.1,
+    heightM: 2.4,
+    color: "#10b981",
+    wallMounted: true,
+  },
+  {
+    catalogId: "lightbox_panel",
+    catalogVersion: 1,
+    nameKo: "라이트박스(1m)",
+    widthM: 1,
+    depthM: 0.15,
+    heightM: 2,
+    color: "#f43f5e",
+    wallMounted: true,
+  },
+  {
+    catalogId: "brochure_stand",
+    catalogVersion: 1,
+    nameKo: "브로슈어 랙",
+    widthM: 0.4,
+    depthM: 0.4,
+    heightM: 1.5,
+    color: "#64748b",
   },
 ];
 
@@ -263,6 +294,8 @@ export function evaluateExpoScene(scene: ExpoBoothScene): ExpoSceneWarning[] {
   const halfW = scene.boothWidthM / 2;
   const halfD = scene.boothDepthM / 2;
   for (const box of boxes) {
+    const component = scene.components.find((c) => c.id === box.id);
+    if (component && findCatalogItem(component.catalogId)?.wallMounted) continue;
     if (
       box.minX <= -halfW + 1e-6 ||
       box.maxX >= halfW - 1e-6 ||
@@ -301,13 +334,23 @@ function clampToBooth(
   // 그리드 위에서만 움직이도록: 먼저 스냅하고, 경계는 그리드로 내림한
   // 최댓값으로 자른다 (스냅이 경계 밖으로 되돌리는 것을 방지).
   const size = componentFootprintSize(component);
-  const maxX = Math.max(0, floorToGrid(scene.boothWidthM / 2 - size.w / 2));
-  const maxZ = Math.max(0, floorToGrid(scene.boothDepthM / 2 - size.d / 2));
+  const wallMounted = findCatalogItem(component.catalogId)?.wallMounted ?? false;
+  // 벽 요소는 벽면 밀착이 목적이므로 그리드로 내리지 않고 정확한 한계까지 허용
+  const limit = (half: number, extent: number) =>
+    wallMounted
+      ? Math.max(0, round2(half - extent))
+      : Math.max(0, floorToGrid(half - extent));
+  const maxX = limit(scene.boothWidthM / 2, size.w / 2);
+  const maxZ = limit(scene.boothDepthM / 2, size.d / 2);
   return {
     ...component,
     x: Math.min(maxX, Math.max(-maxX, snap(component.x))),
     z: Math.min(maxZ, Math.max(-maxZ, snap(component.z))),
   };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }
 
 function floorToGrid(value: number): number {

@@ -44,6 +44,7 @@ export type ExpoTradeCategory =
   | "electrical_venue"
   | "furniture_fixtures"
   | "signage_lightbox"
+  | "graphics_print"
   | "design_pm"
   | "install_dismantle"
   | "overhead_profit"
@@ -56,6 +57,7 @@ export const EXPO_TRADE_LABELS: Record<ExpoTradeCategory, string> = {
   electrical_venue: "전기/주최측 서비스",
   furniture_fixtures: "가구/집기",
   signage_lightbox: "사이니지/라이트박스",
+  graphics_print: "그래픽 출력·부착",
   design_pm: "디자인/PM",
   install_dismantle: "설치·해체",
   overhead_profit: "일반관리·이윤",
@@ -166,6 +168,21 @@ export const EXPO_ALLOWANCE_COSTBOOK = {
       label: "사이니지 타워",
       unitKrw: 450_000,
     },
+    graphic_wall: {
+      trade: "graphics_print" as ExpoTradeCategory,
+      label: "그래픽 월(3m) 출력·부착",
+      unitKrw: 600_000,
+    },
+    lightbox_panel: {
+      trade: "signage_lightbox" as ExpoTradeCategory,
+      label: "라이트박스(1m)",
+      unitKrw: 550_000,
+    },
+    brochure_stand: {
+      trade: "furniture_fixtures" as ExpoTradeCategory,
+      label: "브로슈어 랙",
+      unitKrw: 80_000,
+    },
   } as Record<
     string,
     { trade: ExpoTradeCategory; label: string; unitKrw: number }
@@ -189,7 +206,7 @@ export const EXPO_ALLOWANCE_COSTBOOK = {
 
 const BASE_ASSUMPTIONS = [
   "코스트북 v1의 모든 단가는 allowance(가정) 상태 — 시공사 검토 전 확정 금액이 아닙니다.",
-  "시스템(옥타놈) 조립부스 표준 사양 기준, 특수 목공·그래픽 출력 미포함.",
+  "시스템(옥타놈) 조립부스 표준 사양 기준, 특수 목공 미포함 — 그래픽 출력은 배치한 그래픽 월/라이트박스 항목에만 포함.",
   "전기 1kW 기본 가정 — 실제 용량·주최측 단가는 행사 매뉴얼 기준.",
   "부가세 별도.",
 ];

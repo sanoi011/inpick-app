@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildCatalogEstimate } from "../estimate";
+import { confirmExpoDimensions } from "../footprint";
 import {
   EXPO_BASE_CATALOG,
   ExpoSceneError,
@@ -115,4 +117,57 @@ test("scene guard accepts round-tripped JSON and rejects junk", () => {
   assert.ok(isExpoBoothScene(JSON.parse(JSON.stringify(scene))));
   assert.ok(!isExpoBoothScene(null));
   assert.ok(!isExpoBoothScene({ schemaVersion: 99 }));
+});
+
+test("wall-mounted elements reach the wall flush without a wall warning", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "graphic_wall", "g1");
+  // 뒷벽 방향(-z)으로 계속 밀면 그리드 대신 벽면 밀착 한계까지 이동
+  for (let i = 0; i < 6; i += 1) {
+    scene = moveExpoComponent(scene, "g1", 0, -0.5);
+  }
+  const wall = scene.components.find((c) => c.id === "g1")!;
+  // depth 0.1 → 한계 z = -(1.5 - 0.05) = -1.45 (벽면 밀착)
+  assert.equal(wall.z, -1.45);
+  const warnings = evaluateExpoScene(scene).filter(
+    (w) => w.code === "component_touches_wall" && w.componentIds.includes("g1"),
+  );
+  assert.equal(warnings.length, 0);
+});
+
+test("non-wall components at the boundary still warn", () => {
+  // 안내 카운터(1m)는 6m 부스에서 그리드 클램프 한계(x=2.5)가 벽면과 일치한다.
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "info_counter", "b1");
+  for (let i = 0; i < 6; i += 1) {
+    scene = moveExpoComponent(scene, "b1", 0.5, 0);
+  }
+  const warnings = evaluateExpoScene(scene).filter(
+    (w) => w.code === "component_touches_wall" && w.componentIds.includes("b1"),
+  );
+  assert.ok(warnings.length >= 1);
+});
+
+test("new wall catalog items are priced in the costbook", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "graphic_wall", "g1");
+  scene = addExpoComponent(scene, "lightbox_panel", "l1");
+  scene = addExpoComponent(scene, "brochure_stand", "b1");
+  const estimate = buildCatalogEstimate(
+    scene,
+    confirmExpoDimensions(
+      { widthM: 6, depthM: 3, boothType: "inline", wallHeightM: 2.5 },
+      "2026-07-26T00:00:00.000Z",
+    ),
+  );
+  for (const id of [
+    "component_graphic_wall",
+    "component_lightbox_panel",
+    "component_brochure_stand",
+  ]) {
+    assert.ok(
+      estimate.lines.some((line) => line.id === id),
+      `missing line: ${id}`,
+    );
+  }
 });
