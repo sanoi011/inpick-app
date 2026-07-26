@@ -143,6 +143,7 @@ interface ExpoBriefDraft {
   /** Storage URL만 저장 (data URL 금지 — localStorage 용량 보호) */
   conceptImageUrl?: string;
   brandKit?: ExpoBrandKit;
+  conceptGallery?: Array<{ url: string; prompt: string; createdAt: string }>;
   eventInfo?: ExpoEventInfo;
   officialServices?: ExpoOfficialServices;
   estimateOverrides?: ExpoEstimateOverrides;
@@ -194,6 +195,9 @@ export default function ExpoBriefPage() {
   const [conceptImage, setConceptImage] = useState<string | null>(null);
   const [conceptLoading, setConceptLoading] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
+  const [conceptGallery, setConceptGallery] = useState<
+    Array<{ url: string; prompt: string; createdAt: string }>
+  >([]);
   // 브랜드 — URL 후보 추출은 자동 확정 금지, 사용자가 선택+권한 확인 후 적용
   const [brandUrl, setBrandUrl] = useState("");
   const [brandLoading, setBrandLoading] = useState(false);
@@ -342,6 +346,20 @@ export default function ExpoBriefPage() {
             setConceptImage(draft.conceptImageUrl);
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
+          if (Array.isArray(draft.conceptGallery)) {
+            setConceptGallery(
+              draft.conceptGallery
+                .filter(
+                  (item) =>
+                    item &&
+                    typeof item.url === "string" &&
+                    item.url.startsWith("https://") &&
+                    typeof item.prompt === "string" &&
+                    typeof item.createdAt === "string",
+                )
+                .slice(0, 8),
+            );
+          }
           if (isExpoEventInfo(draft.eventInfo)) setEventInfo(draft.eventInfo);
           if (isExpoOfficialServices(draft.officialServices)) {
             setOfficialServices(draft.officialServices);
@@ -376,6 +394,7 @@ export default function ExpoBriefPage() {
           ? conceptImage
           : undefined,
       brandKit: brandKit ?? undefined,
+      conceptGallery,
       eventInfo,
       officialServices,
       estimateOverrides,
@@ -387,7 +406,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -845,6 +864,14 @@ export default function ExpoBriefPage() {
       };
       if (response.ok && payload.imageUrl) {
         setConceptImage(payload.imageUrl);
+        if (payload.imageUrl.startsWith("https://")) {
+          const entry = {
+            url: payload.imageUrl,
+            prompt: conceptPrompt,
+            createdAt: new Date().toISOString(),
+          };
+          setConceptGallery((gallery) => [entry, ...gallery].slice(0, 8));
+        }
       } else if (response.status === 401) {
         setConceptError("로그인 후 이용할 수 있습니다. (토큰 1개 사용)");
       } else if (response.status === 402) {
@@ -1168,6 +1195,31 @@ export default function ExpoBriefPage() {
                 <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
                   {conceptError}
                 </p>
+              )}
+              {conceptGallery.length > 1 && !conceptLoading && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {conceptGallery.map((item) => (
+                    <button
+                      key={item.url}
+                      type="button"
+                      onClick={() => setConceptImage(item.url)}
+                      title={item.prompt || "컨셉 이미지"}
+                      aria-pressed={conceptImage === item.url}
+                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
+                        conceptImage === item.url
+                          ? "border-violet-600"
+                          : "border-black/10"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
+                      <img
+                        src={item.url}
+                        alt="컨셉 썸네일"
+                        className="h-14 w-20 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
               )}
               {conceptImage && !conceptLoading && (
                 <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
