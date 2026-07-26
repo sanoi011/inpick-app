@@ -28,6 +28,7 @@ import {
 import type { ExpoConfirmedDimensions } from "@/lib/expo/footprint";
 import { isExpoClientDecision } from "@/lib/expo/client-decision";
 import ProposalDecisionForm from "@/components/expo/ProposalDecisionForm";
+import PrintProposalButton from "@/components/expo/PrintProposalButton";
 
 /**
  * 공개 읽기전용 제안 페이지 — 공유 토큰으로만 접근 (service role 조회).
@@ -123,14 +124,15 @@ export default async function ExpoSharedProposalPage({
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white px-4 py-8 sm:px-6">
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white px-4 py-8 print:bg-white sm:px-6">
       <div className="mx-auto w-full max-w-2xl">
         <p className="text-xs font-bold tracking-[0.2em] text-blue-600">
           INPICK EXPO · 제안 공유본
         </p>
-        <h1 className="mt-1.5 text-2xl font-bold text-black">
-          {project.title}
-        </h1>
+        <div className="mt-1.5 flex items-start justify-between gap-3">
+          <h1 className="text-2xl font-bold text-black">{project.title}</h1>
+          <PrintProposalButton />
+        </div>
         <p
           role="note"
           className="mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-xs font-semibold leading-5 text-amber-800"
@@ -153,7 +155,7 @@ export default async function ExpoSharedProposalPage({
           </div>
         )}
 
-        <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+        <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
           <p className="text-sm font-bold text-black">부스 개요</p>
           <ul className="mt-2 space-y-1 text-sm text-black/70">
             <li>
@@ -222,7 +224,7 @@ export default async function ExpoSharedProposalPage({
         </div>
 
         {(estimate || range) && (
-          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-black">예상 금액</p>
               <span
@@ -281,7 +283,7 @@ export default async function ExpoSharedProposalPage({
         )}
 
         {eventItems.length > 0 && (
-          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
             <p className="text-sm font-bold text-black">행사 규정 검토</p>
             <ul className="mt-2 space-y-1">
               {eventItems.map((item) => (
@@ -302,9 +304,11 @@ export default async function ExpoSharedProposalPage({
           </div>
         )}
 
-        <ProposalDecisionForm token={token} initialDecision={clientDecision} />
+        <div className="print:hidden">
+          <ProposalDecisionForm token={token} initialDecision={clientDecision} />
+        </div>
 
-        <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+        <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold text-black">제안 준비도</p>
             <span className="text-xs font-semibold text-black/45">
