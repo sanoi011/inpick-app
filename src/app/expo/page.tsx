@@ -36,6 +36,11 @@ import {
   type ExpoSceneHistory,
 } from "@/lib/expo/scene-history";
 import type { ExpoCameraPreset } from "@/components/expo/BoothShell3D";
+import {
+  buildCatalogEstimate,
+  buildConceptualRange,
+  formatKrw,
+} from "@/lib/expo/estimate";
 
 const CAMERA_PRESET_IDS: readonly ExpoCameraPreset[] = [
   "hero",
@@ -300,6 +305,25 @@ export default function ExpoBriefPage() {
       ],
     };
   }, [footprint, selectedLabel]);
+
+  // 견적 — 치수 확정 전엔 개념 범위, 확정 후엔 씬 기반 카탈로그 견적 (전부 allowance)
+  const conceptualRange = useMemo(() => {
+    if (!displayFootprint || confirmedDims) return null;
+    try {
+      return buildConceptualRange(displayFootprint.canonicalAreaSqm);
+    } catch {
+      return null;
+    }
+  }, [displayFootprint, confirmedDims]);
+
+  const catalogEstimate = useMemo(() => {
+    if (!confirmedDims) return null;
+    try {
+      return buildCatalogEstimate(scene, confirmedDims);
+    } catch {
+      return null;
+    }
+  }, [scene, confirmedDims]);
 
   return (
     <main
@@ -759,6 +783,96 @@ export default function ExpoBriefPage() {
                 </form>
               )}
             </div>
+
+            {(conceptualRange || catalogEstimate) && (
+              <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-black">예상 금액</p>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                      catalogEstimate
+                        ? "bg-blue-50 text-blue-700"
+                        : "bg-amber-50 text-amber-700"
+                    }`}
+                  >
+                    {catalogEstimate
+                      ? "카탈로그 견적 · 가정 단가"
+                      : "개념 범위 · 치수 확정 전"}
+                  </span>
+                </div>
+
+                {catalogEstimate ? (
+                  <>
+                    <ul className="mt-3 divide-y divide-black/[0.06]">
+                      {[...catalogEstimate.lines, ...catalogEstimate.markupLines].map(
+                        (line) => (
+                          <li
+                            key={line.id}
+                            className="flex items-baseline justify-between gap-3 py-1.5 text-xs"
+                          >
+                            <span className="min-w-0 flex-1 truncate font-medium text-black/70">
+                              {line.label}
+                              <span className="ml-1.5 text-black/40">
+                                {line.unit === "sqm"
+                                  ? `${line.quantity}㎡`
+                                  : line.unit === "ea"
+                                    ? `${line.quantity}개`
+                                    : line.unit === "pct"
+                                      ? `${line.quantity}%`
+                                      : "1식"}
+                              </span>
+                            </span>
+                            <span className="tabular-nums font-semibold text-black/80">
+                              {formatKrw(line.amountKrw)}
+                            </span>
+                          </li>
+                        ),
+                      )}
+                    </ul>
+                    <div className="mt-2 flex items-baseline justify-between border-t border-black/10 pt-2">
+                      <span className="text-sm font-bold text-black">
+                        합계 (부가세 별도)
+                      </span>
+                      <span className="tabular-nums text-lg font-bold text-blue-700">
+                        {formatKrw(catalogEstimate.totalKrw)}
+                      </span>
+                    </div>
+                  </>
+                ) : conceptualRange ? (
+                  <>
+                    <p className="mt-2 tabular-nums text-xl font-bold text-black">
+                      {formatKrw(conceptualRange.lowKrw)} ~{" "}
+                      {formatKrw(conceptualRange.highKrw)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-black/50">
+                      가정 면적 {conceptualRange.areaSqm}㎡ 기준 — 치수를
+                      확정하면 배치 기반 카탈로그 견적으로 전환됩니다.
+                    </p>
+                  </>
+                ) : null}
+
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[11px] font-semibold text-black/45">
+                    가정 및 제외 항목 보기
+                  </summary>
+                  <ul className="mt-1.5 space-y-1 text-[11px] leading-4 text-black/50">
+                    {(catalogEstimate ?? conceptualRange)?.assumptions.map(
+                      (assumption, index) => (
+                        <li key={index}>· {assumption}</li>
+                      ),
+                    )}
+                  </ul>
+                </details>
+
+                <button
+                  type="button"
+                  disabled
+                  className="mt-3 w-full cursor-not-allowed rounded-xl border border-black/10 bg-zinc-50 px-4 py-2.5 text-sm font-bold text-black/35"
+                >
+                  시공사 견적 요청 — 준비 중
+                </button>
+              </div>
+            )}
 
             <p role="status" className="mt-2 text-right text-[11px] font-medium text-black/40">
               {saveState === "saved"
