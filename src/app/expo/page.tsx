@@ -185,6 +185,9 @@ export default function ExpoBriefPage() {
   const [cloneState, setCloneState] = useState<"idle" | "loading" | "signed_out" | "error">("idle");
   const [cloneSelectedId, setCloneSelectedId] = useState<string | null>(null);
   const [cloneArea, setCloneArea] = useState("");
+  // 제안 공유 — provisional 상태에서도 가능 (라벨이 함께 공유됨)
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [shareState, setShareState] = useState<"idle" | "loading" | "copied" | "error">("idle");
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -404,6 +407,35 @@ export default function ExpoBriefPage() {
     setUnit("sqm");
     setAreaInput(String(kit.areaSqm));
     generate(kit.areaSqm, "sqm");
+  }
+
+  async function shareProposal() {
+    if (!serverProjectId || shareState === "loading") return;
+    setShareState("loading");
+    try {
+      const response = await fetch("/api/expo/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: serverProjectId }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        path?: string;
+      };
+      if (response.ok && payload.path) {
+        const url = `${window.location.origin}${payload.path}`;
+        setShareUrl(url);
+        try {
+          await navigator.clipboard.writeText(url);
+          setShareState("copied");
+        } catch {
+          setShareState("idle");
+        }
+      } else {
+        setShareState("error");
+      }
+    } catch {
+      setShareState("error");
+    }
   }
 
   function applyCloneReflow() {
@@ -1643,15 +1675,39 @@ export default function ExpoBriefPage() {
               </div>
             )}
 
-            <p role="status" className="mt-2 text-right text-[11px] font-medium text-black/40">
-              {saveState === "saved"
-                ? "서버에 저장됨"
-                : saveState === "saving"
-                  ? "서버 저장 중…"
-                  : saveState === "signed_out"
-                    ? "로그인하면 서버에 저장됩니다 (현재 이 기기에만 저장)"
-                    : "이 기기에 임시 저장됨"}
-            </p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              {serverProjectId ? (
+                <button
+                  type="button"
+                  onClick={shareProposal}
+                  disabled={shareState === "loading"}
+                  className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700 hover:bg-blue-100 disabled:opacity-50"
+                >
+                  {shareState === "loading"
+                    ? "링크 만드는 중…"
+                    : shareState === "copied"
+                      ? "링크 복사됨 ✓"
+                      : "제안 공유 링크"}
+                </button>
+              ) : (
+                <span />
+              )}
+              <p role="status" className="text-right text-[11px] font-medium text-black/40">
+                {saveState === "saved"
+                  ? "서버에 저장됨"
+                  : saveState === "saving"
+                    ? "서버 저장 중…"
+                    : saveState === "signed_out"
+                      ? "로그인하면 서버에 저장됩니다 (현재 이 기기에만 저장)"
+                      : "이 기기에 임시 저장됨"}
+              </p>
+            </div>
+            {shareUrl && (
+              <p className="mt-1 break-all rounded-lg bg-zinc-50 px-3 py-2 text-[11px] text-black/60">
+                {shareUrl}
+                {shareState === "error" && " — 복사 실패, 직접 복사해 주세요"}
+              </p>
+            )}
           </section>
         )}
 
