@@ -358,6 +358,58 @@ export default function ExpoBriefPage() {
     [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange],
   );
 
+  // AI 컨셉 — GPT Image 2 (본체 인픽과 동일 엔진·토큰 정책, 컨셉 전용)
+  const [conceptPrompt, setConceptPrompt] = useState("");
+  const [conceptImage, setConceptImage] = useState<string | null>(null);
+  const [conceptLoading, setConceptLoading] = useState(false);
+  const [conceptError, setConceptError] = useState<string | null>(null);
+
+  async function generateConcept() {
+    if (!displayFootprint || conceptLoading) return;
+    setConceptError(null);
+    setConceptLoading(true);
+    try {
+      const dims = confirmedDims ?? {
+        widthM: displayFootprint.selected.widthM,
+        depthM: displayFootprint.selected.depthM,
+        wallHeightM: displayFootprint.wallHeightM,
+        boothType: displayFootprint.boothType,
+      };
+      const response = await fetch("/api/expo/concept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          widthM: dims.widthM,
+          depthM: dims.depthM,
+          wallHeightM: dims.wallHeightM,
+          boothType: dims.boothType,
+          dimensionsConfirmed: Boolean(confirmedDims),
+          scene,
+          prompt: conceptPrompt,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        imageUrl?: string;
+        error?: string;
+      };
+      if (response.ok && payload.imageUrl) {
+        setConceptImage(payload.imageUrl);
+      } else if (response.status === 401) {
+        setConceptError("로그인 후 이용할 수 있습니다. (토큰 1개 사용)");
+      } else if (response.status === 402) {
+        setConceptError("토큰이 부족합니다 — 우측 상단에서 충전해 주세요.");
+      } else if (response.status === 503) {
+        setConceptError("AI 엔진이 아직 이 환경에 설정되지 않았습니다.");
+      } else {
+        setConceptError("컨셉 생성에 실패했습니다. 사용한 토큰은 자동 환불됩니다.");
+      }
+    } catch {
+      setConceptError("네트워크 오류 — 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setConceptLoading(false);
+    }
+  }
+
   return (
     <main
       className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white px-4 pb-8 sm:px-6"
@@ -522,6 +574,70 @@ export default function ExpoBriefPage() {
               cameraPreset={cameraPreset}
               onCameraPresetChange={setCameraPreset}
             />
+
+            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
+                  GPT Image 2 · 토큰 1개
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-black/50">
+                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
+                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
+                이후 데칼 단계에서 정확히 적용됩니다.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="expo-concept-prompt"
+                  type="text"
+                  value={conceptPrompt}
+                  maxLength={500}
+                  onChange={(e) => setConceptPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") generateConcept();
+                  }}
+                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
+                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                />
+                <button
+                  type="button"
+                  onClick={generateConcept}
+                  disabled={conceptLoading}
+                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
+                </button>
+              </div>
+              {conceptLoading && (
+                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+                  />
+                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
+                </p>
+              )}
+              {conceptError && (
+                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {conceptError}
+                </p>
+              )}
+              {conceptImage && !conceptLoading && (
+                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
+                  <img
+                    src={conceptImage}
+                    alt="AI 부스 컨셉 이미지"
+                    className="w-full"
+                  />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
+                    AI 컨셉 — 시공 기준 아님
+                  </span>
+                </div>
+              )}
+            </div>
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
             {scene && (
