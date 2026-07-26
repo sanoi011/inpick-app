@@ -122,6 +122,10 @@ interface CloneSourceProject {
   scene: unknown;
   brand: unknown;
   event: unknown;
+  confirmed_dimensions: unknown;
+  concept_image_url: string | null;
+  official_services: unknown;
+  estimate_overrides: unknown;
   quick_fields: { builderName?: string; clientName?: string; eventName?: string } | null;
   updated_at: string;
 }
@@ -546,6 +550,72 @@ export default function ExpoBriefPage() {
     }
   }
 
+  function resumeProject(project: CloneSourceProject) {
+    setError(null);
+    try {
+      const fp = createProvisionalFootprint(project.area_input, project.area_unit);
+      setStartMode("quick_area");
+      setUnit(project.area_unit);
+      setAreaInput(String(project.area_input));
+      setFootprint(fp);
+      setSelectedLabel(fp.selected.label);
+      setSelectedComponentId(null);
+      setServerProjectId(project.id); // 같은 프로젝트로 계속 저장
+      const savedConfirmed = project.confirmed_dimensions as ExpoConfirmedDimensions | null;
+      setConfirmedDims(savedConfirmed ?? null);
+      const savedScene = isExpoBoothScene(project.scene) ? project.scene : null;
+      setSceneHistory(
+        createSceneHistory(
+          savedScene ??
+            createExpoScene(
+              savedConfirmed?.widthM ?? fp.selected.widthM,
+              savedConfirmed?.depthM ?? fp.selected.depthM,
+            ),
+        ),
+      );
+      setBrandKit(isExpoBrandKit(project.brand) ? project.brand : null);
+      setEventInfo(
+        isExpoEventInfo(project.event) ? project.event : createEmptyEventInfo(),
+      );
+      setOfficialServices(
+        isExpoOfficialServices(project.official_services)
+          ? project.official_services
+          : createEmptyOfficialServices(),
+      );
+      setEstimateOverrides(
+        isExpoEstimateOverrides(project.estimate_overrides)
+          ? project.estimate_overrides
+          : {},
+      );
+      setConceptImage(
+        project.concept_image_url && project.concept_image_url.startsWith("https://")
+          ? project.concept_image_url
+          : null,
+      );
+      if (project.quick_fields) {
+        setBuilderName(project.quick_fields.builderName ?? "");
+        setClientName(project.quick_fields.clientName ?? "");
+        setEventName(project.quick_fields.eventName ?? "");
+      }
+      const dims = savedConfirmed ?? {
+        widthM: fp.selected.widthM,
+        depthM: fp.selected.depthM,
+        wallHeightM: fp.wallHeightM,
+      };
+      setDimWidth(String(dims.widthM));
+      setDimDepth(String(dims.depthM));
+      setDimHeight(String(dims.wallHeightM));
+      setProposal(null); // serverProjectId 효과가 서버에서 다시 로드
+      setClientDecision(null);
+    } catch (cause) {
+      setError(
+        cause instanceof ExpoFootprintError
+          ? footprintErrorMessage(cause.code)
+          : "프로젝트를 불러오지 못했습니다.",
+      );
+    }
+  }
+
   function applyCloneReflow() {
     const source = cloneProjects?.find((project) => project.id === cloneSelectedId);
     const area = Number(cloneArea);
@@ -948,6 +1018,15 @@ export default function ExpoBriefPage() {
                           {new Date(project.updated_at).toLocaleDateString("ko-KR")}
                         </span>
                       </button>
+                      {cloneSelectedId === project.id && (
+                        <button
+                          type="button"
+                          onClick={() => resumeProject(project)}
+                          className="mt-1 w-full rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700 hover:bg-green-100"
+                        >
+                          이 프로젝트 이어하기 (복제 아님 — 같은 프로젝트로 저장)
+                        </button>
+                      )}
                     </li>
                   ))}
                 </ul>
