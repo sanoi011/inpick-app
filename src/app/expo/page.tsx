@@ -153,7 +153,14 @@ export default function ExpoBriefPage() {
   }, [footprint, selectedLabel]);
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white px-4 py-8 sm:px-6">
+    <main
+      className="min-h-screen bg-gradient-to-b from-blue-50 via-white to-white px-4 pb-8 sm:px-6"
+      style={{
+        // 독립 iOS 셸(kr.inpick.expo)의 노치/상태바 안전영역 대응
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 2rem)",
+        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 2rem)",
+      }}
+    >
       <div className="mx-auto w-full max-w-2xl">
         <p className="text-xs font-bold tracking-[0.2em] text-blue-600">
           INPICK EXPO
