@@ -41,6 +41,21 @@ import {
   buildConceptualRange,
   formatKrw,
 } from "@/lib/expo/estimate";
+import {
+  EXPO_READINESS_STATE_LABELS,
+  evaluateProposalReadiness,
+  readinessPercent,
+  type ExpoReadinessState,
+} from "@/lib/expo/readiness";
+
+const READINESS_CHIP_CLASSES: Record<ExpoReadinessState, string> = {
+  unstarted: "bg-zinc-100 text-zinc-500",
+  assumed: "bg-amber-50 text-amber-700",
+  needs_review: "bg-orange-50 text-orange-700",
+  confirmed: "bg-green-50 text-green-700",
+  blocked: "bg-red-50 text-red-700",
+  stale: "bg-zinc-100 text-zinc-600",
+};
 
 const CAMERA_PRESET_IDS: readonly ExpoCameraPreset[] = [
   "hero",
@@ -324,6 +339,24 @@ export default function ExpoBriefPage() {
       return null;
     }
   }, [scene, confirmedDims]);
+
+  // 제안 준비도 — 항목별 상태를 숨기지 않는다 (§3.16)
+  const readiness = useMemo(
+    () =>
+      displayFootprint
+        ? evaluateProposalReadiness({
+            hasFootprint: true,
+            dimensionsConfirmed: Boolean(confirmedDims),
+            componentCount: scene?.components.length ?? 0,
+            priceStage: catalogEstimate
+              ? "catalog_estimate"
+              : conceptualRange
+                ? "conceptual_range"
+                : null,
+          })
+        : null,
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange],
+  );
 
   return (
     <main
@@ -871,6 +904,37 @@ export default function ExpoBriefPage() {
                 >
                   시공사 견적 요청 — 준비 중
                 </button>
+              </div>
+            )}
+
+            {readiness && (
+              <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-black">제안 준비도</p>
+                  <span className="text-xs font-semibold text-black/45">
+                    참고 진행률 {readinessPercent(readiness)}%
+                  </span>
+                </div>
+                <ul className="mt-2 space-y-1.5">
+                  {readiness.map((item) => (
+                    <li
+                      key={item.dimension}
+                      className="flex items-center gap-2 text-xs"
+                    >
+                      <span className="w-14 shrink-0 font-bold text-black/70">
+                        {item.label}
+                      </span>
+                      <span
+                        className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${READINESS_CHIP_CLASSES[item.state]}`}
+                      >
+                        {EXPO_READINESS_STATE_LABELS[item.state]}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate text-black/45">
+                        {item.detail}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </div>
             )}
 

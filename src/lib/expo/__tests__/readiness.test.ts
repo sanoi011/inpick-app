@@ -1,0 +1,65 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import {
+  evaluateProposalReadiness,
+  readinessPercent,
+} from "../readiness";
+
+function stateOf(
+  items: ReturnType<typeof evaluateProposalReadiness>,
+  dimension: string,
+) {
+  const item = items.find((i) => i.dimension === dimension);
+  assert.ok(item, `dimension missing: ${dimension}`);
+  return item.state;
+}
+
+test("empty brief starts everything unstarted", () => {
+  const items = evaluateProposalReadiness({
+    hasFootprint: false,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: null,
+  });
+  assert.equal(items.length, 7);
+  assert.ok(items.every((item) => item.state === "unstarted"));
+  assert.ok(items.every((item) => item.detail.length > 0));
+  assert.equal(readinessPercent(items), 0);
+});
+
+test("footprint promotes space and price to assumed, never confirmed", () => {
+  const items = evaluateProposalReadiness({
+    hasFootprint: true,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: "conceptual_range",
+  });
+  assert.equal(stateOf(items, "space"), "assumed");
+  assert.equal(stateOf(items, "price"), "assumed");
+  assert.equal(stateOf(items, "configuration"), "unstarted");
+});
+
+test("confirmed dimensions make space confirmed but price stays assumed", () => {
+  const items = evaluateProposalReadiness({
+    hasFootprint: true,
+    dimensionsConfirmed: true,
+    componentCount: 3,
+    priceStage: "catalog_estimate",
+  });
+  assert.equal(stateOf(items, "space"), "confirmed");
+  assert.equal(stateOf(items, "price"), "assumed");
+  assert.equal(stateOf(items, "configuration"), "assumed");
+  const config = items.find((i) => i.dimension === "configuration");
+  assert.ok(config?.detail.includes("3개"));
+});
+
+test("percent reflects mixed states and full pipeline is below 100 in v1", () => {
+  const items = evaluateProposalReadiness({
+    hasFootprint: true,
+    dimensionsConfirmed: true,
+    componentCount: 1,
+    priceStage: "catalog_estimate",
+  });
+  const percent = readinessPercent(items);
+  assert.ok(percent > 0 && percent < 100);
+});
