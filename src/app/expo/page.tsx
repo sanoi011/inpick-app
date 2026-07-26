@@ -42,6 +42,14 @@ import {
   formatKrw,
 } from "@/lib/expo/estimate";
 import {
+  createEmptyEventInfo,
+  evaluateEventRules,
+  hasEventRuleInput,
+  hasEventRuleViolation,
+  isExpoEventInfo,
+  type ExpoEventInfo,
+} from "@/lib/expo/event-rules";
+import {
   isExpoBrandKit,
   type ExpoBrandCandidates,
   type ExpoBrandKit,
@@ -100,6 +108,7 @@ interface ExpoBriefDraft {
   /** Storage URL만 저장 (data URL 금지 — localStorage 용량 보호) */
   conceptImageUrl?: string;
   brandKit?: ExpoBrandKit;
+  eventInfo?: ExpoEventInfo;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -157,6 +166,8 @@ export default function ExpoBriefPage() {
   const [brandLogoPick, setBrandLogoPick] = useState<string | null>(null);
   const [brandColorPick, setBrandColorPick] = useState<string | null>(null);
   const [brandKit, setBrandKit] = useState<ExpoBrandKit | null>(null);
+  // 행사 규정 — 전부 사용자가 행사 매뉴얼에서 입력한 값 (source = 사용자 입력)
+  const [eventInfo, setEventInfo] = useState<ExpoEventInfo>(createEmptyEventInfo);
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -211,6 +222,7 @@ export default function ExpoBriefPage() {
             setConceptImage(draft.conceptImageUrl);
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
+          if (isExpoEventInfo(draft.eventInfo)) setEventInfo(draft.eventInfo);
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -238,6 +250,7 @@ export default function ExpoBriefPage() {
           ? conceptImage
           : undefined,
       brandKit: brandKit ?? undefined,
+      eventInfo,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -246,7 +259,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -279,6 +292,7 @@ export default function ExpoBriefPage() {
                 ? conceptImage
                 : null,
             brand: brandKit,
+            event: { ...eventInfo, eventName: eventInfo.eventName || eventName },
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -296,7 +310,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, brandKit, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -379,6 +393,20 @@ export default function ExpoBriefPage() {
     }
   }, [scene, confirmedDims]);
 
+  // 행사 규정 검토 — 사용자 입력값 기준 (source 명시)
+  const mergedEventInfo = useMemo(
+    () => ({ ...eventInfo, eventName: eventInfo.eventName || eventName }),
+    [eventInfo, eventName],
+  );
+  const eventReviewItems = useMemo(
+    () =>
+      evaluateEventRules(
+        mergedEventInfo,
+        confirmedDims?.wallHeightM ?? displayFootprint?.wallHeightM ?? null,
+      ),
+    [mergedEventInfo, confirmedDims, displayFootprint],
+  );
+
   // 제안 준비도 — 항목별 상태를 숨기지 않는다 (§3.16)
   const readiness = useMemo(
     () =>
@@ -393,9 +421,13 @@ export default function ExpoBriefPage() {
                 ? "conceptual_range"
                 : null,
             brandConfirmed: Boolean(brandKit),
+            eventRules: {
+              entered: hasEventRuleInput(mergedEventInfo),
+              violation: hasEventRuleViolation(eventReviewItems),
+            },
           })
         : null,
-    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit],
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems],
   );
 
   async function importBrand() {
@@ -1191,6 +1223,123 @@ export default function ExpoBriefPage() {
                     </p>
                   )}
                 </form>
+              )}
+            </div>
+
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">행사 규정</p>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    hasEventRuleViolation(eventReviewItems)
+                      ? "bg-red-50 text-red-700"
+                      : hasEventRuleInput(mergedEventInfo)
+                        ? "bg-green-50 text-green-700"
+                        : "bg-zinc-100 text-zinc-500"
+                  }`}
+                >
+                  {hasEventRuleViolation(eventReviewItems)
+                    ? "위반 있음"
+                    : hasEventRuleInput(mergedEventInfo)
+                      ? "매뉴얼 기준 입력됨"
+                      : "미입력"}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-black/50">
+                행사 매뉴얼의 값을 직접 입력하세요 — 입력된 값만 검토 기준이
+                되며, 일반 규칙을 가정하지 않습니다.
+              </p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["expo-event-venue", "장소", "text", eventInfo.venue, (v: string) => setEventInfo((s) => ({ ...s, venue: v }))],
+                    ["expo-event-booth", "부스 번호", "text", eventInfo.boothNumber, (v: string) => setEventInfo((s) => ({ ...s, boothNumber: v }))],
+                  ] as const
+                ).map(([id, label, type, value, setter]) => (
+                  <div key={id}>
+                    <label htmlFor={id} className="block text-[11px] font-semibold text-black/60">
+                      {label}
+                    </label>
+                    <input
+                      id={id}
+                      type={type}
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label htmlFor="expo-event-maxh" className="block text-[11px] font-semibold text-black/60">
+                    허용 높이 (m)
+                  </label>
+                  <input
+                    id="expo-event-maxh"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="0"
+                    value={eventInfo.maxHeightM ?? ""}
+                    onChange={(e) =>
+                      setEventInfo((s) => ({
+                        ...s,
+                        maxHeightM: e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="expo-event-power" className="block text-[11px] font-semibold text-black/60">
+                    전기 용량 (kW)
+                  </label>
+                  <input
+                    id="expo-event-power"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.5"
+                    min="0"
+                    value={eventInfo.powerKw ?? ""}
+                    onChange={(e) =>
+                      setEventInfo((s) => ({
+                        ...s,
+                        powerKw: e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+              </div>
+              <div className="mt-2">
+                <label htmlFor="expo-event-source" className="block text-[11px] font-semibold text-black/60">
+                  출처 메모 (예: 매뉴얼 p.12)
+                </label>
+                <input
+                  id="expo-event-source"
+                  type="text"
+                  value={eventInfo.sourceNote}
+                  onChange={(e) => setEventInfo((s) => ({ ...s, sourceNote: e.target.value }))}
+                  className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              {eventReviewItems.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {eventReviewItems.map((item) => (
+                    <li
+                      key={item.code}
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
+                        item.severity === "violation"
+                          ? "bg-red-50 text-red-700"
+                          : item.severity === "warning"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {item.severity === "violation" ? "✕ " : item.severity === "warning" ? "⚠ " : "✓ "}
+                      {item.message}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 

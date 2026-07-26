@@ -47,6 +47,8 @@ export interface ExpoReadinessInput {
   priceStage: "conceptual_range" | "catalog_estimate" | null;
   /** 사용자가 브랜드 킷을 확정(사용 권한 확인 포함)했는가 */
   brandConfirmed?: boolean;
+  /** 행사 규정 — 입력 여부와 위반 여부 (event-rules.ts 계산 결과) */
+  eventRules?: { entered: boolean; violation: boolean };
 }
 
 export function evaluateProposalReadiness(
@@ -58,6 +60,7 @@ export function evaluateProposalReadiness(
     componentCount,
     priceStage,
     brandConfirmed = false,
+    eventRules = { entered: false, violation: false },
   } = input;
 
   const space: ExpoReadinessItem = dimensionsConfirmed
@@ -135,12 +138,26 @@ export function evaluateProposalReadiness(
         },
     configuration,
     price,
-    {
-      dimension: "event_rules",
-      label: "행사 규정",
-      state: "unstarted",
-      detail: "행사 매뉴얼 등록 기능 준비 중",
-    },
+    eventRules.violation
+      ? {
+          dimension: "event_rules" as const,
+          label: "행사 규정",
+          state: "blocked" as const,
+          detail: "입력한 매뉴얼 기준 위반 항목 있음 — 검토 필요",
+        }
+      : eventRules.entered
+        ? {
+            dimension: "event_rules" as const,
+            label: "행사 규정",
+            state: "confirmed" as const,
+            detail: "행사 매뉴얼 기준 값 입력됨 (사용자 입력)",
+          }
+        : {
+            dimension: "event_rules" as const,
+            label: "행사 규정",
+            state: "unstarted" as const,
+            detail: "행사 매뉴얼의 허용 높이·전기 용량을 입력하세요",
+          },
     {
       dimension: "official_services",
       label: "공식 서비스",

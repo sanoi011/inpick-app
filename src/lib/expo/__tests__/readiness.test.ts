@@ -81,3 +81,27 @@ test("brand confirms only through the user's rights-confirmed kit", () => {
   });
   assert.equal(stateOf(withBrand, "brand"), "confirmed");
 });
+
+test("event rules confirm on input and block on violation", () => {
+  const base = {
+    hasFootprint: true,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: "conceptual_range" as const,
+  };
+  assert.equal(stateOf(evaluateProposalReadiness(base), "event_rules"), "unstarted");
+  assert.equal(
+    stateOf(
+      evaluateProposalReadiness({ ...base, eventRules: { entered: true, violation: false } }),
+      "event_rules",
+    ),
+    "confirmed",
+  );
+  assert.equal(
+    stateOf(
+      evaluateProposalReadiness({ ...base, eventRules: { entered: true, violation: true } }),
+      "event_rules",
+    ),
+    "blocked",
+  );
+});

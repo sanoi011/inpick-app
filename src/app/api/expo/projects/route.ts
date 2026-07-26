@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isExpoBrandKit } from "@/lib/expo/brand-import";
+import { isExpoEventInfo } from "@/lib/expo/event-rules";
 
 export const dynamic = "force-dynamic";
 
@@ -26,7 +27,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("expo_projects")
     .select(
-      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, quick_fields, updated_at",
+      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, updated_at",
     )
     .eq("status", "draft")
     .order("updated_at", { ascending: false })
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
     scene?: unknown;
     conceptImageUrl?: unknown;
     brand?: unknown;
+    event?: unknown;
     quickFields?: unknown;
   };
   try {
@@ -100,6 +102,7 @@ export async function POST(request: NextRequest) {
         ? body.conceptImageUrl.slice(0, 2000)
         : null,
     brand: isExpoBrandKit(body.brand) ? body.brand : null,
+    event: isExpoEventInfo(body.event) ? body.event : null,
     concept_generated_at:
       typeof body.conceptImageUrl === "string" &&
       /^https:\/\//.test(body.conceptImageUrl)
