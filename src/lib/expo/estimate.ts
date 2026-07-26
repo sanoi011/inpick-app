@@ -441,3 +441,56 @@ export function buildCatalogEstimate(
 export function formatKrw(amount: number): string {
   return `${amount.toLocaleString("ko-KR")}원`;
 }
+
+const CSV_UNIT_LABELS: Record<ExpoEstimateLine["unit"], string> = {
+  sqm: "㎡",
+  ea: "개",
+  lot: "식",
+  pct: "%",
+  kw: "kW",
+};
+
+/**
+ * 견적 → CSV (엑셀 호환 UTF-8 BOM). 소스 상태 컬럼으로 allowance/quoted를
+ * 그대로 노출한다 — 내보내기에서도 가정을 숨기지 않는다.
+ */
+export function estimateToCsv(estimate: ExpoCatalogEstimate): string {
+  const escape = (value: string) => `"${value.replace(/"/g, '""')}"`;
+  const rows: string[] = [
+    ["구분", "공종", "항목", "수량", "단위", "단가(원)", "금액(원)", "금액 소스"].join(","),
+  ];
+  for (const line of estimate.lines) {
+    rows.push(
+      [
+        "직접비",
+        escape(EXPO_TRADE_LABELS[line.trade]),
+        escape(line.label),
+        String(line.quantity),
+        CSV_UNIT_LABELS[line.unit],
+        String(line.unitAmountKrw),
+        String(line.amountKrw),
+        EXPO_MONEY_SOURCE_LABELS[line.source],
+      ].join(","),
+    );
+  }
+  for (const line of estimate.markupLines) {
+    rows.push(
+      [
+        "요율",
+        escape(EXPO_TRADE_LABELS[line.trade]),
+        escape(line.label),
+        String(line.quantity),
+        "%",
+        "",
+        String(line.amountKrw),
+        EXPO_MONEY_SOURCE_LABELS[line.source],
+      ].join(","),
+    );
+  }
+  rows.push(["합계(부가세 별도)", "", "", "", "", "", String(estimate.totalKrw), ""].join(","));
+  rows.push([]. join(","));
+  for (const assumption of estimate.assumptions) {
+    rows.push(["가정", escape(assumption)].join(","));
+  }
+  return "\ufeff" + rows.join("\r\n");
+}

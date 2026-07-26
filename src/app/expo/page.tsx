@@ -40,6 +40,7 @@ import {
   EXPO_MONEY_SOURCE_LABELS,
   buildCatalogEstimate,
   buildConceptualRange,
+  estimateToCsv,
   formatKrw,
   isExpoEstimateOverrides,
   type ExpoEstimateOverrides,
@@ -465,6 +466,19 @@ export default function ExpoBriefPage() {
     setUnit("sqm");
     setAreaInput(String(kit.areaSqm));
     generate(kit.areaSqm, "sqm");
+  }
+
+  function downloadEstimateCsv() {
+    if (!catalogEstimate) return;
+    const blob = new Blob([estimateToCsv(catalogEstimate)], {
+      type: "text/csv;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `inpick-expo-estimate-${catalogEstimate.areaSqm}sqm.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   }
 
   async function shareProposal() {
@@ -1786,6 +1800,13 @@ export default function ExpoBriefPage() {
                         {formatKrw(catalogEstimate.totalKrw)}
                       </span>
                     </div>
+                    <button
+                      type="button"
+                      onClick={downloadEstimateCsv}
+                      className="mt-2 rounded-lg border border-black/15 px-3 py-1.5 text-[11px] font-bold text-black/70 hover:bg-zinc-50"
+                    >
+                      BOM/견적 CSV 내보내기
+                    </button>
                   </>
                 ) : conceptualRange ? (
                   <>

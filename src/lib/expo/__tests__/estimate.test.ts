@@ -7,6 +7,7 @@ import {
   ExpoEstimateError,
   buildCatalogEstimate,
   buildConceptualRange,
+  estimateToCsv,
 } from "../estimate";
 
 const CONFIRMED_6X3 = confirmExpoDimensions(
@@ -182,4 +183,21 @@ test("invalid or unknown overrides are ignored, staying allowance", () => {
   });
   assert.equal(estimate.quotedLineCount, 0);
   assert.ok(estimate.lines.every((line) => line.source === "allowance"));
+});
+
+test("csv export carries source states, totals and assumptions", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "signage_tower", "t1");
+  const estimate = buildCatalogEstimate(scene, CONFIRMED_6X3, {
+    overrides: { component_signage_tower: { unitAmountKrw: 500_000 } },
+  });
+  const csv = estimateToCsv(estimate);
+  assert.ok(csv.startsWith("﻿"));
+  assert.ok(csv.includes("금액 소스"));
+  assert.ok(csv.includes("견적 접수")); // quoted 라인
+  assert.ok(csv.includes("가정 단가")); // allowance 라인
+  assert.ok(csv.includes(String(estimate.totalKrw)));
+  assert.ok(csv.includes("부가세 별도"));
+  const lineCount = csv.split("\r\n").length;
+  assert.ok(lineCount >= estimate.lines.length + estimate.markupLines.length + 3);
 });
