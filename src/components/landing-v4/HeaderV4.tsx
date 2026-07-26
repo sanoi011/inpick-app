@@ -136,6 +136,16 @@ export default function HeaderV4({ variant = "overlay" }: { variant?: "overlay" 
           커뮤니티
         </a>
 
+        {/* 엑스포 — 전시부스 CPQ. 모바일 폭에서는 메뉴가 넘쳐 sm 이상에서만 노출 */}
+        <a
+          href="/expo"
+          className={`hidden shrink-0 items-center whitespace-nowrap rounded-full px-2.5 py-2 text-[13px] font-bold tracking-tight transition-colors sm:inline-flex sm:px-3 sm:text-[14px] ${
+            isDark ? "text-offwhite hover:bg-offwhite/10" : "text-ink hover:bg-ink/5"
+          }`}
+        >
+          엑스포
+        </a>
+
         {/* 메인 카테고리 nav (데스크탑) */}
         <div className="hidden xl:flex items-center gap-0.5 flex-1 justify-center">
           {MAIN_CATEGORIES.map((c) => (

@@ -30,6 +30,7 @@ const NAV_ITEMS = [
   { label: "부분 AI 인테리어", href: "/partial-ai" },
   { label: "부분시공", href: "/partial-install" },
   { label: "시공사", href: "/find-contractors" },
+  { label: "엑스포", href: "/expo" },
   { label: "커뮤니티", href: "/community" },
 ];
 
@@ -121,6 +122,7 @@ const FOOTER_LINKS = [
       { label: "부분 AI 인테리어", href: "/partial-ai" },
       { label: "부분시공", href: "/partial-install" },
       { label: "시공사 찾기", href: "/find-contractors" },
+      { label: "엑스포 부스 디자인", href: "/expo" },
     ],
   },
   {
