@@ -30,6 +30,8 @@ import { isExpoClientDecision } from "@/lib/expo/client-decision";
 import { isExpoProposalSnapshot, isProposalStale } from "@/lib/expo/proposal";
 import ProposalDecisionForm from "@/components/expo/ProposalDecisionForm";
 import PrintProposalButton from "@/components/expo/PrintProposalButton";
+import SharedBoothView from "@/components/expo/SharedBoothView";
+import type { ExpoProvisionalFootprint } from "@/lib/expo/footprint";
 
 /**
  * 공개 읽기전용 제안 페이지 — 공유 토큰으로만 접근 (service role 조회).
@@ -129,6 +131,30 @@ export default async function ExpoSharedProposalPage({
       : false,
   });
 
+  // 읽기전용 3D — 저장된 footprint가 구조적으로 유효할 때만
+  const rawFootprint = project.footprint as ExpoProvisionalFootprint | null;
+  const viewFootprint =
+    rawFootprint &&
+    typeof rawFootprint.selected?.widthM === "number" &&
+    typeof rawFootprint.selected?.depthM === "number" &&
+    typeof rawFootprint.wallHeightM === "number"
+      ? confirmed
+        ? {
+            ...rawFootprint,
+            selected: {
+              widthM: confirmed.widthM,
+              depthM: confirmed.depthM,
+              areaSqm: confirmed.areaSqm,
+              standardMatch: false,
+              label: `${confirmed.widthM}m × ${confirmed.depthM}m`,
+            },
+            boothType: confirmed.boothType,
+            openSides: confirmed.openSides,
+            wallHeightM: confirmed.wallHeightM,
+          }
+        : rawFootprint
+      : null;
+
   const componentCounts = new Map<string, number>();
   for (const component of scene?.components ?? []) {
     componentCounts.set(
@@ -154,6 +180,16 @@ export default async function ExpoSharedProposalPage({
           이 페이지는 검토용 제안 공유본입니다 — 시공 확정 문서가 아니며, 모든
           금액은 가정(allowance) 단가 기준입니다.
         </p>
+
+        {viewFootprint && (
+          <SharedBoothView
+            footprint={viewFootprint}
+            confirmed={Boolean(confirmed)}
+            scene={scene}
+            brandColorHex={brand?.colorHex ?? null}
+            brandLogoUrl={brand?.logoUrl ?? null}
+          />
+        )}
 
         {project.concept_image_url && (
           <div className="relative mt-4 overflow-hidden rounded-2xl border border-black/10">
