@@ -92,6 +92,8 @@ interface ExpoBriefDraft {
   confirmedDimensions: ExpoConfirmedDimensions | null;
   scene: ExpoBoothScene | null;
   cameraPreset?: ExpoCameraPreset;
+  /** Storage URL만 저장 (data URL 금지 — localStorage 용량 보호) */
+  conceptImageUrl?: string;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -135,6 +137,11 @@ export default function ExpoBriefPage() {
   const scene = sceneHistory.present;
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [cameraPreset, setCameraPreset] = useState<ExpoCameraPreset>("hero");
+  // AI 컨셉 — GPT Image 2 (본체 인픽과 동일 엔진·토큰 정책, 컨셉 전용)
+  const [conceptPrompt, setConceptPrompt] = useState("");
+  const [conceptImage, setConceptImage] = useState<string | null>(null);
+  const [conceptLoading, setConceptLoading] = useState(false);
+  const [conceptError, setConceptError] = useState<string | null>(null);
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -182,6 +189,12 @@ export default function ExpoBriefPage() {
           if (draft.cameraPreset && CAMERA_PRESET_IDS.includes(draft.cameraPreset)) {
             setCameraPreset(draft.cameraPreset);
           }
+          if (
+            typeof draft.conceptImageUrl === "string" &&
+            draft.conceptImageUrl.startsWith("https://")
+          ) {
+            setConceptImage(draft.conceptImageUrl);
+          }
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -204,6 +217,10 @@ export default function ExpoBriefPage() {
       confirmedDimensions: confirmedDims,
       scene,
       cameraPreset,
+      conceptImageUrl:
+        conceptImage && conceptImage.startsWith("https://")
+          ? conceptImage
+          : undefined,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -212,7 +229,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -240,6 +257,10 @@ export default function ExpoBriefPage() {
             footprint,
             confirmedDimensions: confirmedDims,
             scene,
+            conceptImageUrl:
+              conceptImage && conceptImage.startsWith("https://")
+                ? conceptImage
+                : null,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -257,7 +278,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -357,12 +378,6 @@ export default function ExpoBriefPage() {
         : null,
     [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange],
   );
-
-  // AI 컨셉 — GPT Image 2 (본체 인픽과 동일 엔진·토큰 정책, 컨셉 전용)
-  const [conceptPrompt, setConceptPrompt] = useState("");
-  const [conceptImage, setConceptImage] = useState<string | null>(null);
-  const [conceptLoading, setConceptLoading] = useState(false);
-  const [conceptError, setConceptError] = useState<string | null>(null);
 
   async function generateConcept() {
     if (!displayFootprint || conceptLoading) return;

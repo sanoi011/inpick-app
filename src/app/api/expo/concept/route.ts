@@ -10,6 +10,7 @@ import {
   buildBoothConceptPrompt,
 } from "@/lib/expo/concept-prompt";
 import { isExpoBoothScene } from "@/lib/expo/scene";
+import { ensureStorageUrl } from "@/lib/inpick/storage/image-storage";
 
 /**
  * POST /api/expo/concept — 부스 AI 컨셉 이미지 1장 (GPT Image 2).
@@ -116,8 +117,23 @@ export async function POST(request: NextRequest) {
           errors.push(`${size}: 응답에 이미지 데이터 없음`);
           continue;
         }
+        // Storage 업로드 후 URL 반환 — 실패해도 생성 결과는 잃지 않는다
+        const dataUrl = `data:image/png;base64,${b64}`;
+        let imageUrl = dataUrl;
+        try {
+          imageUrl = await ensureStorageUrl(dataUrl, {
+            jobId: `expo-${charge.userId.slice(0, 8)}-${Date.now().toString(36)}`,
+            roomName: "booth-concept",
+            modelVersion: "gpt-image-2",
+          });
+        } catch (storageCause) {
+          console.error(
+            "[expo-concept] storage upload failed, returning data URL:",
+            storageCause instanceof Error ? storageCause.message : storageCause,
+          );
+        }
         return NextResponse.json({
-          imageUrl: `data:image/png;base64,${b64}`,
+          imageUrl,
           model: data.model || "gpt-image-2",
           label: "ai_concept",
           charged: charge.charged,

@@ -25,7 +25,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("expo_projects")
     .select(
-      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, quick_fields, updated_at",
+      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, quick_fields, updated_at",
     )
     .eq("status", "draft")
     .order("updated_at", { ascending: false })
@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
     footprint?: unknown;
     confirmedDimensions?: unknown;
     scene?: unknown;
+    conceptImageUrl?: unknown;
     quickFields?: unknown;
   };
   try {
@@ -90,6 +91,17 @@ export async function POST(request: NextRequest) {
         ? body.confirmedDimensions
         : null,
     scene: body.scene && typeof body.scene === "object" ? body.scene : null,
+    // data URL은 저장하지 않는다 (행 비대 방지) — Storage URL만
+    concept_image_url:
+      typeof body.conceptImageUrl === "string" &&
+      /^https:\/\//.test(body.conceptImageUrl)
+        ? body.conceptImageUrl.slice(0, 2000)
+        : null,
+    concept_generated_at:
+      typeof body.conceptImageUrl === "string" &&
+      /^https:\/\//.test(body.conceptImageUrl)
+        ? new Date().toISOString()
+        : null,
     quick_fields:
       body.quickFields && typeof body.quickFields === "object"
         ? body.quickFields
