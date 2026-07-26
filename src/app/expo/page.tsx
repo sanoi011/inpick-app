@@ -25,6 +25,24 @@ import {
   rotateExpoComponent,
   type ExpoBoothScene,
 } from "@/lib/expo/scene";
+import {
+  applySceneChange,
+  canRedoScene,
+  canUndoScene,
+  createSceneHistory,
+  redoScene,
+  resetSceneHistory,
+  undoScene,
+  type ExpoSceneHistory,
+} from "@/lib/expo/scene-history";
+import type { ExpoCameraPreset } from "@/components/expo/BoothShell3D";
+
+const CAMERA_PRESET_IDS: readonly ExpoCameraPreset[] = [
+  "hero",
+  "front",
+  "top",
+  "visitor",
+];
 
 const BoothShell3D = dynamic(() => import("@/components/expo/BoothShell3D"), {
   ssr: false,
@@ -53,6 +71,7 @@ interface ExpoBriefDraft {
   selectedCandidateLabel: string | null;
   confirmedDimensions: ExpoConfirmedDimensions | null;
   scene: ExpoBoothScene | null;
+  cameraPreset?: ExpoCameraPreset;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -90,8 +109,30 @@ export default function ExpoBriefPage() {
   const [dimDepth, setDimDepth] = useState("");
   const [dimHeight, setDimHeight] = useState("2.5");
   const [dimBoothType, setDimBoothType] = useState<ExpoBoothType>("inline");
-  const [scene, setScene] = useState<ExpoBoothScene | null>(null);
+  const [sceneHistory, setSceneHistory] = useState<ExpoSceneHistory>(() =>
+    createSceneHistory(null),
+  );
+  const scene = sceneHistory.present;
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [cameraPreset, setCameraPreset] = useState<ExpoCameraPreset>("hero");
+
+  function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
+    setSceneHistory((history) =>
+      history.present ? applySceneChange(history, op(history.present)) : history,
+    );
+  }
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "z") return;
+      const target = event.target as HTMLElement | null;
+      if (target && /^(input|textarea|select)$/i.test(target.tagName)) return;
+      event.preventDefault();
+      setSceneHistory(event.shiftKey ? redoScene : undoScene);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // 초기 복구 — 로컬 임시 저장분 (서버 저장은 다음 슬라이스, UI에 정직하게 표기)
   useEffect(() => {
@@ -114,7 +155,13 @@ export default function ExpoBriefPage() {
           setSelectedLabel(draft.selectedCandidateLabel);
           setConfirmedDims(draft.confirmedDimensions);
           setServerProjectId(draft.serverProjectId);
-          if (isExpoBoothScene(draft.scene)) setScene(draft.scene);
+          const restoredScene = draft.scene;
+          if (isExpoBoothScene(restoredScene)) {
+            setSceneHistory(createSceneHistory(restoredScene));
+          }
+          if (draft.cameraPreset && CAMERA_PRESET_IDS.includes(draft.cameraPreset)) {
+            setCameraPreset(draft.cameraPreset);
+          }
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -136,6 +183,7 @@ export default function ExpoBriefPage() {
       selectedCandidateLabel: selectedLabel,
       confirmedDimensions: confirmedDims,
       scene,
+      cameraPreset,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -144,7 +192,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -199,10 +247,13 @@ export default function ExpoBriefPage() {
       setSelectedLabel(fp.selected.label);
       setConfirmedDims(null);
       setSelectedComponentId(null);
-      setScene((prev) =>
-        prev && prev.components.length > 0
-          ? resizeExpoScene(prev, fp.selected.widthM, fp.selected.depthM)
-          : createExpoScene(fp.selected.widthM, fp.selected.depthM),
+      setSceneHistory((history) =>
+        resetSceneHistory(
+          history,
+          history.present && history.present.components.length > 0
+            ? resizeExpoScene(history.present, fp.selected.widthM, fp.selected.depthM)
+            : createExpoScene(fp.selected.widthM, fp.selected.depthM),
+        ),
       );
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
@@ -411,6 +462,8 @@ export default function ExpoBriefPage() {
               scene={scene}
               selectedComponentId={selectedComponentId}
               onSelectComponent={setSelectedComponentId}
+              cameraPreset={cameraPreset}
+              onCameraPresetChange={setCameraPreset}
             />
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
@@ -418,9 +471,29 @@ export default function ExpoBriefPage() {
               <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-black">부스 구성 요소</p>
-                  <span className="text-xs text-black/45">
-                    {scene.components.length}개 배치됨
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-label="되돌리기"
+                      disabled={!canUndoScene(sceneHistory)}
+                      onClick={() => setSceneHistory(undoScene)}
+                      className="h-7 rounded-lg border border-black/15 px-2.5 text-xs font-bold text-black/70 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      ↺ 되돌리기
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="다시 실행"
+                      disabled={!canRedoScene(sceneHistory)}
+                      onClick={() => setSceneHistory(redoScene)}
+                      className="h-7 rounded-lg border border-black/15 px-2.5 text-xs font-bold text-black/70 hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      ↻
+                    </button>
+                    <span className="text-xs text-black/45">
+                      {scene.components.length}개 배치됨
+                    </span>
+                  </div>
                 </div>
                 <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
                   {EXPO_BASE_CATALOG.map((item) => (
@@ -429,8 +502,8 @@ export default function ExpoBriefPage() {
                       type="button"
                       onClick={() => {
                         const componentId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-                        setScene((prev) =>
-                          prev ? addExpoComponent(prev, item.catalogId, componentId) : prev,
+                        updateScene((current) =>
+                          addExpoComponent(current, item.catalogId, componentId),
                         );
                         setSelectedComponentId(componentId);
                       }}
@@ -470,10 +543,8 @@ export default function ExpoBriefPage() {
                           type="button"
                           aria-label={aria}
                           onClick={() =>
-                            setScene((prev) =>
-                              prev
-                                ? moveExpoComponent(prev, selectedComponentId, dx, dz)
-                                : prev,
+                            updateScene((current) =>
+                              moveExpoComponent(current, selectedComponentId, dx, dz),
                             )
                           }
                           className="h-9 w-9 rounded-lg border border-blue-200 bg-white text-sm font-bold text-blue-700 hover:bg-blue-100"
@@ -484,10 +555,8 @@ export default function ExpoBriefPage() {
                       <button
                         type="button"
                         onClick={() =>
-                          setScene((prev) =>
-                            prev
-                              ? rotateExpoComponent(prev, selectedComponentId)
-                              : prev,
+                          updateScene((current) =>
+                            rotateExpoComponent(current, selectedComponentId),
                           )
                         }
                         className="h-9 rounded-lg border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 hover:bg-blue-100"
@@ -497,10 +566,8 @@ export default function ExpoBriefPage() {
                       <button
                         type="button"
                         onClick={() => {
-                          setScene((prev) =>
-                            prev
-                              ? removeExpoComponent(prev, selectedComponentId)
-                              : prev,
+                          updateScene((current) =>
+                            removeExpoComponent(current, selectedComponentId),
                           );
                           setSelectedComponentId(null);
                         }}
@@ -609,10 +676,13 @@ export default function ExpoBriefPage() {
                         },
                         new Date().toISOString(),
                       );
-                      setScene((prev) =>
-                        prev
-                          ? resizeExpoScene(prev, next.widthM, next.depthM)
-                          : createExpoScene(next.widthM, next.depthM),
+                      setSceneHistory((history) =>
+                        resetSceneHistory(
+                          history,
+                          history.present
+                            ? resizeExpoScene(history.present, next.widthM, next.depthM)
+                            : createExpoScene(next.widthM, next.depthM),
+                        ),
                       );
                       setConfirmedDims(next);
 

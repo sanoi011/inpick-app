@@ -1,7 +1,7 @@
 "use client";
 
 import { Component, type ReactNode, useEffect, useMemo, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { ExpoProvisionalFootprint } from "@/lib/expo/footprint";
 import {
@@ -15,7 +15,18 @@ import {
  * 가정(provisional)임을 화면에 상시 표기한다. 이 셸은 컨셉 확인용이며
  * 치수 확정 전 BOM/제안서의 근거가 되지 않는다.
  */
+export type ExpoCameraPreset = "hero" | "front" | "top" | "visitor";
+
+export const EXPO_CAMERA_PRESETS: Array<{ id: ExpoCameraPreset; label: string }> = [
+  { id: "hero", label: "기본" },
+  { id: "front", label: "정면" },
+  { id: "top", label: "탑뷰" },
+  { id: "visitor", label: "관람객" },
+];
+
 export interface BoothSceneViewProps {
+  cameraPreset?: ExpoCameraPreset;
+  onCameraPresetChange?: (preset: ExpoCameraPreset) => void;
   scene?: ExpoBoothScene | null;
   selectedComponentId?: string | null;
   onSelectComponent?: (id: string | null) => void;
@@ -27,6 +38,8 @@ export default function BoothShell3D({
   scene = null,
   selectedComponentId = null,
   onSelectComponent,
+  cameraPreset = "hero",
+  onCameraPresetChange,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -105,6 +118,8 @@ export default function BoothShell3D({
         scene={scene}
         selectedComponentId={selectedComponentId}
         onSelectComponent={onSelectComponent}
+        cameraPreset={cameraPreset}
+        onCameraPresetChange={onCameraPresetChange}
       />
     </ShellErrorBoundary>
   );
@@ -177,12 +192,60 @@ class ShellErrorBoundary extends Component<
   }
 }
 
+function CameraRig({
+  preset,
+  width,
+  depth,
+  wallHeight,
+}: {
+  preset: ExpoCameraPreset;
+  width: number;
+  depth: number;
+  wallHeight: number;
+}) {
+  const camera = useThree((state) => state.camera);
+  const controls = useThree((state) => state.controls) as {
+    target?: { set: (x: number, y: number, z: number) => void };
+    update?: () => void;
+  } | null;
+
+  useEffect(() => {
+    const r = Math.max(width, depth);
+    const views: Record<
+      ExpoCameraPreset,
+      { position: [number, number, number]; target: [number, number, number] }
+    > = {
+      hero: {
+        position: [r * 0.9, r * 0.75, r * 1.25],
+        target: [0, wallHeight / 3, 0],
+      },
+      front: {
+        position: [0, wallHeight * 0.55, r * 1.7],
+        target: [0, wallHeight / 2.5, 0],
+      },
+      top: { position: [0, r * 2.4, 0.02], target: [0, 0, 0] },
+      visitor: {
+        position: [0, 1.6, depth / 2 + 1.8],
+        target: [0, 1.3, -depth / 4],
+      },
+    };
+    const view = views[preset];
+    camera.position.set(...view.position);
+    controls?.target?.set(...view.target);
+    controls?.update?.();
+  }, [preset, width, depth, wallHeight, camera, controls]);
+
+  return null;
+}
+
 function BoothShellCanvas({
   footprint,
   confirmed = false,
   scene = null,
   selectedComponentId = null,
   onSelectComponent,
+  cameraPreset = "hero",
+  onCameraPresetChange,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -296,6 +359,12 @@ function BoothShellCanvas({
           );
         })}
 
+        <CameraRig
+          preset={cameraPreset}
+          width={width}
+          depth={depth}
+          wallHeight={wallHeight}
+        />
         <OrbitControls
           makeDefault
           enablePan={false}
@@ -305,6 +374,28 @@ function BoothShellCanvas({
           target={[0, wallHeight / 3, 0]}
         />
       </Canvas>
+
+      <div
+        role="group"
+        aria-label="카메라 시점"
+        className="absolute bottom-3 left-1/2 flex -translate-x-1/2 gap-1 rounded-full bg-white/90 p-1 shadow backdrop-blur"
+      >
+        {EXPO_CAMERA_PRESETS.map((preset) => (
+          <button
+            key={preset.id}
+            type="button"
+            aria-pressed={cameraPreset === preset.id}
+            onClick={() => onCameraPresetChange?.(preset.id)}
+            className={
+              cameraPreset === preset.id
+                ? "whitespace-nowrap rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold text-white"
+                : "whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-bold text-black/55 hover:text-blue-700"
+            }
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
 
       <div className="pointer-events-none absolute left-3 top-3 flex flex-col gap-1.5">
         <span className="rounded-full bg-blue-600 px-3 py-1 text-xs font-bold text-white shadow">
