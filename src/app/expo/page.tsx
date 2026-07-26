@@ -124,6 +124,8 @@ interface CloneSourceProject {
   event: unknown;
   confirmed_dimensions: unknown;
   concept_image_url: string | null;
+  concept_images: unknown;
+  contract_prep: unknown;
   official_services: unknown;
   estimate_overrides: unknown;
   quick_fields: { builderName?: string; clientName?: string; eventName?: string } | null;
@@ -624,6 +626,29 @@ export default function ExpoBriefPage() {
       setConceptImage(
         project.concept_image_url && project.concept_image_url.startsWith("https://")
           ? project.concept_image_url
+          : null,
+      );
+      setConceptGallery(
+        Array.isArray(project.concept_images)
+          ? (project.concept_images as Array<{ url?: unknown; prompt?: unknown; createdAt?: unknown }>)
+              .filter(
+                (item): item is { url: string; prompt: string; createdAt: string } =>
+                  Boolean(item) &&
+                  typeof item.url === "string" &&
+                  item.url.startsWith("https://") &&
+                  typeof item.prompt === "string" &&
+                  typeof item.createdAt === "string",
+              )
+              .slice(0, 8)
+          : [],
+      );
+      const savedPrep = project.contract_prep as { startedAt?: unknown; note?: unknown } | null;
+      setContractPrep(
+        savedPrep && typeof savedPrep.startedAt === "string"
+          ? {
+              startedAt: savedPrep.startedAt,
+              note: typeof savedPrep.note === "string" ? savedPrep.note : "",
+            }
           : null,
       );
       if (project.quick_fields) {

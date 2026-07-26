@@ -57,7 +57,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, proposal, quick_fields, client_decision, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, proposal, contract_prep, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -227,6 +227,16 @@ export default async function ExpoSharedProposalPage({
             {event?.eventName && <li>· 행사: {event.eventName}</li>}
             {event?.venue && <li>· 장소: {event.venue}</li>}
             {event?.boothNumber && <li>· 부스 번호: {event.boothNumber}</li>}
+            {(() => {
+              const prep = project.contract_prep as { startedAt?: unknown } | null;
+              if (!prep || typeof prep.startedAt !== "string") return null;
+              return (
+                <li className="font-semibold text-emerald-700">
+                  · 계약 준비 중 ({new Date(prep.startedAt).toLocaleDateString("ko-KR")}{" "}
+                  기록) — 계약서·법무 검토는 별도 진행
+                </li>
+              );
+            })()}
             {officialServices && hasOfficialServicesInput(officialServices) && (
               <li>
                 · 공식 서비스:{" "}
