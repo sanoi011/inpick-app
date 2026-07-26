@@ -97,6 +97,9 @@ export interface ExpoCatalogEstimate {
   totalKrw: number;
   vatIncluded: false;
   assumptions: string[];
+  /** 시공사 검토(quoted) 직접비 라인 수 / 전체 직접비 라인 수 */
+  quotedLineCount: number;
+  directLineCount: number;
 }
 
 export class ExpoEstimateError extends Error {
@@ -265,9 +268,28 @@ export function buildConceptualRange(areaSqm: number): ExpoConceptualRange {
 }
 
 /** 치수 확정 후 — 확정 면적 + 씬 컴포넌트 기반 라인아이템 견적. */
+/** 시공사 검토 단가 — 라인 id별 단가 덮어쓰기. 적용 라인은 quoted가 된다. */
+export type ExpoEstimateOverrides = Record<string, { unitAmountKrw: number }>;
+
+export function isExpoEstimateOverrides(
+  value: unknown,
+): value is ExpoEstimateOverrides {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  return Object.values(value as Record<string, unknown>).every(
+    (entry) =>
+      Boolean(entry) &&
+      typeof entry === "object" &&
+      typeof (entry as { unitAmountKrw?: unknown }).unitAmountKrw === "number",
+  );
+}
+
+const MAX_OVERRIDE_UNIT_KRW = 100_000_000;
+
 export interface ExpoEstimateOptions {
   /** 행사 매뉴얼에서 입력한 전기 용량 (kW) — 있으면 기본 1kW 가정을 대체 */
   powerKw?: number | null;
+  /** 시공사 검토 단가 (직접비 라인만) — markup 요율에는 적용되지 않는다 */
+  overrides?: ExpoEstimateOverrides | null;
 }
 
 export function buildCatalogEstimate(
@@ -358,6 +380,29 @@ export function buildCatalogEstimate(
     });
   }
 
+  // 시공사 검토 단가 적용 — 해당 라인은 allowance → quoted
+  const overrides = options.overrides ?? null;
+  const pricedLines = lines.map((line) => {
+    const override = overrides?.[line.id];
+    if (
+      !override ||
+      !Number.isFinite(override.unitAmountKrw) ||
+      override.unitAmountKrw < 0 ||
+      override.unitAmountKrw > MAX_OVERRIDE_UNIT_KRW
+    ) {
+      return line;
+    }
+    return {
+      ...line,
+      unitAmountKrw: override.unitAmountKrw,
+      amountKrw: roundKrw(override.unitAmountKrw * line.quantity, 1_000),
+      source: "quoted" as const,
+      note: "시공사 검토 단가",
+    };
+  });
+  lines.length = 0;
+  lines.push(...pricedLines);
+
   const directSubtotalKrw = lines.reduce((sum, line) => sum + line.amountKrw, 0);
   const markupLines: ExpoEstimateLine[] = book.markups.map((markup) => ({
     id: `markup_${markup.trade}`,
@@ -383,6 +428,8 @@ export function buildCatalogEstimate(
     directSubtotalKrw,
     totalKrw,
     vatIncluded: false,
+    quotedLineCount: lines.filter((line) => line.source === "quoted").length,
+    directLineCount: lines.length,
     assumptions: [
       "확정 면적과 현재 배치 기준 — 배치를 바꾸면 금액이 갱신됩니다.",
       "예비비(예상 변동분)는 합계에 포함하지 않았습니다.",

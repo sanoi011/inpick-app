@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
+  EXPO_MONEY_SOURCE_LABELS,
   buildCatalogEstimate,
   buildConceptualRange,
   formatKrw,
+  isExpoEstimateOverrides,
   type ExpoCatalogEstimate,
   type ExpoConceptualRange,
 } from "@/lib/expo/estimate";
@@ -51,7 +53,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, quick_fields, client_decision, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -77,6 +79,9 @@ export default async function ExpoSharedProposalPage({
     if (confirmed)
       estimate = buildCatalogEstimate(scene, confirmed, {
         powerKw: event?.powerKw ?? null,
+        overrides: isExpoEstimateOverrides(project.estimate_overrides)
+          ? project.estimate_overrides
+          : null,
       });
     else if (footprint?.canonicalAreaSqm)
       range = buildConceptualRange(footprint.canonicalAreaSqm);
@@ -225,7 +230,11 @@ export default async function ExpoSharedProposalPage({
                   estimate ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
                 }`}
               >
-                {estimate ? "카탈로그 견적 · 가정 단가" : "개념 범위 · 치수 확정 전"}
+                {estimate
+                  ? estimate.quotedLineCount > 0
+                    ? `카탈로그 견적 · 검토 단가 ${estimate.quotedLineCount}/${estimate.directLineCount}`
+                    : "카탈로그 견적 · 가정 단가"
+                  : "개념 범위 · 치수 확정 전"}
               </span>
             </div>
             {estimate ? (
@@ -238,6 +247,11 @@ export default async function ExpoSharedProposalPage({
                     >
                       <span className="min-w-0 flex-1 truncate font-medium text-black/70">
                         {line.label}
+                        {line.source === "quoted" && (
+                          <span className="ml-1.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">
+                            {EXPO_MONEY_SOURCE_LABELS.quoted}
+                          </span>
+                        )}
                       </span>
                       <span className="tabular-nums font-semibold text-black/80">
                         {formatKrw(line.amountKrw)}

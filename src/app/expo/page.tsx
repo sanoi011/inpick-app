@@ -37,9 +37,12 @@ import {
 } from "@/lib/expo/scene-history";
 import type { ExpoCameraPreset } from "@/components/expo/BoothShell3D";
 import {
+  EXPO_MONEY_SOURCE_LABELS,
   buildCatalogEstimate,
   buildConceptualRange,
   formatKrw,
+  isExpoEstimateOverrides,
+  type ExpoEstimateOverrides,
 } from "@/lib/expo/estimate";
 import {
   EXPO_DECISION_LABELS,
@@ -131,6 +134,7 @@ interface ExpoBriefDraft {
   brandKit?: ExpoBrandKit;
   eventInfo?: ExpoEventInfo;
   officialServices?: ExpoOfficialServices;
+  estimateOverrides?: ExpoEstimateOverrides;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -193,6 +197,10 @@ export default function ExpoBriefPage() {
   const [officialServices, setOfficialServices] = useState<ExpoOfficialServices>(
     createEmptyOfficialServices,
   );
+  // 시공사 검토 단가 — 라인 id별 override (적용 라인은 quoted)
+  const [estimateOverrides, setEstimateOverrides] = useState<ExpoEstimateOverrides>({});
+  const [overrideEditId, setOverrideEditId] = useState<string | null>(null);
+  const [overrideDraft, setOverrideDraft] = useState("");
   // Clone & Reflow — 저장된 프로젝트를 새 면적으로 복제
   const [cloneProjects, setCloneProjects] = useState<CloneSourceProject[] | null>(null);
   const [cloneState, setCloneState] = useState<"idle" | "loading" | "signed_out" | "error">("idle");
@@ -320,6 +328,9 @@ export default function ExpoBriefPage() {
           if (isExpoOfficialServices(draft.officialServices)) {
             setOfficialServices(draft.officialServices);
           }
+          if (isExpoEstimateOverrides(draft.estimateOverrides)) {
+            setEstimateOverrides(draft.estimateOverrides);
+          }
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -349,6 +360,7 @@ export default function ExpoBriefPage() {
       brandKit: brandKit ?? undefined,
       eventInfo,
       officialServices,
+      estimateOverrides,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -357,7 +369,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, officialServices, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -392,6 +404,7 @@ export default function ExpoBriefPage() {
             brand: brandKit,
             event: { ...eventInfo, eventName: eventInfo.eventName || eventName },
             officialServices,
+            estimateOverrides,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -409,7 +422,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, officialServices, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -563,11 +576,12 @@ export default function ExpoBriefPage() {
     try {
       return buildCatalogEstimate(scene, confirmedDims, {
         powerKw: eventInfo.powerKw,
+        overrides: estimateOverrides,
       });
     } catch {
       return null;
     }
-  }, [scene, confirmedDims, eventInfo.powerKw]);
+  }, [scene, confirmedDims, eventInfo.powerKw, estimateOverrides]);
 
   // 행사 규정 검토 — 사용자 입력값 기준 (source 명시)
   const mergedEventInfo = useMemo(
@@ -1652,7 +1666,9 @@ export default function ExpoBriefPage() {
                     }`}
                   >
                     {catalogEstimate
-                      ? "카탈로그 견적 · 가정 단가"
+                      ? catalogEstimate.quotedLineCount > 0
+                        ? `카탈로그 견적 · 검토 단가 ${catalogEstimate.quotedLineCount}/${catalogEstimate.directLineCount}`
+                        : "카탈로그 견적 · 가정 단가"
                       : "개념 범위 · 치수 확정 전"}
                   </span>
                 </div>
@@ -1660,11 +1676,18 @@ export default function ExpoBriefPage() {
                 {catalogEstimate ? (
                   <>
                     <ul className="mt-3 divide-y divide-black/[0.06]">
-                      {[...catalogEstimate.lines, ...catalogEstimate.markupLines].map(
-                        (line) => (
-                          <li
-                            key={line.id}
-                            className="flex items-baseline justify-between gap-3 py-1.5 text-xs"
+                      {catalogEstimate.lines.map((line) => (
+                        <li key={line.id} className="py-1.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOverrideEditId(
+                                overrideEditId === line.id ? null : line.id,
+                              );
+                              setOverrideDraft(String(line.unitAmountKrw));
+                            }}
+                            className="flex w-full items-baseline justify-between gap-3 text-left"
+                            title="단가 검토 (탭하여 편집)"
                           >
                             <span className="min-w-0 flex-1 truncate font-medium text-black/70">
                               {line.label}
@@ -1673,17 +1696,87 @@ export default function ExpoBriefPage() {
                                   ? `${line.quantity}㎡`
                                   : line.unit === "ea"
                                     ? `${line.quantity}개`
-                                    : line.unit === "pct"
-                                      ? `${line.quantity}%`
+                                    : line.unit === "kw"
+                                      ? `${line.quantity}kW`
                                       : "1식"}
                               </span>
+                              {line.source === "quoted" && (
+                                <span className="ml-1.5 rounded-full bg-blue-50 px-1.5 py-0.5 text-[9px] font-bold text-blue-700">
+                                  {EXPO_MONEY_SOURCE_LABELS.quoted}
+                                </span>
+                              )}
                             </span>
                             <span className="tabular-nums font-semibold text-black/80">
                               {formatKrw(line.amountKrw)}
                             </span>
-                          </li>
-                        ),
-                      )}
+                          </button>
+                          {overrideEditId === line.id && (
+                            <div className="mt-1.5 flex items-center gap-1.5">
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min="0"
+                                step="1000"
+                                value={overrideDraft}
+                                onChange={(e) => setOverrideDraft(e.target.value)}
+                                aria-label={`${line.label} 단가`}
+                                className="w-32 rounded-lg border border-blue-300 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-200"
+                              />
+                              <span className="text-[10px] text-black/40">
+                                원/{line.unit === "sqm" ? "㎡" : line.unit === "ea" ? "개" : line.unit === "kw" ? "kW" : "식"}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const value = Number(overrideDraft);
+                                  if (Number.isFinite(value) && value >= 0) {
+                                    setEstimateOverrides((prev) => ({
+                                      ...prev,
+                                      [line.id]: { unitAmountKrw: value },
+                                    }));
+                                  }
+                                  setOverrideEditId(null);
+                                }}
+                                className="rounded-lg bg-blue-600 px-2.5 py-1.5 text-[10px] font-bold text-white"
+                              >
+                                검토 단가 적용
+                              </button>
+                              {estimateOverrides[line.id] && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEstimateOverrides((prev) => {
+                                      const next = { ...prev };
+                                      delete next[line.id];
+                                      return next;
+                                    });
+                                    setOverrideEditId(null);
+                                  }}
+                                  className="rounded-lg border border-black/15 px-2.5 py-1.5 text-[10px] font-bold text-black/60"
+                                >
+                                  가정으로 되돌리기
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                      {catalogEstimate.markupLines.map((line) => (
+                        <li
+                          key={line.id}
+                          className="flex items-baseline justify-between gap-3 py-1.5 text-xs"
+                        >
+                          <span className="min-w-0 flex-1 truncate font-medium text-black/70">
+                            {line.label}
+                            <span className="ml-1.5 text-black/40">
+                              {line.quantity}%
+                            </span>
+                          </span>
+                          <span className="tabular-nums font-semibold text-black/80">
+                            {formatKrw(line.amountKrw)}
+                          </span>
+                        </li>
+                      ))}
                     </ul>
                     <div className="mt-2 flex items-baseline justify-between border-t border-black/10 pt-2">
                       <span className="text-sm font-bold text-black">

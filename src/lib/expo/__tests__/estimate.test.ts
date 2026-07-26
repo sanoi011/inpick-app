@@ -146,3 +146,40 @@ test("manual power capacity replaces the base electrical allowance", () => {
     150_000,
   );
 });
+
+test("contractor overrides reprice lines as quoted and flow into markups", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "product_table", "p1");
+  const base = buildCatalogEstimate(scene, CONFIRMED_6X3);
+  const overridden = buildCatalogEstimate(scene, CONFIRMED_6X3, {
+    overrides: {
+      area_system_structure: { unitAmountKrw: 100_000 },
+      component_product_table: { unitAmountKrw: 200_000 },
+    },
+  });
+  const structure = overridden.lines.find((l) => l.id === "area_system_structure");
+  assert.ok(structure);
+  assert.equal(structure.source, "quoted");
+  assert.equal(structure.amountKrw, 1_800_000); // 18㎡ × 10만
+  const table = overridden.lines.find((l) => l.id === "component_product_table");
+  assert.equal(table?.source, "quoted");
+  assert.equal(table?.amountKrw, 200_000);
+  assert.equal(overridden.quotedLineCount, 2);
+  assert.ok(overridden.directLineCount >= 5);
+  // 마크업은 새 직접비 기준으로 재계산
+  const expectedDirect = overridden.lines.reduce((sum, l) => sum + l.amountKrw, 0);
+  assert.equal(overridden.directSubtotalKrw, expectedDirect);
+  assert.ok(overridden.totalKrw !== base.totalKrw);
+});
+
+test("invalid or unknown overrides are ignored, staying allowance", () => {
+  const estimate = buildCatalogEstimate(createExpoScene(6, 3), CONFIRMED_6X3, {
+    overrides: {
+      area_system_structure: { unitAmountKrw: Number.NaN },
+      nonexistent_line: { unitAmountKrw: 5_000 },
+      area_floor_finish: { unitAmountKrw: -10 },
+    },
+  });
+  assert.equal(estimate.quotedLineCount, 0);
+  assert.ok(estimate.lines.every((line) => line.source === "allowance"));
+});
