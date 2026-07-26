@@ -42,6 +42,11 @@ import {
   formatKrw,
 } from "@/lib/expo/estimate";
 import {
+  isExpoBrandKit,
+  type ExpoBrandCandidates,
+  type ExpoBrandKit,
+} from "@/lib/expo/brand-import";
+import {
   EXPO_READINESS_STATE_LABELS,
   evaluateProposalReadiness,
   readinessPercent,
@@ -94,6 +99,7 @@ interface ExpoBriefDraft {
   cameraPreset?: ExpoCameraPreset;
   /** Storage URL만 저장 (data URL 금지 — localStorage 용량 보호) */
   conceptImageUrl?: string;
+  brandKit?: ExpoBrandKit;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -142,6 +148,15 @@ export default function ExpoBriefPage() {
   const [conceptImage, setConceptImage] = useState<string | null>(null);
   const [conceptLoading, setConceptLoading] = useState(false);
   const [conceptError, setConceptError] = useState<string | null>(null);
+  // 브랜드 — URL 후보 추출은 자동 확정 금지, 사용자가 선택+권한 확인 후 적용
+  const [brandUrl, setBrandUrl] = useState("");
+  const [brandLoading, setBrandLoading] = useState(false);
+  const [brandError, setBrandError] = useState<string | null>(null);
+  const [brandCandidates, setBrandCandidates] =
+    useState<ExpoBrandCandidates | null>(null);
+  const [brandLogoPick, setBrandLogoPick] = useState<string | null>(null);
+  const [brandColorPick, setBrandColorPick] = useState<string | null>(null);
+  const [brandKit, setBrandKit] = useState<ExpoBrandKit | null>(null);
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -195,6 +210,7 @@ export default function ExpoBriefPage() {
           ) {
             setConceptImage(draft.conceptImageUrl);
           }
+          if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -221,6 +237,7 @@ export default function ExpoBriefPage() {
         conceptImage && conceptImage.startsWith("https://")
           ? conceptImage
           : undefined,
+      brandKit: brandKit ?? undefined,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -229,7 +246,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, brandKit, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -261,6 +278,7 @@ export default function ExpoBriefPage() {
               conceptImage && conceptImage.startsWith("https://")
                 ? conceptImage
                 : null,
+            brand: brandKit,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -278,7 +296,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, brandKit, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -374,10 +392,57 @@ export default function ExpoBriefPage() {
               : conceptualRange
                 ? "conceptual_range"
                 : null,
+            brandConfirmed: Boolean(brandKit),
           })
         : null,
-    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange],
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit],
   );
+
+  async function importBrand() {
+    if (!brandUrl.trim() || brandLoading) return;
+    setBrandError(null);
+    setBrandLoading(true);
+    setBrandCandidates(null);
+    try {
+      const response = await fetch("/api/expo/brand-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: brandUrl.trim() }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        candidates?: ExpoBrandCandidates;
+        error?: string;
+      };
+      if (response.ok && payload.candidates) {
+        setBrandCandidates(payload.candidates);
+        setBrandLogoPick(payload.candidates.logoCandidates[0] ?? null);
+        setBrandColorPick(payload.candidates.colorCandidates[0] ?? null);
+      } else if (response.status === 401) {
+        setBrandError("로그인 후 이용할 수 있습니다.");
+      } else if (payload.error === "UNSAFE_URL") {
+        setBrandError("주소를 확인해 주세요 (https 공개 사이트만 지원).");
+      } else {
+        setBrandError("브랜드 정보를 가져오지 못했습니다. 주소를 확인해 주세요.");
+      }
+    } catch {
+      setBrandError("네트워크 오류 — 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setBrandLoading(false);
+    }
+  }
+
+  function applyBrand() {
+    if (!brandCandidates) return;
+    setBrandKit({
+      name: brandCandidates.siteName ?? brandCandidates.title,
+      logoUrl: brandLogoPick,
+      colorHex: brandColorPick,
+      sourceUrl: brandCandidates.sourceUrl,
+      retrievedAt: brandCandidates.retrievedAt,
+      rightsConfirmed: true,
+    });
+    setBrandCandidates(null);
+  }
 
   async function generateConcept() {
     if (!displayFootprint || conceptLoading) return;
@@ -401,6 +466,7 @@ export default function ExpoBriefPage() {
           dimensionsConfirmed: Boolean(confirmedDims),
           scene,
           prompt: conceptPrompt,
+          brandColorHex: brandKit?.colorHex ?? null,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
@@ -588,6 +654,7 @@ export default function ExpoBriefPage() {
               onSelectComponent={setSelectedComponentId}
               cameraPreset={cameraPreset}
               onCameraPresetChange={setCameraPreset}
+              brandColorHex={brandKit?.colorHex ?? null}
             />
 
             {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
@@ -651,6 +718,160 @@ export default function ExpoBriefPage() {
                     AI 컨셉 — 시공 기준 아님
                   </span>
                 </div>
+              )}
+            </div>
+
+            {/* 브랜드 — 후보는 자동 확정하지 않는다 (§3.2) */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">브랜드</p>
+                {brandKit ? (
+                  <span className="rounded-full bg-green-50 px-2.5 py-1 text-[10px] font-bold text-green-700">
+                    적용됨
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-zinc-500">
+                    선택
+                  </span>
+                )}
+              </div>
+
+              {brandKit ? (
+                <div className="mt-2 flex items-center gap-3">
+                  {brandKit.logoUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element -- 외부 브랜드 로고
+                    <img
+                      src={brandKit.logoUrl}
+                      alt="브랜드 로고"
+                      className="h-10 w-10 rounded-lg border border-black/10 object-contain"
+                    />
+                  )}
+                  {brandKit.colorHex && (
+                    <span
+                      aria-label={`브랜드 컬러 ${brandKit.colorHex}`}
+                      className="inline-block h-6 w-6 rounded-full border border-black/15"
+                      style={{ backgroundColor: brandKit.colorHex }}
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-black/80">
+                      {brandKit.name ?? "브랜드"}
+                    </p>
+                    <p className="text-[10px] text-black/40">
+                      벽 요소에 브랜드 컬러 적용됨 · 로고 데칼은 다음 단계
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setBrandKit(null)}
+                    className="shrink-0 rounded-lg border border-black/15 px-2.5 py-1.5 text-xs font-semibold text-black/60 hover:bg-zinc-50"
+                  >
+                    해제
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="mt-1 text-xs text-black/50">
+                    회사 웹사이트 주소를 입력하면 로고·브랜드 컬러 후보를
+                    가져옵니다. 후보는 자동 적용되지 않습니다.
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <input
+                      id="expo-brand-url"
+                      type="url"
+                      value={brandUrl}
+                      onChange={(e) => setBrandUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") importBrand();
+                      }}
+                      placeholder="예: www.회사도메인.com"
+                      className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                    <button
+                      type="button"
+                      onClick={importBrand}
+                      disabled={brandLoading}
+                      className="shrink-0 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-bold text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {brandLoading ? "가져오는 중…" : "가져오기"}
+                    </button>
+                  </div>
+                  {brandError && (
+                    <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                      {brandError}
+                    </p>
+                  )}
+                  {brandCandidates && (
+                    <div className="mt-3 rounded-xl bg-zinc-50 p-3">
+                      <p className="text-xs font-bold text-black/70">
+                        {brandCandidates.siteName ?? brandCandidates.title ?? "후보"}
+                      </p>
+                      {brandCandidates.logoCandidates.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {brandCandidates.logoCandidates.map((logo) => (
+                            <button
+                              key={logo}
+                              type="button"
+                              aria-pressed={brandLogoPick === logo}
+                              onClick={() =>
+                                setBrandLogoPick(
+                                  brandLogoPick === logo ? null : logo,
+                                )
+                              }
+                              className={`rounded-lg border-2 bg-white p-1 ${
+                                brandLogoPick === logo
+                                  ? "border-blue-600"
+                                  : "border-black/10"
+                              }`}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element -- 외부 로고 후보 */}
+                              <img
+                                src={logo}
+                                alt="로고 후보"
+                                className="h-9 w-9 object-contain"
+                              />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {brandCandidates.colorCandidates.length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {brandCandidates.colorCandidates.map((color) => (
+                            <button
+                              key={color}
+                              type="button"
+                              aria-label={`컬러 ${color}`}
+                              aria-pressed={brandColorPick === color}
+                              onClick={() =>
+                                setBrandColorPick(
+                                  brandColorPick === color ? null : color,
+                                )
+                              }
+                              className={`h-7 w-7 rounded-full border-2 ${
+                                brandColorPick === color
+                                  ? "border-blue-600"
+                                  : "border-black/10"
+                              }`}
+                              style={{ backgroundColor: color }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={applyBrand}
+                        disabled={!brandLogoPick && !brandColorPick}
+                        className="mt-3 w-full rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        이 브랜드 사용 — 로고·컬러 사용 권한 보유를 확인합니다
+                      </button>
+                      <p className="mt-1.5 text-[10px] leading-4 text-black/40">
+                        출처: {brandCandidates.sourceUrl} · 수집{" "}
+                        {new Date(brandCandidates.retrievedAt).toLocaleString("ko-KR")}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
 

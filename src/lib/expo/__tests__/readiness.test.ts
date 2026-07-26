@@ -63,3 +63,21 @@ test("percent reflects mixed states and full pipeline is below 100 in v1", () =>
   const percent = readinessPercent(items);
   assert.ok(percent > 0 && percent < 100);
 });
+
+test("brand confirms only through the user's rights-confirmed kit", () => {
+  const without = evaluateProposalReadiness({
+    hasFootprint: true,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: "conceptual_range",
+  });
+  assert.equal(stateOf(without, "brand"), "unstarted");
+  const withBrand = evaluateProposalReadiness({
+    hasFootprint: true,
+    dimensionsConfirmed: false,
+    componentCount: 0,
+    priceStage: "conceptual_range",
+    brandConfirmed: true,
+  });
+  assert.equal(stateOf(withBrand, "brand"), "confirmed");
+});

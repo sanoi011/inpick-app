@@ -27,6 +27,8 @@ export const EXPO_CAMERA_PRESETS: Array<{ id: ExpoCameraPreset; label: string }>
 export interface BoothSceneViewProps {
   cameraPreset?: ExpoCameraPreset;
   onCameraPresetChange?: (preset: ExpoCameraPreset) => void;
+  /** 확정된 브랜드 컬러 — 벽 요소(그래픽 월/라이트박스)에 결정적으로 적용 */
+  brandColorHex?: string | null;
   scene?: ExpoBoothScene | null;
   selectedComponentId?: string | null;
   onSelectComponent?: (id: string | null) => void;
@@ -40,6 +42,7 @@ export default function BoothShell3D({
   onSelectComponent,
   cameraPreset = "hero",
   onCameraPresetChange,
+  brandColorHex = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -120,6 +123,7 @@ export default function BoothShell3D({
         onSelectComponent={onSelectComponent}
         cameraPreset={cameraPreset}
         onCameraPresetChange={onCameraPresetChange}
+        brandColorHex={brandColorHex}
       />
     </ShellErrorBoundary>
   );
@@ -246,6 +250,7 @@ function BoothShellCanvas({
   onSelectComponent,
   cameraPreset = "hero",
   onCameraPresetChange,
+  brandColorHex = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -351,7 +356,9 @@ function BoothShellCanvas({
             >
               <boxGeometry args={[size.w, item.heightM, size.d]} />
               <meshStandardMaterial
-                color={item.color}
+                color={
+                  item.wallMounted && brandColorHex ? brandColorHex : item.color
+                }
                 emissive={isSelected ? "#1d4ed8" : "#000000"}
                 emissiveIntensity={isSelected ? 0.45 : 0}
               />

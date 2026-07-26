@@ -22,6 +22,8 @@ export interface ExpoConceptPromptInput {
   dimensionsConfirmed: boolean;
   scene: ExpoBoothScene | null;
   userPrompt: string;
+  /** 확정된 브랜드 컬러 — 색만 전달, 로고/텍스트는 여전히 금지 */
+  brandColorHex?: string | null;
 }
 
 export class ExpoConceptPromptError extends Error {
@@ -93,6 +95,9 @@ export function buildBoothConceptPrompt(input: ExpoConceptPromptInput): string {
       : `The booth is an empty shell ready for fixture planning. `) +
     `${styleTag} ` +
     `System aluminum frame construction with clean panel finishes, professional exhibition lighting from truss spots. ` +
+    (input.brandColorHex && /^#[0-9a-f]{6}$/i.test(input.brandColorHex)
+      ? `Brand primary color approximately ${input.brandColorHex.toLowerCase()} used on the backwall graphic and accent panels. `
+      : "") +
     `IMPORTANT branding rule: use neutral abstract placeholder graphics and BLANK sign panels only — ` +
     `do NOT render any real brand logos, readable company names, or legible text of any kind. ` +
     `No people. Eye-level camera from the aisle, slightly wide angle showing the full booth. ` +

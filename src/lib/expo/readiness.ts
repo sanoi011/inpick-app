@@ -45,12 +45,20 @@ export interface ExpoReadinessInput {
   dimensionsConfirmed: boolean;
   componentCount: number;
   priceStage: "conceptual_range" | "catalog_estimate" | null;
+  /** 사용자가 브랜드 킷을 확정(사용 권한 확인 포함)했는가 */
+  brandConfirmed?: boolean;
 }
 
 export function evaluateProposalReadiness(
   input: ExpoReadinessInput,
 ): ExpoReadinessItem[] {
-  const { hasFootprint, dimensionsConfirmed, componentCount, priceStage } = input;
+  const {
+    hasFootprint,
+    dimensionsConfirmed,
+    componentCount,
+    priceStage,
+    brandConfirmed = false,
+  } = input;
 
   const space: ExpoReadinessItem = dimensionsConfirmed
     ? {
@@ -112,12 +120,19 @@ export function evaluateProposalReadiness(
 
   return [
     space,
-    {
-      dimension: "brand",
-      label: "브랜드",
-      state: "unstarted",
-      detail: "Brand URL Importer 준비 중",
-    },
+    brandConfirmed
+      ? {
+          dimension: "brand" as const,
+          label: "브랜드",
+          state: "confirmed" as const,
+          detail: "브랜드 킷 확정됨 (사용 권한 확인)",
+        }
+      : {
+          dimension: "brand" as const,
+          label: "브랜드",
+          state: "unstarted" as const,
+          detail: "참고 웹사이트에서 브랜드를 가져오세요",
+        },
     configuration,
     price,
     {

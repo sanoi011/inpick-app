@@ -76,3 +76,13 @@ test("invalid dims and oversized prompts are rejected", () => {
       e.code === "EXPO_CONCEPT_PROMPT_TOO_LONG",
   );
 });
+
+test("brand color joins the prompt but never invites logos", () => {
+  const prompt = buildBoothConceptPrompt({ ...BASE, brandColorHex: "#1A2B3C" });
+  assert.ok(prompt.includes("Brand primary color approximately #1a2b3c"));
+  assert.ok(prompt.includes("do NOT render any real brand logos"));
+  const withoutBrand = buildBoothConceptPrompt(BASE);
+  assert.ok(!withoutBrand.includes("Brand primary color"));
+  const invalidColor = buildBoothConceptPrompt({ ...BASE, brandColorHex: "red" });
+  assert.ok(!invalidColor.includes("Brand primary color"));
+});
