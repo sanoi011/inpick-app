@@ -93,7 +93,19 @@ const BUILDER_KITS = [
   { id: "kit_36_island", label: "36㎡ 프리미엄", areaSqm: 36, description: "6m × 6m 대형 전시" },
 ] as const;
 
-type StartMode = "quick_area" | "builder_kit";
+type StartMode = "quick_area" | "builder_kit" | "clone_reflow";
+
+interface CloneSourceProject {
+  id: string;
+  title: string;
+  area_input: number;
+  area_unit: ExpoAreaUnit;
+  scene: unknown;
+  brand: unknown;
+  event: unknown;
+  quick_fields: { builderName?: string; clientName?: string; eventName?: string } | null;
+  updated_at: string;
+}
 
 interface ExpoBriefDraft {
   version: 3;
@@ -168,6 +180,11 @@ export default function ExpoBriefPage() {
   const [brandKit, setBrandKit] = useState<ExpoBrandKit | null>(null);
   // 행사 규정 — 전부 사용자가 행사 매뉴얼에서 입력한 값 (source = 사용자 입력)
   const [eventInfo, setEventInfo] = useState<ExpoEventInfo>(createEmptyEventInfo);
+  // Clone & Reflow — 저장된 프로젝트를 새 면적으로 복제
+  const [cloneProjects, setCloneProjects] = useState<CloneSourceProject[] | null>(null);
+  const [cloneState, setCloneState] = useState<"idle" | "loading" | "signed_out" | "error">("idle");
+  const [cloneSelectedId, setCloneSelectedId] = useState<string | null>(null);
+  const [cloneArea, setCloneArea] = useState("");
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -186,6 +203,40 @@ export default function ExpoBriefPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (startMode !== "clone_reflow" || cloneProjects !== null) return;
+    let cancelled = false;
+    (async () => {
+      setCloneState("loading");
+      try {
+        const response = await fetch("/api/expo/projects");
+        if (cancelled) return;
+        if (response.status === 401) {
+          setCloneState("signed_out");
+          return;
+        }
+        const payload = (await response.json().catch(() => ({}))) as {
+          projects?: CloneSourceProject[];
+        };
+        if (response.ok && Array.isArray(payload.projects)) {
+          setCloneProjects(payload.projects);
+          setCloneState("idle");
+          if (payload.projects[0]) {
+            setCloneSelectedId(payload.projects[0].id);
+            setCloneArea(String(payload.projects[0].area_input));
+          }
+        } else {
+          setCloneState("error");
+        }
+      } catch {
+        if (!cancelled) setCloneState("error");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [startMode, cloneProjects]);
 
   // 초기 복구 — 로컬 임시 저장분 (서버 저장은 다음 슬라이스, UI에 정직하게 표기)
   useEffect(() => {
@@ -353,6 +404,51 @@ export default function ExpoBriefPage() {
     setUnit("sqm");
     setAreaInput(String(kit.areaSqm));
     generate(kit.areaSqm, "sqm");
+  }
+
+  function applyCloneReflow() {
+    const source = cloneProjects?.find((project) => project.id === cloneSelectedId);
+    const area = Number(cloneArea);
+    if (!source || !Number.isFinite(area) || area <= 0) {
+      setError("복제할 프로젝트와 새 면적을 확인해 주세요.");
+      return;
+    }
+    setError(null);
+    try {
+      const fp = createProvisionalFootprint(area, source.area_unit);
+      setUnit(source.area_unit);
+      setAreaInput(String(area));
+      setFootprint(fp);
+      setSelectedLabel(fp.selected.label);
+      setConfirmedDims(null);
+      setSelectedComponentId(null);
+      setConceptImage(null);
+      setServerProjectId(null); // 복제본은 새 프로젝트로 저장
+      const sourceScene = isExpoBoothScene(source.scene) ? source.scene : null;
+      setSceneHistory(
+        createSceneHistory(
+          sourceScene
+            ? resizeExpoScene(sourceScene, fp.selected.widthM, fp.selected.depthM)
+            : createExpoScene(fp.selected.widthM, fp.selected.depthM),
+        ),
+      );
+      if (isExpoBrandKit(source.brand)) setBrandKit(source.brand);
+      if (isExpoEventInfo(source.event)) setEventInfo(source.event);
+      if (source.quick_fields) {
+        setBuilderName(source.quick_fields.builderName ?? "");
+        setClientName(source.quick_fields.clientName ?? "");
+        setEventName(source.quick_fields.eventName ?? "");
+      }
+      setDimWidth(String(fp.selected.widthM));
+      setDimDepth(String(fp.selected.depthM));
+      setDimHeight(String(fp.wallHeightM));
+    } catch (cause) {
+      setError(
+        cause instanceof ExpoFootprintError
+          ? footprintErrorMessage(cause.code)
+          : "면적을 확인해 주세요.",
+      );
+    }
   }
 
   const displayFootprint = useMemo(() => {
@@ -593,15 +689,18 @@ export default function ExpoBriefPage() {
           >
             Builder Kit
           </button>
-          <div
-            aria-disabled="true"
-            className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/15 bg-zinc-50 px-2 py-2 text-center"
+          <button
+            type="button"
+            onClick={() => setStartMode("clone_reflow")}
+            aria-pressed={startMode === "clone_reflow"}
+            className={`rounded-xl border px-2 py-2.5 text-xs font-bold transition ${
+              startMode === "clone_reflow"
+                ? "border-blue-600 bg-blue-600 text-white"
+                : "border-black/15 bg-white text-black/70 hover:border-blue-300"
+            }`}
           >
-            <span className="text-xs font-bold text-black/40">Clone & Reflow</span>
-            <span className="mt-0.5 text-[10px] font-semibold text-amber-600">
-              준비 중
-            </span>
-          </div>
+            Clone & Reflow
+          </button>
         </div>
 
         {startMode === "quick_area" ? (
@@ -650,6 +749,86 @@ export default function ExpoBriefPage() {
               3D 부스 만들기
             </button>
           </form>
+        ) : startMode === "clone_reflow" ? (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+            {cloneState === "signed_out" ? (
+              <p className="text-sm text-black/60">
+                로그인하면 저장된 프로젝트를 복제해 새 면적으로 리플로우할 수
+                있습니다.
+              </p>
+            ) : cloneState === "loading" ? (
+              <p className="text-sm text-black/50">저장된 프로젝트 불러오는 중…</p>
+            ) : cloneState === "error" ? (
+              <p className="text-sm text-red-600">
+                프로젝트 목록을 불러오지 못했습니다 — 잠시 후 다시 시도해
+                주세요.
+              </p>
+            ) : cloneProjects && cloneProjects.length === 0 ? (
+              <p className="text-sm text-black/60">
+                저장된 프로젝트가 없습니다 — Quick Area로 먼저 부스를 만들면
+                자동 저장됩니다.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-bold text-black">
+                  복제할 프로젝트 선택
+                </p>
+                <ul className="mt-2 space-y-1.5">
+                  {(cloneProjects ?? []).slice(0, 5).map((project) => (
+                    <li key={project.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setCloneSelectedId(project.id);
+                          setCloneArea(String(project.area_input));
+                        }}
+                        aria-pressed={cloneSelectedId === project.id}
+                        className={`w-full rounded-xl border px-3 py-2 text-left text-sm transition ${
+                          cloneSelectedId === project.id
+                            ? "border-blue-600 bg-blue-50"
+                            : "border-black/10 bg-white hover:border-blue-300"
+                        }`}
+                      >
+                        <span className="font-semibold text-black/80">
+                          {project.title}
+                        </span>
+                        <span className="ml-2 text-xs text-black/45">
+                          {project.area_input}
+                          {project.area_unit === "sqm" ? "㎡" : "ft²"} ·{" "}
+                          {new Date(project.updated_at).toLocaleDateString("ko-KR")}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-3 flex gap-2">
+                  <input
+                    id="expo-clone-area"
+                    type="number"
+                    inputMode="decimal"
+                    min="1"
+                    step="0.1"
+                    value={cloneArea}
+                    onChange={(e) => setCloneArea(e.target.value)}
+                    placeholder="새 면적"
+                    aria-label="새 면적"
+                    className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                  <button
+                    type="button"
+                    onClick={applyCloneReflow}
+                    className="shrink-0 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:opacity-95"
+                  >
+                    복제 & 리플로우
+                  </button>
+                </div>
+                <p className="mt-1.5 text-[10px] text-black/40">
+                  배치·브랜드·행사 규정을 가져와 새 경계에 맞게 재클램프합니다.
+                  치수 확정과 컨셉 이미지는 초기화되며 새 프로젝트로 저장됩니다.
+                </p>
+              </>
+            )}
+          </div>
         ) : (
           <div className="mt-4 grid gap-2 sm:grid-cols-3">
             {BUILDER_KITS.map((kit) => (
