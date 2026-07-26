@@ -33,7 +33,13 @@ const config: CapacitorConfig = {
     // nid.naver.com: 네이버 OAuth 로그인을 인앱 WebView에서 완결(외부 Safari로 나가면
     // Apple Guideline 4 거절 — 2026-07-07 v1.0(5) 리젝 사유). 콜백은 same-origin이라
     // 세션 쿠키가 WebView에 그대로 박힘. 로그인 화면 외 naver.com 링크는 종전대로 외부 오픈.
-    allowNavigation: ["interiorpick.co.kr", "www.interiorpick.co.kr", "nid.naver.com"],
+    allowNavigation: [
+      "interiorpick.co.kr",
+      "www.interiorpick.co.kr",
+      "inpick-hankwon.vercel.app",
+      "write.interiorpick.co.kr",
+      "nid.naver.com",
+    ],
     cleartext: false,           // HTTPS 강제
     androidScheme: "https",
   },

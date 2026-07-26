@@ -11,6 +11,7 @@ import {
   Calculator,
   Camera,
   ChevronDown,
+  BookOpen,
   ImagePlus,
   Layers3,
   Menu,
@@ -25,9 +26,16 @@ import PromotionalBannerSlot from "@/components/business/PromotionalBannerSlot";
 import { BUSINESS_MENU_ITEMS } from "@/lib/business-center";
 import { buildConsumerAuthHref } from "@/lib/auth/access-policy";
 
+const WRITING_APP_URL =
+  process.env.NEXT_PUBLIC_WRITING_APP_URL ||
+  (process.env.NODE_ENV === "development"
+    ? "http://127.0.0.1:3020"
+    : "https://inpick-hankwon.vercel.app");
+
 const NAV_ITEMS = [
   { label: "AI 디자인", href: "/workflow" },
   { label: "부분 AI 인테리어", href: "/partial-ai" },
+  { label: "AI 글쓰기", href: WRITING_APP_URL },
   { label: "부분시공", href: "/partial-install" },
   { label: "시공사", href: "/find-contractors" },
   { label: "엑스포", href: "/expo" },
@@ -120,6 +128,7 @@ const FOOTER_LINKS = [
     links: [
       { label: "AI 인테리어", href: "/workflow" },
       { label: "부분 AI 인테리어", href: "/partial-ai" },
+      { label: "AI 글쓰기", href: WRITING_APP_URL },
       { label: "부분시공", href: "/partial-install" },
       { label: "시공사 찾기", href: "/find-contractors" },
       { label: "엑스포 부스 디자인", href: "/expo" },
@@ -371,6 +380,39 @@ export default function Home() {
       </section>
 
       <AppDownloadSection />
+
+      <section className="border-y border-black/[0.07] bg-white px-5 py-16 sm:px-8 sm:py-20">
+        <Link
+          href={WRITING_APP_URL}
+          className="group mx-auto grid max-w-[1400px] overflow-hidden rounded-[28px] border border-black/[0.08] bg-[#f7f7f5] lg:grid-cols-[0.95fr_1.05fr]"
+          aria-label="독립 AI 글쓰기 서비스 한권 열기"
+        >
+          <div className="flex flex-col justify-center px-7 py-12 sm:px-12 sm:py-16 lg:px-16">
+            <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#2d6cff]">InPick Creative · New</p>
+            <h2 className="mt-4 text-[30px] font-medium leading-[1.12] tracking-[-0.055em] sm:text-[44px]">
+              공간을 설계하듯,<br />이야기도 한 권으로.
+            </h2>
+            <p className="mt-5 max-w-lg text-[13px] leading-6 text-black/52 sm:text-[14px]">
+              기억이나 상상을 편하게 들려주면 AI가 질문하고 구조를 잡아 원고 완성까지 함께하는 독립 글쓰기 스튜디오입니다.
+            </p>
+            <span className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-black px-5 py-3 text-[12px] font-semibold text-white transition group-hover:bg-[#2d6cff]">
+              AI 글쓰기 시작하기 <ArrowUpRight className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="relative flex min-h-[340px] items-center justify-center overflow-hidden bg-[radial-gradient(circle_at_50%_48%,#6c9aff_0%,#2d6cff_34%,#dfe9ff_68%,#f3f6ff_72%)] sm:min-h-[410px]">
+            <div className="absolute h-[280px] w-[210px] rotate-[5deg] rounded-[3px] bg-[#fffefa] p-9 shadow-[0_28px_70px_rgba(13,41,105,0.24)] transition duration-500 group-hover:rotate-[2deg] group-hover:scale-[1.02] sm:h-[330px] sm:w-[244px] sm:p-11">
+              <BookOpen className="h-5 w-5 text-[#2d6cff]" strokeWidth={1.5} />
+              <p className="mt-8 font-serif text-[20px] leading-[1.55] tracking-[-0.04em] sm:text-[23px]">당신 안의 이야기가<br />한 권이 되는 곳.</p>
+              <div className="mt-8 space-y-3">
+                <i className="block h-px bg-black/12" />
+                <i className="block h-px w-[86%] bg-black/12" />
+                <i className="block h-px w-[93%] bg-black/12" />
+                <i className="block h-px w-[54%] bg-black/12" />
+              </div>
+            </div>
+          </div>
+        </Link>
+      </section>
 
       <PromotionalBannerSlot placement="home_mid" className="bg-[#f7f7f5] px-5 pb-14 sm:px-8 sm:pb-20" />
 
