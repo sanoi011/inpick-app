@@ -42,6 +42,11 @@ import {
   formatKrw,
 } from "@/lib/expo/estimate";
 import {
+  EXPO_DECISION_LABELS,
+  isExpoClientDecision,
+  type ExpoClientDecision,
+} from "@/lib/expo/client-decision";
+import {
   createEmptyEventInfo,
   evaluateEventRules,
   hasEventRuleInput,
@@ -188,6 +193,7 @@ export default function ExpoBriefPage() {
   // 제안 공유 — provisional 상태에서도 가능 (라벨이 함께 공유됨)
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied" | "error">("idle");
+  const [clientDecision, setClientDecision] = useState<ExpoClientDecision | null>(null);
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -206,6 +212,32 @@ export default function ExpoBriefPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+
+  useEffect(() => {
+    if (!serverProjectId) {
+      setClientDecision(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch("/api/expo/projects");
+        if (cancelled || !response.ok) return;
+        const payload = (await response.json().catch(() => ({}))) as {
+          projects?: Array<{ id: string; client_decision?: unknown }>;
+        };
+        const row = payload.projects?.find((project) => project.id === serverProjectId);
+        if (row && isExpoClientDecision(row.client_decision)) {
+          setClientDecision(row.client_decision);
+        }
+      } catch {
+        // 결정 조회 실패는 조용히 무시 (다음 로드에서 재시도)
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [serverProjectId]);
 
   useEffect(() => {
     if (startMode !== "clone_reflow" || cloneProjects !== null) return;
@@ -456,6 +488,7 @@ export default function ExpoBriefPage() {
       setSelectedComponentId(null);
       setConceptImage(null);
       setServerProjectId(null); // 복제본은 새 프로젝트로 저장
+      setClientDecision(null);
       const sourceScene = isExpoBoothScene(source.scene) ? source.scene : null;
       setSceneHistory(
         createSceneHistory(
@@ -553,9 +586,10 @@ export default function ExpoBriefPage() {
               entered: hasEventRuleInput(mergedEventInfo),
               violation: hasEventRuleViolation(eventReviewItems),
             },
+            clientDecision: clientDecision?.decision ?? null,
           })
         : null,
-    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems],
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems, clientDecision],
   );
 
   async function importBrand() {
@@ -1675,6 +1709,25 @@ export default function ExpoBriefPage() {
               </div>
             )}
 
+            {clientDecision && (
+              <p
+                className={`mt-2 rounded-xl px-3 py-2.5 text-xs font-bold ${
+                  clientDecision.decision === "approved"
+                    ? "bg-green-50 text-green-700"
+                    : "bg-amber-50 text-amber-800"
+                }`}
+              >
+                {EXPO_DECISION_LABELS[clientDecision.decision]}
+                {clientDecision.comment && (
+                  <span className="ml-1.5 font-medium text-black/60">
+                    &ldquo;{clientDecision.comment}&rdquo;
+                  </span>
+                )}
+                <span className="ml-1.5 font-medium text-black/40">
+                  {new Date(clientDecision.decidedAt).toLocaleString("ko-KR")}
+                </span>
+              </p>
+            )}
             <div className="mt-2 flex items-center justify-between gap-2">
               {serverProjectId ? (
                 <button

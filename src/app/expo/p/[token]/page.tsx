@@ -22,6 +22,8 @@ import {
   readinessPercent,
 } from "@/lib/expo/readiness";
 import type { ExpoConfirmedDimensions } from "@/lib/expo/footprint";
+import { isExpoClientDecision } from "@/lib/expo/client-decision";
+import ProposalDecisionForm from "@/components/expo/ProposalDecisionForm";
 
 /**
  * 공개 읽기전용 제안 페이지 — 공유 토큰으로만 접근 (service role 조회).
@@ -47,7 +49,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -80,6 +82,9 @@ export default async function ExpoSharedProposalPage({
         confirmed?.wallHeightM ?? footprint?.wallHeightM ?? null,
       )
     : [];
+  const clientDecision = isExpoClientDecision(project.client_decision)
+    ? project.client_decision
+    : null;
   const readiness = evaluateProposalReadiness({
     hasFootprint: Boolean(footprint),
     dimensionsConfirmed: Boolean(confirmed),
@@ -90,6 +95,7 @@ export default async function ExpoSharedProposalPage({
       entered: event ? hasEventRuleInput(event) : false,
       violation: hasEventRuleViolation(eventItems),
     },
+    clientDecision: clientDecision?.decision ?? null,
   });
 
   const componentCounts = new Map<string, number>();
@@ -254,6 +260,8 @@ export default async function ExpoSharedProposalPage({
             </ul>
           </div>
         )}
+
+        <ProposalDecisionForm token={token} initialDecision={clientDecision} />
 
         <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between">

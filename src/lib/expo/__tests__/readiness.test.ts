@@ -105,3 +105,24 @@ test("event rules confirm on input and block on violation", () => {
     "blocked",
   );
 });
+
+test("client decision drives the last readiness dimension", () => {
+  const base = {
+    hasFootprint: true,
+    dimensionsConfirmed: true,
+    componentCount: 1,
+    priceStage: "catalog_estimate" as const,
+  };
+  assert.equal(stateOf(evaluateProposalReadiness(base), "client_decision"), "unstarted");
+  assert.equal(
+    stateOf(evaluateProposalReadiness({ ...base, clientDecision: "approved" }), "client_decision"),
+    "confirmed",
+  );
+  assert.equal(
+    stateOf(
+      evaluateProposalReadiness({ ...base, clientDecision: "changes_requested" }),
+      "client_decision",
+    ),
+    "needs_review",
+  );
+});

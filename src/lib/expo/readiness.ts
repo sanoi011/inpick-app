@@ -49,6 +49,8 @@ export interface ExpoReadinessInput {
   brandConfirmed?: boolean;
   /** 행사 규정 — 입력 여부와 위반 여부 (event-rules.ts 계산 결과) */
   eventRules?: { entered: boolean; violation: boolean };
+  /** 고객 결정 (공유 페이지에서 기록) */
+  clientDecision?: "approved" | "changes_requested" | null;
 }
 
 export function evaluateProposalReadiness(
@@ -61,6 +63,7 @@ export function evaluateProposalReadiness(
     priceStage,
     brandConfirmed = false,
     eventRules = { entered: false, violation: false },
+    clientDecision = null,
   } = input;
 
   const space: ExpoReadinessItem = dimensionsConfirmed
@@ -164,12 +167,26 @@ export function evaluateProposalReadiness(
       state: "unstarted",
       detail: "전기/리깅 등 주최측 신청 연동 준비 중",
     },
-    {
-      dimension: "client_decision",
-      label: "고객 승인",
-      state: "unstarted",
-      detail: "제안 공유·승인 기능 준비 중",
-    },
+    clientDecision === "approved"
+      ? {
+          dimension: "client_decision" as const,
+          label: "고객 승인",
+          state: "confirmed" as const,
+          detail: "고객이 제안을 승인함 (시공 확정 아님)",
+        }
+      : clientDecision === "changes_requested"
+        ? {
+            dimension: "client_decision" as const,
+            label: "고객 승인",
+            state: "needs_review" as const,
+            detail: "고객 변경 요청 있음 — 반영 후 재공유",
+          }
+        : {
+            dimension: "client_decision" as const,
+            label: "고객 승인",
+            state: "unstarted" as const,
+            detail: "공유 링크에서 고객 결정 대기",
+          },
   ];
 }
 

@@ -27,7 +27,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("expo_projects")
     .select(
-      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, updated_at",
+      "id, title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, quick_fields, client_decision, updated_at",
     )
     .eq("status", "draft")
     .order("updated_at", { ascending: false })
