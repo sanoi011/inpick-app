@@ -27,6 +27,7 @@ import {
 } from "@/lib/expo/readiness";
 import type { ExpoConfirmedDimensions } from "@/lib/expo/footprint";
 import { isExpoClientDecision } from "@/lib/expo/client-decision";
+import { isExpoProposalSnapshot, isProposalStale } from "@/lib/expo/proposal";
 import ProposalDecisionForm from "@/components/expo/ProposalDecisionForm";
 import PrintProposalButton from "@/components/expo/PrintProposalButton";
 
@@ -54,7 +55,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, quick_fields, client_decision, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, proposal, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -99,11 +100,24 @@ export default async function ExpoSharedProposalPage({
   const clientDecision = isExpoClientDecision(project.client_decision)
     ? project.client_decision
     : null;
+  const proposal = isExpoProposalSnapshot(project.proposal)
+    ? project.proposal
+    : null;
+  const proposalFresh = proposal
+    ? !isProposalStale(proposal, scene, estimate)
+    : false;
+  const displayEstimate = proposalFresh && proposal ? proposal.estimate : estimate;
   const readiness = evaluateProposalReadiness({
     hasFootprint: Boolean(footprint),
     dimensionsConfirmed: Boolean(confirmed),
     componentCount: scene?.components.length ?? 0,
-    priceStage: estimate ? "catalog_estimate" : range ? "conceptual_range" : null,
+    priceStage: proposalFresh
+      ? "contractor_proposal"
+      : estimate
+        ? "catalog_estimate"
+        : range
+          ? "conceptual_range"
+          : null,
     brandConfirmed: Boolean(brand),
     eventRules: {
       entered: event ? hasEventRuleInput(event) : false,
@@ -223,7 +237,7 @@ export default async function ExpoSharedProposalPage({
           )}
         </div>
 
-        {(estimate || range) && (
+        {(displayEstimate || range) && (
           <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
             <div className="flex items-center justify-between">
               <p className="text-sm font-bold text-black">예상 금액</p>
@@ -232,17 +246,19 @@ export default async function ExpoSharedProposalPage({
                   estimate ? "bg-blue-50 text-blue-700" : "bg-amber-50 text-amber-700"
                 }`}
               >
-                {estimate
-                  ? estimate.quotedLineCount > 0
-                    ? `카탈로그 견적 · 검토 단가 ${estimate.quotedLineCount}/${estimate.directLineCount}`
-                    : "카탈로그 견적 · 가정 단가"
-                  : "개념 범위 · 치수 확정 전"}
+                {proposalFresh && proposal
+                  ? `시공사 발행 제안 · ${new Date(proposal.publishedAt).toLocaleDateString("ko-KR")}`
+                  : displayEstimate
+                    ? displayEstimate.quotedLineCount > 0
+                      ? `카탈로그 견적 · 검토 단가 ${displayEstimate.quotedLineCount}/${displayEstimate.directLineCount}`
+                      : "카탈로그 견적 · 가정 단가"
+                    : "개념 범위 · 치수 확정 전"}
               </span>
             </div>
-            {estimate ? (
+            {displayEstimate ? (
               <>
                 <ul className="mt-2 divide-y divide-black/[0.06]">
-                  {[...estimate.lines, ...estimate.markupLines].map((line) => (
+                  {[...displayEstimate.lines, ...displayEstimate.markupLines].map((line) => (
                     <li
                       key={line.id}
                       className="flex items-baseline justify-between gap-3 py-1.5 text-xs"
@@ -266,7 +282,7 @@ export default async function ExpoSharedProposalPage({
                     합계 (부가세 별도)
                   </span>
                   <span className="tabular-nums text-lg font-bold text-blue-700">
-                    {formatKrw(estimate.totalKrw)}
+                    {formatKrw(displayEstimate.totalKrw)}
                   </span>
                 </div>
               </>
@@ -275,9 +291,17 @@ export default async function ExpoSharedProposalPage({
                 {formatKrw(range.lowKrw)} ~ {formatKrw(range.highKrw)}
               </p>
             ) : null}
+            {proposal && !proposalFresh && (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800">
+                이전 발행본({new Date(proposal.publishedAt).toLocaleDateString("ko-KR")})은
+                이후 변경으로 무효화되었습니다 — 아래 금액은 현재 계산
+                기준입니다.
+              </p>
+            )}
             <p className="mt-2 text-[11px] leading-4 text-black/45">
-              모든 단가는 allowance(가정) 상태로, 시공사 검토·발행 전 확정
-              금액이 아닙니다. 부가세 별도.
+              {proposalFresh
+                ? "시공사가 발행한 검토 단가(quoted) 기반 제안입니다. 계약 전 금액이며 부가세 별도."
+                : "모든 단가는 allowance(가정) 상태로, 시공사 검토·발행 전 확정 금액이 아닙니다. 부가세 별도."}
             </p>
           </div>
         )}

@@ -44,7 +44,7 @@ export interface ExpoReadinessInput {
   hasFootprint: boolean;
   dimensionsConfirmed: boolean;
   componentCount: number;
-  priceStage: "conceptual_range" | "catalog_estimate" | null;
+  priceStage: "conceptual_range" | "catalog_estimate" | "contractor_proposal" | null;
   /** 사용자가 브랜드 킷을 확정(사용 권한 확인 포함)했는가 */
   brandConfirmed?: boolean;
   /** 행사 규정 — 입력 여부와 위반 여부 (event-rules.ts 계산 결과) */
@@ -106,7 +106,14 @@ export function evaluateProposalReadiness(
         };
 
   const price: ExpoReadinessItem =
-    priceStage === "catalog_estimate"
+    priceStage === "contractor_proposal"
+      ? {
+          dimension: "price",
+          label: "금액",
+          state: "confirmed",
+          detail: "시공사 발행 제안 — 검토 단가(quoted) 기반",
+        }
+      : priceStage === "catalog_estimate"
       ? {
           dimension: "price",
           label: "금액",

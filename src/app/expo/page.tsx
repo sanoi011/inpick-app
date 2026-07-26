@@ -46,6 +46,12 @@ import {
   type ExpoEstimateOverrides,
 } from "@/lib/expo/estimate";
 import {
+  canPublishProposal,
+  isExpoProposalSnapshot,
+  isProposalStale,
+  type ExpoProposalSnapshot,
+} from "@/lib/expo/proposal";
+import {
   EXPO_DECISION_LABELS,
   isExpoClientDecision,
   type ExpoClientDecision,
@@ -211,6 +217,8 @@ export default function ExpoBriefPage() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [shareState, setShareState] = useState<"idle" | "loading" | "copied" | "error">("idle");
   const [clientDecision, setClientDecision] = useState<ExpoClientDecision | null>(null);
+  const [proposal, setProposal] = useState<ExpoProposalSnapshot | null>(null);
+  const [publishState, setPublishState] = useState<"idle" | "loading" | "error">("idle");
 
   function updateScene(op: (current: ExpoBoothScene) => ExpoBoothScene) {
     setSceneHistory((history) =>
@@ -243,9 +251,14 @@ export default function ExpoBriefPage() {
         const payload = (await response.json().catch(() => ({}))) as {
           projects?: Array<{ id: string; client_decision?: unknown }>;
         };
-        const row = payload.projects?.find((project) => project.id === serverProjectId);
+        const row = payload.projects?.find((project) => project.id === serverProjectId) as
+          | { id: string; client_decision?: unknown; proposal?: unknown }
+          | undefined;
         if (row && isExpoClientDecision(row.client_decision)) {
           setClientDecision(row.client_decision);
+        }
+        if (row && isExpoProposalSnapshot(row.proposal)) {
+          setProposal(row.proposal);
         }
       } catch {
         // 결정 조회 실패는 조용히 무시 (다음 로드에서 재시도)
@@ -481,6 +494,29 @@ export default function ExpoBriefPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function publishProposal() {
+    if (!serverProjectId || publishState === "loading") return;
+    setPublishState("loading");
+    try {
+      const response = await fetch("/api/expo/publish", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: serverProjectId }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        proposal?: unknown;
+      };
+      if (response.ok && isExpoProposalSnapshot(payload.proposal)) {
+        setProposal(payload.proposal);
+        setPublishState("idle");
+      } else {
+        setPublishState("error");
+      }
+    } catch {
+      setPublishState("error");
+    }
+  }
+
   async function shareProposal() {
     if (!serverProjectId || shareState === "loading") return;
     setShareState("loading");
@@ -529,6 +565,7 @@ export default function ExpoBriefPage() {
       setConceptImage(null);
       setServerProjectId(null); // 복제본은 새 프로젝트로 저장
       setClientDecision(null);
+      setProposal(null);
       const sourceScene = isExpoBoothScene(source.scene) ? source.scene : null;
       setSceneHistory(
         createSceneHistory(
@@ -619,11 +656,14 @@ export default function ExpoBriefPage() {
             hasFootprint: true,
             dimensionsConfirmed: Boolean(confirmedDims),
             componentCount: scene?.components.length ?? 0,
-            priceStage: catalogEstimate
-              ? "catalog_estimate"
-              : conceptualRange
-                ? "conceptual_range"
-                : null,
+            priceStage:
+              proposal && scene && catalogEstimate && !isProposalStale(proposal, scene, catalogEstimate)
+                ? "contractor_proposal"
+                : catalogEstimate
+                  ? "catalog_estimate"
+                  : conceptualRange
+                    ? "conceptual_range"
+                    : null,
             brandConfirmed: Boolean(brandKit),
             eventRules: {
               entered: hasEventRuleInput(mergedEventInfo),
@@ -633,7 +673,7 @@ export default function ExpoBriefPage() {
             officialServicesEntered: hasOfficialServicesInput(officialServices),
           })
         : null,
-    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems, clientDecision, officialServices],
+    [displayFootprint, confirmedDims, scene, catalogEstimate, conceptualRange, brandKit, mergedEventInfo, eventReviewItems, clientDecision, officialServices, proposal],
   );
 
   async function importBrand() {
@@ -1800,13 +1840,64 @@ export default function ExpoBriefPage() {
                         {formatKrw(catalogEstimate.totalKrw)}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={downloadEstimateCsv}
-                      className="mt-2 rounded-lg border border-black/15 px-3 py-1.5 text-[11px] font-bold text-black/70 hover:bg-zinc-50"
-                    >
-                      BOM/견적 CSV 내보내기
-                    </button>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={downloadEstimateCsv}
+                        className="rounded-lg border border-black/15 px-3 py-1.5 text-[11px] font-bold text-black/70 hover:bg-zinc-50"
+                      >
+                        BOM/견적 CSV 내보내기
+                      </button>
+                      {(() => {
+                        const gate = canPublishProposal(catalogEstimate, Boolean(confirmedDims));
+                        const fresh =
+                          proposal && scene && catalogEstimate
+                            ? !isProposalStale(proposal, scene, catalogEstimate)
+                            : false;
+                        if (fresh && proposal) {
+                          return (
+                            <span className="rounded-lg bg-green-50 px-3 py-1.5 text-[11px] font-bold text-green-700">
+                              제안 발행됨 ·{" "}
+                              {new Date(proposal.publishedAt).toLocaleDateString("ko-KR")}
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            type="button"
+                            onClick={publishProposal}
+                            disabled={!gate.ok || !serverProjectId || publishState === "loading"}
+                            title={!gate.ok ? gate.detail : !serverProjectId ? "로그인·저장 후 발행할 수 있습니다" : undefined}
+                            className="rounded-lg bg-blue-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {publishState === "loading"
+                              ? "발행 중…"
+                              : proposal
+                                ? "재발행 (변경 반영)"
+                                : "시공사 제안 발행"}
+                          </button>
+                        );
+                      })()}
+                    </div>
+                    {(() => {
+                      const gate = canPublishProposal(catalogEstimate, Boolean(confirmedDims));
+                      if (gate.ok) return null;
+                      return (
+                        <p className="mt-1 text-[10px] text-black/40">{gate.detail}</p>
+                      );
+                    })()}
+                    {proposal && scene && catalogEstimate &&
+                      isProposalStale(proposal, scene, catalogEstimate) && (
+                        <p className="mt-1 rounded-lg bg-amber-50 px-3 py-1.5 text-[10px] font-semibold text-amber-800">
+                          발행본이 현재 상태와 다릅니다 — 변경 사항을 반영하려면
+                          재발행하세요.
+                        </p>
+                      )}
+                    {publishState === "error" && (
+                      <p className="mt-1 text-[10px] font-semibold text-red-600">
+                        발행 실패 — 저장 완료 후 다시 시도해 주세요.
+                      </p>
+                    )}
                   </>
                 ) : conceptualRange ? (
                   <>
