@@ -4,19 +4,33 @@ import { Component, type ReactNode, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import type { ExpoProvisionalFootprint } from "@/lib/expo/footprint";
+import {
+  componentFootprintSize,
+  findCatalogItem,
+  type ExpoBoothScene,
+} from "@/lib/expo/scene";
 
 /**
  * Provisional booth shell — 면적 기반 임시 footprint의 3D 확인용 셸.
  * 가정(provisional)임을 화면에 상시 표기한다. 이 셸은 컨셉 확인용이며
  * 치수 확정 전 BOM/제안서의 근거가 되지 않는다.
  */
+export interface BoothSceneViewProps {
+  scene?: ExpoBoothScene | null;
+  selectedComponentId?: string | null;
+  onSelectComponent?: (id: string | null) => void;
+}
+
 export default function BoothShell3D({
   footprint,
   confirmed = false,
+  scene = null,
+  selectedComponentId = null,
+  onSelectComponent,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
-}) {
+} & BoothSceneViewProps) {
   const [webglReady, setWebglReady] = useState<boolean | null>(null);
   const [glCrashed, setGlCrashed] = useState(false);
 
@@ -85,7 +99,13 @@ export default function BoothShell3D({
   }
   return (
     <ShellErrorBoundary fallback={<BoothShellPoster footprint={footprint} reason="render_error" confirmed={confirmed} />}>
-      <BoothShellCanvas footprint={footprint} confirmed={confirmed} />
+      <BoothShellCanvas
+        footprint={footprint}
+        confirmed={confirmed}
+        scene={scene}
+        selectedComponentId={selectedComponentId}
+        onSelectComponent={onSelectComponent}
+      />
     </ShellErrorBoundary>
   );
 }
@@ -160,10 +180,13 @@ class ShellErrorBoundary extends Component<
 function BoothShellCanvas({
   footprint,
   confirmed = false,
+  scene = null,
+  selectedComponentId = null,
+  onSelectComponent,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
-}) {
+} & BoothSceneViewProps) {
   const { widthM: width, depthM: depth } = footprint.selected;
   const wallHeight = footprint.wallHeightM;
   const wallThickness = 0.08;
@@ -182,7 +205,12 @@ function BoothShellCanvas({
 
   return (
     <div className="relative h-[320px] w-full overflow-hidden rounded-2xl border border-black/10 bg-gradient-to-b from-slate-50 to-white sm:h-[400px]">
-      <Canvas camera={camera} shadows dpr={[1, 2]}>
+      <Canvas
+        camera={camera}
+        shadows
+        dpr={[1, 2]}
+        onPointerMissed={() => onSelectComponent?.(null)}
+      >
         <ambientLight intensity={0.7} />
         <directionalLight
           position={[6, 10, 4]}
@@ -241,6 +269,32 @@ function BoothShellCanvas({
             <meshStandardMaterial color="#fafafa" />
           </mesh>
         )}
+
+        {/* 카탈로그 컴포넌트 배치 */}
+        {(scene?.components ?? []).map((component) => {
+          const item = findCatalogItem(component.catalogId);
+          if (!item) return null;
+          const size = componentFootprintSize(component);
+          const isSelected = component.id === selectedComponentId;
+          return (
+            <mesh
+              key={component.id}
+              position={[component.x, item.heightM / 2, component.z]}
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelectComponent?.(component.id);
+              }}
+              castShadow
+            >
+              <boxGeometry args={[size.w, item.heightM, size.d]} />
+              <meshStandardMaterial
+                color={item.color}
+                emissive={isSelected ? "#1d4ed8" : "#000000"}
+                emissiveIntensity={isSelected ? 0.45 : 0}
+              />
+            </mesh>
+          );
+        })}
 
         <OrbitControls
           makeDefault

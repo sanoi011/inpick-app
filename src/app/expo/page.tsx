@@ -13,6 +13,18 @@ import {
   type ExpoProvisionalFootprint,
 } from "@/lib/expo/footprint";
 import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/client";
+import {
+  EXPO_BASE_CATALOG,
+  addExpoComponent,
+  createExpoScene,
+  evaluateExpoScene,
+  isExpoBoothScene,
+  moveExpoComponent,
+  removeExpoComponent,
+  resizeExpoScene,
+  rotateExpoComponent,
+  type ExpoBoothScene,
+} from "@/lib/expo/scene";
 
 const BoothShell3D = dynamic(() => import("@/components/expo/BoothShell3D"), {
   ssr: false,
@@ -33,13 +45,14 @@ const BUILDER_KITS = [
 type StartMode = "quick_area" | "builder_kit";
 
 interface ExpoBriefDraft {
-  version: 2;
+  version: 3;
   savedAt: string;
   startMode: StartMode;
   areaInput: string;
   unit: ExpoAreaUnit;
   selectedCandidateLabel: string | null;
   confirmedDimensions: ExpoConfirmedDimensions | null;
+  scene: ExpoBoothScene | null;
   serverProjectId: string | null;
   quickFields: {
     builderName: string;
@@ -48,7 +61,7 @@ interface ExpoBriefDraft {
   };
 }
 
-const DRAFT_KEY = "expo_brief_draft_v2";
+const DRAFT_KEY = "expo_brief_draft_v3";
 
 const BOOTH_TYPE_LABELS: Record<ExpoBoothType, string> = {
   inline: "인라인 (오픈 1면)",
@@ -77,6 +90,8 @@ export default function ExpoBriefPage() {
   const [dimDepth, setDimDepth] = useState("");
   const [dimHeight, setDimHeight] = useState("2.5");
   const [dimBoothType, setDimBoothType] = useState<ExpoBoothType>("inline");
+  const [scene, setScene] = useState<ExpoBoothScene | null>(null);
+  const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
 
   // 초기 복구 — 로컬 임시 저장분 (서버 저장은 다음 슬라이스, UI에 정직하게 표기)
   useEffect(() => {
@@ -84,7 +99,7 @@ export default function ExpoBriefPage() {
       const raw = window.localStorage.getItem(DRAFT_KEY);
       if (!raw) return;
       const draft = JSON.parse(raw) as ExpoBriefDraft;
-      if (draft.version !== 2) return;
+      if (draft.version !== 3) return;
       setStartMode(draft.startMode);
       setAreaInput(draft.areaInput);
       setUnit(draft.unit);
@@ -99,6 +114,7 @@ export default function ExpoBriefPage() {
           setSelectedLabel(draft.selectedCandidateLabel);
           setConfirmedDims(draft.confirmedDimensions);
           setServerProjectId(draft.serverProjectId);
+          if (isExpoBoothScene(draft.scene)) setScene(draft.scene);
         } catch {
           // 복구 실패는 새 입력으로 시작
         }
@@ -112,13 +128,14 @@ export default function ExpoBriefPage() {
   // autosave (로컬)
   useEffect(() => {
     const draft: ExpoBriefDraft = {
-      version: 2,
+      version: 3,
       savedAt: new Date().toISOString(),
       startMode,
       areaInput,
       unit,
       selectedCandidateLabel: selectedLabel,
       confirmedDimensions: confirmedDims,
+      scene,
       serverProjectId,
       quickFields: { builderName, clientName, eventName },
     };
@@ -127,7 +144,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -154,6 +171,7 @@ export default function ExpoBriefPage() {
             areaUnit: unit,
             footprint,
             confirmedDimensions: confirmedDims,
+            scene,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -171,7 +189,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
     setError(null);
@@ -180,6 +198,12 @@ export default function ExpoBriefPage() {
       setFootprint(fp);
       setSelectedLabel(fp.selected.label);
       setConfirmedDims(null);
+      setSelectedComponentId(null);
+      setScene((prev) =>
+        prev && prev.components.length > 0
+          ? resizeExpoScene(prev, fp.selected.widthM, fp.selected.depthM)
+          : createExpoScene(fp.selected.widthM, fp.selected.depthM),
+      );
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
       setDimHeight(String(fp.wallHeightM));
@@ -384,7 +408,126 @@ export default function ExpoBriefPage() {
                   : displayFootprint
               }
               confirmed={Boolean(confirmedDims)}
+              scene={scene}
+              selectedComponentId={selectedComponentId}
+              onSelectComponent={setSelectedComponentId}
             />
+
+            {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
+            {scene && (
+              <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-bold text-black">부스 구성 요소</p>
+                  <span className="text-xs text-black/45">
+                    {scene.components.length}개 배치됨
+                  </span>
+                </div>
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {EXPO_BASE_CATALOG.map((item) => (
+                    <button
+                      key={item.catalogId}
+                      type="button"
+                      onClick={() => {
+                        const componentId = `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
+                        setScene((prev) =>
+                          prev ? addExpoComponent(prev, item.catalogId, componentId) : prev,
+                        );
+                        setSelectedComponentId(componentId);
+                      }}
+                      className="shrink-0 rounded-xl border border-black/15 px-3 py-2 text-xs font-bold text-black/70 hover:border-blue-400 hover:text-blue-700"
+                    >
+                      <span
+                        aria-hidden
+                        className="mr-1.5 inline-block h-2.5 w-2.5 rounded-sm align-middle"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      + {item.nameKo}
+                    </button>
+                  ))}
+                </div>
+
+                {selectedComponentId && scene.components.some((c) => c.id === selectedComponentId) && (
+                  <div className="mt-3 rounded-xl bg-blue-50 p-3">
+                    <p className="text-xs font-bold text-blue-800">
+                      선택됨:{" "}
+                      {EXPO_BASE_CATALOG.find(
+                        (i) =>
+                          i.catalogId ===
+                          scene.components.find((c) => c.id === selectedComponentId)?.catalogId,
+                      )?.nameKo ?? "구성 요소"}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      {(
+                        [
+                          ["←", -0.5, 0, "왼쪽으로 0.5m"],
+                          ["→", 0.5, 0, "오른쪽으로 0.5m"],
+                          ["↑", 0, -0.5, "안쪽으로 0.5m"],
+                          ["↓", 0, 0.5, "앞쪽으로 0.5m"],
+                        ] as const
+                      ).map(([label, dx, dz, aria]) => (
+                        <button
+                          key={aria}
+                          type="button"
+                          aria-label={aria}
+                          onClick={() =>
+                            setScene((prev) =>
+                              prev
+                                ? moveExpoComponent(prev, selectedComponentId, dx, dz)
+                                : prev,
+                            )
+                          }
+                          className="h-9 w-9 rounded-lg border border-blue-200 bg-white text-sm font-bold text-blue-700 hover:bg-blue-100"
+                        >
+                          {label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setScene((prev) =>
+                            prev
+                              ? rotateExpoComponent(prev, selectedComponentId)
+                              : prev,
+                          )
+                        }
+                        className="h-9 rounded-lg border border-blue-200 bg-white px-3 text-xs font-bold text-blue-700 hover:bg-blue-100"
+                      >
+                        90° 회전
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScene((prev) =>
+                            prev
+                              ? removeExpoComponent(prev, selectedComponentId)
+                              : prev,
+                          );
+                          setSelectedComponentId(null);
+                        }}
+                        className="h-9 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-600 hover:bg-red-50"
+                      >
+                        삭제
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {scene && evaluateExpoScene(scene).length > 0 && (
+                  <ul className="mt-2 space-y-1">
+                    {evaluateExpoScene(scene).map((warning, index) => (
+                      <li
+                        key={`${warning.code}-${index}`}
+                        className="rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-semibold text-amber-800"
+                      >
+                        {warning.code === "components_overlap"
+                          ? "⚠ 구성 요소가 서로 겹칩니다 — 위치를 조정해 주세요."
+                          : "⚠ 구성 요소가 벽면에 붙어 있습니다 — 통로/설치 여유를 확인하세요."}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
 
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
@@ -457,17 +600,22 @@ export default function ExpoBriefPage() {
                     e.preventDefault();
                     setConfirmError(null);
                     try {
-                      setConfirmedDims(
-                        confirmExpoDimensions(
-                          {
-                            widthM: Number(dimWidth),
-                            depthM: Number(dimDepth),
-                            boothType: dimBoothType,
-                            wallHeightM: Number(dimHeight),
-                          },
-                          new Date().toISOString(),
-                        ),
+                      const next = confirmExpoDimensions(
+                        {
+                          widthM: Number(dimWidth),
+                          depthM: Number(dimDepth),
+                          boothType: dimBoothType,
+                          wallHeightM: Number(dimHeight),
+                        },
+                        new Date().toISOString(),
                       );
+                      setScene((prev) =>
+                        prev
+                          ? resizeExpoScene(prev, next.widthM, next.depthM)
+                          : createExpoScene(next.widthM, next.depthM),
+                      );
+                      setConfirmedDims(next);
+
                     } catch (cause) {
                       setConfirmError(
                         cause instanceof ExpoDimensionError
