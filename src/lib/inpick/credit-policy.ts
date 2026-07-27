@@ -23,7 +23,7 @@ export const CREDIT_COSTS = {
   "partial-ai-room": 5, // 부분 AI 인테리어: 거실·방·주방·욕실 1실 렌더
   "render-room-high": 2, // 고화질 재생성
   "refine-render": 2, // 정밀 영역 선택 후 GPT Image 2 자재 재렌더
-  "expo-concept": 1, // 엑스포 부스 AI 컨셉 이미지 1장 (GPT Image 2)
+  "expo-concept": 0, // 엑스포 부스 AI 컨셉 이미지 (테스트 기간 무료 — 정식 오픈 시 1로 복원, 로그인은 필수 유지)
   "unlock-estimate-details": ESTIMATE_BUNDLE_TOKEN_COST, // Step3 세부견적 + 전체 문서 영구 공개
   "normalize-floorplan": 1, // 캐시 miss 시 (정형화)
   "extract-material": 0, // 자동 분석 무료

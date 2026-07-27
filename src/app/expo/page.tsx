@@ -951,7 +951,7 @@ export default function ExpoBriefPage() {
           setConceptGallery((gallery) => [entry, ...gallery].slice(0, 8));
         }
       } else if (response.status === 401) {
-        setConceptError("로그인 후 이용할 수 있습니다. (토큰 1개 사용)");
+        setConceptError("로그인 후 이용할 수 있습니다. (테스트 기간 무료)");
       } else if (response.status === 402) {
         setConceptError("토큰이 부족합니다 — 우측 상단에서 충전해 주세요.");
       } else if (response.status === 503) {
@@ -1602,7 +1602,7 @@ export default function ExpoBriefPage() {
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
                 <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
-                  GPT Image 2 · 토큰 1개
+                  GPT Image 2 · 테스트 무료
                 </span>
               </div>
               <p className="mt-1 text-xs text-black/50">
