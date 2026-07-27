@@ -562,14 +562,8 @@ export default function ExpoBriefPage() {
   }, [footprint, confirmedDims, scene, conceptImage, conceptGallery, contractPrep, printItems, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function handleSubmit(event: FormEvent) {
+    // 면적 입력은 상태로만 유지 — 생성은 아래 AI 컨셉 카드에서만 일어난다
     event.preventDefault();
-    const area = Number(areaInput);
-    if (!Number.isFinite(area) || area <= 0) {
-      setError("면적을 확인해 주세요.");
-      return;
-    }
-    setError(null);
-    void generateConcept();
   }
 
   /** 컨셉 확정 — 3D 부스 생성(무벽 기본, 프롬프트 벽 언급 시 그래픽 월) 후 배치 단계로 */
@@ -582,11 +576,8 @@ export default function ExpoBriefPage() {
       setSelectedLabel(fp.selected.label);
       setConfirmedDims(null);
       setSelectedComponentId(null);
-      const current = sceneHistory.present;
-      let nextScene =
-        current && current.components.length > 0
-          ? resizeExpoScene(current, fp.selected.widthM, fp.selected.depthM)
-          : createExpoScene(fp.selected.widthM, fp.selected.depthM);
+      // 이전 작업 잔재를 승계하지 않는다 — 컨셉 이미지 기반 재구성이 이어진다
+      let nextScene = createExpoScene(fp.selected.widthM, fp.selected.depthM);
       if (promptMentionsWall(conceptPrompt)) {
         nextScene = addWallFromPrompt(
           nextScene,
@@ -1114,6 +1105,15 @@ export default function ExpoBriefPage() {
   async function generateConcept() {
     if (conceptLoading) return;
     setConceptError(null);
+    if (!conceptPrompt.trim()) {
+      setConceptError("원하는 부스 컨셉을 먼저 적어 주세요.");
+      return;
+    }
+    const areaForDims = Number(areaInput);
+    if (!confirmedDims && !displayFootprint && (!Number.isFinite(areaForDims) || areaForDims <= 0)) {
+      setConceptError("부스 면적을 먼저 입력해 주세요.");
+      return;
+    }
     setConceptLoading(true);
     try {
       let dims: { widthM: number; depthM: number; wallHeightM: number; boothType: ExpoBoothType };
@@ -1308,12 +1308,10 @@ export default function ExpoBriefPage() {
               </div>
             </div>
 
-            <button
-              type="submit"
-              className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white transition hover:opacity-95"
-            >
-              다음 — 컨셉 프롬프트 입력
-            </button>
+            <p className="mt-2 text-[11px] text-black/45">
+              면적을 입력한 뒤, 아래 <b>AI 컨셉 렌더</b>에 원하는 부스
+              분위기를 적고 컨셉을 생성하세요.
+            </p>
           </form>
         ) : startMode === "clone_reflow" ? (
           <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
