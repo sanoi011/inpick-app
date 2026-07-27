@@ -1596,33 +1596,6 @@ export default function ExpoBriefPage() {
             >
               ← 정보·프롬프트 수정
             </button>
-            <BoothShell3D
-              footprint={
-                confirmedDims
-                  ? {
-                      ...displayFootprint,
-                      selected: {
-                        widthM: confirmedDims.widthM,
-                        depthM: confirmedDims.depthM,
-                        areaSqm: confirmedDims.areaSqm,
-                        standardMatch: false,
-                        label: `${confirmedDims.widthM}m × ${confirmedDims.depthM}m`,
-                      },
-                      boothType: confirmedDims.boothType,
-                      openSides: confirmedDims.openSides,
-                      wallHeightM: confirmedDims.wallHeightM,
-                    }
-                  : displayFootprint
-              }
-              confirmed={Boolean(confirmedDims)}
-              scene={scene}
-              selectedComponentId={selectedComponentId}
-              onSelectComponent={setSelectedComponentId}
-              cameraPreset={cameraPreset}
-              onCameraPresetChange={setCameraPreset}
-              brandColorHex={brandKit?.colorHex ?? null}
-              brandLogoUrl={brandKit?.logoUrl ?? null}
-            />
 
             {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
@@ -1712,6 +1685,33 @@ export default function ExpoBriefPage() {
                 </div>
               )}
             </div>
+            <BoothShell3D
+              footprint={
+                confirmedDims
+                  ? {
+                      ...displayFootprint,
+                      selected: {
+                        widthM: confirmedDims.widthM,
+                        depthM: confirmedDims.depthM,
+                        areaSqm: confirmedDims.areaSqm,
+                        standardMatch: false,
+                        label: `${confirmedDims.widthM}m × ${confirmedDims.depthM}m`,
+                      },
+                      boothType: confirmedDims.boothType,
+                      openSides: confirmedDims.openSides,
+                      wallHeightM: confirmedDims.wallHeightM,
+                    }
+                  : displayFootprint
+              }
+              confirmed={Boolean(confirmedDims)}
+              scene={scene}
+              selectedComponentId={selectedComponentId}
+              onSelectComponent={setSelectedComponentId}
+              cameraPreset={cameraPreset}
+              onCameraPresetChange={setCameraPreset}
+              brandColorHex={brandKit?.colorHex ?? null}
+              brandLogoUrl={brandKit?.logoUrl ?? null}
+            />
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
             {scene && (
