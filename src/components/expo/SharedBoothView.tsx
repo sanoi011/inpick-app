@@ -24,12 +24,14 @@ export default function SharedBoothView({
   scene,
   brandColorHex,
   brandLogoUrl,
+  wallTextures = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed: boolean;
   scene: ExpoBoothScene | null;
   brandColorHex: string | null;
   brandLogoUrl: string | null;
+  wallTextures?: Record<string, string> | null;
 }) {
   return (
     <div className="mt-4 print:hidden">
@@ -40,6 +42,7 @@ export default function SharedBoothView({
         selectedComponentId={null}
         brandColorHex={brandColorHex}
         brandLogoUrl={brandLogoUrl}
+        wallTextures={wallTextures}
       />
     </div>
   );

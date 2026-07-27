@@ -28,6 +28,7 @@ import {
 import type { ExpoConfirmedDimensions } from "@/lib/expo/footprint";
 import { isExpoClientDecision } from "@/lib/expo/client-decision";
 import { isExpoProposalSnapshot, isProposalStale } from "@/lib/expo/proposal";
+import { isExpoPrintItems } from "@/lib/expo/print-items";
 import ProposalDecisionForm from "@/components/expo/ProposalDecisionForm";
 import PrintProposalButton from "@/components/expo/PrintProposalButton";
 import SharedBoothView from "@/components/expo/SharedBoothView";
@@ -57,7 +58,7 @@ export default async function ExpoSharedProposalPage({
   const { data: project } = await admin
     .from("expo_projects")
     .select(
-      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, proposal, contract_prep, quick_fields, client_decision, updated_at",
+      "title, area_input, area_unit, footprint, confirmed_dimensions, scene, concept_image_url, brand, event, official_services, estimate_overrides, proposal, contract_prep, print_items, quick_fields, client_decision, updated_at",
     )
     .eq("share_token", token)
     .maybeSingle();
@@ -155,6 +156,16 @@ export default async function ExpoSharedProposalPage({
         : rawFootprint
       : null;
 
+  const printItems = isExpoPrintItems(project.print_items)
+    ? project.print_items
+    : [];
+  const printArtworks = printItems.filter(
+    (item) => item.artworkUrl && item.artworkUrl.startsWith("https://"),
+  );
+  const wallTextures = Object.fromEntries(
+    printArtworks.map((item) => [item.id, item.artworkUrl as string]),
+  );
+
   const componentCounts = new Map<string, number>();
   for (const component of scene?.components ?? []) {
     componentCounts.set(
@@ -188,6 +199,7 @@ export default async function ExpoSharedProposalPage({
             scene={scene}
             brandColorHex={brand?.colorHex ?? null}
             brandLogoUrl={brand?.logoUrl ?? null}
+            wallTextures={wallTextures}
           />
         )}
 
@@ -349,6 +361,31 @@ export default async function ExpoSharedProposalPage({
                 ? "시공사가 발행한 검토 단가(quoted) 기반 제안입니다. 계약 전 금액이며 부가세 별도."
                 : "모든 단가는 allowance(가정) 상태로, 시공사 검토·발행 전 확정 금액이 아닙니다. 부가세 별도."}
             </p>
+          </div>
+        )}
+
+        {printArtworks.length > 0 && (
+          <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm print:break-inside-avoid print:shadow-none">
+            <p className="text-sm font-bold text-black">인쇄물 시안</p>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              {printArtworks.map((item) => (
+                <figure key={item.id} className="relative overflow-hidden rounded-xl border border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- 인쇄물 시안 */}
+                  <img
+                    src={item.artworkUrl as string}
+                    alt={`${item.label} 시안`}
+                    className="w-full"
+                  />
+                  <figcaption className="px-2 py-1.5 text-[11px] font-semibold text-black/65">
+                    {item.label}
+                    {item.confirmed ? " · 확정" : " · 검토 중"}
+                  </figcaption>
+                  <span className="absolute left-1.5 top-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-bold text-white">
+                    AI 시안 — 인쇄 원본 아님
+                  </span>
+                </figure>
+              ))}
+            </div>
           </div>
         )}
 

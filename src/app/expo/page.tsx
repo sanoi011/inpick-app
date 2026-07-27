@@ -1932,8 +1932,8 @@ export default function ExpoBriefPage() {
         )}
         {restored && !error && (
           <p role="status" className="mt-3 text-xs font-medium text-black/45">
-            이전 작성 내용을 이 기기에서 복구했습니다. (서버 저장은 준비 중 —
-            현재는 이 기기에만 임시 저장됩니다)
+            이전 작성 내용을 복구했습니다 — 로그인 상태면 서버에도 자동
+            저장됩니다.
           </p>
         )}
 
