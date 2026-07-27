@@ -11,10 +11,12 @@ import {
   evaluateExpoScene,
   expoDecalPlacement,
   addWallFromPrompt,
+  applyConceptSuggestions,
   promptMentionsWall,
   isExpoBoothScene,
   moveExpoComponent,
   removeExpoComponent,
+  resizeExpoComponent,
   resizeExpoScene,
   rotateExpoComponent,
 } from "../scene";
@@ -202,4 +204,47 @@ test("prompt wall op adds one backwall only when asked and none exists", () => {
   // 이미 벽 요소가 있으면 추가하지 않는다
   const again = addWallFromPrompt(scene, "w2");
   assert.equal(again.components.length, scene.components.length);
+});
+
+test("concept suggestions top up counts without touching existing placements", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "product_table", "mine");
+  const before = scene.components.find((c) => c.id === "mine")!;
+  const applied = applyConceptSuggestions(
+    scene,
+    [
+      { catalogId: "product_table", count: 2 },
+      { catalogId: "graphic_wall", count: 1 },
+      { catalogId: "mystery", count: 3 },
+      { catalogId: "info_counter", count: 99 },
+    ],
+    "ai",
+  );
+  const tables = applied.components.filter((c) => c.catalogId === "product_table");
+  assert.equal(tables.length, 2); // 기존 1 + 부족분 1
+  const mine = applied.components.find((c) => c.id === "mine")!;
+  assert.deepEqual({ x: mine.x, z: mine.z }, { x: before.x, z: before.z });
+  assert.equal(applied.components.filter((c) => c.catalogId === "graphic_wall").length, 1);
+  assert.equal(applied.components.filter((c) => c.catalogId === "mystery").length, 0);
+  assert.equal(applied.components.filter((c) => c.catalogId === "info_counter").length, 4); // 종류당 캡
+  const wall = applied.components.find((c) => c.catalogId === "graphic_wall")!;
+  assert.equal(wall.z, -1.45); // 뒷면 밀착
+});
+
+test("component size overrides resize the footprint and survive rotation", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "product_table", "t1");
+  scene = resizeExpoComponent(scene, "t1", 2.5, 1.2);
+  const resized = scene.components.find((c) => c.id === "t1")!;
+  assert.equal(resized.widthM, 2.5);
+  assert.equal(resized.depthM, 1.2);
+  assert.deepEqual(componentFootprintSize(resized), { w: 2.5, d: 1.2 });
+  scene = rotateExpoComponent(scene, "t1");
+  const rotated = scene.components.find((c) => c.id === "t1")!;
+  assert.deepEqual(componentFootprintSize(rotated), { w: 1.2, d: 2.5 });
+  // 극단값은 0.1–20m로 클램프
+  scene = resizeExpoComponent(scene, "t1", 0.01, 999);
+  const clamped = scene.components.find((c) => c.id === "t1")!;
+  assert.equal(clamped.widthM, 0.1);
+  assert.equal(clamped.depthM, 20);
 });

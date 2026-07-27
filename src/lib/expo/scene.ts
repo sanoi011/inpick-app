@@ -108,6 +108,9 @@ export interface ExpoSceneComponent {
   z: number;
   /** 0 | 90 | 180 | 270 (도) */
   rotation: number;
+  /** 카탈로그 기본 크기 덮어쓰기 (m) — 미지정 시 카탈로그 값 */
+  widthM?: number;
+  depthM?: number;
 }
 
 export interface ExpoBoothScene {
@@ -165,10 +168,10 @@ export function componentFootprintSize(component: ExpoSceneComponent): {
 } {
   const item = findCatalogItem(component.catalogId);
   if (!item) return { w: 0.5, d: 0.5 };
+  const baseW = component.widthM ?? item.widthM;
+  const baseD = component.depthM ?? item.depthM;
   const rotated = component.rotation % 180 !== 0;
-  return rotated
-    ? { w: item.depthM, d: item.widthM }
-    : { w: item.widthM, d: item.depthM };
+  return rotated ? { w: baseD, d: baseW } : { w: baseW, d: baseD };
 }
 
 export function addExpoComponent(
@@ -225,6 +228,28 @@ export function rotateExpoComponent(
   });
   const components = [...scene.components];
   components[index] = rotated;
+  return bump({ ...scene, components });
+}
+
+/** 컴포넌트 크기 변경 (0.1–20m, 0.1m 단위 반올림) — 위치는 새 크기로 재클램프 */
+export function resizeExpoComponent(
+  scene: ExpoBoothScene,
+  componentId: string,
+  widthM: number,
+  depthM: number,
+): ExpoBoothScene {
+  const index = scene.components.findIndex((c) => c.id === componentId);
+  if (index < 0) throw new ExpoSceneError("EXPO_SCENE_COMPONENT_NOT_FOUND");
+  const clampSize = (value: number) =>
+    Math.min(20, Math.max(0.1, Math.round(value * 10) / 10));
+  const current = scene.components[index];
+  const resized = clampToBooth(scene, {
+    ...current,
+    widthM: clampSize(widthM),
+    depthM: clampSize(depthM),
+  });
+  const components = [...scene.components];
+  components[index] = resized;
   return bump({ ...scene, components });
 }
 
@@ -429,4 +454,50 @@ export function addWallFromPrompt(
   const withWall = addExpoComponent(scene, "graphic_wall", componentId);
   // 뒷면(-z)으로 밀어 벽면 위치에 배치 — wallMounted 클램프가 한계를 잡는다
   return moveExpoComponent(withWall, componentId, 0, -100);
+}
+
+export interface ExpoConceptSuggestion {
+  catalogId: string;
+  count: number;
+}
+
+/**
+ * 컨셉 이미지 비전 분석 결과를 씬에 반영한다 (Phase 3 image-to-scene 제안).
+ * - 카탈로그에 없는 id는 무시, 종류당 최대 4개·씬 한도 준수.
+ * - 이미 있는 수량은 유지하고 부족분만 추가 — 사용자 배치를 덮지 않는다.
+ * - 결과는 일반 씬 연산 하나로 적용돼 되돌리기 1번으로 취소된다.
+ */
+export function applyConceptSuggestions(
+  scene: ExpoBoothScene,
+  suggestions: ExpoConceptSuggestion[],
+  idPrefix: string,
+): ExpoBoothScene {
+  let next = scene;
+  let placed = 0;
+  let wallPlaced = 0;
+  for (const suggestion of suggestions) {
+    const item = findCatalogItem(suggestion.catalogId);
+    if (!item) continue;
+    const want = Math.min(Math.max(0, Math.floor(suggestion.count)), 4);
+    const have = next.components.filter(
+      (component) => component.catalogId === suggestion.catalogId,
+    ).length;
+    for (let index = have; index < want; index += 1) {
+      if (next.components.length >= EXPO_MAX_COMPONENTS) return next;
+      const id = `${idPrefix}_${suggestion.catalogId}_${index}`;
+      next = addExpoComponent(next, suggestion.catalogId, id);
+      if (item.wallMounted) {
+        // 벽 요소는 뒷면에 나란히
+        next = moveExpoComponent(next, id, (wallPlaced - 1) * 1.5, -100);
+        wallPlaced += 1;
+      } else {
+        // 바닥 요소는 3열 그리드로 간단히 스태거
+        const column = placed % 3;
+        const row = Math.floor(placed / 3);
+        next = moveExpoComponent(next, id, (column - 1) * 1.5, 0.5 + row);
+        placed += 1;
+      }
+    }
+  }
+  return next;
 }
