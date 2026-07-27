@@ -35,6 +35,8 @@ export interface BoothSceneViewProps {
   brandLogoUrl?: string | null;
   /** 컨셉 이미지 URL — 그래픽 월 전면 텍스처(컨셉 전용 표기 하에) */
   wallTextureUrl?: string | null;
+  /** 컴포넌트별 인쇄물 아트워크 텍스처 (componentId → url) */
+  wallTextures?: Record<string, string> | null;
   scene?: ExpoBoothScene | null;
   selectedComponentId?: string | null;
   onSelectComponent?: (id: string | null) => void;
@@ -51,6 +53,7 @@ export default function BoothShell3D({
   brandColorHex = null,
   brandLogoUrl = null,
   wallTextureUrl = null,
+  wallTextures = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -134,6 +137,7 @@ export default function BoothShell3D({
         brandColorHex={brandColorHex}
         brandLogoUrl={brandLogoUrl}
         wallTextureUrl={wallTextureUrl}
+        wallTextures={wallTextures}
       />
     </ShellErrorBoundary>
   );
@@ -335,6 +339,7 @@ function BoothShellCanvas({
   brandColorHex = null,
   brandLogoUrl = null,
   wallTextureUrl = null,
+  wallTextures = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -449,15 +454,21 @@ function BoothShellCanvas({
                   emissiveIntensity={isSelected ? 0.45 : 0}
                 />
               </mesh>
-              {component.catalogId === "graphic_wall" && wallTextureUrl && (
-                <BrandLogoDecal
-                  url={wallTextureUrl}
-                  fit="cover"
-                  placement={{
-                    ...expoDecalPlacement(component, item),
-                  }}
-                />
-              )}
+              {(() => {
+                const texture =
+                  wallTextures?.[component.id] ??
+                  (component.catalogId === "graphic_wall" ? wallTextureUrl : null);
+                if (!texture || !item.wallMounted && component.catalogId !== "signage_tower") {
+                  return null;
+                }
+                return (
+                  <BrandLogoDecal
+                    url={texture}
+                    fit="cover"
+                    placement={{ ...expoDecalPlacement(component, item) }}
+                  />
+                );
+              })()}
               {component.catalogId === "graphic_wall" && brandLogoUrl && (
                 <BrandLogoDecal
                   url={brandLogoUrl}

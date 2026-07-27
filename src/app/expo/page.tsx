@@ -51,6 +51,13 @@ import {
   type ExpoEstimateOverrides,
 } from "@/lib/expo/estimate";
 import {
+  EXPO_PRINT_KIND_LABELS,
+  allPrintsConfirmed,
+  derivePrintItems,
+  isExpoPrintItems,
+  type ExpoPrintItem,
+} from "@/lib/expo/print-items";
+import {
   canPublishProposal,
   isExpoProposalSnapshot,
   isProposalStale,
@@ -164,6 +171,7 @@ interface ExpoBriefDraft {
   contractPrep?: { startedAt: string; note: string } | null;
   conceptWallTextureUrl?: string | null;
   conceptAccentHex?: string | null;
+  printItems?: ExpoPrintItem[];
   eventInfo?: ExpoEventInfo;
   officialServices?: ExpoOfficialServices;
   estimateOverrides?: ExpoEstimateOverrides;
@@ -228,6 +236,10 @@ export default function ExpoBriefPage() {
   // 선택 컴포넌트 크기 입력 (적용 버튼으로 확정)
   const [sizeDraftW, setSizeDraftW] = useState("");
   const [sizeDraftD, setSizeDraftD] = useState("");
+  // 인쇄물 — 씬 파생 목록 (note/첨부/아트워크/확정은 사용자 데이터)
+  const [printItems, setPrintItems] = useState<ExpoPrintItem[]>([]);
+  const [printBusyId, setPrintBusyId] = useState<string | null>(null);
+  const [printError, setPrintError] = useState<string | null>(null);
   // 브랜드 — URL 후보 추출은 자동 확정 금지, 사용자가 선택+권한 확인 후 적용
   const [brandUrl, setBrandUrl] = useState("");
   const [brandLoading, setBrandLoading] = useState(false);
@@ -343,6 +355,13 @@ export default function ExpoBriefPage() {
     };
   }, [startMode, cloneProjects]);
 
+  // 인쇄물 단계 진입/씬 변경 시 목록 파생 (기존 입력 유지)
+  useEffect(() => {
+    if (flowStep !== "print" && flowStep !== "final") return;
+    setPrintItems((existing) => derivePrintItems(sceneHistory.present, existing));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- present 스냅샷 기준
+  }, [flowStep, sceneHistory.present]);
+
   // 선택 변경 시 크기 입력칸을 현재 값으로 동기화
   useEffect(() => {
     if (!selectedComponentId) return;
@@ -391,6 +410,7 @@ export default function ExpoBriefPage() {
             setConceptImage(draft.conceptImageUrl);
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
+          if (isExpoPrintItems(draft.printItems)) setPrintItems(draft.printItems);
           if (
             typeof draft.conceptWallTextureUrl === "string" &&
             draft.conceptWallTextureUrl.startsWith("https://")
@@ -470,6 +490,7 @@ export default function ExpoBriefPage() {
       contractPrep,
       conceptWallTextureUrl: conceptWallTexture ?? undefined,
       conceptAccentHex: conceptAccent ?? undefined,
+      printItems,
       eventInfo,
       officialServices,
       estimateOverrides,
@@ -481,7 +502,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, contractPrep, conceptWallTexture, conceptAccent, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, contractPrep, conceptWallTexture, conceptAccent, printItems, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -519,6 +540,7 @@ export default function ExpoBriefPage() {
             estimateOverrides,
             conceptGallery,
             contractPrep,
+            printItems,
             quickFields: { builderName, clientName, eventName },
           }),
         });
@@ -536,7 +558,7 @@ export default function ExpoBriefPage() {
       }
     }, 1200);
     return () => window.clearTimeout(timer);
-  }, [footprint, confirmedDims, scene, conceptImage, conceptGallery, contractPrep, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
+  }, [footprint, confirmedDims, scene, conceptImage, conceptGallery, contractPrep, printItems, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -960,6 +982,74 @@ export default function ExpoBriefPage() {
     });
     setBrandCandidates(null);
     setBrandLoading(false);
+  }
+
+  function patchPrintItem(id: string, patch: Partial<ExpoPrintItem>) {
+    setPrintItems((items) =>
+      items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
+    );
+  }
+
+  async function uploadPrintRef(id: string, file: File) {
+    setPrintError(null);
+    setPrintBusyId(id);
+    try {
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(file);
+      });
+      const response = await fetch("/api/expo/print-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageBase64: dataUrl }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as { url?: string };
+      if (response.ok && payload.url) {
+        patchPrintItem(id, { refImageUrl: payload.url });
+      } else if (response.status === 401) {
+        setPrintError("로그인 후 첨부할 수 있습니다.");
+      } else {
+        setPrintError("첨부 업로드에 실패했습니다.");
+      }
+    } catch {
+      setPrintError("첨부 업로드에 실패했습니다.");
+    } finally {
+      setPrintBusyId(null);
+    }
+  }
+
+  async function generatePrintArtwork(item: ExpoPrintItem) {
+    setPrintError(null);
+    setPrintBusyId(item.id);
+    try {
+      const response = await fetch("/api/expo/print-artwork", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: item.kind,
+          note: item.note,
+          boothPrompt: conceptPrompt,
+          brandColorHex: brandKit?.colorHex ?? conceptAccent,
+          refImageUrl: item.refImageUrl,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        artworkUrl?: string;
+      };
+      if (response.ok && payload.artworkUrl) {
+        patchPrintItem(item.id, { artworkUrl: payload.artworkUrl, confirmed: false });
+      } else if (response.status === 401) {
+        setPrintError("로그인 후 생성할 수 있습니다. (테스트 기간 무료)");
+      } else {
+        setPrintError("아트워크 생성에 실패했습니다 — 다시 시도해 주세요.");
+      }
+    } catch {
+      setPrintError("네트워크 오류 — 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setPrintBusyId(null);
+    }
   }
 
   async function applyConceptToScene() {
@@ -1836,12 +1926,109 @@ export default function ExpoBriefPage() {
         )}
 
         {flowStep === "print" && (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-            <p className="text-sm font-bold text-black">인쇄물 컨셉</p>
-            <p className="mt-1 text-xs text-black/50">
-              부스에 부착할 인쇄물(백월 그래픽·라이트박스·사이니지)별 컨셉
-              확정과 개별 이미지 생성 — 다음 업데이트에서 열립니다.
-            </p>
+          <div className="mt-4">
+            <div className="rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">인쇄물 컨셉</p>
+                <span className="rounded-full bg-zinc-100 px-2.5 py-1 text-[10px] font-bold text-black/55">
+                  {printItems.filter((item) => item.confirmed).length}/
+                  {printItems.length} 확정
+                </span>
+              </div>
+              <p className="mt-1 text-xs leading-5 text-black/50">
+                3D에 배치한 벽·사이니지에서 인쇄물이 파생됩니다. 항목별로
+                컨셉 메모를 적고, 로고·제품 사진을 첨부하면 시안에
+                반영됩니다. 생성 시안은 <b>인쇄 발주 원본이 아닙니다</b>.
+              </p>
+            </div>
+
+            {printItems.length === 0 && (
+              <p className="mt-3 rounded-2xl border border-dashed border-black/15 bg-zinc-50 px-4 py-6 text-center text-sm text-black/50">
+                씬에 인쇄물 요소가 없습니다 — 2단계(3D 배치)에서 그래픽
+                월·라이트박스·사이니지 타워를 추가하세요.
+              </p>
+            )}
+
+            {printItems.map((item) => (
+              <div
+                key={item.id}
+                className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-bold text-black">{item.label}</p>
+                  <label className="flex items-center gap-1.5 text-xs font-semibold text-black/70">
+                    <input
+                      type="checkbox"
+                      checked={item.confirmed}
+                      onChange={(e) =>
+                        patchPrintItem(item.id, { confirmed: e.target.checked })
+                      }
+                      className="h-4 w-4 rounded border-black/20 accent-green-600"
+                    />
+                    확정
+                  </label>
+                </div>
+                <input
+                  type="text"
+                  value={item.note}
+                  maxLength={500}
+                  onChange={(e) => patchPrintItem(item.id, { note: e.target.value })}
+                  placeholder="컨셉 메모 (예: 신제품 히어로 이미지 + 슬로건 크게)"
+                  className="mt-2 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <label className="cursor-pointer rounded-lg border border-black/15 px-3 py-2 text-xs font-bold text-black/70 hover:bg-zinc-50">
+                    {item.refImageUrl ? "첨부 교체" : "이미지 첨부"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) void uploadPrintRef(item.id, file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {item.refImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element -- 첨부 썸네일
+                    <img
+                      src={item.refImageUrl}
+                      alt="첨부 참조"
+                      className="h-10 w-10 rounded-lg border border-black/10 object-cover"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => generatePrintArtwork(item)}
+                    disabled={printBusyId !== null}
+                    className="rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-2 text-xs font-bold text-white hover:opacity-95 disabled:opacity-50"
+                  >
+                    {printBusyId === item.id
+                      ? "생성 중… (최대 1~2분)"
+                      : item.artworkUrl
+                        ? "수정 재생성"
+                        : "시안 생성"}
+                  </button>
+                </div>
+                {item.artworkUrl && (
+                  <div className="relative mt-2 overflow-hidden rounded-xl border border-black/10">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- 아트워크 시안 */}
+                    <img src={item.artworkUrl} alt={`${item.label} 시안`} className="w-full" />
+                    <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
+                      AI 시안 — 인쇄 원본 아님
+                    </span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {printError && (
+              <p role="alert" className="mt-2 rounded-xl bg-red-50 px-3 py-2.5 text-xs font-medium text-red-700">
+                {printError}
+              </p>
+            )}
+
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
@@ -1855,7 +2042,11 @@ export default function ExpoBriefPage() {
                 onClick={() => setFlowStep("final")}
                 className="min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:opacity-95"
               >
-                확정하고 견적 보기 →
+                {printItems.length === 0
+                  ? "인쇄물 없이 견적 보기 →"
+                  : allPrintsConfirmed(printItems)
+                    ? "인쇄물 확정 완료 — 견적 보기 →"
+                    : "확정하고 견적 보기 →"}
               </button>
             </div>
           </div>
@@ -1900,6 +2091,14 @@ export default function ExpoBriefPage() {
               brandColorHex={brandKit?.colorHex ?? conceptAccent}
               brandLogoUrl={brandKit?.logoUrl ?? null}
               wallTextureUrl={conceptWallTexture}
+              wallTextures={Object.fromEntries(
+                printItems
+                  .filter(
+                    (item) =>
+                      item.artworkUrl && item.artworkUrl.startsWith("https://"),
+                  )
+                  .map((item) => [item.id, item.artworkUrl as string]),
+              )}
             />
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}

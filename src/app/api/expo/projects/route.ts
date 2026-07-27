@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isExpoBrandKit } from "@/lib/expo/brand-import";
 import { isExpoEventInfo, isExpoOfficialServices } from "@/lib/expo/event-rules";
 import { isExpoEstimateOverrides } from "@/lib/expo/estimate";
+import { isExpoPrintItems } from "@/lib/expo/print-items";
 
 export const dynamic = "force-dynamic";
 
@@ -67,6 +68,7 @@ export async function POST(request: NextRequest) {
     estimateOverrides?: unknown;
     conceptGallery?: unknown;
     contractPrep?: unknown;
+    printItems?: unknown;
     quickFields?: unknown;
   };
   try {
@@ -138,6 +140,9 @@ export async function POST(request: NextRequest) {
     : null;
   if (conceptGallery && conceptGallery.length > 0) {
     (row as Record<string, unknown>).concept_images = conceptGallery;
+  }
+  if (isExpoPrintItems(body.printItems) && body.printItems.length > 0) {
+    (row as Record<string, unknown>).print_items = body.printItems.slice(0, 20);
   }
   const contractPrep = body.contractPrep as
     | { startedAt?: unknown; note?: unknown }
