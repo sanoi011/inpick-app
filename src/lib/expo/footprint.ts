@@ -28,7 +28,8 @@ export const KR_EXPO_MARKET_CONFIG: ExpoMarketConfig = {
   standardModuleM: 3,
   defaultDepthM: 3,
   defaultWallHeightM: 2.5,
-  defaultBoothType: "inline",
+  // 기본은 아일랜드(4면 오픈·무벽) — 벽은 프롬프트/구성에서 만들어질 때만 생긴다
+  defaultBoothType: "island",
 };
 
 export interface ExpoFootprintCandidate {
@@ -41,7 +42,7 @@ export interface ExpoFootprintCandidate {
 
 export type ExpoFootprintAssumption =
   | "area_only_no_confirmed_dimensions"
-  | "default_booth_type_inline"
+  | "default_booth_type_island"
   | "default_wall_height"
   | "non_standard_area_fitted"
   | "unit_converted_from_sqft";
@@ -111,7 +112,7 @@ export function createProvisionalFootprint(
 
   const assumptions: ExpoFootprintAssumption[] = [
     "area_only_no_confirmed_dimensions",
-    "default_booth_type_inline",
+    "default_booth_type_island",
     "default_wall_height",
   ];
   if (unit === "sqft") assumptions.push("unit_converted_from_sqft");

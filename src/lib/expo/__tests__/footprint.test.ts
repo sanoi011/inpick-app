@@ -16,8 +16,8 @@ test("9㎡ resolves to the 3×3 standard module", () => {
   assert.equal(fp.selected.standardMatch, true);
   assert.equal(fp.standardSizeMatch, true);
   assert.equal(fp.alternatives.length, 0);
-  assert.equal(fp.boothType, "inline");
-  assert.equal(fp.openSides, 1);
+  assert.equal(fp.boothType, "island"); // 기본 무벽(4면 오픈)
+  assert.equal(fp.openSides, 4);
   assert.equal(fp.wallHeightM, 2.5);
   assert.equal(fp.confirmationState, "provisional");
   assert.ok(fp.assumptions.includes("area_only_no_confirmed_dimensions"));

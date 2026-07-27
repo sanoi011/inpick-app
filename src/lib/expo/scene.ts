@@ -405,3 +405,28 @@ function bump(scene: ExpoBoothScene): ExpoBoothScene {
 function round1(value: number): number {
   return Math.round(value * 10) / 10;
 }
+
+/** 프롬프트에 벽/월 언급이 있는가 — 프롬프트 발 벽 생성 트리거 */
+export function promptMentionsWall(prompt: string): boolean {
+  return /벽|백월|그래픽\s*월|월(?![요화수목금토일])|backwall|graphic\s*wall|\bwall/i.test(
+    prompt,
+  );
+}
+
+/**
+ * 프롬프트가 벽을 요구할 때 그래픽 월 1장을 뒷면에 배치한다 (Phase 3
+ * prompt-to-scene 최소 연산). 이미 벽 요소가 있으면 그대로 둔다.
+ * 히스토리로 되돌릴 수 있는 일반 씬 연산이다 — 자동 확정이 아니다.
+ */
+export function addWallFromPrompt(
+  scene: ExpoBoothScene,
+  componentId: string,
+): ExpoBoothScene {
+  const hasWallElement = scene.components.some(
+    (component) => findCatalogItem(component.catalogId)?.wallMounted,
+  );
+  if (hasWallElement) return scene;
+  const withWall = addExpoComponent(scene, "graphic_wall", componentId);
+  // 뒷면(-z)으로 밀어 벽면 위치에 배치 — wallMounted 클램프가 한계를 잡는다
+  return moveExpoComponent(withWall, componentId, 0, -100);
+}

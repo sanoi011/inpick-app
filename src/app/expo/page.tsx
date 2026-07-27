@@ -21,6 +21,8 @@ import {
   isExpoBoothScene,
   moveExpoComponent,
   removeExpoComponent,
+  addWallFromPrompt,
+  promptMentionsWall,
   resizeExpoScene,
   rotateExpoComponent,
   type ExpoBoothScene,
@@ -168,6 +170,9 @@ const BOOTH_TYPE_LABELS: Record<ExpoBoothType, string> = {
 };
 
 export default function ExpoBriefPage() {
+  // 플로우: 정보 입력 → 컨셉 프롬프트 → 결과(3D→이미지→견적)
+  const [flowStep, setFlowStep] = useState<"info" | "prompt" | "result">("info");
+  const [autoConcept, setAutoConcept] = useState(false);
   const [startMode, setStartMode] = useState<StartMode>("quick_area");
   const [areaInput, setAreaInput] = useState("");
   const [unit, setUnit] = useState<ExpoAreaUnit>("sqm");
@@ -186,7 +191,7 @@ export default function ExpoBriefPage() {
   const [dimWidth, setDimWidth] = useState("");
   const [dimDepth, setDimDepth] = useState("");
   const [dimHeight, setDimHeight] = useState("2.5");
-  const [dimBoothType, setDimBoothType] = useState<ExpoBoothType>("inline");
+  const [dimBoothType, setDimBoothType] = useState<ExpoBoothType>("island");
   const [sceneHistory, setSceneHistory] = useState<ExpoSceneHistory>(() =>
     createSceneHistory(null),
   );
@@ -391,6 +396,12 @@ export default function ExpoBriefPage() {
     }
   }, []);
 
+  // 복구된 footprint가 있으면 결과 단계에서 시작
+  useEffect(() => {
+    if (restored && footprint) setFlowStep("result");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 복구 직후 1회만
+  }, [restored]);
+
   // autosave (로컬)
   useEffect(() => {
     const draft: ExpoBriefDraft = {
@@ -478,25 +489,44 @@ export default function ExpoBriefPage() {
     return () => window.clearTimeout(timer);
   }, [footprint, confirmedDims, scene, conceptImage, conceptGallery, contractPrep, brandKit, eventInfo, officialServices, estimateOverrides, areaInput, unit, serverProjectId, builderName, clientName, eventName]);
 
-  function generate(areaValue: number, areaUnit: ExpoAreaUnit) {
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    const area = Number(areaInput);
+    if (!Number.isFinite(area) || area <= 0) {
+      setError("면적을 확인해 주세요.");
+      return;
+    }
+    setError(null);
+    setFlowStep("prompt");
+  }
+
+  /** 프롬프트 단계 완료 — 3D 부스 생성 (기본 무벽, 프롬프트가 벽을 요구하면 그래픽 월 배치) */
+  function createBoothFromPrompt() {
+    const area = Number(areaInput);
     setError(null);
     try {
-      const fp = createProvisionalFootprint(areaValue, areaUnit);
+      const fp = createProvisionalFootprint(area, unit);
       setFootprint(fp);
       setSelectedLabel(fp.selected.label);
       setConfirmedDims(null);
       setSelectedComponentId(null);
-      setSceneHistory((history) =>
-        resetSceneHistory(
-          history,
-          history.present && history.present.components.length > 0
-            ? resizeExpoScene(history.present, fp.selected.widthM, fp.selected.depthM)
-            : createExpoScene(fp.selected.widthM, fp.selected.depthM),
-        ),
-      );
+      const current = sceneHistory.present;
+      let nextScene =
+        current && current.components.length > 0
+          ? resizeExpoScene(current, fp.selected.widthM, fp.selected.depthM)
+          : createExpoScene(fp.selected.widthM, fp.selected.depthM);
+      if (promptMentionsWall(conceptPrompt)) {
+        nextScene = addWallFromPrompt(
+          nextScene,
+          `c_${Date.now().toString(36)}_wall`,
+        );
+      }
+      setSceneHistory(createSceneHistory(nextScene));
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
       setDimHeight(String(fp.wallHeightM));
+      setFlowStep("result");
+      setAutoConcept(true); // 3D 다음 단계 — 컨셉 이미지 자동 생성
     } catch (cause) {
       setFootprint(null);
       setSelectedLabel(null);
@@ -505,20 +535,16 @@ export default function ExpoBriefPage() {
           ? footprintErrorMessage(cause.code)
           : "면적을 확인해 주세요.",
       );
+      setFlowStep("info");
     }
-  }
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    const area = Number(areaInput);
-    generate(area, unit);
   }
 
   function applyKit(kit: (typeof BUILDER_KITS)[number]) {
     setStartMode("builder_kit");
     setUnit("sqm");
     setAreaInput(String(kit.areaSqm));
-    generate(kit.areaSqm, "sqm");
+    setError(null);
+    setFlowStep("prompt");
   }
 
   function downloadEstimateCsv() {
@@ -664,6 +690,7 @@ export default function ExpoBriefPage() {
       setDimWidth(String(dims.widthM));
       setDimDepth(String(dims.depthM));
       setDimHeight(String(dims.wallHeightM));
+      setFlowStep("result");
       setProposal(null); // serverProjectId 효과가 서버에서 다시 로드
       setContractPrep(null);
       setClientDecision(null);
@@ -715,6 +742,7 @@ export default function ExpoBriefPage() {
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
       setDimHeight(String(fp.wallHeightM));
+      setFlowStep("result");
     } catch (cause) {
       setError(
         cause instanceof ExpoFootprintError
@@ -742,6 +770,14 @@ export default function ExpoBriefPage() {
       ],
     };
   }, [footprint, selectedLabel]);
+
+  // 3D 생성 직후 — 프롬프트가 있으면 컨셉 이미지를 이어서 자동 생성
+  useEffect(() => {
+    if (!autoConcept || !displayFootprint || conceptLoading) return;
+    setAutoConcept(false);
+    if (conceptPrompt.trim()) void generateConcept();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 1회 트리거
+  }, [autoConcept, displayFootprint]);
 
   // 견적 — 치수 확정 전엔 개념 범위, 확정 후엔 씬 기반 카탈로그 견적 (전부 allowance)
   const conceptualRange = useMemo(() => {
@@ -952,6 +988,8 @@ export default function ExpoBriefPage() {
           &ldquo;가정&rdquo;으로 표시됩니다.
         </p>
 
+        {flowStep === "info" && (
+          <>
         {/* 시작 방식 카드 (§7.1) */}
         <div className="mt-5 grid grid-cols-3 gap-2">
           <button
@@ -1035,7 +1073,7 @@ export default function ExpoBriefPage() {
               type="submit"
               className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white transition hover:opacity-95"
             >
-              3D 부스 만들기
+              다음 — 컨셉 프롬프트 입력
             </button>
           </form>
         ) : startMode === "clone_reflow" ? (
@@ -1147,137 +1185,158 @@ export default function ExpoBriefPage() {
           </div>
         )}
 
-        {error && (
-          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
-            {error}
-          </p>
-        )}
-        {restored && !error && (
-          <p role="status" className="mt-3 text-xs font-medium text-black/45">
-            이전 작성 내용을 이 기기에서 복구했습니다. (서버 저장은 준비 중 —
-            현재는 이 기기에만 임시 저장됩니다)
-          </p>
-        )}
-
-        {displayFootprint && (
-          <section aria-label="3D 부스 셸" className="mt-5">
-            <BoothShell3D
-              footprint={
-                confirmedDims
-                  ? {
-                      ...displayFootprint,
-                      selected: {
-                        widthM: confirmedDims.widthM,
-                        depthM: confirmedDims.depthM,
-                        areaSqm: confirmedDims.areaSqm,
-                        standardMatch: false,
-                        label: `${confirmedDims.widthM}m × ${confirmedDims.depthM}m`,
-                      },
-                      boothType: confirmedDims.boothType,
-                      openSides: confirmedDims.openSides,
-                      wallHeightM: confirmedDims.wallHeightM,
-                    }
-                  : displayFootprint
-              }
-              confirmed={Boolean(confirmedDims)}
-              scene={scene}
-              selectedComponentId={selectedComponentId}
-              onSelectComponent={setSelectedComponentId}
-              cameraPreset={cameraPreset}
-              onCameraPresetChange={setCameraPreset}
-              brandColorHex={brandKit?.colorHex ?? null}
-              brandLogoUrl={brandKit?.logoUrl ?? null}
-            />
-
-            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
-                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
-                  GPT Image 2 · 토큰 1개
+                <p className="text-sm font-bold text-black">행사 규정</p>
+                <span
+                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
+                    hasEventRuleViolation(eventReviewItems)
+                      ? "bg-red-50 text-red-700"
+                      : hasEventRuleInput(mergedEventInfo)
+                        ? "bg-green-50 text-green-700"
+                        : "bg-zinc-100 text-zinc-500"
+                  }`}
+                >
+                  {hasEventRuleViolation(eventReviewItems)
+                    ? "위반 있음"
+                    : hasEventRuleInput(mergedEventInfo)
+                      ? "매뉴얼 기준 입력됨"
+                      : "미입력"}
                 </span>
               </div>
               <p className="mt-1 text-xs text-black/50">
-                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
-                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
-                이후 데칼 단계에서 정확히 적용됩니다.
+                행사 매뉴얼의 값을 직접 입력하세요 — 입력된 값만 검토 기준이
+                되며, 일반 규칙을 가정하지 않습니다.
               </p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  id="expo-concept-prompt"
-                  type="text"
-                  value={conceptPrompt}
-                  maxLength={500}
-                  onChange={(e) => setConceptPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") generateConcept();
-                  }}
-                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
-                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
-                />
-                <button
-                  type="button"
-                  onClick={generateConcept}
-                  disabled={conceptLoading}
-                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
-                </button>
-              </div>
-              {conceptLoading && (
-                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["expo-event-venue", "장소", "text", eventInfo.venue, (v: string) => setEventInfo((s) => ({ ...s, venue: v }))],
+                    ["expo-event-booth", "부스 번호", "text", eventInfo.boothNumber, (v: string) => setEventInfo((s) => ({ ...s, boothNumber: v }))],
+                  ] as const
+                ).map(([id, label, type, value, setter]) => (
+                  <div key={id}>
+                    <label htmlFor={id} className="block text-[11px] font-semibold text-black/60">
+                      {label}
+                    </label>
+                    <input
+                      id={id}
+                      type={type}
+                      value={value}
+                      onChange={(e) => setter(e.target.value)}
+                      className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label htmlFor="expo-event-maxh" className="block text-[11px] font-semibold text-black/60">
+                    허용 높이 (m)
+                  </label>
+                  <input
+                    id="expo-event-maxh"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.1"
+                    min="0"
+                    value={eventInfo.maxHeightM ?? ""}
+                    onChange={(e) =>
+                      setEventInfo((s) => ({
+                        ...s,
+                        maxHeightM: e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   />
-                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
+                </div>
+                <div>
+                  <label htmlFor="expo-event-power" className="block text-[11px] font-semibold text-black/60">
+                    전기 용량 (kW)
+                  </label>
+                  <input
+                    id="expo-event-power"
+                    type="number"
+                    inputMode="decimal"
+                    step="0.5"
+                    min="0"
+                    value={eventInfo.powerKw ?? ""}
+                    onChange={(e) =>
+                      setEventInfo((s) => ({
+                        ...s,
+                        powerKw: e.target.value === "" ? null : Number(e.target.value),
+                      }))
+                    }
+                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+              </div>
+              <div className="mt-2">
+                <label htmlFor="expo-event-source" className="block text-[11px] font-semibold text-black/60">
+                  출처 메모 (예: 매뉴얼 p.12)
+                </label>
+                <input
+                  id="expo-event-source"
+                  type="text"
+                  value={eventInfo.sourceNote}
+                  onChange={(e) => setEventInfo((s) => ({ ...s, sourceNote: e.target.value }))}
+                  className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+              <div className="mt-3 border-t border-black/[0.06] pt-2.5">
+                <p className="text-xs font-bold text-black/70">
+                  공식 서비스 신청 현황 (주최측)
                 </p>
-              )}
-              {conceptError && (
-                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  {conceptError}
-                </p>
-              )}
-              {conceptGallery.length > 1 && !conceptLoading && (
-                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-                  {conceptGallery.map((item) => (
-                    <button
-                      key={item.url}
-                      type="button"
-                      onClick={() => setConceptImage(item.url)}
-                      title={item.prompt || "컨셉 이미지"}
-                      aria-pressed={conceptImage === item.url}
-                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
-                        conceptImage === item.url
-                          ? "border-violet-600"
-                          : "border-black/10"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
-                      <img
-                        src={item.url}
-                        alt="컨셉 썸네일"
-                        className="h-14 w-20 object-cover"
+                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
+                  {(
+                    [
+                      ["expo-svc-power", "전기 신청함", officialServices.powerApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, powerApplied: v }))],
+                      ["expo-svc-rig", "리깅 신청함", officialServices.riggingApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, riggingApplied: v }))],
+                      ["expo-svc-net", "인터넷 신청함", officialServices.internetApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, internetApplied: v }))],
+                    ] as const
+                  ).map(([id, label, checked, setter]) => (
+                    <label key={id} htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-black/70">
+                      <input
+                        id={id}
+                        type="checkbox"
+                        checked={checked}
+                        onChange={(e) => setter(e.target.checked)}
+                        className="h-4 w-4 rounded border-black/20 accent-blue-600"
                       />
-                    </button>
+                      {label}
+                    </label>
                   ))}
                 </div>
-              )}
-              {conceptImage && !conceptLoading && (
-                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
-                  <img
-                    src={conceptImage}
-                    alt="AI 부스 컨셉 이미지"
-                    className="w-full"
-                  />
-                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
-                    AI 컨셉 — 시공 기준 아님
-                  </span>
-                </div>
+                <input
+                  type="text"
+                  value={officialServices.note}
+                  onChange={(e) =>
+                    setOfficialServices((s) => ({ ...s, note: e.target.value }))
+                  }
+                  placeholder="신청 메모 (예: 전기 3kW 6/30 신청 완료)"
+                  aria-label="공식 서비스 신청 메모"
+                  className="mt-2 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+
+              {eventReviewItems.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {eventReviewItems.map((item) => (
+                    <li
+                      key={item.code}
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
+                        item.severity === "violation"
+                          ? "bg-red-50 text-red-700"
+                          : item.severity === "warning"
+                            ? "bg-amber-50 text-amber-800"
+                            : "bg-green-50 text-green-700"
+                      }`}
+                    >
+                      {item.severity === "violation" ? "✕ " : item.severity === "warning" ? "⚠ " : "✓ "}
+                      {item.message}
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
-
             {/* 브랜드 — 후보는 자동 확정하지 않는다 (§3.2) */}
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
@@ -1431,6 +1490,226 @@ export default function ExpoBriefPage() {
                     </div>
                   )}
                 </>
+              )}
+            </div>
+        <details
+          className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm"
+          open={detailsOpen}
+          onToggle={(e) => setDetailsOpen((e.target as HTMLDetailsElement).open)}
+        >
+          <summary className="cursor-pointer text-sm font-bold text-blue-600">
+            선택 정보 (업체·고객사·행사)
+          </summary>
+          <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            {(
+              [
+                ["expo-builder", "시공사", builderName, setBuilderName],
+                ["expo-client", "고객사", clientName, setClientName],
+                ["expo-event", "행사명", eventName, setEventName],
+              ] as const
+            ).map(([id, label, value, setter]) => (
+              <div key={id}>
+                <label htmlFor={id} className="block text-xs font-semibold text-black/60">
+                  {label}
+                </label>
+                <input
+                  id={id}
+                  type="text"
+                  value={value}
+                  onChange={(e) => setter(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+            ))}
+          </div>
+        </details>
+
+            <p className="mt-4 text-center text-[11px] text-black/40">
+              행사 규정·브랜드는 선택 입력 — 나중에 결과 화면에서도 바꿀 수
+              있습니다.
+            </p>
+          </>
+        )}
+
+        {flowStep === "prompt" && (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+            <p className="text-sm font-bold text-black">
+              어떤 부스를 원하시나요?
+            </p>
+            <p className="mt-1 text-xs leading-5 text-black/50">
+              분위기·컬러·소재·벽 구성을 자유롭게 적어주세요. 부스는 기본
+              4면 오픈(무벽)으로 시작하고, <b>벽·백월을 언급하면 3D에 그래픽
+              월이 배치</b>됩니다. 입력을 마치면 3D 모델 → 컨셉 이미지 →
+              견적 순서로 이어집니다.
+            </p>
+            <textarea
+              id="expo-flow-prompt"
+              value={conceptPrompt}
+              maxLength={500}
+              rows={4}
+              onChange={(e) => setConceptPrompt(e.target.value)}
+              placeholder={"예: 백월에 브랜드 로고를 크게, 화이트+우드 톤 미니멀 테크 부스, 밝은 스팟 조명"}
+              className="mt-3 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFlowStep("info")}
+                className="rounded-xl border border-black/15 px-4 py-3 text-sm font-bold text-black/60 hover:bg-zinc-50"
+              >
+                ← 정보 수정
+              </button>
+              <button
+                type="button"
+                onClick={createBoothFromPrompt}
+                className="min-w-0 flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:opacity-95"
+              >
+                부스 3D 생성하기 →
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] text-black/40">
+              {Number(areaInput) || "?"}
+              {unit === "sqm" ? "㎡" : "ft²"} 기준 · 프롬프트는 언제든 결과
+              화면에서 수정·재생성할 수 있습니다.
+            </p>
+          </div>
+        )}
+
+        {error && (
+          <p role="alert" className="mt-3 rounded-xl bg-red-50 px-3 py-2.5 text-sm font-medium text-red-700">
+            {error}
+          </p>
+        )}
+        {restored && !error && (
+          <p role="status" className="mt-3 text-xs font-medium text-black/45">
+            이전 작성 내용을 이 기기에서 복구했습니다. (서버 저장은 준비 중 —
+            현재는 이 기기에만 임시 저장됩니다)
+          </p>
+        )}
+
+        {flowStep === "result" && displayFootprint && (
+          <section aria-label="3D 부스 셸" className="mt-5">
+            <button
+              type="button"
+              onClick={() => setFlowStep("info")}
+              className="mb-2 rounded-lg border border-black/15 px-3 py-1.5 text-[11px] font-bold text-black/60 hover:bg-zinc-50"
+            >
+              ← 정보·프롬프트 수정
+            </button>
+            <BoothShell3D
+              footprint={
+                confirmedDims
+                  ? {
+                      ...displayFootprint,
+                      selected: {
+                        widthM: confirmedDims.widthM,
+                        depthM: confirmedDims.depthM,
+                        areaSqm: confirmedDims.areaSqm,
+                        standardMatch: false,
+                        label: `${confirmedDims.widthM}m × ${confirmedDims.depthM}m`,
+                      },
+                      boothType: confirmedDims.boothType,
+                      openSides: confirmedDims.openSides,
+                      wallHeightM: confirmedDims.wallHeightM,
+                    }
+                  : displayFootprint
+              }
+              confirmed={Boolean(confirmedDims)}
+              scene={scene}
+              selectedComponentId={selectedComponentId}
+              onSelectComponent={setSelectedComponentId}
+              cameraPreset={cameraPreset}
+              onCameraPresetChange={setCameraPreset}
+              brandColorHex={brandKit?.colorHex ?? null}
+              brandLogoUrl={brandKit?.logoUrl ?? null}
+            />
+
+            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
+                  GPT Image 2 · 토큰 1개
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-black/50">
+                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
+                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
+                이후 데칼 단계에서 정확히 적용됩니다.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="expo-concept-prompt"
+                  type="text"
+                  value={conceptPrompt}
+                  maxLength={500}
+                  onChange={(e) => setConceptPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") generateConcept();
+                  }}
+                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
+                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                />
+                <button
+                  type="button"
+                  onClick={generateConcept}
+                  disabled={conceptLoading}
+                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
+                </button>
+              </div>
+              {conceptLoading && (
+                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+                  />
+                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
+                </p>
+              )}
+              {conceptError && (
+                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {conceptError}
+                </p>
+              )}
+              {conceptGallery.length > 1 && !conceptLoading && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {conceptGallery.map((item) => (
+                    <button
+                      key={item.url}
+                      type="button"
+                      onClick={() => setConceptImage(item.url)}
+                      title={item.prompt || "컨셉 이미지"}
+                      aria-pressed={conceptImage === item.url}
+                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
+                        conceptImage === item.url
+                          ? "border-violet-600"
+                          : "border-black/10"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
+                      <img
+                        src={item.url}
+                        alt="컨셉 썸네일"
+                        className="h-14 w-20 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {conceptImage && !conceptLoading && (
+                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
+                  <img
+                    src={conceptImage}
+                    alt="AI 부스 컨셉 이미지"
+                    className="w-full"
+                  />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
+                    AI 컨셉 — 시공 기준 아님
+                  </span>
+                </div>
               )}
             </div>
 
@@ -1595,7 +1874,7 @@ export default function ExpoBriefPage() {
               </div>
               <ul className="mt-3 space-y-1 text-xs leading-5 text-black/55">
                 <li>
-                  · 부스 타입 <b>인라인(오픈 1면)</b>, 벽 높이{" "}
+                  · 부스 타입 <b>아일랜드(4면 오픈·무벽)</b>, 벽 높이{" "}
                   <b>{displayFootprint.wallHeightM}m</b>는 기본 가정입니다.
                 </li>
                 <li>
@@ -1725,159 +2004,6 @@ export default function ExpoBriefPage() {
                     </p>
                   )}
                 </form>
-              )}
-            </div>
-
-            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-black">행사 규정</p>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold ${
-                    hasEventRuleViolation(eventReviewItems)
-                      ? "bg-red-50 text-red-700"
-                      : hasEventRuleInput(mergedEventInfo)
-                        ? "bg-green-50 text-green-700"
-                        : "bg-zinc-100 text-zinc-500"
-                  }`}
-                >
-                  {hasEventRuleViolation(eventReviewItems)
-                    ? "위반 있음"
-                    : hasEventRuleInput(mergedEventInfo)
-                      ? "매뉴얼 기준 입력됨"
-                      : "미입력"}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-black/50">
-                행사 매뉴얼의 값을 직접 입력하세요 — 입력된 값만 검토 기준이
-                되며, 일반 규칙을 가정하지 않습니다.
-              </p>
-              <div className="mt-2 grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["expo-event-venue", "장소", "text", eventInfo.venue, (v: string) => setEventInfo((s) => ({ ...s, venue: v }))],
-                    ["expo-event-booth", "부스 번호", "text", eventInfo.boothNumber, (v: string) => setEventInfo((s) => ({ ...s, boothNumber: v }))],
-                  ] as const
-                ).map(([id, label, type, value, setter]) => (
-                  <div key={id}>
-                    <label htmlFor={id} className="block text-[11px] font-semibold text-black/60">
-                      {label}
-                    </label>
-                    <input
-                      id={id}
-                      type={type}
-                      value={value}
-                      onChange={(e) => setter(e.target.value)}
-                      className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                    />
-                  </div>
-                ))}
-                <div>
-                  <label htmlFor="expo-event-maxh" className="block text-[11px] font-semibold text-black/60">
-                    허용 높이 (m)
-                  </label>
-                  <input
-                    id="expo-event-maxh"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.1"
-                    min="0"
-                    value={eventInfo.maxHeightM ?? ""}
-                    onChange={(e) =>
-                      setEventInfo((s) => ({
-                        ...s,
-                        maxHeightM: e.target.value === "" ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="expo-event-power" className="block text-[11px] font-semibold text-black/60">
-                    전기 용량 (kW)
-                  </label>
-                  <input
-                    id="expo-event-power"
-                    type="number"
-                    inputMode="decimal"
-                    step="0.5"
-                    min="0"
-                    value={eventInfo.powerKw ?? ""}
-                    onChange={(e) =>
-                      setEventInfo((s) => ({
-                        ...s,
-                        powerKw: e.target.value === "" ? null : Number(e.target.value),
-                      }))
-                    }
-                    className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                  />
-                </div>
-              </div>
-              <div className="mt-2">
-                <label htmlFor="expo-event-source" className="block text-[11px] font-semibold text-black/60">
-                  출처 메모 (예: 매뉴얼 p.12)
-                </label>
-                <input
-                  id="expo-event-source"
-                  type="text"
-                  value={eventInfo.sourceNote}
-                  onChange={(e) => setEventInfo((s) => ({ ...s, sourceNote: e.target.value }))}
-                  className="mt-0.5 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-              <div className="mt-3 border-t border-black/[0.06] pt-2.5">
-                <p className="text-xs font-bold text-black/70">
-                  공식 서비스 신청 현황 (주최측)
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1.5">
-                  {(
-                    [
-                      ["expo-svc-power", "전기 신청함", officialServices.powerApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, powerApplied: v }))],
-                      ["expo-svc-rig", "리깅 신청함", officialServices.riggingApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, riggingApplied: v }))],
-                      ["expo-svc-net", "인터넷 신청함", officialServices.internetApplied, (v: boolean) => setOfficialServices((s) => ({ ...s, internetApplied: v }))],
-                    ] as const
-                  ).map(([id, label, checked, setter]) => (
-                    <label key={id} htmlFor={id} className="flex items-center gap-1.5 text-xs font-medium text-black/70">
-                      <input
-                        id={id}
-                        type="checkbox"
-                        checked={checked}
-                        onChange={(e) => setter(e.target.checked)}
-                        className="h-4 w-4 rounded border-black/20 accent-blue-600"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  value={officialServices.note}
-                  onChange={(e) =>
-                    setOfficialServices((s) => ({ ...s, note: e.target.value }))
-                  }
-                  placeholder="신청 메모 (예: 전기 3kW 6/30 신청 완료)"
-                  aria-label="공식 서비스 신청 메모"
-                  className="mt-2 w-full rounded-lg border border-black/15 px-2.5 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-
-              {eventReviewItems.length > 0 && (
-                <ul className="mt-2 space-y-1">
-                  {eventReviewItems.map((item) => (
-                    <li
-                      key={item.code}
-                      className={`rounded-lg px-3 py-1.5 text-[11px] font-semibold ${
-                        item.severity === "violation"
-                          ? "bg-red-50 text-red-700"
-                          : item.severity === "warning"
-                            ? "bg-amber-50 text-amber-800"
-                            : "bg-green-50 text-green-700"
-                      }`}
-                    >
-                      {item.severity === "violation" ? "✕ " : item.severity === "warning" ? "⚠ " : "✓ "}
-                      {item.message}
-                    </li>
-                  ))}
-                </ul>
               )}
             </div>
 
@@ -2238,37 +2364,6 @@ export default function ExpoBriefPage() {
           </section>
         )}
 
-        <details
-          className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm"
-          open={detailsOpen}
-          onToggle={(e) => setDetailsOpen((e.target as HTMLDetailsElement).open)}
-        >
-          <summary className="cursor-pointer text-sm font-bold text-blue-600">
-            선택 정보 (업체·고객사·행사)
-          </summary>
-          <div className="mt-3 grid gap-3 sm:grid-cols-3">
-            {(
-              [
-                ["expo-builder", "시공사", builderName, setBuilderName],
-                ["expo-client", "고객사", clientName, setClientName],
-                ["expo-event", "행사명", eventName, setEventName],
-              ] as const
-            ).map(([id, label, value, setter]) => (
-              <div key={id}>
-                <label htmlFor={id} className="block text-xs font-semibold text-black/60">
-                  {label}
-                </label>
-                <input
-                  id={id}
-                  type="text"
-                  value={value}
-                  onChange={(e) => setter(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-black/15 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-            ))}
-          </div>
-        </details>
       </div>
     </main>
   );

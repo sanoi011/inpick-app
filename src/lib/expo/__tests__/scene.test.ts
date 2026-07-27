@@ -10,6 +10,8 @@ import {
   createExpoScene,
   evaluateExpoScene,
   expoDecalPlacement,
+  addWallFromPrompt,
+  promptMentionsWall,
   isExpoBoothScene,
   moveExpoComponent,
   removeExpoComponent,
@@ -184,4 +186,20 @@ test("decal placement follows rotation to the facing side", () => {
   const side = expoDecalPlacement({ ...base, rotation: 90 }, item);
   assert.ok(side.x > base.x); // +x
   assert.equal(side.faceWidth, item.widthM); // 회전해도 보이는 면 폭은 3m
+});
+
+test("prompt wall op adds one backwall only when asked and none exists", () => {
+  assert.ok(promptMentionsWall("백월에 로고 크게"));
+  assert.ok(promptMentionsWall("clean white backwall"));
+  assert.ok(!promptMentionsWall("밝은 조명의 미니멀 부스"));
+
+  let scene = createExpoScene(6, 3);
+  scene = addWallFromPrompt(scene, "w1");
+  const wall = scene.components.find((c) => c.id === "w1");
+  assert.ok(wall);
+  assert.equal(wall.catalogId, "graphic_wall");
+  assert.equal(wall.z, -1.45); // 뒷면 밀착
+  // 이미 벽 요소가 있으면 추가하지 않는다
+  const again = addWallFromPrompt(scene, "w2");
+  assert.equal(again.components.length, scene.components.length);
 });
