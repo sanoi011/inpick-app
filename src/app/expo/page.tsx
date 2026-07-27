@@ -129,8 +129,8 @@ type StartMode = "quick_area" | "builder_kit" | "clone_reflow";
 type FlowStep = "concept" | "model" | "company" | "print" | "final";
 
 const FLOW_STEPS: Array<{ id: FlowStep; label: string }> = [
-  { id: "concept", label: "1. 컨셉" },
-  { id: "model", label: "2. 3D 배치" },
+  { id: "concept", label: "1. 부스 시작" },
+  { id: "model", label: "2. 3D·컨셉" },
   { id: "company", label: "3. 기업정보" },
   { id: "print", label: "4. 인쇄물" },
   { id: "final", label: "5. 확정·견적" },
@@ -1347,8 +1347,8 @@ export default function ExpoBriefPage() {
             </div>
 
             <p className="mt-2 text-[11px] text-black/45">
-              면적을 입력한 뒤, 아래 <b>AI 컨셉 렌더</b>에 원하는 부스
-              분위기를 적고 컨셉을 생성하세요.
+              면적을 입력하고 3D 부스를 만든 뒤, 배치 화면 아래에서 컨셉
+              이미지를 생성합니다.
             </p>
           </form>
         ) : startMode === "clone_reflow" ? (
@@ -1461,144 +1461,26 @@ export default function ExpoBriefPage() {
         )}
 
 
-            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
-            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
-                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
-                  GPT Image 2 · 테스트 무료
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-black/50">
-                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
-                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
-                이후 데칼 단계에서 정확히 적용됩니다.
-              </p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  id="expo-concept-prompt"
-                  type="text"
-                  value={conceptPrompt}
-                  maxLength={500}
-                  onChange={(e) => setConceptPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") generateConcept();
-                  }}
-                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
-                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
-                />
-                <button
-                  type="button"
-                  onClick={generateConcept}
-                  disabled={conceptLoading}
-                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
-                </button>
-              </div>
-              {conceptLoading && (
-                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
-                  />
-                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
-                </p>
-              )}
-              {conceptError && (
-                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  {conceptError}
-                </p>
-              )}
-              {conceptGallery.length > 1 && !conceptLoading && (
-                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-                  {conceptGallery.map((item) => (
-                    <button
-                      key={item.url}
-                      type="button"
-                      onClick={() => setConceptImage(item.url)}
-                      title={item.prompt || "컨셉 이미지"}
-                      aria-pressed={conceptImage === item.url}
-                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
-                        conceptImage === item.url
-                          ? "border-violet-600"
-                          : "border-black/10"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
-                      <img
-                        src={item.url}
-                        alt="컨셉 썸네일"
-                        className="h-14 w-20 object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {conceptImage && !conceptLoading && (
-                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
-                  <img
-                    src={conceptImage}
-                    alt="AI 부스 컨셉 이미지"
-                    className="w-full"
-                  />
-                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
-                    AI 컨셉 — 시공 기준 아님
-                  </span>
-                </div>
-              )}
-              {conceptImage && conceptImage.startsWith("https://") && !conceptLoading && (
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={applyConceptToScene}
-                    disabled={applyConceptState === "loading"}
-                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-                  >
-                    {applyConceptState === "loading"
-                      ? "이미지 속 배치 분석 중… (최대 2분)"
-                      : "이미지 속 배치를 3D로 구현"}
-                  </button>
-                  <span className="text-[10px] text-black/40">
-                    사물 위치·크기·방향을 읽어 재구성 — 되돌리기로 취소 가능
-                  </span>
-                </div>
-              )}
-              {applyConceptState === "error" && (
-                <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  이미지에서 배치를 읽지 못했습니다 — 다시 시도하거나 직접
-                  배치해 주세요.
-                </p>
-              )}
-            </div>
-
-            {displayFootprint === null && (
+            {displayFootprint === null ? (
               <button
                 type="button"
                 onClick={createBoothFromPrompt}
                 className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white hover:opacity-95"
               >
-                이 컨셉으로 3D 배치하기 →
+                3D 부스 만들기 →
               </button>
-            )}
-            {displayFootprint !== null && (
+            ) : (
               <button
                 type="button"
-                onClick={() => {
-                  if (conceptImage && conceptImage.startsWith("https://")) {
-                    setAutoApplyConcept(true);
-                  }
-                  setFlowStep("model");
-                }}
+                onClick={() => setFlowStep("model")}
                 className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white hover:opacity-95"
               >
                 3D 배치로 이동 →
               </button>
             )}
             <p className="mt-1.5 text-center text-[11px] text-black/40">
-              이미지 없이도 3D 배치로 넘어갈 수 있습니다 — 부스는 무벽(4면
-              오픈)으로 시작합니다.
+              부스는 무벽(4면 오픈)으로 시작합니다 — 다음 단계에서 직접
+              배치하고, 그 아래에서 컨셉 이미지를 생성합니다.
             </p>
           </>
         )}
@@ -2114,6 +1996,41 @@ export default function ExpoBriefPage() {
               {flowStep === "final" ? "← 인쇄물" : "← 컨셉으로"}
             </button>
 
+            {conceptImage && conceptImage.startsWith("https://") && (
+              <div className="mb-2">
+                {applyConceptState === "loading" ? (
+                  <p role="status" className="flex items-center gap-2 rounded-xl bg-violet-50 px-3 py-2.5 text-xs font-bold text-violet-700">
+                    <span
+                      aria-hidden
+                      className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+                    />
+                    컨셉 이미지에서 사물 배치를 분석해 3D로 구현하는 중…
+                    (최대 2분 — 완료되면 아래에 배치됩니다)
+                  </p>
+                ) : applyConceptState === "error" ? (
+                  <div className="flex items-center justify-between gap-2 rounded-xl bg-red-50 px-3 py-2.5">
+                    <p className="text-xs font-bold text-red-700">
+                      이미지 배치 분석에 실패했습니다.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={applyConceptToScene}
+                      className="shrink-0 rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700"
+                    >
+                      다시 분석
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={applyConceptToScene}
+                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100"
+                  >
+                    컨셉 이미지 배치 다시 구현
+                  </button>
+                )}
+              </div>
+            )}
             <BoothShell3D
               footprint={
                 confirmedDims
@@ -2150,6 +2067,122 @@ export default function ExpoBriefPage() {
                   .map((item) => [item.id, item.artworkUrl as string]),
               )}
             />
+
+            {flowStep === "model" && (
+              <>
+            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
+                  GPT Image 2 · 테스트 무료
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-black/50">
+                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
+                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
+                이후 데칼 단계에서 정확히 적용됩니다.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="expo-concept-prompt"
+                  type="text"
+                  value={conceptPrompt}
+                  maxLength={500}
+                  onChange={(e) => setConceptPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") generateConcept();
+                  }}
+                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
+                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                />
+                <button
+                  type="button"
+                  onClick={generateConcept}
+                  disabled={conceptLoading}
+                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
+                </button>
+              </div>
+              {conceptLoading && (
+                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+                  />
+                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
+                </p>
+              )}
+              {conceptError && (
+                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {conceptError}
+                </p>
+              )}
+              {conceptGallery.length > 1 && !conceptLoading && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {conceptGallery.map((item) => (
+                    <button
+                      key={item.url}
+                      type="button"
+                      onClick={() => setConceptImage(item.url)}
+                      title={item.prompt || "컨셉 이미지"}
+                      aria-pressed={conceptImage === item.url}
+                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
+                        conceptImage === item.url
+                          ? "border-violet-600"
+                          : "border-black/10"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
+                      <img
+                        src={item.url}
+                        alt="컨셉 썸네일"
+                        className="h-14 w-20 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {conceptImage && !conceptLoading && (
+                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
+                  <img
+                    src={conceptImage}
+                    alt="AI 부스 컨셉 이미지"
+                    className="w-full"
+                  />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
+                    AI 컨셉 — 시공 기준 아님
+                  </span>
+                </div>
+              )}
+              {conceptImage && conceptImage.startsWith("https://") && !conceptLoading && (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={applyConceptToScene}
+                    disabled={applyConceptState === "loading"}
+                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                  >
+                    {applyConceptState === "loading"
+                      ? "이미지 속 배치 분석 중… (최대 2분)"
+                      : "이미지 속 배치를 3D로 구현"}
+                  </button>
+                  <span className="text-[10px] text-black/40">
+                    사물 위치·크기·방향을 읽어 재구성 — 되돌리기로 취소 가능
+                  </span>
+                </div>
+              )}
+              {applyConceptState === "error" && (
+                <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  이미지에서 배치를 읽지 못했습니다 — 다시 시도하거나 직접
+                  배치해 주세요.
+                </p>
+              )}
+            </div>
+              </>
+            )}
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
             {scene && (
@@ -2329,47 +2362,6 @@ export default function ExpoBriefPage() {
                 )}
               </div>
             )}
-
-            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-bold text-black">
-                  임시 치수 후보
-                </p>
-                <span className="text-xs font-semibold text-black/45">
-                  {displayFootprint.canonicalAreaSqm}㎡ 기준
-                </span>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {[displayFootprint.selected, ...displayFootprint.alternatives].map(
-                  (candidate) => (
-                    <button
-                      key={candidate.label}
-                      type="button"
-                      onClick={() => setSelectedLabel(candidate.label)}
-                      aria-pressed={candidate.label === displayFootprint.selected.label}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-bold ${
-                        candidate.label === displayFootprint.selected.label
-                          ? "border-blue-600 bg-blue-600 text-white"
-                          : "border-black/15 bg-white text-black/65"
-                      }`}
-                    >
-                      {candidate.label}
-                      {candidate.standardMatch ? "" : " (비표준)"}
-                    </button>
-                  ),
-                )}
-              </div>
-              <ul className="mt-3 space-y-1 text-xs leading-5 text-black/55">
-                <li>
-                  · 부스 타입 <b>아일랜드(4면 오픈·무벽)</b>, 벽 높이{" "}
-                  <b>{displayFootprint.wallHeightM}m</b>는 기본 가정입니다.
-                </li>
-                <li>
-                  · 실제 폭·깊이·오픈면·높이 제한은 행사 매뉴얼 기준으로
-                  확정해야 견적 단계로 진행됩니다.
-                </li>
-              </ul>
-            </div>
 
             {/* 치수 확정 — provisional 해제 단계 */}
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
