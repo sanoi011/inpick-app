@@ -16,13 +16,16 @@ import { createClient as createSupabaseBrowserClient } from "@/lib/supabase/clie
 import {
   EXPO_BASE_CATALOG,
   addExpoComponent,
+  findCatalogItem,
   createExpoScene,
   evaluateExpoScene,
   isExpoBoothScene,
   moveExpoComponent,
   removeExpoComponent,
   addWallFromPrompt,
+  applyConceptSuggestions,
   promptMentionsWall,
+  resizeExpoComponent,
   resizeExpoScene,
   rotateExpoComponent,
   type ExpoBoothScene,
@@ -149,6 +152,8 @@ interface ExpoBriefDraft {
   brandKit?: ExpoBrandKit;
   conceptGallery?: Array<{ url: string; prompt: string; createdAt: string }>;
   contractPrep?: { startedAt: string; note: string } | null;
+  conceptWallTextureUrl?: string | null;
+  conceptAccentHex?: string | null;
   eventInfo?: ExpoEventInfo;
   officialServices?: ExpoOfficialServices;
   estimateOverrides?: ExpoEstimateOverrides;
@@ -206,6 +211,13 @@ export default function ExpoBriefPage() {
   const [conceptGallery, setConceptGallery] = useState<
     Array<{ url: string; prompt: string; createdAt: string }>
   >([]);
+  // 컨셉 → 3D 반영 (벽 텍스처·팔레트 악센트) — 컨셉 전용 표기 유지
+  const [conceptWallTexture, setConceptWallTexture] = useState<string | null>(null);
+  const [conceptAccent, setConceptAccent] = useState<string | null>(null);
+  const [applyConceptState, setApplyConceptState] = useState<"idle" | "loading" | "error">("idle");
+  // 선택 컴포넌트 크기 입력 (적용 버튼으로 확정)
+  const [sizeDraftW, setSizeDraftW] = useState("");
+  const [sizeDraftD, setSizeDraftD] = useState("");
   // 브랜드 — URL 후보 추출은 자동 확정 금지, 사용자가 선택+권한 확인 후 적용
   const [brandUrl, setBrandUrl] = useState("");
   const [brandLoading, setBrandLoading] = useState(false);
@@ -321,6 +333,19 @@ export default function ExpoBriefPage() {
     };
   }, [startMode, cloneProjects]);
 
+  // 선택 변경 시 크기 입력칸을 현재 값으로 동기화
+  useEffect(() => {
+    if (!selectedComponentId) return;
+    const component = sceneHistory.present?.components.find(
+      (entry) => entry.id === selectedComponentId,
+    );
+    if (!component) return;
+    const item = findCatalogItem(component.catalogId);
+    setSizeDraftW(String(component.widthM ?? item?.widthM ?? 1));
+    setSizeDraftD(String(component.depthM ?? item?.depthM ?? 1));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 선택 시점 스냅샷
+  }, [selectedComponentId]);
+
   // 초기 복구 — 로컬 임시 저장분 (서버 저장은 다음 슬라이스, UI에 정직하게 표기)
   useEffect(() => {
     try {
@@ -356,6 +381,18 @@ export default function ExpoBriefPage() {
             setConceptImage(draft.conceptImageUrl);
           }
           if (isExpoBrandKit(draft.brandKit)) setBrandKit(draft.brandKit);
+          if (
+            typeof draft.conceptWallTextureUrl === "string" &&
+            draft.conceptWallTextureUrl.startsWith("https://")
+          ) {
+            setConceptWallTexture(draft.conceptWallTextureUrl);
+          }
+          if (
+            typeof draft.conceptAccentHex === "string" &&
+            /^#[0-9a-f]{6}$/i.test(draft.conceptAccentHex)
+          ) {
+            setConceptAccent(draft.conceptAccentHex);
+          }
           if (
             draft.contractPrep &&
             typeof draft.contractPrep.startedAt === "string"
@@ -421,6 +458,8 @@ export default function ExpoBriefPage() {
       brandKit: brandKit ?? undefined,
       conceptGallery,
       contractPrep,
+      conceptWallTextureUrl: conceptWallTexture ?? undefined,
+      conceptAccentHex: conceptAccent ?? undefined,
       eventInfo,
       officialServices,
       estimateOverrides,
@@ -432,7 +471,7 @@ export default function ExpoBriefPage() {
     } catch {
       // 저장 실패는 치명적이지 않음 — 다음 저장 시 재시도
     }
-  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, contractPrep, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
+  }, [startMode, areaInput, unit, selectedLabel, confirmedDims, scene, cameraPreset, conceptImage, conceptGallery, contractPrep, conceptWallTexture, conceptAccent, brandKit, eventInfo, officialServices, estimateOverrides, serverProjectId, builderName, clientName, eventName]);
 
   // 서버 저장 — 로그인 세션이 있으면 디바운스 업서트. 마이그레이션 미적용/
   // 미로그인 환경은 로컬 임시 저장으로 조용히 폴백한다.
@@ -909,6 +948,52 @@ export default function ExpoBriefPage() {
     });
     setBrandCandidates(null);
     setBrandLoading(false);
+  }
+
+  async function applyConceptToScene() {
+    if (!conceptImage || !conceptImage.startsWith("https://") || applyConceptState === "loading") {
+      return;
+    }
+    setApplyConceptState("loading");
+    try {
+      const response = await fetch("/api/expo/apply-concept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrl: conceptImage }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        palette?: string[];
+        components?: Array<{ catalogId: string; count: number }>;
+      };
+      if (!response.ok) {
+        setApplyConceptState("error");
+        return;
+      }
+      setConceptWallTexture(conceptImage);
+      if (payload.palette?.[0] && /^#[0-9a-f]{6}$/i.test(payload.palette[0])) {
+        setConceptAccent(payload.palette[0]);
+      }
+      const suggestions = [...(payload.components ?? [])];
+      if (!suggestions.some((entry) => entry.catalogId === "graphic_wall")) {
+        // 텍스처를 입힐 벽이 없으면 백월 1장 제안에 포함
+        suggestions.unshift({ catalogId: "graphic_wall", count: 1 });
+      }
+      setSceneHistory((history) =>
+        history.present
+          ? applySceneChange(
+              history,
+              applyConceptSuggestions(
+                history.present,
+                suggestions,
+                `ai_${Date.now().toString(36)}`,
+              ),
+            )
+          : history,
+      );
+      setApplyConceptState("idle");
+    } catch {
+      setApplyConceptState("error");
+    }
   }
 
   async function generateConcept() {
@@ -1684,6 +1769,28 @@ export default function ExpoBriefPage() {
                   </span>
                 </div>
               )}
+              {conceptImage && conceptImage.startsWith("https://") && !conceptLoading && (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={applyConceptToScene}
+                    disabled={applyConceptState === "loading"}
+                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                  >
+                    {applyConceptState === "loading"
+                      ? "이미지 분석 중…"
+                      : "이 이미지를 3D에 반영"}
+                  </button>
+                  <span className="text-[10px] text-black/40">
+                    벽 텍스처·팔레트·구성 제안 — 되돌리기로 취소 가능
+                  </span>
+                </div>
+              )}
+              {applyConceptState === "error" && (
+                <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  이미지 분석에 실패했습니다 — 잠시 후 다시 시도해 주세요.
+                </p>
+              )}
             </div>
             <BoothShell3D
               footprint={
@@ -1709,8 +1816,9 @@ export default function ExpoBriefPage() {
               onSelectComponent={setSelectedComponentId}
               cameraPreset={cameraPreset}
               onCameraPresetChange={setCameraPreset}
-              brandColorHex={brandKit?.colorHex ?? null}
+              brandColorHex={brandKit?.colorHex ?? conceptAccent}
               brandLogoUrl={brandKit?.logoUrl ?? null}
+              wallTextureUrl={conceptWallTexture}
             />
 
             {/* 컴포넌트 카탈로그 — 모든 오브젝트는 카탈로그에서만 온다 */}
@@ -1821,6 +1929,45 @@ export default function ExpoBriefPage() {
                         className="h-9 rounded-lg border border-red-200 bg-white px-3 text-xs font-bold text-red-600 hover:bg-red-50"
                       >
                         삭제
+                      </button>
+                    </div>
+                    <div className="mt-2 flex items-end gap-2">
+                      {(
+                        [
+                          ["expo-size-w", "가로 (m)", sizeDraftW, setSizeDraftW],
+                          ["expo-size-d", "세로 (m)", sizeDraftD, setSizeDraftD],
+                        ] as const
+                      ).map(([id, label, value, setter]) => (
+                        <div key={id}>
+                          <label htmlFor={id} className="block text-[10px] font-semibold text-blue-800/70">
+                            {label}
+                          </label>
+                          <input
+                            id={id}
+                            type="number"
+                            inputMode="decimal"
+                            step="0.1"
+                            min="0.1"
+                            max="20"
+                            value={value}
+                            onChange={(e) => setter(e.target.value)}
+                            className="mt-0.5 w-20 rounded-lg border border-blue-200 bg-white px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-200"
+                          />
+                        </div>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const w = Number(sizeDraftW);
+                          const d = Number(sizeDraftD);
+                          if (!Number.isFinite(w) || !Number.isFinite(d) || w <= 0 || d <= 0) return;
+                          updateScene((current) =>
+                            resizeExpoComponent(current, selectedComponentId, w, d),
+                          );
+                        }}
+                        className="h-8 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white hover:bg-blue-700"
+                      >
+                        크기 적용
                       </button>
                     </div>
                   </div>

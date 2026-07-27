@@ -33,6 +33,8 @@ export interface BoothSceneViewProps {
   brandColorHex?: string | null;
   /** 재호스팅된 로고 URL — 그래픽 월 정면에 결정적 데칼로 렌더 */
   brandLogoUrl?: string | null;
+  /** 컨셉 이미지 URL — 그래픽 월 전면 텍스처(컨셉 전용 표기 하에) */
+  wallTextureUrl?: string | null;
   scene?: ExpoBoothScene | null;
   selectedComponentId?: string | null;
   onSelectComponent?: (id: string | null) => void;
@@ -48,6 +50,7 @@ export default function BoothShell3D({
   onCameraPresetChange,
   brandColorHex = null,
   brandLogoUrl = null,
+  wallTextureUrl = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -130,6 +133,7 @@ export default function BoothShell3D({
         onCameraPresetChange={onCameraPresetChange}
         brandColorHex={brandColorHex}
         brandLogoUrl={brandLogoUrl}
+        wallTextureUrl={wallTextureUrl}
       />
     </ShellErrorBoundary>
   );
@@ -205,9 +209,12 @@ class ShellErrorBoundary extends Component<
 function BrandLogoDecal({
   url,
   placement,
+  fit = "logo",
 }: {
   url: string;
   placement: ReturnType<typeof expoDecalPlacement>;
+  /** logo=면의 55% 로고 배치, cover=면 전체 텍스처 */
+  fit?: "logo" | "cover";
 }) {
   const [texture, setTexture] = useState<THREE.Texture | null>(null);
 
@@ -241,12 +248,19 @@ function BrandLogoDecal({
   const image = texture.image as { width?: number; height?: number } | undefined;
   const aspect =
     image?.width && image?.height ? image.width / image.height : 1;
-  let width = placement.faceWidth * 0.55;
-  let height = width / aspect;
-  const maxHeight = placement.faceHeight * 0.5;
-  if (height > maxHeight) {
-    height = maxHeight;
-    width = height * aspect;
+  let width: number;
+  let height: number;
+  if (fit === "cover") {
+    width = placement.faceWidth * 0.98;
+    height = placement.faceHeight * 0.94;
+  } else {
+    width = placement.faceWidth * 0.55;
+    height = width / aspect;
+    const maxHeight = placement.faceHeight * 0.5;
+    if (height > maxHeight) {
+      height = maxHeight;
+      width = height * aspect;
+    }
   }
   return (
     <mesh
@@ -320,6 +334,7 @@ function BoothShellCanvas({
   onCameraPresetChange,
   brandColorHex = null,
   brandLogoUrl = null,
+  wallTextureUrl = null,
 }: {
   footprint: ExpoProvisionalFootprint;
   confirmed?: boolean;
@@ -434,10 +449,25 @@ function BoothShellCanvas({
                   emissiveIntensity={isSelected ? 0.45 : 0}
                 />
               </mesh>
+              {component.catalogId === "graphic_wall" && wallTextureUrl && (
+                <BrandLogoDecal
+                  url={wallTextureUrl}
+                  fit="cover"
+                  placement={{
+                    ...expoDecalPlacement(component, item),
+                  }}
+                />
+              )}
               {component.catalogId === "graphic_wall" && brandLogoUrl && (
                 <BrandLogoDecal
                   url={brandLogoUrl}
-                  placement={expoDecalPlacement(component, item)}
+                  placement={(() => {
+                    const base = expoDecalPlacement(component, item);
+                    // 텍스처가 있으면 로고를 살짝 앞으로
+                    return wallTextureUrl
+                      ? { ...base, z: base.z + (base.rotationY === 0 ? 0.01 : 0), x: base.x + (Math.abs(base.rotationY) === Math.PI / 2 ? (base.rotationY > 0 ? 0.01 : -0.01) : 0) }
+                      : base;
+                  })()}
                 />
               )}
             </group>
