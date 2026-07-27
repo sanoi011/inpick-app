@@ -148,6 +148,7 @@ interface CloneSourceProject {
   concept_image_url: string | null;
   concept_images: unknown;
   contract_prep: unknown;
+  print_items: unknown;
   official_services: unknown;
   estimate_overrides: unknown;
   quick_fields: { builderName?: string; clientName?: string; eventName?: string } | null;
@@ -741,6 +742,7 @@ export default function ExpoBriefPage() {
               .slice(0, 8)
           : [],
       );
+      setPrintItems(isExpoPrintItems(project.print_items) ? project.print_items : []);
       const savedPrep = project.contract_prep as { startedAt?: unknown; note?: unknown } | null;
       setContractPrep(
         savedPrep && typeof savedPrep.startedAt === "string"
