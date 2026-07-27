@@ -119,6 +119,16 @@ const BUILDER_KITS = [
 
 type StartMode = "quick_area" | "builder_kit" | "clone_reflow";
 
+type FlowStep = "concept" | "model" | "company" | "print" | "final";
+
+const FLOW_STEPS: Array<{ id: FlowStep; label: string }> = [
+  { id: "concept", label: "1. 컨셉" },
+  { id: "model", label: "2. 3D 배치" },
+  { id: "company", label: "3. 기업정보" },
+  { id: "print", label: "4. 인쇄물" },
+  { id: "final", label: "5. 확정·견적" },
+];
+
 interface CloneSourceProject {
   id: string;
   title: string;
@@ -175,9 +185,9 @@ const BOOTH_TYPE_LABELS: Record<ExpoBoothType, string> = {
 };
 
 export default function ExpoBriefPage() {
-  // 플로우: 정보 입력 → 컨셉 프롬프트 → 결과(3D→이미지→견적)
-  const [flowStep, setFlowStep] = useState<"info" | "prompt" | "result">("info");
-  const [autoConcept, setAutoConcept] = useState(false);
+  // 확정 플로우: 컨셉 이미지 → 3D 배치 → 기업정보 → 인쇄물 → 확정·견적
+  const [flowStep, setFlowStep] = useState<FlowStep>("concept");
+  const [autoApplyConcept, setAutoApplyConcept] = useState(false);
   const [startMode, setStartMode] = useState<StartMode>("quick_area");
   const [areaInput, setAreaInput] = useState("");
   const [unit, setUnit] = useState<ExpoAreaUnit>("sqm");
@@ -433,9 +443,9 @@ export default function ExpoBriefPage() {
     }
   }, []);
 
-  // 복구된 footprint가 있으면 결과 단계에서 시작
+  // 복구된 footprint가 있으면 마지막 단계에서 시작
   useEffect(() => {
-    if (restored && footprint) setFlowStep("result");
+    if (restored && footprint) setFlowStep("final");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 복구 직후 1회만
   }, [restored]);
 
@@ -536,10 +546,10 @@ export default function ExpoBriefPage() {
       return;
     }
     setError(null);
-    setFlowStep("prompt");
+    void generateConcept();
   }
 
-  /** 프롬프트 단계 완료 — 3D 부스 생성 (기본 무벽, 프롬프트가 벽을 요구하면 그래픽 월 배치) */
+  /** 컨셉 확정 — 3D 부스 생성(무벽 기본, 프롬프트 벽 언급 시 그래픽 월) 후 배치 단계로 */
   function createBoothFromPrompt() {
     const area = Number(areaInput);
     setError(null);
@@ -564,8 +574,11 @@ export default function ExpoBriefPage() {
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
       setDimHeight(String(fp.wallHeightM));
-      setFlowStep("result");
-      setAutoConcept(true); // 3D 다음 단계 — 컨셉 이미지 자동 생성
+      setFlowStep("model");
+      // 생성된 컨셉 이미지를 3D에 자동 반영 (벽 텍스처·팔레트·구성 제안)
+      if (conceptImage && conceptImage.startsWith("https://")) {
+        setAutoApplyConcept(true);
+      }
     } catch (cause) {
       setFootprint(null);
       setSelectedLabel(null);
@@ -574,7 +587,7 @@ export default function ExpoBriefPage() {
           ? footprintErrorMessage(cause.code)
           : "면적을 확인해 주세요.",
       );
-      setFlowStep("info");
+      setFlowStep("concept");
     }
   }
 
@@ -583,7 +596,6 @@ export default function ExpoBriefPage() {
     setUnit("sqm");
     setAreaInput(String(kit.areaSqm));
     setError(null);
-    setFlowStep("prompt");
   }
 
   function downloadEstimateCsv() {
@@ -729,7 +741,7 @@ export default function ExpoBriefPage() {
       setDimWidth(String(dims.widthM));
       setDimDepth(String(dims.depthM));
       setDimHeight(String(dims.wallHeightM));
-      setFlowStep("result");
+      setFlowStep("final");
       setProposal(null); // serverProjectId 효과가 서버에서 다시 로드
       setContractPrep(null);
       setClientDecision(null);
@@ -781,7 +793,7 @@ export default function ExpoBriefPage() {
       setDimWidth(String(fp.selected.widthM));
       setDimDepth(String(fp.selected.depthM));
       setDimHeight(String(fp.wallHeightM));
-      setFlowStep("result");
+      setFlowStep("final");
     } catch (cause) {
       setError(
         cause instanceof ExpoFootprintError
@@ -810,13 +822,13 @@ export default function ExpoBriefPage() {
     };
   }, [footprint, selectedLabel]);
 
-  // 3D 생성 직후 — 프롬프트가 있으면 컨셉 이미지를 이어서 자동 생성
+  // 3D 진입 직후 — 컨셉 이미지를 씬에 자동 반영
   useEffect(() => {
-    if (!autoConcept || !displayFootprint || conceptLoading) return;
-    setAutoConcept(false);
-    if (conceptPrompt.trim()) void generateConcept();
+    if (!autoApplyConcept || !displayFootprint) return;
+    setAutoApplyConcept(false);
+    void applyConceptToScene();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 1회 트리거
-  }, [autoConcept, displayFootprint]);
+  }, [autoApplyConcept, displayFootprint]);
 
   // 견적 — 치수 확정 전엔 개념 범위, 확정 후엔 씬 기반 카탈로그 견적 (전부 allowance)
   const conceptualRange = useMemo(() => {
@@ -997,16 +1009,30 @@ export default function ExpoBriefPage() {
   }
 
   async function generateConcept() {
-    if (!displayFootprint || conceptLoading) return;
+    if (conceptLoading) return;
     setConceptError(null);
     setConceptLoading(true);
     try {
-      const dims = confirmedDims ?? {
-        widthM: displayFootprint.selected.widthM,
-        depthM: displayFootprint.selected.depthM,
-        wallHeightM: displayFootprint.wallHeightM,
-        boothType: displayFootprint.boothType,
-      };
+      let dims: { widthM: number; depthM: number; wallHeightM: number; boothType: ExpoBoothType };
+      if (confirmedDims) {
+        dims = confirmedDims;
+      } else if (displayFootprint) {
+        dims = {
+          widthM: displayFootprint.selected.widthM,
+          depthM: displayFootprint.selected.depthM,
+          wallHeightM: displayFootprint.wallHeightM,
+          boothType: displayFootprint.boothType,
+        };
+      } else {
+        // 컨셉 단계 — 아직 3D 전이라 면적으로 임시 치수 계산
+        const fp = createProvisionalFootprint(Number(areaInput), unit);
+        dims = {
+          widthM: fp.selected.widthM,
+          depthM: fp.selected.depthM,
+          wallHeightM: fp.wallHeightM,
+          boothType: fp.boothType,
+        };
+      }
       const response = await fetch("/api/expo/concept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1073,7 +1099,32 @@ export default function ExpoBriefPage() {
           &ldquo;가정&rdquo;으로 표시됩니다.
         </p>
 
-        {flowStep === "info" && (
+        <nav aria-label="플로우 단계" className="mt-4 flex gap-1 overflow-x-auto pb-1">
+          {FLOW_STEPS.map((step) => {
+            const needsBooth = step.id === "model" || step.id === "print" || step.id === "final";
+            const enabled = !needsBooth || Boolean(displayFootprint);
+            return (
+              <button
+                key={step.id}
+                type="button"
+                disabled={!enabled}
+                aria-current={flowStep === step.id ? "step" : undefined}
+                onClick={() => setFlowStep(step.id)}
+                className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-[11px] font-bold transition ${
+                  flowStep === step.id
+                    ? "bg-blue-600 text-white"
+                    : enabled
+                      ? "bg-white text-black/60 border border-black/10 hover:border-blue-300"
+                      : "bg-zinc-100 text-black/30 cursor-not-allowed"
+                }`}
+              >
+                {step.label}
+              </button>
+            );
+          })}
+        </nav>
+
+        {flowStep === "concept" && (
           <>
         {/* 시작 방식 카드 (§7.1) */}
         <div className="mt-5 grid grid-cols-3 gap-2">
@@ -1270,6 +1321,150 @@ export default function ExpoBriefPage() {
           </div>
         )}
 
+
+            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
+            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
+                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
+                  GPT Image 2 · 테스트 무료
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-black/50">
+                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
+                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
+                이후 데칼 단계에서 정확히 적용됩니다.
+              </p>
+              <div className="mt-2 flex gap-2">
+                <input
+                  id="expo-concept-prompt"
+                  type="text"
+                  value={conceptPrompt}
+                  maxLength={500}
+                  onChange={(e) => setConceptPrompt(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") generateConcept();
+                  }}
+                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
+                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
+                />
+                <button
+                  type="button"
+                  onClick={generateConcept}
+                  disabled={conceptLoading}
+                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
+                </button>
+              </div>
+              {conceptLoading && (
+                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
+                  <span
+                    aria-hidden
+                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
+                  />
+                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
+                </p>
+              )}
+              {conceptError && (
+                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  {conceptError}
+                </p>
+              )}
+              {conceptGallery.length > 1 && !conceptLoading && (
+                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
+                  {conceptGallery.map((item) => (
+                    <button
+                      key={item.url}
+                      type="button"
+                      onClick={() => setConceptImage(item.url)}
+                      title={item.prompt || "컨셉 이미지"}
+                      aria-pressed={conceptImage === item.url}
+                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
+                        conceptImage === item.url
+                          ? "border-violet-600"
+                          : "border-black/10"
+                      }`}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
+                      <img
+                        src={item.url}
+                        alt="컨셉 썸네일"
+                        className="h-14 w-20 object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+              {conceptImage && !conceptLoading && (
+                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
+                  <img
+                    src={conceptImage}
+                    alt="AI 부스 컨셉 이미지"
+                    className="w-full"
+                  />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
+                    AI 컨셉 — 시공 기준 아님
+                  </span>
+                </div>
+              )}
+              {conceptImage && conceptImage.startsWith("https://") && !conceptLoading && (
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={applyConceptToScene}
+                    disabled={applyConceptState === "loading"}
+                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
+                  >
+                    {applyConceptState === "loading"
+                      ? "이미지 분석 중…"
+                      : "이 이미지를 3D에 반영"}
+                  </button>
+                  <span className="text-[10px] text-black/40">
+                    벽 텍스처·팔레트·구성 제안 — 되돌리기로 취소 가능
+                  </span>
+                </div>
+              )}
+              {applyConceptState === "error" && (
+                <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                  이미지 분석에 실패했습니다 — 잠시 후 다시 시도해 주세요.
+                </p>
+              )}
+            </div>
+
+            {displayFootprint === null && (
+              <button
+                type="button"
+                onClick={createBoothFromPrompt}
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white hover:opacity-95"
+              >
+                이 컨셉으로 3D 배치하기 →
+              </button>
+            )}
+            {displayFootprint !== null && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (conceptImage && conceptImage.startsWith("https://")) {
+                    setAutoApplyConcept(true);
+                  }
+                  setFlowStep("model");
+                }}
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white hover:opacity-95"
+              >
+                3D 배치로 이동 →
+              </button>
+            )}
+            <p className="mt-1.5 text-center text-[11px] text-black/40">
+              이미지 없이도 3D 배치로 넘어갈 수 있습니다 — 부스는 무벽(4면
+              오픈)으로 시작합니다.
+            </p>
+          </>
+        )}
+
+        {flowStep === "company" && (
+          <>
             <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-bold text-black">행사 규정</p>
@@ -1609,55 +1804,23 @@ export default function ExpoBriefPage() {
           </div>
         </details>
 
-            <p className="mt-4 text-center text-[11px] text-black/40">
-              행사 규정·브랜드는 선택 입력 — 나중에 결과 화면에서도 바꿀 수
-              있습니다.
-            </p>
-          </>
-        )}
-
-        {flowStep === "prompt" && (
-          <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-            <p className="text-sm font-bold text-black">
-              어떤 부스를 원하시나요?
-            </p>
-            <p className="mt-1 text-xs leading-5 text-black/50">
-              분위기·컬러·소재·벽 구성을 자유롭게 적어주세요. 부스는 기본
-              4면 오픈(무벽)으로 시작하고, <b>벽·백월을 언급하면 3D에 그래픽
-              월이 배치</b>됩니다. 입력을 마치면 3D 모델 → 컨셉 이미지 →
-              견적 순서로 이어집니다.
-            </p>
-            <textarea
-              id="expo-flow-prompt"
-              value={conceptPrompt}
-              maxLength={500}
-              rows={4}
-              onChange={(e) => setConceptPrompt(e.target.value)}
-              placeholder={"예: 백월에 브랜드 로고를 크게, 화이트+우드 톤 미니멀 테크 부스, 밝은 스팟 조명"}
-              className="mt-3 w-full rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
-            />
             <div className="mt-3 flex gap-2">
               <button
                 type="button"
-                onClick={() => setFlowStep("info")}
+                onClick={() => setFlowStep("model")}
                 className="rounded-xl border border-black/15 px-4 py-3 text-sm font-bold text-black/60 hover:bg-zinc-50"
               >
-                ← 정보 수정
+                ← 3D 배치
               </button>
               <button
                 type="button"
-                onClick={createBoothFromPrompt}
-                className="min-w-0 flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:opacity-95"
+                onClick={() => setFlowStep("print")}
+                className="min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:opacity-95"
               >
-                부스 3D 생성하기 →
+                다음 — 인쇄물 컨셉 →
               </button>
             </div>
-            <p className="mt-1.5 text-[10px] text-black/40">
-              {Number(areaInput) || "?"}
-              {unit === "sqm" ? "㎡" : "ft²"} 기준 · 프롬프트는 언제든 결과
-              화면에서 수정·재생성할 수 있습니다.
-            </p>
-          </div>
+          </>
         )}
 
         {error && (
@@ -1672,126 +1835,44 @@ export default function ExpoBriefPage() {
           </p>
         )}
 
-        {flowStep === "result" && displayFootprint && (
+        {flowStep === "print" && (
+          <div className="mt-4 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
+            <p className="text-sm font-bold text-black">인쇄물 컨셉</p>
+            <p className="mt-1 text-xs text-black/50">
+              부스에 부착할 인쇄물(백월 그래픽·라이트박스·사이니지)별 컨셉
+              확정과 개별 이미지 생성 — 다음 업데이트에서 열립니다.
+            </p>
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setFlowStep("company")}
+                className="rounded-xl border border-black/15 px-4 py-3 text-sm font-bold text-black/60 hover:bg-zinc-50"
+              >
+                ← 기업정보
+              </button>
+              <button
+                type="button"
+                onClick={() => setFlowStep("final")}
+                className="min-w-0 flex-1 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3 text-sm font-bold text-white hover:opacity-95"
+              >
+                확정하고 견적 보기 →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {(flowStep === "model" || flowStep === "final") && displayFootprint && (
           <section aria-label="3D 부스 셸" className="mt-5">
             <button
               type="button"
-              onClick={() => setFlowStep("info")}
+              onClick={() =>
+                setFlowStep(flowStep === "final" ? "print" : "concept")
+              }
               className="mb-2 rounded-lg border border-black/15 px-3 py-1.5 text-[11px] font-bold text-black/60 hover:bg-zinc-50"
             >
-              ← 정보·프롬프트 수정
+              {flowStep === "final" ? "← 인쇄물" : "← 컨셉으로"}
             </button>
 
-            {/* AI 컨셉 — 프롬프트로 부스 컨셉 렌더 (GPT Image 2, 컨셉 전용) */}
-            <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-bold text-black">AI 컨셉 렌더</p>
-                <span className="rounded-full bg-violet-50 px-2.5 py-1 text-[10px] font-bold text-violet-700">
-                  GPT Image 2 · 테스트 무료
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-black/50">
-                원하는 분위기를 적으면 현재 부스 구성을 반영한 컨셉 이미지를
-                만듭니다. 구조·치수의 기준은 항상 3D 씬이며, 로고·브랜드는
-                이후 데칼 단계에서 정확히 적용됩니다.
-              </p>
-              <div className="mt-2 flex gap-2">
-                <input
-                  id="expo-concept-prompt"
-                  type="text"
-                  value={conceptPrompt}
-                  maxLength={500}
-                  onChange={(e) => setConceptPrompt(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") generateConcept();
-                  }}
-                  placeholder="예: 화이트+우드 톤 미니멀 테크 부스, 밝은 조명"
-                  className="min-w-0 flex-1 rounded-xl border border-black/15 px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
-                />
-                <button
-                  type="button"
-                  onClick={generateConcept}
-                  disabled={conceptLoading}
-                  className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {conceptLoading ? "생성 중…" : conceptImage ? "재생성" : "컨셉 생성"}
-                </button>
-              </div>
-              {conceptLoading && (
-                <p role="status" className="mt-2 flex items-center gap-2 text-xs font-medium text-violet-700">
-                  <span
-                    aria-hidden
-                    className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-violet-300 border-t-violet-700"
-                  />
-                  컨셉 이미지를 그리는 중입니다 — 최대 1~2분 걸립니다.
-                </p>
-              )}
-              {conceptError && (
-                <p role="alert" className="mt-2 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  {conceptError}
-                </p>
-              )}
-              {conceptGallery.length > 1 && !conceptLoading && (
-                <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
-                  {conceptGallery.map((item) => (
-                    <button
-                      key={item.url}
-                      type="button"
-                      onClick={() => setConceptImage(item.url)}
-                      title={item.prompt || "컨셉 이미지"}
-                      aria-pressed={conceptImage === item.url}
-                      className={`relative shrink-0 overflow-hidden rounded-lg border-2 ${
-                        conceptImage === item.url
-                          ? "border-violet-600"
-                          : "border-black/10"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element -- 갤러리 썸네일 */}
-                      <img
-                        src={item.url}
-                        alt="컨셉 썸네일"
-                        className="h-14 w-20 object-cover"
-                      />
-                    </button>
-                  ))}
-                </div>
-              )}
-              {conceptImage && !conceptLoading && (
-                <div className="relative mt-3 overflow-hidden rounded-xl border border-black/10">
-                  {/* eslint-disable-next-line @next/next/no-img-element -- data URL 컨셉 이미지 */}
-                  <img
-                    src={conceptImage}
-                    alt="AI 부스 컨셉 이미지"
-                    className="w-full"
-                  />
-                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-1 text-[10px] font-bold text-white">
-                    AI 컨셉 — 시공 기준 아님
-                  </span>
-                </div>
-              )}
-              {conceptImage && conceptImage.startsWith("https://") && !conceptLoading && (
-                <div className="mt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={applyConceptToScene}
-                    disabled={applyConceptState === "loading"}
-                    className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
-                  >
-                    {applyConceptState === "loading"
-                      ? "이미지 분석 중…"
-                      : "이 이미지를 3D에 반영"}
-                  </button>
-                  <span className="text-[10px] text-black/40">
-                    벽 텍스처·팔레트·구성 제안 — 되돌리기로 취소 가능
-                  </span>
-                </div>
-              )}
-              {applyConceptState === "error" && (
-                <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  이미지 분석에 실패했습니다 — 잠시 후 다시 시도해 주세요.
-                </p>
-              )}
-            </div>
             <BoothShell3D
               footprint={
                 confirmedDims
@@ -2154,6 +2235,18 @@ export default function ExpoBriefPage() {
               )}
             </div>
 
+            {flowStep === "model" && (
+              <button
+                type="button"
+                onClick={() => setFlowStep("company")}
+                className="mt-3 w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-3.5 text-base font-bold text-white hover:opacity-95"
+              >
+                배치 완료 — 기업정보 입력 →
+              </button>
+            )}
+
+            {flowStep === "final" && (
+              <>
             {(conceptualRange || catalogEstimate) && (
               <div className="mt-3 rounded-2xl border border-black/10 bg-white p-4 shadow-sm">
                 <div className="flex items-center justify-between gap-2">
@@ -2507,6 +2600,8 @@ export default function ExpoBriefPage() {
                 {shareUrl}
                 {shareState === "error" && " — 복사 실패, 직접 복사해 주세요"}
               </p>
+            )}
+              </>
             )}
           </section>
         )}
