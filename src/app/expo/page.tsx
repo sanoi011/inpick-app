@@ -977,6 +977,35 @@ export default function ExpoBriefPage() {
     setBrandLoading(false);
   }
 
+  /** 씬만 빈 부스로 초기화 — 되돌리기 1번으로 복구 가능 */
+  function clearSceneLayout() {
+    setSelectedComponentId(null);
+    setConceptWallTexture(null);
+    setConceptAccent(null);
+    setSceneHistory((history) =>
+      history.present
+        ? applySceneChange(
+            history,
+            createExpoScene(history.present.boothWidthM, history.present.boothDepthM),
+          )
+        : history,
+    );
+  }
+
+  /** 이 기기의 작업 내용 전체 초기화 — 서버 저장본은 '이어하기'로 복원 가능 */
+  function startNewProject() {
+    const ok = window.confirm(
+      "이 기기의 작업 내용을 모두 지우고 새 프로젝트를 시작할까요?\n(로그인 저장본은 Clone & Reflow의 '이어하기'로 다시 열 수 있습니다)",
+    );
+    if (!ok) return;
+    try {
+      window.localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // 삭제 실패 시에도 새로고침으로 진행
+    }
+    window.location.reload();
+  }
+
   function patchPrintItem(id: string, patch: Partial<ExpoPrintItem>) {
     setPrintItems((items) =>
       items.map((item) => (item.id === id ? { ...item, ...patch } : item)),
@@ -1202,7 +1231,15 @@ export default function ExpoBriefPage() {
           &ldquo;가정&rdquo;으로 표시됩니다.
         </p>
 
-        <nav aria-label="플로우 단계" className="mt-4 flex gap-1 overflow-x-auto pb-1">
+        <div className="mt-4 flex items-center gap-1">
+          <button
+            type="button"
+            onClick={startNewProject}
+            className="shrink-0 rounded-full border border-red-200 bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-600 hover:bg-red-100"
+          >
+            새 프로젝트
+          </button>
+        <nav aria-label="플로우 단계" className="flex min-w-0 flex-1 gap-1 overflow-x-auto pb-1">
           {FLOW_STEPS.map((step) => {
             const needsBooth = step.id === "model" || step.id === "print" || step.id === "final";
             const enabled = !needsBooth || Boolean(displayFootprint);
@@ -1226,6 +1263,7 @@ export default function ExpoBriefPage() {
             );
           })}
         </nav>
+        </div>
 
         {flowStep === "concept" && (
           <>
@@ -2119,6 +2157,16 @@ export default function ExpoBriefPage() {
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-black">부스 구성 요소</p>
                   <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      aria-label="배치 비우기"
+                      disabled={!scene || scene.components.length === 0}
+                      onClick={clearSceneLayout}
+                      title="모든 구성 요소를 제거합니다 (되돌리기로 복구 가능)"
+                      className="h-7 rounded-lg border border-red-200 px-2.5 text-xs font-bold text-red-600 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-35"
+                    >
+                      비우기
+                    </button>
                     <button
                       type="button"
                       aria-label="되돌리기"
