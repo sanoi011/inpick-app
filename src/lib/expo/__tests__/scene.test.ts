@@ -12,6 +12,7 @@ import {
   expoDecalPlacement,
   addWallFromPrompt,
   applyConceptSuggestions,
+  applyConceptLayout,
   promptMentionsWall,
   isExpoBoothScene,
   moveExpoComponent,
@@ -247,4 +248,36 @@ test("component size overrides resize the footprint and survive rotation", () =>
   const clamped = scene.components.find((c) => c.id === "t1")!;
   assert.equal(clamped.widthM, 0.1);
   assert.equal(clamped.depthM, 20);
+});
+
+test("concept layout places by plan fractions, replaces prior AI placements only", () => {
+  let scene = createExpoScene(6, 3);
+  scene = addExpoComponent(scene, "product_table", "user1"); // 사용자 배치
+  scene = applyConceptLayout(
+    scene,
+    [
+      { catalogId: "graphic_wall", x: 0.5, z: 0, widthM: 4 },
+      { catalogId: "info_counter", x: 0.25, z: 0.8, rotation: 90 },
+      { catalogId: "unknown_thing", x: 0.5, z: 0.5 },
+    ],
+    "ai_r1",
+  );
+  assert.ok(scene.components.some((c) => c.id === "user1")); // 보존
+  const wall = scene.components.find((c) => c.catalogId === "graphic_wall")!;
+  assert.equal(wall.widthM, 4);
+  assert.ok(wall.z <= -1.4); // 뒷벽 근처 (z=0 → -1.5 클램프)
+  const counter = scene.components.find((c) => c.catalogId === "info_counter")!;
+  assert.equal(counter.rotation, 90);
+  assert.equal(counter.x, -1.5); // (0.25-0.5)*6 스냅
+  assert.ok(!scene.components.some((c) => c.catalogId === "unknown_thing"));
+
+  // 재적용 — AI 배치 교체, 중복 없음
+  const reapplied = applyConceptLayout(
+    scene,
+    [{ catalogId: "signage_tower", x: 0.9, z: 0.9 }],
+    "ai_r2",
+  );
+  assert.ok(reapplied.components.some((c) => c.id === "user1"));
+  assert.equal(reapplied.components.filter((c) => c.id.startsWith("ai_")).length, 1);
+  assert.equal(reapplied.components.filter((c) => c.catalogId === "graphic_wall").length, 0);
 });

@@ -23,7 +23,7 @@ import {
   moveExpoComponent,
   removeExpoComponent,
   addWallFromPrompt,
-  applyConceptSuggestions,
+  applyConceptLayout,
   promptMentionsWall,
   resizeExpoComponent,
   resizeExpoScene,
@@ -1060,41 +1060,52 @@ export default function ExpoBriefPage() {
     }
     setApplyConceptState("loading");
     try {
+      const booth = sceneHistory.present;
       const response = await fetch("/api/expo/apply-concept", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ imageUrl: conceptImage }),
+        body: JSON.stringify({
+          imageUrl: conceptImage,
+          boothWidthM: booth?.boothWidthM ?? displayFootprint?.selected.widthM,
+          boothDepthM: booth?.boothDepthM ?? displayFootprint?.selected.depthM,
+        }),
       });
       const payload = (await response.json().catch(() => ({}))) as {
         palette?: string[];
-        components?: Array<{ catalogId: string; count: number }>;
+        components?: Array<{
+          catalogId: string;
+          x?: number;
+          z?: number;
+          widthM?: number;
+          depthM?: number;
+          rotation?: number;
+        }>;
       };
       if (!response.ok) {
         setApplyConceptState("error");
         return;
       }
-      setConceptWallTexture(conceptImage);
       if (payload.palette?.[0] && /^#[0-9a-f]{6}$/i.test(payload.palette[0])) {
         setConceptAccent(payload.palette[0]);
       }
-      const suggestions = [...(payload.components ?? [])];
-      if (!suggestions.some((entry) => entry.catalogId === "graphic_wall")) {
-        // 텍스처를 입힐 벽이 없으면 백월 1장 제안에 포함
-        suggestions.unshift({ catalogId: "graphic_wall", count: 1 });
+      // 이미지 속 사물·매스를 좌표/크기/회전으로 재구성 — 이미지를 벽에
+      // 붙이지 않는다. 사용자가 놓은 컴포넌트는 보존, AI 배치만 교체.
+      const entries = payload.components ?? [];
+      if (entries.length > 0) {
+        setSceneHistory((history) =>
+          history.present
+            ? applySceneChange(
+                history,
+                applyConceptLayout(
+                  history.present,
+                  entries,
+                  `ai_${Date.now().toString(36)}`,
+                ),
+              )
+            : history,
+        );
       }
-      setSceneHistory((history) =>
-        history.present
-          ? applySceneChange(
-              history,
-              applyConceptSuggestions(
-                history.present,
-                suggestions,
-                `ai_${Date.now().toString(36)}`,
-              ),
-            )
-          : history,
-      );
-      setApplyConceptState("idle");
+      setApplyConceptState(entries.length > 0 ? "idle" : "error");
     } catch {
       setApplyConceptState("error");
     }
@@ -1510,17 +1521,18 @@ export default function ExpoBriefPage() {
                     className="rounded-lg border border-violet-300 bg-violet-50 px-3 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 disabled:opacity-50"
                   >
                     {applyConceptState === "loading"
-                      ? "이미지 분석 중…"
-                      : "이 이미지를 3D에 반영"}
+                      ? "이미지 속 배치 분석 중… (최대 2분)"
+                      : "이미지 속 배치를 3D로 구현"}
                   </button>
                   <span className="text-[10px] text-black/40">
-                    벽 텍스처·팔레트·구성 제안 — 되돌리기로 취소 가능
+                    사물 위치·크기·방향을 읽어 재구성 — 되돌리기로 취소 가능
                   </span>
                 </div>
               )}
               {applyConceptState === "error" && (
                 <p role="alert" className="mt-1.5 rounded-lg bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
-                  이미지 분석에 실패했습니다 — 잠시 후 다시 시도해 주세요.
+                  이미지에서 배치를 읽지 못했습니다 — 다시 시도하거나 직접
+                  배치해 주세요.
                 </p>
               )}
             </div>

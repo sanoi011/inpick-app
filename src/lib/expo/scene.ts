@@ -501,3 +501,78 @@ export function applyConceptSuggestions(
   }
   return next;
 }
+
+export interface ExpoConceptLayoutEntry {
+  catalogId: string;
+  /** 부스 평면 비율 좌표 — x: 0=왼쪽 벽, 1=오른쪽 벽 / z: 0=뒷벽, 1=전면 통로 */
+  x?: number;
+  z?: number;
+  widthM?: number;
+  depthM?: number;
+  rotation?: number;
+}
+
+const AI_PLACEMENT_PREFIX = "ai_";
+
+/**
+ * 컨셉 이미지 비전 레이아웃을 씬에 정밀 반영한다.
+ * - 이전 AI 배치(ai_ 접두사·프롬프트 벽)는 교체하고, 사용자가 직접 놓은
+ *   컴포넌트는 보존한다 → 재적용해도 중복되지 않는다.
+ * - 좌표·크기·회전은 일반 씬 연산(스냅·클램프·리비전)을 그대로 통과한다.
+ */
+export function applyConceptLayout(
+  scene: ExpoBoothScene,
+  entries: ExpoConceptLayoutEntry[],
+  idPrefix: string,
+): ExpoBoothScene {
+  let next = bump({
+    ...scene,
+    components: scene.components.filter(
+      (component) =>
+        !component.id.startsWith(AI_PLACEMENT_PREFIX) &&
+        !component.id.endsWith("_wall"),
+    ),
+  });
+  const clamp01 = (value: number) => Math.min(1, Math.max(0, value));
+  const perKind: Record<string, number> = {};
+  let placed = 0;
+  for (const entry of entries.slice(0, 12)) {
+    const item = findCatalogItem(entry.catalogId);
+    if (!item) continue;
+    perKind[entry.catalogId] = (perKind[entry.catalogId] ?? 0) + 1;
+    if (perKind[entry.catalogId] > 4) continue;
+    if (next.components.length >= EXPO_MAX_COMPONENTS) break;
+    const id = `${idPrefix}_${placed}`;
+    next = addExpoComponent(next, entry.catalogId, id);
+    if (
+      (typeof entry.widthM === "number" && Number.isFinite(entry.widthM)) ||
+      (typeof entry.depthM === "number" && Number.isFinite(entry.depthM))
+    ) {
+      next = resizeExpoComponent(
+        next,
+        id,
+        typeof entry.widthM === "number" && Number.isFinite(entry.widthM)
+          ? entry.widthM
+          : item.widthM,
+        typeof entry.depthM === "number" && Number.isFinite(entry.depthM)
+          ? entry.depthM
+          : item.depthM,
+      );
+    }
+    const quarterTurns = ((Math.round((entry.rotation ?? 0) / 90) % 4) + 4) % 4;
+    for (let turn = 0; turn < quarterTurns; turn += 1) {
+      next = rotateExpoComponent(next, id);
+    }
+    const current = next.components.find((component) => component.id === id);
+    if (!current) continue;
+    if (typeof entry.x === "number" && typeof entry.z === "number") {
+      const targetX = (clamp01(entry.x) - 0.5) * next.boothWidthM;
+      const targetZ = (clamp01(entry.z) - 0.5) * next.boothDepthM;
+      next = moveExpoComponent(next, id, targetX - current.x, targetZ - current.z);
+    } else if (item.wallMounted) {
+      next = moveExpoComponent(next, id, 0, -100);
+    }
+    placed += 1;
+  }
+  return next;
+}
