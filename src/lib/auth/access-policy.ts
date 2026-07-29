@@ -12,7 +12,12 @@ export const WEB_AUTH_RETURN_STORAGE_KEY = "inpick_web_auth_return_to";
 
 /** Web visitors must authenticate before entering the free AI workflow. */
 export function requiresConsumerAuthOnWeb(pathname: string): boolean {
-  return pathname === "/workflow" || pathname.startsWith("/workflow/");
+  return (
+    pathname === "/workflow" ||
+    pathname.startsWith("/workflow/") ||
+    pathname === "/writing" ||
+    pathname.startsWith("/writing/")
+  );
 }
 
 /** Legal and authentication screens remain reachable before native app sign-in. */
