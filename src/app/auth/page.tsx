@@ -33,11 +33,11 @@ type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 function OAuthRow({
   onProvider,
   loadingProvider,
-  forceNaver = false,
+  showPendingNaver = false,
 }: {
   onProvider: (p: OAuthProvider) => void;
   loadingProvider: OAuthProvider | null;
-  forceNaver?: boolean;
+  showPendingNaver?: boolean;
 }) {
   const allItems: {
     key: OAuthProvider;
@@ -89,9 +89,10 @@ function OAuthRow({
     },
     {
       key: "naver",
-      label: "네이버",
+      label: NAVER_LOGIN_ENABLED ? "네이버" : "네이버 (검수 중)",
       bg: "bg-[#03C75A]",
       fg: "text-white",
+      disabled: !NAVER_LOGIN_ENABLED,
       icon: (
         <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
           <path d="M16.273 12.845L7.376 0H0v24h7.726V11.155L16.624 24H24V0h-7.727v12.845z" />
@@ -112,7 +113,7 @@ function OAuthRow({
     },
   ];
   // 네이버 검수 재신청 중 — 통과 후 NEXT_PUBLIC_ENABLE_NAVER_LOGIN=true로 재노출.
-  const items = NAVER_LOGIN_ENABLED || forceNaver ? allItems : allItems.filter((it) => it.key !== "naver");
+  const items = NAVER_LOGIN_ENABLED || showPendingNaver ? allItems : allItems.filter((it) => it.key !== "naver");
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -500,7 +501,7 @@ function ConsumerAuthForm({ hankwon = false }: { hankwon?: boolean }) {
       {error && <Alert kind="danger">{error}</Alert>}
       {message && <Alert kind="success">{message}</Alert>}
 
-      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} forceNaver={hankwon} />
+      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} showPendingNaver={hankwon} />
 
       <Divider>또는 이메일로</Divider>
 

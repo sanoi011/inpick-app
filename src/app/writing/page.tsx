@@ -75,12 +75,6 @@ export default function WritingPage() {
         setBridgeState("ready");
         return;
       }
-      if (event.data?.type === "hankwon:navigate") {
-        const href = typeof event.data.href === "string" ? event.data.href : "/";
-        if (href === "/" || href === "/mypage" || href.startsWith("/mypage/")) {
-          window.location.assign(href);
-        }
-      }
       if (event.data?.type === "hankwon:signout") {
         void signOut();
       }
