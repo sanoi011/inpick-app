@@ -322,13 +322,8 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp, hankwo
             <div className="flex flex-col gap-2.5">
               <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
               <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
-              {(NAVER_LOGIN_ENABLED || hankwon) && (
-                <OAuthBtn
-                  provider="naver"
-                  onClick={() => handleOAuth("naver")}
-                  disabled={!NAVER_LOGIN_ENABLED}
-                  label={NAVER_LOGIN_ENABLED ? "네이버" : "네이버 (검수 중)"}
-                />
+              {NAVER_LOGIN_ENABLED && !hankwon && (
+                <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
               )}
               <OAuthBtn provider="apple" onClick={() => handleOAuth("apple")} />
             </div>
@@ -746,13 +741,9 @@ const OAUTH_ICONS: Record<"google" | "kakao" | "naver" | "apple", React.ReactNod
 function OAuthBtn({
   provider,
   onClick,
-  disabled = false,
-  label,
 }: {
   provider: "google" | "kakao" | "naver" | "apple";
   onClick: () => void;
-  disabled?: boolean;
-  label?: string;
 }) {
   const config = {
     google: { label: "Google", bg: "border-black/10 bg-white text-black hover:bg-black/[0.035]" },
@@ -764,11 +755,10 @@ function OAuthBtn({
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
-      className={`inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-full border text-[13px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-45 ${config.bg}`}
+      className={`inline-flex h-[48px] w-full items-center justify-center gap-2 rounded-full border text-[13px] font-semibold transition ${config.bg}`}
     >
       {OAUTH_ICONS[provider]}
-      <span>{label || config.label}</span>
+      <span>{config.label}</span>
     </button>
   );
 }
