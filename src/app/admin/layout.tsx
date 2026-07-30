@@ -7,6 +7,7 @@ import {
   BarChart3, Users, FolderKanban, FileText, Hexagon,
   Bot, Package, RefreshCw, Settings, LogOut, Menu, X, Shield, FileImage,
   Library, ExternalLink, Rocket, Heart, Activity, CreditCard, AlertTriangle, MessagesSquare, Wrench, PieChart, Megaphone, Inbox,
+  BookOpen,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { label: "환경 설정", href: "/admin/settings", icon: Settings },
   { label: "비즈니스·광고 센터", href: "/admin/business-center", icon: Megaphone },
   { label: "비즈니스 문의 관리", href: "/admin/business-inquiries", icon: Inbox },
+  { label: "한권 관리", href: "/admin/hankwon", icon: BookOpen },
 ];
 
 const NAV_GROUPS = [
@@ -58,6 +60,10 @@ const NAV_GROUPS = [
   {
     label: "Business",
     items: [NAV_ITEMS[25], NAV_ITEMS[24]],
+  },
+  {
+    label: "Connected services",
+    items: [NAV_ITEMS[26]],
   },
   {
     label: "System",
