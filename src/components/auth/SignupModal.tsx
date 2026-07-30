@@ -46,6 +46,7 @@ interface SignupModalProps {
   onClose: () => void;
   onSwitchToLogin?: () => void;
   onSignedUp?: () => void;
+  hankwon?: boolean;
 }
 
 function formatPhone(raw: string): string {
@@ -75,7 +76,7 @@ function passwordStrength(pw: string): {
   return { score: s as 0 | 1 | 2 | 3 | 4, ...map[s] };
 }
 
-export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: SignupModalProps) {
+export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp, hankwon = false }: SignupModalProps) {
   const supabase = createClient();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -208,7 +209,9 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
           agreePrivacy,
           agreeAge14,
           agreeMarketing,
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: hankwon
+            ? `${window.location.origin}/auth/callback?next=${encodeURIComponent("/writing")}`
+            : `${window.location.origin}/auth/callback`,
         }),
       });
       const data = await res.json();
@@ -235,12 +238,16 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
   const handleOAuth = async (provider: "google" | "kakao" | "naver" | "apple") => {
     setError("");
     if (provider === "naver") {
-      window.location.href = "/api/auth/naver/start?account_type=consumer";
+      window.location.href = hankwon
+        ? "/api/auth/naver/start?account_type=consumer&next=%2Fwriting"
+        : "/api/auth/naver/start?account_type=consumer";
       return;
     }
     try {
       const { error } = await startOAuth(supabase, provider as "google" | "kakao" | "apple", {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: hankwon
+          ? `${window.location.origin}/auth/callback?next=${encodeURIComponent("/writing")}`
+          : `${window.location.origin}/auth/callback`,
       });
       if (error) setError(`${provider} 로그인 실패: ${error}`);
     } catch (err) {
@@ -272,7 +279,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
           <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/32">Create your account</p>
           <h2 className="mt-2 text-[26px] font-medium tracking-[-0.05em] text-black">회원가입</h2>
           <p className="mt-2 text-[13px] text-black/45">
-            INPICK 가입 시 <span className="font-semibold text-primary-500">+5 토큰</span> 증정
+            {hankwon ? "하나의 계정으로 한권 내 서재를 모든 기기에서 이어서 이용합니다." : <>INPICK 가입 시 <span className="font-semibold text-primary-500">+5 토큰</span> 증정</>}
           </p>
         </div>
 
@@ -315,7 +322,7 @@ export function SignupModal({ open, onClose, onSwitchToLogin, onSignedUp }: Sign
             <div className="flex flex-col gap-2.5">
               <OAuthBtn provider="google" onClick={() => handleOAuth("google")} />
               <OAuthBtn provider="kakao" onClick={() => handleOAuth("kakao")} />
-              {NAVER_LOGIN_ENABLED && (
+              {(NAVER_LOGIN_ENABLED || hankwon) && (
                 <OAuthBtn provider="naver" onClick={() => handleOAuth("naver")} />
               )}
               <OAuthBtn provider="apple" onClick={() => handleOAuth("apple")} />

@@ -601,13 +601,14 @@ function ConsumerAuthForm({ hankwon = false }: { hankwon?: boolean }) {
             onClick={() => setShowSignupModal(true)}
             className="font-semibold text-primary-500 hover:underline"
           >
-            회원가입 <Hexagon className="inline h-3 w-3 align-text-bottom" /> +5 토큰
+            {hankwon ? "회원가입" : <>회원가입 <Hexagon className="inline h-3 w-3 align-text-bottom" /> +5 토큰</>}
           </button>
         </p>
       </div>
 
       <SignupModal
         open={showSignupModal}
+        hankwon={hankwon}
         onClose={() => setShowSignupModal(false)}
         onSwitchToLogin={() => setShowSignupModal(false)}
       />
