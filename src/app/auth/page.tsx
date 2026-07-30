@@ -33,9 +33,11 @@ type OAuthProvider = "google" | "kakao" | "apple" | "naver";
 function OAuthRow({
   onProvider,
   loadingProvider,
+  forceNaver = false,
 }: {
   onProvider: (p: OAuthProvider) => void;
   loadingProvider: OAuthProvider | null;
+  forceNaver?: boolean;
 }) {
   const allItems: {
     key: OAuthProvider;
@@ -110,7 +112,7 @@ function OAuthRow({
     },
   ];
   // 네이버 검수 재신청 중 — 통과 후 NEXT_PUBLIC_ENABLE_NAVER_LOGIN=true로 재노출.
-  const items = NAVER_LOGIN_ENABLED ? allItems : allItems.filter((it) => it.key !== "naver");
+  const items = NAVER_LOGIN_ENABLED || forceNaver ? allItems : allItems.filter((it) => it.key !== "naver");
 
   return (
     <div className="flex flex-col gap-2.5">
@@ -134,7 +136,7 @@ function OAuthRow({
 }
 
 /* ─── 소비자 로그인 폼 ────────────────────────── */
-function ConsumerAuthForm() {
+function ConsumerAuthForm({ hankwon = false }: { hankwon?: boolean }) {
   const searchParams = useSearchParams();
   const router = useRouter();
   // 복귀 URL — 코드베이스에 returnUrl/next/redirect 세 이름이 혼재하므로 모두 허용(2026-07-05 로그인 후 복귀 실패 수정)
@@ -498,7 +500,7 @@ function ConsumerAuthForm() {
       {error && <Alert kind="danger">{error}</Alert>}
       {message && <Alert kind="success">{message}</Alert>}
 
-      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} />
+      <OAuthRow onProvider={handleOAuth} loadingProvider={oauthLoading} forceNaver={hankwon} />
 
       <Divider>또는 이메일로</Divider>
 
@@ -884,6 +886,8 @@ function PrimaryButton({
 /* ─── 통합 인증 페이지 ─────────────────────── */
 function AuthContent() {
   const searchParams = useSearchParams();
+  const authReturnUrl = searchParams.get("returnUrl") || searchParams.get("next") || searchParams.get("redirect");
+  const hankwon = searchParams.get("client") === "hankwon" || sanitizeAuthReturnPath(authReturnUrl) === "/writing";
   const initialTab =
     searchParams.get("type") === "contractor" ? "contractor" : "consumer";
   const [activeTab, setActiveTab] = useState<"consumer" | "contractor">(initialTab);
@@ -892,12 +896,12 @@ function AuthContent() {
     <main className="min-h-screen bg-white font-kr text-[#0d0d0d]">
       <header className="absolute inset-x-0 top-0 z-20 pt-safe">
         <div className="flex h-16 items-center justify-between px-5 sm:px-8 lg:h-20 lg:px-10">
-          <Link href="/" className="flex items-center gap-2.5" aria-label="InPick 홈">
-            <span className="hex-mask h-[22px] w-[22px] text-primary-500" />
-            <span className="font-en text-[21px] font-bold tracking-[-0.055em]">inpick</span>
+          <Link href={hankwon ? "/writing" : "/"} className="flex items-center gap-2.5" aria-label={hankwon ? "한권 홈" : "InPick 홈"}>
+            {hankwon ? <span className="grid h-[28px] w-[28px] place-items-center rounded-lg bg-[#2d6cff] font-serif text-sm font-bold text-white">한</span> : <span className="hex-mask h-[22px] w-[22px] text-primary-500" />}
+            <span className={hankwon ? "font-kr text-[21px] font-bold tracking-[-0.055em]" : "font-en text-[21px] font-bold tracking-[-0.055em]"}>{hankwon ? "한권" : "inpick"}</span>
           </Link>
-          <Link href="/" className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
-            메인으로 <ArrowUpRight className="h-4 w-4" />
+          <Link href={hankwon ? "/writing" : "/"} className="hidden items-center gap-1.5 text-[13px] font-medium text-black/55 transition hover:text-black sm:inline-flex">
+            {hankwon ? "한권으로" : "메인으로"} <ArrowUpRight className="h-4 w-4" />
           </Link>
         </div>
       </header>
@@ -930,19 +934,21 @@ function AuthContent() {
           <div className="w-full max-w-[430px]">
             <div className="mb-7">
               <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/35">
-                {activeTab === "consumer" ? "Welcome to InPick" : "InPick for business"}
+                {hankwon ? "WELCOME TO HANKWON" : activeTab === "consumer" ? "Welcome to InPick" : "InPick for business"}
               </p>
               <h2 className="mt-2 break-keep text-[28px] font-medium tracking-[-0.055em] sm:text-[34px]">
-                {activeTab === "consumer" ? "다시 만나서 반가워요." : "인픽과 함께 사업을 시작하세요."}
+                {hankwon ? "내 이야기를 이어서 써볼까요?" : activeTab === "consumer" ? "다시 만나서 반가워요." : "인픽과 함께 사업을 시작하세요."}
               </h2>
               <p className="mt-3 text-[13px] leading-6 text-black/48">
-                {activeTab === "consumer"
+                {hankwon
+                  ? "Google·카카오·네이버·Apple 또는 이메일로 로그인하면 한권 내 서재가 계정별로 안전하게 연결됩니다."
+                  : activeTab === "consumer"
                   ? "로그인하고 저장된 디자인과 견적을 이어서 확인하세요."
                   : "소셜 계정으로 로그인하고 사업자 정보를 등록해 입찰·매칭을 시작하세요."}
               </p>
             </div>
 
-            <div className="mb-6 flex gap-2">
+            {!hankwon && <div className="mb-6 flex gap-2">
               <TabButton
                 active={activeTab === "consumer"}
                 onClick={() => setActiveTab("consumer")}
@@ -957,9 +963,9 @@ function AuthContent() {
                 title="사업자"
                 sub="입찰·매칭"
               />
-            </div>
+            </div>}
 
-            <div>{activeTab === "consumer" ? <ConsumerAuthForm /> : <ContractorAuthForm />}</div>
+            <div>{hankwon || activeTab === "consumer" ? <ConsumerAuthForm hankwon={hankwon} /> : <ContractorAuthForm />}</div>
 
             <p className="mt-7 border-t border-black/[0.07] pt-5 text-center text-[10px] leading-5 text-black/35">
               로그인 시{" "}

@@ -30,7 +30,7 @@ export default function WritingPage() {
         "writing-session-bridge",
       );
       if (!session?.access_token || !session.refresh_token) {
-        window.location.replace("/auth?type=consumer&returnUrl=%2Fwriting&source=protected_route");
+        window.location.replace("/auth?type=consumer&returnUrl=%2Fwriting&client=hankwon&source=protected_route");
         return;
       }
       frameRef.current?.contentWindow?.postMessage(
@@ -51,6 +51,19 @@ export default function WritingPage() {
     }
   }, [supabase, writingOrigin]);
 
+  const signOut = useCallback(async () => {
+    setBridgeState("connecting");
+    try {
+      await withAuthTimeout(
+        supabase.auth.signOut(),
+        AUTH_SESSION_RESTORE_TIMEOUT_MS,
+        "writing-sign-out",
+      );
+    } finally {
+      window.location.replace("/auth?type=consumer&returnUrl=%2Fwriting&client=hankwon&source=signed_out");
+    }
+  }, [supabase]);
+
   useEffect(() => {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== writingOrigin || event.source !== frameRef.current?.contentWindow) return;
@@ -68,6 +81,9 @@ export default function WritingPage() {
           window.location.assign(href);
         }
       }
+      if (event.data?.type === "hankwon:signout") {
+        void signOut();
+      }
     };
     window.addEventListener("message", onMessage);
     const {
@@ -79,7 +95,7 @@ export default function WritingPage() {
       window.removeEventListener("message", onMessage);
       subscription.unsubscribe();
     };
-  }, [sendSession, supabase, writingOrigin]);
+  }, [sendSession, signOut, supabase, writingOrigin]);
 
   return (
     <main className="relative h-[100dvh] min-h-[560px] overflow-hidden bg-[#fbfaf6]">
