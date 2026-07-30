@@ -35,7 +35,24 @@ export type SupabaseOAuthProvider = "google" | "kakao" | "apple";
  * - Supabase 대시보드 Auth → URL Configuration → Redirect URLs 에 이 값 등록 필요.
  * - Android: AndroidManifest intent-filter(scheme kr.inpick.app, host auth) / iOS: Info.plist CFBundleURLTypes
  */
-export const NATIVE_OAUTH_REDIRECT = "kr.inpick.app://auth/callback";
+export const INPICK_NATIVE_OAUTH_REDIRECT = "kr.inpick.app://auth/callback";
+export const HANKWON_NATIVE_OAUTH_REDIRECT = "kr.aiod.hankwon://auth/callback";
+
+/**
+ * 한권은 인픽과 같은 웹/Supabase 계정을 사용하지만 별도 앱이므로 고유 딥링크를 쓴다.
+ * 같은 커스텀 스킴을 두 앱이 함께 등록하면 iOS가 어느 앱을 열지 보장하지 않는다.
+ */
+export function isHankwonNativeRuntime(userAgent?: string): boolean {
+  const resolvedUserAgent =
+    userAgent ?? (typeof navigator !== "undefined" ? navigator.userAgent : "");
+  return /(?:^|\s)HankwonNative\//i.test(resolvedUserAgent);
+}
+
+export function getNativeOAuthRedirect(userAgent?: string): string {
+  return isHankwonNativeRuntime(userAgent)
+    ? HANKWON_NATIVE_OAUTH_REDIRECT
+    : INPICK_NATIVE_OAUTH_REDIRECT;
+}
 
 export async function startOAuth(
   supabase: SupabaseClient,
@@ -44,6 +61,7 @@ export async function startOAuth(
 ): Promise<{ error?: string }> {
   const platform = detectPlatform();
   const isNative = platform === "ios" || platform === "android";
+  const isHankwonNative = isNative && isHankwonNativeRuntime();
   const returnPath = getReturnPathFromOAuthRedirect(opts.redirectTo);
 
   if (typeof window !== "undefined") {
@@ -68,7 +86,11 @@ export async function startOAuth(
   // iOS 앱: 애플·구글은 SDK로 직접 로그인(웹뷰 X → Safari '주소 유효하지 않음' 에러 소멸).
   // Android는 AAB(versionCode 1, 2026-07-04)에 네이티브 로그인 플러그인이 없어
   // 딥링크 웹 OAuth(2026-07-02 실기 검증) 유지. 카카오는 양쪽 다 웹 OAuth.
-  if (platform === "ios" && (provider === "apple" || provider === "google")) {
+  if (
+    platform === "ios" &&
+    !isHankwonNative &&
+    (provider === "apple" || provider === "google")
+  ) {
     const { signInWithAppleNative, signInWithGoogleNative } = await import("./native-signin");
     const result =
       provider === "apple"
@@ -103,7 +125,7 @@ export async function startOAuth(
     options: {
       // 네이티브: 딥링크로 복귀(appUrlOpen 리스너가 처리) / 웹·PWA: 기존 콜백 URL
       redirectTo: isNative
-        ? NATIVE_OAUTH_REDIRECT
+        ? getNativeOAuthRedirect()
         : getWebOAuthCallbackUrl(opts.redirectTo),
       queryParams: opts.queryParams,
       // 네이티브: 자동 redirect 막고 우리가 외부 브라우저로 직접 오픈
