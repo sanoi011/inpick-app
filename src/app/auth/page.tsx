@@ -942,7 +942,7 @@ function AuthContent() {
               </h2>
               <p className="mt-3 text-[13px] leading-6 text-black/48">
                 {hankwon
-                  ? "Google·카카오·네이버·Apple 또는 이메일로 로그인하면 한권 내 서재가 계정별로 안전하게 연결됩니다."
+                  ? "Google·카카오·Apple 또는 이메일로 로그인하면 한권 내 서재가 계정별로 안전하게 연결됩니다."
                   : activeTab === "consumer"
                   ? "로그인하고 저장된 디자인과 견적을 이어서 확인하세요."
                   : "소셜 계정으로 로그인하고 사업자 정보를 등록해 입찰·매칭을 시작하세요."}
